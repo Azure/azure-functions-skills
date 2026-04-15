@@ -7,7 +7,7 @@ servers:
     description: "Template discovery and scaffolding for Azure Functions"
     type: stdio
     command: npx
-    args: ["-y", "azure-functions-templates-mcp-server"]
+    args: ["-y", "manvir-templates-mcp-server"]
 
   - id: azure
     name: "Azure MCP"
