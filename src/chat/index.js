@@ -21,7 +21,7 @@ export const LAUNCHERS = {
   'github-copilot': {
     command: 'copilot',
     buildArgs: (ctx) => {
-      const args = [];
+      const args = ['--agent', 'functions-guide'];
       if (ctx.startupPrompt) args.push('-i', ctx.startupPrompt);
       return args;
     },

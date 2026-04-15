@@ -58,8 +58,10 @@ describe('LAUNCHERS', () => {
     expect(LAUNCHERS['codex']).toBeTruthy();
   });
 
-  it('ghcp launcher uses copilot -i flag', () => {
+  it('ghcp launcher uses --agent and copilot -i flag', () => {
     const args = LAUNCHERS['github-copilot'].buildArgs({ startupPrompt: 'hello' });
+    expect(args).toContain('--agent');
+    expect(args).toContain('functions-guide');
     expect(args).toContain('-i');
     expect(args).toContain('hello');
   });
