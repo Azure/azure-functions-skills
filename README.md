@@ -100,6 +100,27 @@ const cliAgents = await detectCliAgents();
 const { childProcess, prompt } = await chat({ agent: 'claude-code', dir: '/path/to/project' });
 ```
 
+### Install without npm (Download zip)
+
+If you don't have Node.js or npm, download the plugin zip from [GitHub Releases](https://github.com/Azure/azure-functions-skills/releases):
+
+1. Download the zip for your AI assistant:
+   - `azure-functions-skills-ghcp-<version>.zip` — GitHub Copilot
+   - `azure-functions-skills-claude-<version>.zip` — Claude Code
+   - `azure-functions-skills-codex-<version>.zip` — Codex
+
+2. Extract into your project root:
+   ```bash
+   # Example: GitHub Copilot
+   cd /path/to/your/project
+   unzip azure-functions-skills-ghcp-0.5.0.zip
+
+   # PowerShell
+   Expand-Archive azure-functions-skills-ghcp-0.5.0.zip -DestinationPath .
+   ```
+
+3. Open your project in your IDE — the skills, hooks, and MCP config are picked up automatically.
+
 ## What You Get
 
 | Skill | Description |
