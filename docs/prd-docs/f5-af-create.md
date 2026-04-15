@@ -1,7 +1,7 @@
 # F5: af-create — Project Scaffolding
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 5.1, 6, 8  
+**Draft Spec Section:** 5.1, 6, 8  
 **Depends on:** F1 (Skill Graph Metadata), F3 (af-setup recommended first)
 
 ## Problem
@@ -139,39 +139,39 @@ When Core Tools is not available, `af-create` generates files directly using emb
 
 ## Adding Functions to Existing Projects
 
-`af-create` は新規プロジェクトだけでなく、**既存プロジェクトへの関数追加**もサポートする（func-emulate `fnx-create-function` スキルから採用）。
+`af-create` supports not only new projects but also **adding functions to existing projects** (adopted from the func-emulate `fnx-create-function` skill).
 
 ### Detection Logic
 
 ```
 host.json exists?
-├── Yes → 既存プロジェクト → 関数追加モード
-│   ├── MCP ツール利用可能? → MCP 経由でテンプレート取得 (F19)
-│   └── MCP 不可? → func new or 埋め込みパターンで生成
-└── No → 新規プロジェクトモード (上記 Workflow)
+├── Yes → Existing project → Add function mode
+│   ├── MCP tools available? → Retrieve templates via MCP (F19)
+│   └── MCP unavailable? → Generate via func new or embedded patterns
+└── No → New project mode (Workflow above)
 ```
 
 ### MCP Tool Integration (F19)
 
-Templates MCP サーバーが設定されている場合、`af-create` は MCP ツールを活用する:
+When the Templates MCP server is configured, `af-create` leverages MCP tools:
 
-| MCP Tool | 用途 |
-|----------|------|
-| `get_languages_list` | サポート言語一覧の取得 |
-| `get_templates_list` | 指定言語のテンプレート一覧 |
-| `get_template` | テンプレートの完全なソースコード + 必要な app settings |
-| `get_project_template` | プロジェクト初期化ファイル一式 |
+| MCP Tool | Purpose |
+|----------|---------|
+| `get_languages_list` | Retrieve list of supported languages |
+| `get_templates_list` | List templates for a given language |
+| `get_template` | Get full template source code + required app settings |
+| `get_project_template` | Get complete project initialization files |
 
-### Fallback (MCP なし)
+### Fallback (without MCP)
 
-MCP が利用できない場合:
+When MCP is not available:
 
-1. `func new` コマンドが利用可能なら `func new --name <name> --template <template>` を実行
-2. `func` も利用不可なら、スキル内蔵のテンプレートパターンから生成
+1. If `func new` command is available, run `func new --name <name> --template <template>`
+2. If `func` is also unavailable, generate from embedded template patterns within the skill
 
 ### Available Templates
 
-主要トリガーのサポート状況:
+Support status for major triggers:
 
 | Trigger | Node.js | Python | .NET Isolated | Java |
 |---------|---------|--------|---------------|------|
@@ -186,7 +186,7 @@ MCP が利用できない場合:
 
 ### Post-Add Behavior
 
-関数追加後も graph metadata に基づく次ステップ提案を行う:
+After adding a function, next-step suggestions based on graph metadata are provided:
 
 - "Function added. Run `func start` to test locally."
 - "Consider adding tests for the new function."

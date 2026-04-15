@@ -1,7 +1,7 @@
 # F13: post-task-suggester Hook
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 5.3  
+**Draft Spec Section:** 5.3  
 **Depends on:** F1 (Skill Graph Metadata), F14 (Build System)
 
 ## Problem

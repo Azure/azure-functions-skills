@@ -1,7 +1,7 @@
 # F9: Language Skills (af-python, af-node, af-dotnet)
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 4.2, 6  
+**Draft Spec Section:** 4.2, 6  
 **Depends on:** F1 (Skill Graph Metadata)
 
 ## Problem

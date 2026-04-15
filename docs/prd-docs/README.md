@@ -1,6 +1,6 @@
 # Feature Requirement Documents (FRDs)
 
-Individual feature specs broken out from the [仮スペック](../../../仮スペック.md). Each FRD is self-contained and can be implemented independently.
+Individual feature specs broken out from the Draft Spec. Each FRD is self-contained and can be implemented independently.
 
 ## Vision
 
@@ -101,9 +101,9 @@ af-audit
   → af-doctor (if critical issues)
 ```
 
-## Relationship to 仮スペック
+## Relationship to Draft Spec
 
-The 仮スペック defines the overall vision: a workflow-aware plugin source repo with directed skill graphs. These FRDs break the implementation into shippable units. F1 (Skill Graph Metadata) is the foundation — all other features depend on or extend it.
+The Draft Spec defines the overall vision: a workflow-aware plugin source repo with directed skill graphs. These FRDs break the implementation into shippable units. F1 (Skill Graph Metadata) is the foundation — all other features depend on or extend it.
 
 ## Review Findings (from func-emulate)
 

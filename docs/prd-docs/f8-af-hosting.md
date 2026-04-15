@@ -1,7 +1,7 @@
 # F8: af-hosting — Hosting Plan Guidance
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 4.2, 6, 8  
+**Draft Spec Section:** 4.2, 6, 8  
 **Depends on:** F1 (Skill Graph Metadata)
 
 ## Problem

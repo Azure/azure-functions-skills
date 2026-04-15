@@ -1,38 +1,38 @@
 # F17: af-migrate — Programming Model Migration
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** N/A (func-emulate F21 migrate から発見)  
+**Draft Spec Section:** N/A (discovered from func-emulate F21 migrate)  
 **Depends on:** F1 (Skill Graph Metadata), F4 (af-discovery)
 
 ## Problem
 
-Azure Functions の各言語は新しいプログラミングモデルに移行している:
+Each Azure Functions language is transitioning to a new programming model:
 
-| 言語 | レガシーモデル | 現行モデル | 変更規模 |
-|------|-------------|-----------|---------|
+| Language | Legacy Model | Current Model | Change Scope |
+|----------|-------------|-----------|---------|
 | Node.js | v3 (`function.json` + `index.js`) | v4 (code-first `app.http()`) | Medium |
 | Python | v1 (`function.json` + `__init__.py`) | v2 (decorator `@app.route()`) | Medium |
 | .NET | In-Process | Isolated Worker | High |
 
-数千の既存アプリがレガシーモデルで稼働しており、移行ガイドは Microsoft Learn に存在するが、**実際の変換作業は手作業で全ファイルに触る必要がある**。開発者はどこから始めればいいかわからず、移行中に壊れるリスクを恐れて先延ばしにする。
+Thousands of existing apps run on legacy models. Migration guides exist on Microsoft Learn, but **the actual conversion work requires manually touching every file**. Developers don't know where to start, and fear of breaking things during migration causes them to postpone.
 
-AI コーディングエージェントはこの種の構造化された変換に最適だが、Functions 固有の移行パターンを知らないと正しい変換ができない。
+AI coding agents are ideal for this kind of structured transformation, but they can't produce correct conversions without knowing Functions-specific migration patterns.
 
 ## Feature
 
-`af-migrate` はレガシー Azure Functions プログラミングモデルを検出し、現行モデルへの移行をガイドする。確定的な変換パターンの指示と、複雑なケースでの判断支援を提供する。
+`af-migrate` detects legacy Azure Functions programming models and guides migration to the current model. It provides deterministic conversion pattern instructions and decision support for complex cases.
 
 ## Supported Migration Paths
 
 ### Node.js v3 → v4
 
-| 変更点 | Before (v3) | After (v4) |
+| Change | Before (v3) | After (v4) |
 |--------|-------------|------------|
-| 関数定義 | `function.json` + `index.js` | `app.http()` で code-first 登録 |
-| パッケージ | `@azure/functions` 3.x | `@azure/functions` 4.x |
-| ディレクトリ | `<functionName>/function.json` + `<functionName>/index.js` | `src/functions/<name>.js` (フラット) |
+| Function definition | `function.json` + `index.js` | Code-first registration with `app.http()` |
+| Package | `@azure/functions` 3.x | `@azure/functions` 4.x |
+| Directory | `<functionName>/function.json` + `<functionName>/index.js` | `src/functions/<name>.js` (flat) |
 | Extension Bundle | v3 | v4 |
-| エントリポイント | `scriptFile` in function.json | `main` in package.json |
+| Entry point | `scriptFile` in function.json | `main` in package.json |
 
 ```javascript
 // Before: HttpTrigger/index.js + HttpTrigger/function.json
@@ -53,12 +53,12 @@ app.http('httpTrigger', {
 
 ### Python v1 → v2
 
-| 変更点 | Before (v1) | After (v2) |
+| Change | Before (v1) | After (v2) |
 |--------|-------------|------------|
-| 関数定義 | `function.json` + `__init__.py` | `@app.route()` デコレータ |
-| エントリ | 分散された `__init__.py` | 単一 `function_app.py` |
-| ディレクトリ | `<functionName>/function.json` + `<functionName>/__init__.py` | フラット |
-| 設定 | `AzureWebJobsFeatureFlags` 不要 | `EnableWorkerIndexing` 必須 |
+| Function definition | `function.json` + `__init__.py` | `@app.route()` decorator |
+| Entry point | Distributed `__init__.py` files | Single `function_app.py` |
+| Directory | `<functionName>/function.json` + `<functionName>/__init__.py` | Flat |
+| Config | `AzureWebJobsFeatureFlags` not required | `EnableWorkerIndexing` required |
 
 ```python
 # Before: HttpTrigger/__init__.py + HttpTrigger/function.json
@@ -77,12 +77,12 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
 
 ### .NET In-Process → Isolated Worker
 
-| 変更点 | Before (In-Process) | After (Isolated) |
+| Change | Before (In-Process) | After (Isolated) |
 |--------|---------------------|-------------------|
-| ホスティング | Functions ホスト内で実行 | 別プロセスで実行 |
+| Hosting | Runs inside the Functions host | Runs in a separate process |
 | NuGet | `Microsoft.NET.Sdk.Functions` | `Microsoft.Azure.Functions.Worker` |
-| スタートアップ | `Startup.cs` + `IFunctionsHostBuilder` | `Program.cs` + `HostBuilder` |
-| Binding 属性 | `Microsoft.Azure.WebJobs` 名前空間 | `Microsoft.Azure.Functions.Worker` 名前空間 |
+| Startup | `Startup.cs` + `IFunctionsHostBuilder` | `Program.cs` + `HostBuilder` |
+| Binding attributes | `Microsoft.Azure.WebJobs` namespace | `Microsoft.Azure.Functions.Worker` namespace |
 | DI | `IFunctionsHostBuilder.Services` | `HostBuilder.ConfigureServices` |
 
 ## Migration Workflow
@@ -106,8 +106,8 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
    → Update entry point configuration
 
 4. Validate
-   → func start を実行して関数が登録されることを確認
-   → 既存テストが通ることを確認
+   → Run func start and confirm functions are registered
+   → Confirm existing tests pass
 
 5. Post-migration suggestions (from graph)
    → "Migration complete. Run af-doctor to verify project health."
@@ -148,32 +148,32 @@ entry_conditions:
 
 ## Incremental Migration
 
-全関数を一括移行する必要はない。Node.js v4 は v3 パターンとの共存をサポートするため、`--function <name>` で1関数ずつ移行可能:
+It's not necessary to migrate all functions at once. Node.js v4 supports coexistence with v3 patterns, so you can migrate one function at a time with `--function <name>`:
 
 ```
-Step 1: 1つの HTTP 関数を移行してパターンを確認
-Step 2: 残りの HTTP 関数を移行
-Step 3: Non-HTTP 関数（Timer, Queue 等）を移行
-Step 4: function.json ファイルを削除、ディレクトリ構造をフラット化
+Step 1: Migrate one HTTP function to verify the pattern
+Step 2: Migrate the remaining HTTP functions
+Step 3: Migrate non-HTTP functions (Timer, Queue, etc.)
+Step 4: Delete function.json files and flatten the directory structure
 ```
 
 ## Migration Checklist
 
-各移行で確認すべき共通項目:
+Common items to verify for each migration:
 
-- [ ] パッケージ依存関係を更新
-- [ ] `host.json` の Extension Bundle バージョンを更新
-- [ ] すべての `function.json` を code-first に変換
-- [ ] エントリポイント設定を更新 (`main` in package.json / `function_app.py`)
-- [ ] `func start` で全関数が登録されることを確認
-- [ ] HTTP エンドポイントが応答することを確認
-- [ ] 既存テストが通ることを確認
-- [ ] 不要な `function.json` ファイルと古いディレクトリを削除
+- [ ] Update package dependencies
+- [ ] Update Extension Bundle version in `host.json`
+- [ ] Convert all `function.json` files to code-first
+- [ ] Update entry point configuration (`main` in package.json / `function_app.py`)
+- [ ] Confirm all functions are registered with `func start`
+- [ ] Confirm HTTP endpoints respond correctly
+- [ ] Confirm existing tests pass
+- [ ] Delete unnecessary `function.json` files and old directories
 
 ## Reference Documentation
 
-| 移行パス | Microsoft Learn URL |
-|---------|-------------------|
+| Migration Path | Microsoft Learn URL |
+|---------------|-------------------|
 | Node.js v3 → v4 | https://learn.microsoft.com/azure/azure-functions/functions-node-upgrade-v4 |
 | Python v1 → v2 | https://learn.microsoft.com/azure/azure-functions/functions-reference-python?pivots=python-mode-decorators#upgrade-to-v2 |
 | .NET In-Process → Isolated | https://learn.microsoft.com/azure/azure-functions/migrate-dotnet-to-isolated-model |

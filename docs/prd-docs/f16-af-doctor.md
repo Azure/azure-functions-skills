@@ -1,51 +1,51 @@
 # F16: af-doctor — Project Diagnostics
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** N/A (func-emulate F18 + fnx-diagnostics から発見)  
+**Draft Spec Section:** N/A (discovered from func-emulate F18 + fnx-diagnostics)  
 **Depends on:** F1 (Skill Graph Metadata), F3 (af-setup)
 
 ## Problem
 
-`af-setup` (F3) は初回の環境チェック（Azure CLI, Core Tools, ランタイムの存在確認）を担うが、**開発中に `func start` が失敗した時の診断**は全く別の責務である。
+`af-setup` (F3) handles initial environment checks (verifying the presence of Azure CLI, Core Tools, and runtimes), but **diagnosing `func start` failures during development** is an entirely different responsibility.
 
-`func start` の失敗原因は多岐にわたる:
+`func start` failures have many possible causes:
 
-- `host.json` の構文エラーや不正なバージョン指定
-- `local.settings.json` の欠落や不正な JSON
-- ポート 7071 が既に使用中
-- ランタイムバージョンの不一致（Python 3.8 で v2 model を使おうとする等）
-- Extension Bundle のダウンロード失敗
-- Azurite/ストレージエミュレータが未起動（Blob/Queue トリガー使用時）
-- Worker ランタイムの設定不足（`FUNCTIONS_WORKER_RUNTIME` 未設定）
-- `.NET` in-process プロジェクトの誤検知
+- Syntax errors or invalid version specification in `host.json`
+- Missing `local.settings.json` or invalid JSON
+- Port 7071 already in use
+- Runtime version mismatch (e.g., trying to use v2 model with Python 3.8)
+- Extension Bundle download failure
+- Azurite/storage emulator not running (when using Blob/Queue triggers)
+- Missing worker runtime configuration (`FUNCTIONS_WORKER_RUNTIME` not set)
+- `.NET` in-process project misdetection
 
-開発者はこれらを手動で1つずつ調査するしかなく、初心者ほど原因特定に時間がかかる。
+Developers have no choice but to investigate these one by one manually, and beginners spend the most time identifying root causes.
 
 ## Feature
 
-`af-doctor` は、Azure Functions プロジェクトの健全性を構造化された 8 カテゴリでチェックし、各問題に対してアクション可能な修正提案を返す診断スキル。
+`af-doctor` is a diagnostic skill that checks Azure Functions project health across 8 structured categories and returns actionable fix suggestions for each issue.
 
-`af-setup` との違い:
+Difference from `af-setup`:
 
-| 観点 | af-setup (F3) | af-doctor (F16) |
-|------|-------------|----------------|
-| **タイミング** | 開発開始前（初回セットアップ） | 問題発生時（開発中） |
-| **対象** | グローバルツールの存在確認 | プロジェクト固有の設定・状態 |
-| **出力** | "環境 Ready / Not Ready" | "8 カテゴリ × Pass/Warn/Fail + 修正手順" |
-| **繰り返し** | 1回やれば十分 | 問題のたびに実行 |
+| Aspect | af-setup (F3) | af-doctor (F16) |
+|--------|-------------|----------------|
+| **Timing** | Before development begins (initial setup) | When issues occur (during development) |
+| **Target** | Verify presence of global tools | Project-specific config and state |
+| **Output** | "Environment Ready / Not Ready" | "8 categories × Pass/Warn/Fail + fix instructions" |
+| **Repetition** | Run once is sufficient | Run whenever issues arise |
 
 ## Diagnostic Checks
 
-| # | カテゴリ | Pass | Warn | Fail |
+| # | Category | Pass | Warn | Fail |
 |---|---------|------|------|------|
-| 1 | `host.json` | 存在し、`version: "2.0"` | 不正なバージョン | 欠落 or JSON パースエラー |
-| 2 | `local.settings.json` | 存在し、有効な JSON | 欠落（一部動作可） | JSON パースエラー |
-| 3 | Worker ランタイム | `FUNCTIONS_WORKER_RUNTIME` 設定済み | — | 未設定 or 不正な値 |
-| 4 | ランタイムバージョン | インストール済み、Functions サポート範囲内 | EOL 間近のバージョン | 未インストール or サポート外 |
-| 5 | Extension Bundle | `host.json` に設定あり、ダウンロード済み | 古いバージョン範囲 | ダウンロード失敗、範囲不正 |
-| 6 | ポート可用性 | 7071 が使用可能 | — | ポート使用中 |
-| 7 | Azurite / ストレージ | 起動中（Storage トリガー使用時のみ） | インストール済みだが未起動 | Storage トリガーあるのに未インストール |
-| 8 | セキュリティ | 秘密値が `local.settings.json` のみ | — | ソースコードや設定ファイルに秘密値検出 |
+| 1 | `host.json` | Exists with `version: "2.0"` | Invalid version | Missing or JSON parse error |
+| 2 | `local.settings.json` | Exists with valid JSON | Missing (partially functional) | JSON parse error |
+| 3 | Worker runtime | `FUNCTIONS_WORKER_RUNTIME` is set | — | Not set or invalid value |
+| 4 | Runtime version | Installed and within Functions support range | Version nearing EOL | Not installed or unsupported |
+| 5 | Extension Bundle | Configured in `host.json` and downloaded | Outdated version range | Download failed or invalid range |
+| 6 | Port availability | 7071 is available | — | Port in use |
+| 7 | Azurite / Storage | Running (only when Storage triggers are used) | Installed but not running | Not installed despite Storage triggers present |
+| 8 | Security | Secret values only in `local.settings.json` | — | Secret values detected in source code or config files |
 
 ## Output Format
 
@@ -86,10 +86,10 @@ Step 2: If func start fails, reproduce with verbose output
   → func start --verbose 2>&1
 
 Step 3: Parse error output for known patterns
-  → "WorkerConfig for runtime: X not found" → ランタイム設定問題
-  → "0 functions loaded" → Worker indexing 未有効化 (Python v2)
-  → "Port X in use" → ポート競合
-  → "No job functions found" → function 検出失敗
+  → "WorkerConfig for runtime: X not found" → Runtime config issue
+  → "0 functions loaded" → Worker indexing not enabled (Python v2)
+  → "Port X in use" → Port conflict
+  → "No job functions found" → Function detection failure
 
 Step 4: Read project config files for root cause
   → host.json, local.settings.json, package.json/requirements.txt/*.csproj
@@ -99,14 +99,14 @@ Step 5: Provide fix with exact command and docs link
 
 ## Common Error Patterns
 
-| エラーメッセージ | 原因 | 修正 |
-|----------------|------|------|
-| `No job functions found` | Worker indexing 未有効化 | `FUNCTIONS_WORKER_RUNTIME` を設定、Python v2 は `AzureWebJobsFeatureFlags=EnableWorkerIndexing` |
-| `WorkerConfig for runtime: X not found` | ランタイム未検出 or Core Tools 破損 | Core Tools 再インストール |
-| `Port 7071 is in use` | 別プロセスがポート使用中 | `func start --port 7080` or 前回のプロセスを kill |
-| `Extension bundle download failed` | ネットワーク問題 or CDN 障害 | `func start --offline` (キャッシュ済みなら) or ネットワーク確認 |
-| `Value cannot be null: AzureWebJobsStorage` | ストレージ接続文字列未設定 | `local.settings.json` に `"AzureWebJobsStorage": "UseDevelopmentStorage=true"` 追加 |
-| `The listener for function 'X' was unable to start` | バインディング接続エラー | 接続文字列を確認、Azurite/エミュレータ起動確認 |
+| Error Message | Cause | Fix |
+|--------------|-------|-----|
+| `No job functions found` | Worker indexing not enabled | Set `FUNCTIONS_WORKER_RUNTIME`; for Python v2, set `AzureWebJobsFeatureFlags=EnableWorkerIndexing` |
+| `WorkerConfig for runtime: X not found` | Runtime not detected or Core Tools corrupted | Reinstall Core Tools |
+| `Port 7071 is in use` | Another process is using the port | `func start --port 7080` or kill the previous process |
+| `Extension bundle download failed` | Network issue or CDN outage | `func start --offline` (if cached) or check network |
+| `Value cannot be null: AzureWebJobsStorage` | Storage connection string not set | Add `"AzureWebJobsStorage": "UseDevelopmentStorage=true"` to `local.settings.json` |
+| `The listener for function 'X' was unable to start` | Binding connection error | Verify connection strings; confirm Azurite/emulator is running |
 
 ## Skill Metadata
 

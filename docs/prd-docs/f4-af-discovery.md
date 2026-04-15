@@ -1,7 +1,7 @@
 # F4: af-discovery — Project Analysis
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 4.1, 6, 8  
+**Draft Spec Section:** 4.1, 6, 8  
 **Depends on:** F1 (Skill Graph Metadata)
 
 ## Problem

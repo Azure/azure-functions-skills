@@ -1,7 +1,7 @@
 # F6: af-deploy — Deployment
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 4.2, 6, 8  
+**Draft Spec Section:** 4.2, 6, 8  
 **Depends on:** F1 (Skill Graph Metadata), F5 (af-create recommended first)
 
 ## Problem

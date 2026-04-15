@@ -1,7 +1,7 @@
 # F2: af-help — Entry & Navigation
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 4.1, 5, 7.2  
+**Draft Spec Section:** 4.1, 5, 7.2  
 **Depends on:** F1 (Skill Graph Metadata)
 
 ## Problem

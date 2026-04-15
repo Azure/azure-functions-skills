@@ -1,7 +1,7 @@
 # F15: Distribution — Plugin Packaging
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 10, 11  
+**Draft Spec Section:** 10, 11  
 **Depends on:** F14 (Build System)
 
 ## Problem

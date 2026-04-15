@@ -1,7 +1,7 @@
 # F12: functions-guide Agent
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 5.2  
+**Draft Spec Section:** 5.2  
 **Depends on:** F1 (Skill Graph Metadata)
 
 ## Problem

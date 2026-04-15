@@ -1,35 +1,35 @@
 # F20: CLI & Library — Setup + Chat Commands
 
 **Status:** ✅ Implemented  
-**仮スペック Section:** N/A (func-emulate F20 `fnx setup` / `fnx chat` から発展)  
+**Draft Spec Section:** N/A (evolved from func-emulate F20 `fnx setup` / `fnx chat`)  
 **Depends on:** F14 (Build System)
 
 ## Problem
 
-スキル・エージェント・MCP・フックのファイルを手動でコピーするのは面倒で間違いやすい。また、CLI コーディングエージェント (GHCP CLI, Claude Code, Codex) を起動する際に、Azure Functions 固有のコンテキストやWelcome メッセージを自動的に渡す仕組みがない。
+Manually copying skill, agent, MCP, and hook files is tedious and error-prone. Additionally, when launching CLI coding agents (GHCP CLI, Claude Code, Codex), there's no mechanism to automatically pass Azure Functions-specific context or Welcome messages.
 
-VS Code Chat ウインドウでは `SessionStart` hook の `additionalContext` はモデルに注入されるだけでユーザーには見えない。CLI エージェントでは起動時にプロンプトを引数として渡すことで、Welcome メッセージをチャットに表示できる（func-emulate F20 で実証済み）。
+In VS Code Chat windows, the `SessionStart` hook's `additionalContext` is only injected into the model and not visible to the user. In CLI agents, a startup prompt can be passed as an argument, displaying the Welcome message in the chat (proven in func-emulate F20).
 
 ## Feature
 
-### npm パッケージ: `@agent-loom/azure-functions-skills`
+### npm package: `@agent-loom/azure-functions-skills`
 
-2つの使い方を提供:
+Provides two usage modes:
 
-#### 1. CLI ツール
+#### 1. CLI Tool
 
 ```bash
-# スキル・エージェント・MCP・フックをプロジェクトに配置
+# Place skills, agents, MCP, and hooks into a project
 npx @agent-loom/azure-functions-skills setup
 
-# CLI エージェントを Welcome 付きで起動
+# Launch a CLI agent with Welcome message
 npx @agent-loom/azure-functions-skills chat
 
-# プラグインアーティファクトをビルド
+# Build plugin artifacts
 npx @agent-loom/azure-functions-skills build
 ```
 
-#### 2. ライブラリ (VS Code Extension 等から利用)
+#### 2. Library (for use from VS Code Extensions, etc.)
 
 ```javascript
 // Setup API
@@ -43,17 +43,17 @@ const result = await chat({ agent: 'claude-code', dir: '/path/to/project' });
 
 ## Commands
 
-### `setup` — ワンコマンドインストール
+### `setup` — One-command install
 
 ```
 azure-functions-skills setup [--agent <name>] [--dir <path>]
 ```
 
-1. コーディングエージェントを検知（GHCP, Claude, Codex）
-2. ターゲットごとのファイルを生成・配置
-3. Welcome メッセージを表示
+1. Detect coding agents (GHCP, Claude, Codex)
+2. Generate and place target-specific files
+3. Display Welcome message
 
-**生成ファイル:**
+**Generated Files:**
 
 | Target | Files |
 |--------|-------|
@@ -61,18 +61,18 @@ azure-functions-skills setup [--agent <name>] [--dir <path>]
 | Claude | `CLAUDE.md`, `settings.json`, `skills/` |
 | Codex | `AGENTS.md`, `plugin.json`, `skills/`, `config.toml`, `hooks.json`, `marketplace.json` |
 
-### `chat` — エージェント起動 + Welcome プロンプト
+### `chat` — Agent launch + Welcome prompt
 
 ```
 azure-functions-skills chat [--agent <name>] [--prompt <text>] [--dir <path>]
 ```
 
-1. CLI エージェントを検知（`copilot`, `claude`, `codex`）
-2. プロジェクトを分析（host.json, 言語検知）
-3. startup-prompt.md をテンプレート展開
-4. エージェントを `spawn()` で起動し、プロンプトを引数として渡す
+1. Detect CLI agents (`copilot`, `claude`, `codex`)
+2. Analyze project (host.json, language detection)
+3. Expand startup-prompt.md template
+4. Launch agent via `spawn()` and pass prompt as argument
 
-**Startup Prompt テンプレート:**
+**Startup Prompt Template:**
 
 ```markdown
 ⚡ Azure Functions Skills
@@ -86,15 +86,15 @@ azure-functions-skills chat [--agent <name>] [--prompt <text>] [--dir <path>]
 💬 What would you like to build?
 ```
 
-**エージェントへの渡し方:**
+**Passing to agents:**
 
-| Agent | コマンド |
+| Agent | Command |
 |-------|---------|
 | GHCP CLI | `copilot -i "<prompt>"` |
 | Claude Code | `claude "<prompt>"` |
 | Codex | `codex "<prompt>"` |
 
-### `build` — プラグインアーティファクト生成
+### `build` — Plugin artifact generation
 
 ```
 azure-functions-skills build [--target <name>]
@@ -136,22 +136,22 @@ chat(options?: {
 LAUNCHERS: Record<string, { command: string, buildArgs: (ctx) => string[], description: string }>
 ```
 
-## Welcome メッセージの表示方法まとめ
+## Welcome Message Display Methods Summary
 
-| Surface | 方法 | Welcome 表示 |
-|---------|------|-------------|
-| CLI (`chat` コマンド) | 起動時プロンプト引数 | ✅ チャットに表示される |
-| VS Code Chat | `SessionStart` hook `additionalContext` | ⚠️ モデルに注入のみ（ユーザーには見えない）|
-| VS Code Chat (代替) | `copilot-instructions.md` に「最初の応答で Welcome を返せ」と指示 | ⚠️ AI の判断次第 |
-| VS Code Chat (代替) | `systemMessage` で警告バナー | ⚠️ バナーとして表示（チャットメッセージではない）|
+| Surface | Method | Welcome Display |
+|---------|--------|----------------|
+| CLI (`chat` command) | Startup prompt argument | ✅ Displayed in chat |
+| VS Code Chat | `SessionStart` hook `additionalContext` | ⚠️ Injected into model only (not visible to user) |
+| VS Code Chat (alt) | Instruct in `copilot-instructions.md` to "return Welcome on first response" | ⚠️ At the AI's discretion |
+| VS Code Chat (alt) | Warning banner via `systemMessage` | ⚠️ Displayed as banner (not a chat message) |
 
 ## Cross-Target Implementation
 
-すべてのコマンドは Node.js ESM で実装。依存関係ゼロ（Node.js 18+ 標準 API のみ）。
+All commands are implemented in Node.js ESM. Zero dependencies (Node.js 18+ standard APIs only).
 
-| 用途 | import |
-|------|--------|
+| Use | Import |
+|-----|--------|
 | CLI | `npx @agent-loom/azure-functions-skills <command>` |
 | Library (setup) | `import { applySetup } from '@agent-loom/azure-functions-skills'` |
 | Library (chat) | `import { chat } from '@agent-loom/azure-functions-skills/chat'` |
-| VS Code Extension | Library API を呼び出し |
+| VS Code Extension | Call Library API |

@@ -1,7 +1,7 @@
 # F1: Skill Graph Metadata
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 2, 3  
+**Draft Spec Section:** 2, 3  
 **Depends on:** None (foundation)
 
 ## Problem

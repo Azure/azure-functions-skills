@@ -1,63 +1,63 @@
 # F18: af-audit — Project Audit & Static Analysis
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** N/A (func-emulate F21 audit から発見)  
+**Draft Spec Section:** N/A (discovered from func-emulate F21 audit)  
 **Depends on:** F1 (Skill Graph Metadata)
 
 ## Problem
 
-Azure Functions アプリは時間とともに問題を蓄積する:
+Azure Functions apps accumulate problems over time:
 
-- `authLevel: 'anonymous'` が本番 HTTP エンドポイントに残る
-- ハードコードされた秘密値がソースコードに混入
-- 非推奨の Extension Bundle バージョンを使い続ける
-- ターゲット SKU でサポートされない機能を使う（例: Flex Consumption で Durable Timer）
-- ログ設定が欠落し、本番障害時にテレメトリがない
+- `authLevel: 'anonymous'` left on production HTTP endpoints
+- Hardcoded secrets leak into source code
+- Continued use of deprecated Extension Bundle versions
+- Using features not supported on the target SKU (e.g., Durable Timer on Flex Consumption)
+- Missing logging configuration, leaving no telemetry during production incidents
 
-汎用リンターはこれらの **Functions 固有の問題**を検出できない。`af-observability` (F7) は本番モニタリングの設定を扱うが、`af-audit` はデプロイ前の**静的チェック**を扱う — レイヤーが異なる。
+Generic linters cannot detect these **Functions-specific issues**. `af-observability` (F7) handles production monitoring setup, while `af-audit` handles pre-deployment **static checks** — they operate at different layers.
 
 ## Feature
 
-`af-audit` は Azure Functions プロジェクトに対して Functions ドメイン固有の静的解析を行い、セキュリティ、SKU 互換性、パフォーマンス、ベストプラクティスの問題を検出する。
+`af-audit` performs Functions domain-specific static analysis on Azure Functions projects, detecting security, SKU compatibility, performance, and best practice issues.
 
 ## Rule Categories
 
-| カテゴリ | プレフィックス | 対象 |
-|---------|-------------|------|
-| **Security** | `SEC-` | Auth level, 秘密値漏洩, CORS 設定 |
-| **SKU Compatibility** | `SKU-` | ターゲット SKU でサポートされない機能 |
-| **Performance** | `PERF-` | 同期 I/O, 無制限並行性, 大きなペイロード |
-| **Configuration** | `CFG-` | 不足 app settings, 不正なバインディング式 |
-| **Deprecation** | `DEP-` | 非推奨バインディング, EOL ランタイム, 古い Extension Bundle |
-| **Best Practice** | `BP-` | App Insights 未設定, テストファイル不足 |
+| Category | Prefix | Target |
+|---------|--------|--------|
+| **Security** | `SEC-` | Auth level, secret leaks, CORS configuration |
+| **SKU Compatibility** | `SKU-` | Features not supported on the target SKU |
+| **Performance** | `PERF-` | Synchronous I/O, unbounded concurrency, large payloads |
+| **Configuration** | `CFG-` | Missing app settings, invalid binding expressions |
+| **Deprecation** | `DEP-` | Deprecated bindings, EOL runtimes, old Extension Bundles |
+| **Best Practice** | `BP-` | App Insights not configured, missing test files |
 
 ## Rule Examples
 
 ### Security Rules
 
-| ID | ルール | レベル | 自動修正 |
-|----|-------|--------|---------|
-| SEC-001 | HTTP 関数の `authLevel` が `anonymous` | Error | ⚠️ 手動確認要 |
-| SEC-002 | ソースコードに接続文字列パターン検出 | Error | ❌ |
-| SEC-003 | `local.settings.json` が `.gitignore` に含まれていない | Error | ✅ `.gitignore` に追加 |
-| SEC-004 | CORS が `*` に設定 | Warning | ❌ |
+| ID | Rule | Level | Auto-fix |
+|----|------|-------|----------|
+| SEC-001 | HTTP function `authLevel` is `anonymous` | Error | ⚠️ Manual review required |
+| SEC-002 | Connection string pattern detected in source code | Error | ❌ |
+| SEC-003 | `local.settings.json` not included in `.gitignore` | Error | ✅ Add to `.gitignore` |
+| SEC-004 | CORS set to `*` | Warning | ❌ |
 
 ### SKU Compatibility Rules
 
-| ID | ルール | レベル | 対象 SKU |
-|----|-------|--------|---------|
-| SKU-001 | Durable Functions Timer は Flex Consumption 非対応 | Error | Flex |
-| SKU-002 | 実行タイムアウトが SKU 上限を超過 | Error | Consumption (5/10min) |
-| SKU-003 | VNET 統合が必要だが Consumption プラン | Warning | Consumption |
-| SKU-004 | カスタムコンテナが必要だが非対応 SKU | Error | Flex, Consumption |
+| ID | Rule | Level | Target SKU |
+|----|------|-------|-----------|
+| SKU-001 | Durable Functions Timer not supported on Flex Consumption | Error | Flex |
+| SKU-002 | Execution timeout exceeds SKU limit | Error | Consumption (5/10min) |
+| SKU-003 | VNET integration required but on Consumption plan | Warning | Consumption |
+| SKU-004 | Custom container required but on unsupported SKU | Error | Flex, Consumption |
 
 ### Performance Rules
 
-| ID | ルール | レベル | 自動修正 |
-|----|-------|--------|---------|
-| PERF-001 | async 関数内で同期ファイル I/O | Warning | ✅ `fs.promises` に変換 |
-| PERF-002 | HTTP レスポンスにストリーミング未使用で大ペイロード | Info | ❌ |
-| PERF-003 | Connection pooling 未使用（DB クライアント毎回生成） | Warning | ❌ |
+| ID | Rule | Level | Auto-fix |
+|----|------|-------|----------|
+| PERF-001 | Synchronous file I/O inside async function | Warning | ✅ Convert to `fs.promises` |
+| PERF-002 | Large payload without HTTP response streaming | Info | ❌ |
+| PERF-003 | No connection pooling (DB client created each time) | Warning | ❌ |
 
 ## Output Format
 
@@ -127,51 +127,51 @@ entry_conditions:
 
 ## SKU Detection for Rules
 
-ターゲット SKU の検出順序:
+Target SKU detection order:
 
-1. `app-config.yaml` → `local.targetSku` (fnx 形式)
-2. `local.settings.json` → SKU ヒント
-3. Azure リソース metadata（`.azure/` ディレクトリ）
-4. ユーザーに聞く（検出できない場合）
-5. デフォルト: 全 SKU 共通ルールのみ適用
+1. `app-config.yaml` → `local.targetSku` (fnx format)
+2. `local.settings.json` → SKU hint
+3. Azure resource metadata (`.azure/` directory)
+4. Ask the user (if detection fails)
+5. Default: apply only rules common across all SKUs
 
 ## CI Integration
 
-`af-audit` は CI パイプラインで使用可能:
+`af-audit` can be used in CI pipelines:
 
 ```yaml
 # GitHub Actions example
 - name: Azure Functions Audit
   run: |
-    # AI agent が af-audit を実行し、SARIF 形式で出力
-    # GitHub Code Scanning と統合
+    # AI agent runs af-audit and outputs in SARIF format
+    # Integrates with GitHub Code Scanning
 ```
 
-出力フォーマット: `text` (デフォルト), `json`, `sarif` (GitHub Code Scanning 対応)
+Output formats: `text` (default), `json`, `sarif` (GitHub Code Scanning compatible)
 
 ## Relationship to Other Skills
 
 ```
 af-audit (F18)                     af-observability (F7)
 ──────────────                     ────────────────────
-デプロイ前の静的チェック             デプロイ後の本番モニタリング
+Pre-deployment static checks        Post-deployment production monitoring
 
-  ソースコード解析                    Application Insights 設定
-  設定ファイル検証                    ログレベル設定
-  SKU 互換性チェック                  アラートルール設定
-  セキュリティパターン検出             Kusto クエリテンプレート
+  Source code analysis                Application Insights configuration
+  Configuration file validation      Log level configuration
+  SKU compatibility checks            Alert rule configuration
+  Security pattern detection          Kusto query templates
 
-タイミング: func start 前           タイミング: デプロイ後
+Timing: Before func start           Timing: After deployment
 ```
 
 ```
 af-audit (F18)                     af-doctor (F16)
 ──────────────                     ───────────────
-品質・互換性の静的解析               プロジェクト健全性の動的診断
+Static analysis for quality/compat   Dynamic diagnostics for project health
 
-  "このコードに問題はないか？"         "なぜ func start が失敗するのか？"
-  コード・設定のパターンマッチ         ランタイム状態のチェック
-  SKU 制約違反                       ポート競合、Azurite 状態
+  "Are there problems in this code?"   "Why is func start failing?"
+  Pattern matching on code & config    Runtime state checks
+  SKU constraint violations            Port conflicts, Azurite state
 ```
 
 ## Cross-Target Implementation

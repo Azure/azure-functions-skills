@@ -1,7 +1,7 @@
 # F14: Build System — Cross-Target Generation
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 9  
+**Draft Spec Section:** 9  
 **Depends on:** F1 (Skill Graph Metadata)
 
 ## Problem
@@ -155,12 +155,12 @@ npm run build -- --watch
 
 ## Agent Path Mapping (Manifest)
 
-func-emulate の `default.yaml` マニフェスト設計を採用。10+ のコーディングエージェントへの配布パスを宣言的に管理する。
+Adopts the `default.yaml` manifest design from func-emulate. Declaratively manages distribution paths to 10+ coding agents.
 
 ```yaml
-# agent-paths.yaml — ビルドシステムが参照するパスマッピング
+# agent-paths.yaml — Path mapping referenced by the build system
 agentPaths:
-  # .agents/skills/ を共有するエージェント群
+  # Agents that share .agents/skills/
   shared:
     projectSkills: ".agents/skills"
     agents:
@@ -172,7 +172,7 @@ agentPaths:
       - opencode
       - amp
 
-  # エージェント固有のパス
+  # Agent-specific paths
   custom:
     claude-code:
       projectSkills: ".claude/skills"
@@ -194,21 +194,21 @@ agentPaths:
       mcp: "~/.codeium/windsurf/mcp_config.json"    # global only
 ```
 
-ビルドシステムはこのマッピングを使い、各ターゲットの正しいパスにスキル・指示・MCP 設定を配置する。
+The build system uses this mapping to place skills, instructions, and MCP configs at the correct paths for each target.
 
 ## MCP Configuration Generation
 
-ビルドシステムは MCP 設定ファイルもターゲットごとに生成する (F19 参照):
+The build system also generates MCP config files per target (see F19):
 
-| ターゲット | 出力ファイル | フォーマット |
-|-----------|------------|------------|
+| Target | Output File | Format |
+|--------|------------|--------|
 | GHCP | `.vscode/mcp.json` | `{ "servers": { ... } }` |
 | Claude Code | `.claude/settings.json` | `{ "mcpServers": { ... } }` |
 | Cursor | `.cursor/mcp.json` | `{ "mcpServers": { ... } }` |
 
 ## Response Language Rule Injection
 
-func-emulate の全スキルは `> **Language**: Always respond in the same language the user is using.` を含む。ビルドシステムはこのルールを全スキルの出力に自動注入する:
+All skills in func-emulate include `> **Language**: Always respond in the same language the user is using.`. The build system automatically injects this rule into all skill outputs:
 
 ```
 Step 3.5: Inject standard directives

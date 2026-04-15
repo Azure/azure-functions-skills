@@ -1,7 +1,7 @@
 # F11: af-feedback — Improvement Loop
 
 **Status:** 📋 Proposed  
-**仮スペック Section:** 4.4, 6  
+**Draft Spec Section:** 4.4, 6  
 **Depends on:** F1 (Skill Graph Metadata)
 
 ## Problem
