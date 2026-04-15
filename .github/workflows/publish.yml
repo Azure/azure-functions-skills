@@ -1,0 +1,68 @@
+name: Publish & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build plugins
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # ── GitHub Release with plugin zips ──
+
+      - name: Package plugin zips
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd dist
+          zip -r "../azure-functions-skills-ghcp-${VERSION}.zip" ghcp/
+          zip -r "../azure-functions-skills-claude-${VERSION}.zip" claude/
+          zip -r "../azure-functions-skills-codex-${VERSION}.zip" codex/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            azure-functions-skills-ghcp-*.zip
+            azure-functions-skills-claude-*.zip
+            azure-functions-skills-codex-*.zip
+          body: |
+            ## Install without npm
+
+            Download the zip for your AI assistant and extract it into your project:
+
+            | Assistant | Download | Extract to |
+            |-----------|----------|------------|
+            | **GitHub Copilot** | `azure-functions-skills-ghcp-${{ github.ref_name }}.zip` | Project root |
+            | **Claude Code** | `azure-functions-skills-claude-${{ github.ref_name }}.zip` | Project root |
+            | **Codex** | `azure-functions-skills-codex-${{ github.ref_name }}.zip` | Project root |
+
+            ### Quick install (with npm)
+            ```bash
+            npx @agent-loom/azure-functions-skills setup
+            ```

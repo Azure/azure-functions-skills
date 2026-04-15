@@ -1,0 +1,46 @@
+{
+  "name": "@agent-loom/azure-functions-skills",
+  "version": "0.8.0",
+  "description": "AI assistant plugins for Azure Functions — one-command setup for GitHub Copilot, Claude Code, and Codex",
+  "type": "module",
+  "bin": {
+    "azure-functions-skills": "bin/azure-functions-skills.js"
+  },
+  "exports": {
+    ".": "./src/setup/index.js",
+    "./setup": "./src/setup/index.js",
+    "./chat": "./src/chat/index.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "dist/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node src/build/build.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "setup": "node bin/azure-functions-skills.js setup",
+    "lint": "echo 'TODO: add eslint'"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "vitest": "^3.1.1"
+  },
+  "keywords": [
+    "azure-functions",
+    "serverless",
+    "copilot",
+    "claude",
+    "codex",
+    "ai-skills",
+    "coding-agent"
+  ],
+  "license": "MIT"
+}

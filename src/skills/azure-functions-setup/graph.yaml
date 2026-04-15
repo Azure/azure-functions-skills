@@ -1,0 +1,14 @@
+id: azure-functions-setup
+title: Azure Functions Setup
+suggestions:
+  on_success:
+    - target: azure-functions-create
+      reason: "Your environment is ready. Create a new Azure Functions app."
+      priority: 100
+  on_failure:
+    - target: azure-functions-setup
+      reason: "Fix the issues above and run setup again."
+      priority: 100
+entry_conditions:
+  - user_is_new
+  - tooling_unknown
