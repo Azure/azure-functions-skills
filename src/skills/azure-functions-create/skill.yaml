@@ -1,4 +1,4 @@
-id: af-create
+id: azure-functions-create
 title: Create Azure Functions App
 description: Scaffold a new Azure Functions project with language and template selection
 category: task

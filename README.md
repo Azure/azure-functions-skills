@@ -32,9 +32,9 @@ The CLI auto-detects which coding agents you have (GitHub Copilot, Claude Code, 
   Files written: 9
 
   Skills available:
-    • af-setup  — Verify prerequisites
-    • af-create — Scaffold a new project
-    • af-deploy — Deploy to Azure
+    • azure-functions-setup  — Verify prerequisites
+    • azure-functions-create — Scaffold a new project
+    • azure-functions-deploy — Deploy to Azure
 
   Get started: Ask your AI assistant to "set up Azure Functions"
 ```
@@ -66,11 +66,11 @@ The CLI auto-detects your agent (GHCP CLI / Claude Code / Codex), analyzes your 
 ⚡ Azure Functions Skills
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📂 Functions project detected (node)
-🧩 Skills: af-setup, af-create, af-deploy
+🧩 Skills: azure-functions-setup, azure-functions-create, azure-functions-deploy
 
 🚀 Suggested next steps:
-   → Run af-deploy to deploy your app to Azure
-   → Run af-create to add another function
+   → Run azure-functions-deploy to deploy your app to Azure
+   → Run azure-functions-create to add another function
 
 💬 What would you like to build?
 ```
@@ -104,9 +104,9 @@ const { childProcess, prompt } = await chat({ agent: 'claude-code', dir: '/path/
 
 | Skill | Description |
 |-------|-------------|
-| **af-setup** | Verify prerequisites (Azure CLI, Core Tools, runtime) |
-| **af-create** | Scaffold a new Azure Functions project |
-| **af-deploy** | Deploy to Azure using official tools |
+| **azure-functions-setup** | Verify prerequisites (Azure CLI, Core Tools, runtime) |
+| **azure-functions-create** | Scaffold a new Azure Functions project |
+| **azure-functions-deploy** | Deploy to Azure using official tools |
 
 Plus:
 - **functions-guide** agent — routes you to the right skill based on context
@@ -122,9 +122,9 @@ Plus:
 ```
 .github/copilot-instructions.md           # Always-on instructions + welcome
 .github/agents/functions-guide.agent.md    # @functions-guide custom agent
-.github/skills/af-setup/SKILL.md          # Setup skill (Agent Skills standard)
-.github/skills/af-create/SKILL.md         # Create skill
-.github/skills/af-deploy/SKILL.md         # Deploy skill
+.github/skills/azure-functions-setup/SKILL.md          # Setup skill (Agent Skills standard)
+.github/skills/azure-functions-create/SKILL.md         # Create skill
+.github/skills/azure-functions-deploy/SKILL.md         # Deploy skill
 .github/hooks/welcome-setup.json          # SessionStart: prereq check + welcome
 .vscode/mcp.json                          # Azure Functions Templates + Azure MCP
 AGENTS.md                                 # Coding standards
@@ -144,9 +144,9 @@ hooks.json                                # Plugin hooks (Copilot format)
 ```
 CLAUDE.md                            # Full instructions + skills inline
 .claude/settings.json                # MCP server configuration
-.claude/skills/af-setup.md           # Setup skill
-.claude/skills/af-create.md          # Create skill
-.claude/skills/af-deploy.md          # Deploy skill
+.claude/skills/azure-functions-setup.md           # Setup skill
+.claude/skills/azure-functions-create.md          # Create skill
+.claude/skills/azure-functions-deploy.md          # Deploy skill
 ```
 
 ### Codex (OpenAI)
@@ -169,9 +169,9 @@ After installing the plugin for your preferred agent:
 1. **Open your project** in VS Code (Copilot), terminal (Claude/Codex), or your IDE
 2. **The welcome hook fires** — checks your environment and suggests next steps
 3. **Say** *"I want to create a new Azure Function"*
-   - The agent runs **af-setup** checks
-   - Then guides you through **af-create** (language + trigger selection)
-   - Finally suggests **af-deploy** to push to Azure
+   - The agent runs **azure-functions-setup** checks
+   - Then guides you through **azure-functions-create** (language + trigger selection)
+   - Finally suggests **azure-functions-deploy** to push to Azure
 4. Each step surfaces the **next logical action** from the skill graph
 
 ## Development
@@ -213,9 +213,9 @@ dist/
 ```
 src/
 ├── skills/              # Canonical skill definitions
-│   ├── af-setup/        #   skill.yaml + graph.yaml + content.md
-│   ├── af-create/
-│   └── af-deploy/
+│   ├── azure-functions-setup/        #   skill.yaml + graph.yaml + content.md
+│   ├── azure-functions-create/
+│   └── azure-functions-deploy/
 ├── agents/              # Agent definitions
 │   ├── AGENTS.md        #   Coding standards
 │   └── functions-guide.agent.md

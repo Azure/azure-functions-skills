@@ -1,12 +1,12 @@
 > **Language**: Always respond in the same language the user is using.
 
-# af-create — Create Azure Functions App
+# azure-functions-create — Create Azure Functions App
 
 Guide the user through creating a new Azure Functions project.
 
 ## Prerequisites
 
-Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest running **af-setup** first.
+Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest running **azure-functions-setup** first.
 
 ## Workflow
 
@@ -95,4 +95,4 @@ func new --name MyTimer --template "Timer trigger"
 
 ## After Creation
 
-> ✅ Your project is scaffolded! Next: use **af-deploy** to deploy to Azure.
+> ✅ Your project is scaffolded! Next: use **azure-functions-deploy** to deploy to Azure.

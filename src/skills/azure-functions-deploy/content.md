@@ -1,6 +1,6 @@
 > **Language**: Always respond in the same language the user is using.
 
-# af-deploy — Deploy Azure Functions
+# azure-functions-deploy — Deploy Azure Functions
 
 Deploy your Azure Functions app to Azure. This skill uses the official Azure tools — no custom deployment logic.
 
@@ -10,7 +10,7 @@ Deploy your Azure Functions app to Azure. This skill uses the official Azure too
 - An Azure subscription (`az account show`)
 - A Functions project with `host.json` in the current directory
 
-If any prerequisite is missing, suggest running **af-setup** first.
+If any prerequisite is missing, suggest running **azure-functions-setup** first.
 
 ## Deployment Methods
 

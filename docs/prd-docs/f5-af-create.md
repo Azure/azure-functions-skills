@@ -1,28 +1,28 @@
-# F5: af-create — Project Scaffolding
+# F5: azure-functions-create — Project Scaffolding
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 5.1, 6, 8  
-**Depends on:** F1 (Skill Graph Metadata), F3 (af-setup recommended first)
+**Depends on:** F1 (Skill Graph Metadata), F3 (azure-functions-setup recommended first)
 
 ## Problem
 
-After setting up the environment, the developer's next question is "how do I create a Functions app?" Without `af-create`, the skill graph has a gap between `af-setup` (environment ready) and `af-deploy` (deploy to Azure). The user is left to figure out project scaffolding on their own, using `func init`, `azd init`, or manual file creation — each with different patterns and pitfalls.
+After setting up the environment, the developer's next question is "how do I create a Functions app?" Without `azure-functions-create`, the skill graph has a gap between `azure-functions-setup` (environment ready) and `azure-functions-deploy` (deploy to Azure). The user is left to figure out project scaffolding on their own, using `func init`, `azd init`, or manual file creation — each with different patterns and pitfalls.
 
 ## Feature
 
-`af-create` guides the developer through creating a new Azure Functions project, handling:
+`azure-functions-create` guides the developer through creating a new Azure Functions project, handling:
 
 1. **Language selection** — Python, Node.js/TypeScript, .NET (isolated), Java, PowerShell
 2. **Template selection** — HTTP trigger, Timer, Blob, Queue, Cosmos DB, etc.
 3. **Project structure** — `host.json`, language-specific config, `.gitignore`, entry point
 4. **Programming model** — v2 (Python/Node) vs. traditional, isolated worker (.NET)
-5. **Post-creation next steps** — directed transitions to `af-deploy`, `af-observability`, `af-hosting`
+5. **Post-creation next steps** — directed transitions to `azure-functions-deploy`, `azure-functions-observability`, `azure-functions-hosting`
 
 ## Workflow
 
 ```
 1. Detect if directory is empty or has existing project
-   ├── Non-empty with host.json → "Project already exists. Use af-discovery."
+   ├── Non-empty with host.json → "Project already exists. Use azure-functions-discovery."
    ├── Non-empty without host.json → "Directory not empty. Create a subdirectory?"
    └── Empty → proceed
 
@@ -36,7 +36,7 @@ After setting up the environment, the developer's next question is "how do I cre
    → host.json, local.settings.json, language files, .gitignore
 
 5. Post-creation suggestions (from graph metadata)
-   → "Next: af-deploy to deploy, or af-observability to set up monitoring"
+   → "Next: azure-functions-deploy to deploy, or azure-functions-observability to set up monitoring"
 ```
 
 ## Generated Files by Language
@@ -81,7 +81,7 @@ my-functions-app/
 ## Skill Metadata
 
 ```yaml
-id: af-create
+id: azure-functions-create
 title: Create Azure Functions App
 intent:
   - scaffold_project
@@ -93,17 +93,17 @@ completion_signals:
   - host_json_exists
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "A project exists. Offer deployment next."
       priority: 100
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Offer monitoring setup before or after deployment."
       priority: 70
-    - target: af-help
+    - target: azure-functions-help
       reason: "Provide other common next steps."
       priority: 40
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "Creation failure may be caused by missing prerequisites."
       priority: 70
 entry_conditions:
@@ -121,7 +121,7 @@ entry_conditions:
 
 ### Core Tools Integration
 
-When available, `af-create` leverages `func init` and `func new` under the hood:
+When available, `azure-functions-create` leverages `func init` and `func new` under the hood:
 
 ```bash
 func init my-functions-app --python --model V2
@@ -129,17 +129,17 @@ cd my-functions-app
 func new --name HttpTrigger --template "HTTP trigger"
 ```
 
-When Core Tools is not available, `af-create` generates files directly using embedded templates.
+When Core Tools is not available, `azure-functions-create` generates files directly using embedded templates.
 
 ### Validation
 
 - Verify directory is empty or user confirms subdirectory creation
-- Validate language runtime is installed (delegate to `af-setup` if not)
+- Validate language runtime is installed (delegate to `azure-functions-setup` if not)
 - Confirm generated files are syntactically valid
 
 ## Adding Functions to Existing Projects
 
-`af-create` supports not only new projects but also **adding functions to existing projects** (adopted from the func-emulate `fnx-create-function` skill).
+`azure-functions-create` supports not only new projects but also **adding functions to existing projects** (adopted from the func-emulate `fnx-create-function` skill).
 
 ### Detection Logic
 
@@ -153,7 +153,7 @@ host.json exists?
 
 ### MCP Tool Integration (F19)
 
-When the Templates MCP server is configured, `af-create` leverages MCP tools:
+When the Templates MCP server is configured, `azure-functions-create` leverages MCP tools:
 
 | MCP Tool | Purpose |
 |----------|---------|
@@ -190,7 +190,7 @@ After adding a function, next-step suggestions based on graph metadata are provi
 
 - "Function added. Run `func start` to test locally."
 - "Consider adding tests for the new function."
-- "Run `af-doctor` if `func start` fails."
+- "Run `azure-functions-doctor` if `func start` fails."
 
 ## Cross-Target Implementation
 

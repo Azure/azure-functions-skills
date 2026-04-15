@@ -31,15 +31,15 @@ A build pipeline (`build.ts` or `build.js`) that reads canonical skill metadata 
 ```
 src/
 ├── skills/
-│   ├── af-help/
+│   ├── azure-functions-help/
 │   │   ├── skill.yaml          # Metadata: id, title, description, targets
 │   │   ├── graph.yaml          # Graph edges: suggestions, entry conditions
 │   │   └── content.md          # Skill body (target-agnostic)
-│   ├── af-setup/
+│   ├── azure-functions-setup/
 │   │   ├── skill.yaml
 │   │   ├── graph.yaml
 │   │   └── content.md
-│   ├── af-create/
+│   ├── azure-functions-create/
 │   │   └── ...
 │   └── ...
 ├── agents/
@@ -59,8 +59,8 @@ src/
 dist/
 ├── ghcp/
 │   ├── skills/
-│   │   ├── af-help.md          # GHCP skill format
-│   │   ├── af-setup.md
+│   │   ├── azure-functions-help.md          # GHCP skill format
+│   │   ├── azure-functions-setup.md
 │   │   └── ...
 │   ├── agents/
 │   │   └── functions-guide.md  # GHCP custom agent
@@ -97,7 +97,7 @@ dist/
 
 ### Step 2: Validate Graph
 
-- All skills are reachable from `af-help`
+- All skills are reachable from `azure-functions-help`
 - No orphan skills (every skill has ≥ 1 inbound edge)
 - Max 3 `on_success` suggestions per skill
 - All `target` references in suggestions point to existing skills
@@ -123,7 +123,7 @@ For each target (GHCP, Claude, Codex):
 ## Skill Metadata Schema (`skill.yaml`)
 
 ```yaml
-id: af-setup
+id: azure-functions-setup
 title: Azure Functions Setup
 description: Verify prerequisites and set up your environment
 category: entry  # entry | task | feedback

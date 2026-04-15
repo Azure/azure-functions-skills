@@ -1,4 +1,4 @@
-# F3: af-setup — Environment Verification
+# F3: azure-functions-setup — Environment Verification
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 3.1, 4.1  
@@ -10,7 +10,7 @@ New Azure Functions developers often fail at the first step: their environment i
 
 ## Feature
 
-`af-setup` verifies that the developer's environment has all prerequisites for Azure Functions development and provides actionable fix instructions for anything missing.
+`azure-functions-setup` verifies that the developer's environment has all prerequisites for Azure Functions development and provides actionable fix instructions for anything missing.
 
 ## Checks
 
@@ -42,13 +42,13 @@ Issues Found:
      Docs: https://learn.microsoft.com/cli/azure/authenticate-azure-cli
 
 Next Steps:
-  → af-create: Your environment is ready. Create a new Functions app.
+  → azure-functions-create: Your environment is ready. Create a new Functions app.
 ```
 
 ## Skill Metadata
 
 ```yaml
-id: af-setup
+id: azure-functions-setup
 title: Azure Functions Setup
 intent:
   - verify_tooling
@@ -60,14 +60,14 @@ completion_signals:
   - language_runtime_detected
 suggestions:
   on_success:
-    - target: af-create
+    - target: azure-functions-create
       reason: "The environment is ready. The next logical step is to create a new Azure Functions app."
       priority: 100
-    - target: af-help
+    - target: azure-functions-help
       reason: "If the user is unsure what to do next, provide guided options."
       priority: 60
   on_failure:
-    - target: af-help
+    - target: azure-functions-help
       reason: "Setup could not be completed. Route to troubleshooting guidance."
       priority: 100
 entry_conditions:
@@ -79,7 +79,7 @@ entry_conditions:
 
 ### Language-Aware Checks
 
-If the current directory contains a Functions project, `af-setup` detects the language and only checks relevant runtimes:
+If the current directory contains a Functions project, `azure-functions-setup` detects the language and only checks relevant runtimes:
 
 - `requirements.txt` or `function_app.py` → check Python
 - `package.json` with `@azure/functions` → check Node.js
@@ -98,11 +98,11 @@ Each failed check includes:
 
 ### Idempotent
 
-Running `af-setup` multiple times is safe. Already-passing checks are shown as ✅ without re-installation.
+Running `azure-functions-setup` multiple times is safe. Already-passing checks are shown as ✅ without re-installation.
 
 ## Agent Workspace Configuration
 
-After environment checks complete, `af-setup` automatically places files needed for AI development based on the detected coding agent (adopting the design from func-emulate F20 `fnx setup`).
+After environment checks complete, `azure-functions-setup` automatically places files needed for AI development based on the detected coding agent (adopting the design from func-emulate F20 `fnx setup`).
 
 ### Agent Detection
 

@@ -1,4 +1,4 @@
-# F4: af-discovery — Project Analysis
+# F4: azure-functions-discovery — Project Analysis
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 4.1, 6, 8  
@@ -10,23 +10,23 @@ When a developer opens an existing Azure Functions project, they don't know whic
 
 ## Feature
 
-`af-discovery` scans the current project and recommends the most relevant skills based on what it finds. It serves as the "intelligent starting point" for existing projects (as opposed to `af-setup` for new environments).
+`azure-functions-discovery` scans the current project and recommends the most relevant skills based on what it finds. It serves as the "intelligent starting point" for existing projects (as opposed to `azure-functions-setup` for new environments).
 
 ## Analysis Points
 
 | Signal | Detection | Skill Recommended |
 |--------|-----------|------------------|
 | `host.json` exists | File exists check | Confirms this is a Functions project |
-| `requirements.txt` / `function_app.py` | File exists | af-python |
-| `package.json` with `@azure/functions` | Package dependency check | af-node |
-| `*.csproj` with Functions Worker SDK | MSBuild project scan | af-dotnet |
+| `requirements.txt` / `function_app.py` | File exists | azure-functions-python |
+| `package.json` with `@azure/functions` | Package dependency check | azure-functions-node |
+| `*.csproj` with Functions Worker SDK | MSBuild project scan | azure-functions-dotnet |
 | `pom.xml` with Functions Maven plugin | Maven POM scan | (Java — future) |
-| Durable Functions imports | Code pattern scan | af-durable |
+| Durable Functions imports | Code pattern scan | azure-functions-durable |
 | `host.json` extension bundles | JSON field check | Extension bundle version guidance |
-| `.azure/` directory | Directory exists | af-deploy (already deployed) |
-| Application Insights key | Config scan | af-observability |
-| No monitoring config | Absence check | af-observability (recommend setup) |
-| Multiple functions detected | Function count | af-hosting (scaling considerations) |
+| `.azure/` directory | Directory exists | azure-functions-deploy (already deployed) |
+| Application Insights key | Config scan | azure-functions-observability |
+| No monitoring config | Absence check | azure-functions-observability (recommend setup) |
+| Multiple functions detected | Function count | azure-functions-hosting (scaling considerations) |
 
 ## Output Format
 
@@ -40,9 +40,9 @@ Azure Functions Project Discovery
   Deployment: Not detected
 
 Recommended Skills:
-  1. af-deploy — Your project has no deployment configuration. Set up Azure deployment.
-  2. af-observability — No Application Insights configured. Add monitoring before going to production.
-  3. af-python — Python-specific tips for v2 programming model and async patterns.
+  1. azure-functions-deploy — Your project has no deployment configuration. Set up Azure deployment.
+  2. azure-functions-observability — No Application Insights configured. Add monitoring before going to production.
+  3. azure-functions-python — Python-specific tips for v2 programming model and async patterns.
 
   Run any skill name to get started.
 ```
@@ -50,7 +50,7 @@ Recommended Skills:
 ## Skill Metadata
 
 ```yaml
-id: af-discovery
+id: azure-functions-discovery
 title: Azure Functions Project Discovery
 intent:
   - analyze_project
@@ -61,20 +61,20 @@ completion_signals:
   - skills_recommended
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "Most projects need deployment guidance."
       priority: 90
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Observability is critical for production readiness."
       priority: 80
-    - target: af-hosting
+    - target: azure-functions-hosting
       reason: "Hosting plan choice affects cost and performance."
       priority: 60
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "If no project is detected, the user may need environment setup."
       priority: 80
-    - target: af-create
+    - target: azure-functions-create
       reason: "If the directory is empty, suggest creating a new project."
       priority: 90
 entry_conditions:
@@ -86,7 +86,7 @@ entry_conditions:
 
 ### Scan Depth
 
-`af-discovery` performs lightweight scanning only:
+`azure-functions-discovery` performs lightweight scanning only:
 
 - File existence checks (not full AST parsing)
 - `package.json` / `requirements.txt` dependency checks (top-level only)
@@ -103,18 +103,18 @@ Recommendations are sorted by:
 2. **Language-specific guidance** — medium priority
 3. **Optimization opportunities** (hosting plan, scaling) — lower priority
 
-Maximum 3 recommendations shown. Full list available via `af-help`.
+Maximum 3 recommendations shown. Full list available via `azure-functions-help`.
 
 ### No Project Detected
 
-If the directory has no `host.json`, `af-discovery` outputs:
+If the directory has no `host.json`, `azure-functions-discovery` outputs:
 
 ```
 No Azure Functions project detected in this directory.
 
 Suggestions:
-  → af-create: Scaffold a new Azure Functions project here.
-  → af-setup: Verify your development environment is ready.
+  → azure-functions-create: Scaffold a new Azure Functions project here.
+  → azure-functions-setup: Verify your development environment is ready.
 ```
 
 ## Cross-Target Implementation

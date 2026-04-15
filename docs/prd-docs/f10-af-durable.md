@@ -1,4 +1,4 @@
-# F10: af-durable — Durable Functions
+# F10: azure-functions-durable — Durable Functions
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 4.2, 6  
@@ -16,7 +16,7 @@ Durable Functions is the most complex Azure Functions feature — orchestrations
 
 ## Feature
 
-`af-durable` provides deep guidance on Durable Functions patterns, implementation, debugging, and best practices.
+`azure-functions-durable` provides deep guidance on Durable Functions patterns, implementation, debugging, and best practices.
 
 ## Orchestration Patterns
 
@@ -32,7 +32,7 @@ Durable Functions is the most complex Azure Functions feature — orchestrations
 ## Skill Metadata
 
 ```yaml
-id: af-durable
+id: azure-functions-durable
 title: Durable Functions
 intent:
   - durable_functions_help
@@ -44,14 +44,14 @@ completion_signals:
   - durable_pattern_applied
 suggestions:
   on_success:
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Durable orchestrations need monitoring for long-running instances."
       priority: 90
-    - target: af-feedback
+    - target: azure-functions-feedback
       reason: "Durable Functions is complex. Share what worked or didn't."
       priority: 50
   on_failure:
-    - target: af-help
+    - target: azure-functions-help
       reason: "If the durable pattern is wrong, re-evaluate the approach."
       priority: 70
 entry_conditions:

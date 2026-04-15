@@ -1,13 +1,13 @@
-id: af-create
+id: azure-functions-create
 title: Create Azure Functions App
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "Your project is ready. Deploy to Azure."
       priority: 100
   on_failure:
-    - target: af-setup
-      reason: "Creation failed — check your environment with af-setup."
+    - target: azure-functions-setup
+      reason: "Creation failed — check your environment with azure-functions-setup."
       priority: 80
 entry_conditions:
   - no_project_exists

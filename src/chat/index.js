@@ -99,19 +99,19 @@ export async function buildStartupPrompt(dir) {
     ? `📂 Functions project detected (${project.language})`
     : '📂 No Functions project found — ready to create one';
 
-  const skillList = 'af-setup, af-create, af-deploy';
+  const skillList = 'azure-functions-setup, azure-functions-create, azure-functions-deploy';
 
   const suggestedActions = project
     ? [
         '🚀 Suggested next steps:',
-        '   → Run af-deploy to deploy your app to Azure',
-        '   → Run af-create to add another function',
+        '   → Run azure-functions-deploy to deploy your app to Azure',
+        '   → Run azure-functions-create to add another function',
         '   → Ask about best practices for your project',
       ].join('\n')
     : [
         '🚀 Suggested next steps:',
-        '   → Run af-setup to verify your environment',
-        '   → Run af-create to scaffold a new Azure Functions project',
+        '   → Run azure-functions-setup to verify your environment',
+        '   → Run azure-functions-create to scaffold a new Azure Functions project',
         '   → Ask "help me create a function"',
       ].join('\n');
 

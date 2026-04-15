@@ -1,6 +1,6 @@
 > **Language**: Always respond in the same language the user is using.
 
-# af-setup — Azure Functions Environment Setup
+# azure-functions-setup — Azure Functions Environment Setup
 
 Verify that the developer's environment has all prerequisites for Azure Functions development.
 
@@ -48,4 +48,4 @@ For each failing check, provide:
 
 When all checks pass, suggest the next step:
 
-> ✅ Your environment is ready! Next: use **af-create** to scaffold a new Azure Functions project.
+> ✅ Your environment is ready! Next: use **azure-functions-create** to scaffold a new Azure Functions project.

@@ -35,17 +35,17 @@ Skills and agents packaged as installable plugins per target:
 ```
 azure-functions-skill-pack-ghcp/
 ├── skills/
-│   ├── af-help.md
-│   ├── af-setup.md
-│   ├── af-create.md
-│   ├── af-deploy.md
-│   ├── af-observability.md
-│   ├── af-hosting.md
-│   ├── af-python.md
-│   ├── af-node.md
-│   ├── af-dotnet.md
-│   ├── af-durable.md
-│   └── af-feedback.md
+│   ├── azure-functions-help.md
+│   ├── azure-functions-setup.md
+│   ├── azure-functions-create.md
+│   ├── azure-functions-deploy.md
+│   ├── azure-functions-observability.md
+│   ├── azure-functions-hosting.md
+│   ├── azure-functions-python.md
+│   ├── azure-functions-node.md
+│   ├── azure-functions-dotnet.md
+│   ├── azure-functions-durable.md
+│   └── azure-functions-feedback.md
 ├── agents/
 │   └── functions-guide.md
 ├── hooks/
@@ -85,12 +85,12 @@ azd init --template azure-functions-python-starter
 
 ## ID Collision Prevention
 
-**Critical:** GitHub Copilot CLI gives priority to project-level skills/agents over plugin-level ones with the same ID. If a repo template defines `af-discovery` and the plugin also has `af-discovery`, the repo version wins and the plugin version is ignored.
+**Critical:** GitHub Copilot CLI gives priority to project-level skills/agents over plugin-level ones with the same ID. If a repo template defines `azure-functions-discovery` and the plugin also has `azure-functions-discovery`, the repo version wins and the plugin version is ignored.
 
 ### Rules
 
-1. Plugin skills use `af-` prefix: `af-setup`, `af-deploy`, etc.
-2. Repo template instructions do NOT define skills with `af-` prefix
+1. Plugin skills use `azure-functions-` prefix: `azure-functions-setup`, `azure-functions-deploy`, etc.
+2. Repo template instructions do NOT define skills with `azure-functions-` prefix
 3. Repo template uses `copilot-instructions.md` for guidance (not skill definitions)
 4. If a repo needs to override a plugin skill, it must be intentional and documented
 
@@ -138,11 +138,11 @@ This project uses Azure Functions with Python v2 programming model.
 
 ## Recommended Workflow
 
-1. **af-setup** — Verify your environment has Azure CLI, Core Tools, and Python
-2. **af-create** — Scaffold new functions with templates
-3. **af-deploy** — Deploy to Azure (Flex Consumption recommended)
-4. **af-observability** — Set up Application Insights monitoring
-5. **af-feedback** — Share your experience to improve these skills
+1. **azure-functions-setup** — Verify your environment has Azure CLI, Core Tools, and Python
+2. **azure-functions-create** — Scaffold new functions with templates
+3. **azure-functions-deploy** — Deploy to Azure (Flex Consumption recommended)
+4. **azure-functions-observability** — Set up Application Insights monitoring
+5. **azure-functions-feedback** — Share your experience to improve these skills
 
 ## Available Skills
 

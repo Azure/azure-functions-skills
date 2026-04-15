@@ -1,4 +1,4 @@
-# F7: af-observability — Monitoring
+# F7: azure-functions-observability — Monitoring
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 4.2, 6, 8  
@@ -10,7 +10,7 @@ Azure Functions apps in production without monitoring are flying blind. Develope
 
 ## Feature
 
-`af-observability` guides the developer through setting up comprehensive monitoring for their Azure Functions app:
+`azure-functions-observability` guides the developer through setting up comprehensive monitoring for their Azure Functions app:
 
 1. **Application Insights** — connection, sampling, live metrics
 2. **Structured logging** — host.json log levels, custom telemetry
@@ -63,7 +63,7 @@ Recommended baseline for production:
 ## Skill Metadata
 
 ```yaml
-id: af-observability
+id: azure-functions-observability
 title: Azure Functions Observability
 intent:
   - set_up_monitoring
@@ -76,11 +76,11 @@ completion_signals:
   - alerts_created
 suggestions:
   on_success:
-    - target: af-feedback
+    - target: azure-functions-feedback
       reason: "Monitoring is set up. Share your experience to improve these skills."
       priority: 60
   on_failure:
-    - target: af-help
+    - target: azure-functions-help
       reason: "If observability setup failed, get general guidance."
       priority: 80
 entry_conditions:

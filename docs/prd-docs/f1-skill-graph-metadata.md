@@ -6,7 +6,7 @@
 
 ## Problem
 
-Traditional skill/plugin catalogs are flat lists — users must know which skill they need before they can use it. This creates a discoverability gap: a developer who just set up their environment doesn't know that the next logical step is `af-create`, or that after deployment they should configure observability.
+Traditional skill/plugin catalogs are flat lists — users must know which skill they need before they can use it. This creates a discoverability gap: a developer who just set up their environment doesn't know that the next logical step is `azure-functions-create`, or that after deployment they should configure observability.
 
 There's no machine-readable way to express "after this skill completes, suggest these next skills."
 
@@ -51,10 +51,10 @@ entry_conditions:
 
 ## Examples
 
-### af-setup
+### azure-functions-setup
 
 ```yaml
-id: af-setup
+id: azure-functions-setup
 title: Azure Functions Setup
 intent:
   - verify_tooling
@@ -65,14 +65,14 @@ completion_signals:
   - language_runtime_detected
 suggestions:
   on_success:
-    - target: af-create
+    - target: azure-functions-create
       reason: "The environment is ready. The next logical step is to create a new Azure Functions app."
       priority: 100
-    - target: af-help
+    - target: azure-functions-help
       reason: "If the user is unsure what to do next, provide guided options."
       priority: 60
   on_failure:
-    - target: af-help
+    - target: azure-functions-help
       reason: "Setup could not be completed. Route to troubleshooting guidance."
       priority: 100
 entry_conditions:
@@ -80,10 +80,10 @@ entry_conditions:
   - tooling_unknown
 ```
 
-### af-create
+### azure-functions-create
 
 ```yaml
-id: af-create
+id: azure-functions-create
 title: Create Azure Functions App
 intent:
   - scaffold_project
@@ -93,17 +93,17 @@ completion_signals:
   - function_project_created
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "A project exists. Offer deployment next."
       priority: 100
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Offer monitoring setup before or after deployment."
       priority: 70
-    - target: af-help
+    - target: azure-functions-help
       reason: "Provide other common next steps."
       priority: 40
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "Creation failure may be caused by missing prerequisites."
       priority: 70
 ```
@@ -114,15 +114,15 @@ suggestions:
 2. `intent` values are free-form but should use snake_case
 3. `completion_signals` are semantic — detected by the skill itself, not the graph engine
 4. `suggestions.on_success` is ordered by `priority` descending; consumers show top 3 max
-5. `suggestions.on_failure` always includes a fallback to `af-help` or `af-setup`
-6. `entry_conditions` inform the `functions-guide` agent and `af-help` skill
+5. `suggestions.on_failure` always includes a fallback to `azure-functions-help` or `azure-functions-setup`
+6. `entry_conditions` inform the `functions-guide` agent and `azure-functions-help` skill
 
 ## Graph Constraints
 
-- The graph must be **connected** — every skill must be reachable from `af-help`
+- The graph must be **connected** — every skill must be reachable from `azure-functions-help`
 - No orphan skills — every skill must have at least one inbound edge
 - Maximum 3 `on_success` suggestions per skill (prevents cognitive overload)
-- Failure paths must converge to entry skills (af-help, af-setup)
+- Failure paths must converge to entry skills (azure-functions-help, azure-functions-setup)
 
 ## Build Integration
 
@@ -136,6 +136,6 @@ The build system (F14) reads all `graph.yaml` files and:
 
 ## Future Extensions
 
-- Conditional edges (e.g., suggest `af-python` only if Python runtime detected)
-- Weight learning from usage telemetry (F11: af-feedback)
-- Visual graph explorer in `af-help`
+- Conditional edges (e.g., suggest `azure-functions-python` only if Python runtime detected)
+- Weight learning from usage telemetry (F11: azure-functions-feedback)
+- Visual graph explorer in `azure-functions-help`

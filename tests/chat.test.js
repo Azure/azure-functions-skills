@@ -32,7 +32,7 @@ describe('buildStartupPrompt', () => {
     mkdirSync(dir, { recursive: true });
 
     const prompt = await buildStartupPrompt(dir);
-    expect(prompt).toContain('af-create');
+    expect(prompt).toContain('azure-functions-create');
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -43,7 +43,7 @@ describe('buildStartupPrompt', () => {
     writeFileSync(join(dir, 'host.json'), '{"version":"2.0"}');
 
     const prompt = await buildStartupPrompt(dir);
-    expect(prompt).toContain('af-deploy');
+    expect(prompt).toContain('azure-functions-deploy');
 
     rmSync(dir, { recursive: true, force: true });
   });

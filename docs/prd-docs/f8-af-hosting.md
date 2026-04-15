@@ -1,4 +1,4 @@
-# F8: af-hosting — Hosting Plan Guidance
+# F8: azure-functions-hosting — Hosting Plan Guidance
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 4.2, 6, 8  
@@ -10,7 +10,7 @@ Azure Functions offers multiple hosting plans (Flex Consumption, Consumption, Pr
 
 ## Feature
 
-`af-hosting` helps developers choose and configure the right Azure Functions hosting plan by analyzing their requirements and providing plan-specific guidance.
+`azure-functions-hosting` helps developers choose and configure the right Azure Functions hosting plan by analyzing their requirements and providing plan-specific guidance.
 
 ## Hosting Plan Matrix
 
@@ -55,7 +55,7 @@ Azure Functions offers multiple hosting plans (Flex Consumption, Consumption, Pr
 ## Skill Metadata
 
 ```yaml
-id: af-hosting
+id: azure-functions-hosting
 title: Azure Functions Hosting Plan Guidance
 intent:
   - choose_hosting_plan
@@ -67,14 +67,14 @@ completion_signals:
   - plan_comparison_shown
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "After choosing a hosting plan, deploy the app."
       priority: 100
-    - target: af-feedback
+    - target: azure-functions-feedback
       reason: "Share feedback on the hosting guidance."
       priority: 30
   on_failure:
-    - target: af-help
+    - target: azure-functions-help
       reason: "If hosting decision is blocked, get general guidance."
       priority: 70
 entry_conditions:

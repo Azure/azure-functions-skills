@@ -16,22 +16,22 @@ After completing a task, developers often stop — they don't know what to do ne
 
 | Trigger Point | Skill Completed | Suggestions |
 |--------------|----------------|-------------|
-| After setup | af-setup | "Next: `af-create` — Create a Functions app" |
-| After create | af-create | "Next: `af-deploy` — Deploy to Azure" |
-| After deploy | af-deploy | "Next: `af-observability` — Set up monitoring" |
-| After discovery | af-discovery | Context-dependent top 3 from graph |
-| After observability | af-observability | "Next: `af-feedback` — Share your experience" |
-| After hosting | af-hosting | "Next: `af-deploy` — Deploy with selected plan" |
+| After setup | azure-functions-setup | "Next: `azure-functions-create` — Create a Functions app" |
+| After create | azure-functions-create | "Next: `azure-functions-deploy` — Deploy to Azure" |
+| After deploy | azure-functions-deploy | "Next: `azure-functions-observability` — Set up monitoring" |
+| After discovery | azure-functions-discovery | Context-dependent top 3 from graph |
+| After observability | azure-functions-observability | "Next: `azure-functions-feedback` — Share your experience" |
+| After hosting | azure-functions-hosting | "Next: `azure-functions-deploy` — Deploy with selected plan" |
 
 ## Output Format
 
 ```
 ───────────────────────────────────────
-✅ af-setup completed successfully
+✅ azure-functions-setup completed successfully
 
   Suggested next steps:
-  1. af-create — Your environment is ready. Create a new Azure Functions app.
-  2. af-help — Browse all available skills and guidance.
+  1. azure-functions-create — Your environment is ready. Create a new Azure Functions app.
+  2. azure-functions-help — Browse all available skills and guidance.
 
   Run a skill name to continue, or ignore to proceed manually.
 ───────────────────────────────────────

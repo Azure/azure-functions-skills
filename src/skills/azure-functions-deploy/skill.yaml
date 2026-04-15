@@ -1,4 +1,4 @@
-id: af-deploy
+id: azure-functions-deploy
 title: Deploy Azure Functions
 description: Deploy your Azure Functions app to Azure using official tools
 category: task

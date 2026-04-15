@@ -37,7 +37,7 @@ node --version 2>/dev/null && echo "✅ Node.js" || echo "❌ Node.js — instal
 Would you like to create your first Azure Function?
 I can scaffold a project with your preferred language and trigger type.
 
-→ Just say "create a function" or use the af-create skill.
+→ Just say "create a function" or use the azure-functions-create skill.
 ```
 
 ### Some checks fail
@@ -47,10 +47,10 @@ I can scaffold a project with your preferred language and trigger type.
 
 [Show failing checks with install instructions]
 
-After installing, run af-setup to verify everything works.
+After installing, run azure-functions-setup to verify everything works.
 ```
 
 ## Graph Transition
 
-- All pass → suggest **af-create**
-- Failures → suggest **af-setup** for detailed fix guidance
+- All pass → suggest **azure-functions-create**
+- Failures → suggest **azure-functions-setup** for detailed fix guidance

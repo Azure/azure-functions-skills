@@ -1,8 +1,8 @@
-# F6: af-deploy — Deployment
+# F6: azure-functions-deploy — Deployment
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 4.2, 6, 8  
-**Depends on:** F1 (Skill Graph Metadata), F5 (af-create recommended first)
+**Depends on:** F1 (Skill Graph Metadata), F5 (azure-functions-create recommended first)
 
 ## Problem
 
@@ -10,7 +10,7 @@ Deploying Azure Functions involves multiple choices (Azure CLI vs. azd vs. VS Co
 
 ## Feature
 
-`af-deploy` provides deployment guidance tailored to the user's project, selected hosting plan, and preferred deployment method. It covers first-time deployment, CI/CD setup, and redeployment patterns.
+`azure-functions-deploy` provides deployment guidance tailored to the user's project, selected hosting plan, and preferred deployment method. It covers first-time deployment, CI/CD setup, and redeployment patterns.
 
 ## Deployment Methods
 
@@ -27,7 +27,7 @@ Deploying Azure Functions involves multiple choices (Azure CLI vs. azd vs. VS Co
 
 ```
 1. Detect project state
-   ├── No project → "Run af-create first"
+   ├── No project → "Run azure-functions-create first"
    ├── Project exists, no Azure resources → Guide resource creation
    └── Project exists, resources exist → Guide deployment
 
@@ -47,13 +47,13 @@ Deploying Azure Functions involves multiple choices (Azure CLI vs. azd vs. VS Co
    → Health check, function listing, test invocation
 
 7. Next steps (from graph metadata)
-   → "Next: af-observability to set up monitoring"
+   → "Next: azure-functions-observability to set up monitoring"
 ```
 
 ## Skill Metadata
 
 ```yaml
-id: af-deploy
+id: azure-functions-deploy
 title: Deploy Azure Functions
 intent:
   - deploy_to_azure
@@ -65,17 +65,17 @@ completion_signals:
   - functions_accessible
 suggestions:
   on_success:
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Deployment succeeded. Set up monitoring to track app health."
       priority: 100
-    - target: af-feedback
+    - target: azure-functions-feedback
       reason: "Share your deployment experience."
       priority: 40
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "Deployment failure may be caused by missing prerequisites or wrong credentials."
       priority: 80
-    - target: af-hosting
+    - target: azure-functions-hosting
       reason: "Deployment might fail due to SKU limitations. Review hosting plan."
       priority: 60
 entry_conditions:
@@ -85,7 +85,7 @@ entry_conditions:
 
 ## SKU-Aware Guidance
 
-`af-deploy` provides different instructions based on the target hosting plan:
+`azure-functions-deploy` provides different instructions based on the target hosting plan:
 
 | Hosting Plan | Key Considerations |
 |-------------|-------------------|
@@ -120,7 +120,7 @@ azd up  # provisions infrastructure + deploys code
 
 ## Post-Deploy Verification
 
-After deployment, `af-deploy` verifies:
+After deployment, `azure-functions-deploy` verifies:
 
 1. Function App is running (`az functionapp show --query state`)
 2. Functions are listed (`func azure functionapp list-functions`)

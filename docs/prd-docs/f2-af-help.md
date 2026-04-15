@@ -1,4 +1,4 @@
-# F2: af-help — Entry & Navigation
+# F2: azure-functions-help — Entry & Navigation
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 4.1, 5, 7.2  
@@ -10,7 +10,7 @@ Developers new to Azure Functions skills don't know which skill to use first, or
 
 ## Feature
 
-`af-help` is not a traditional help command that dumps a list. It's a **graph navigator** that:
+`azure-functions-help` is not a traditional help command that dumps a list. It's a **graph navigator** that:
 
 1. Detects the user's current context (tooling installed, project exists, deployment state)
 2. Locates their position in the skill graph
@@ -23,43 +23,43 @@ Developers new to Azure Functions skills don't know which skill to use first, or
 
 | Context | Recommendation |
 |---------|---------------|
-| No Azure CLI, no Core Tools | "Start with `af-setup` to prepare your environment." |
-| Tools installed, no project | "Your environment is ready. Use `af-create` to scaffold a new Functions app." |
-| Project exists, not deployed | "You have a Functions project. Use `af-deploy` to deploy, or `af-observability` to set up monitoring first." |
-| Project deployed | "Your app is running. Use `af-observability` to verify monitoring, or `af-feedback` to share your experience." |
+| No Azure CLI, no Core Tools | "Start with `azure-functions-setup` to prepare your environment." |
+| Tools installed, no project | "Your environment is ready. Use `azure-functions-create` to scaffold a new Functions app." |
+| Project exists, not deployed | "You have a Functions project. Use `azure-functions-deploy` to deploy, or `azure-functions-observability` to set up monitoring first." |
+| Project deployed | "Your app is running. Use `azure-functions-observability` to verify monitoring, or `azure-functions-feedback` to share your experience." |
 | Unknown / can't detect | Show full skill catalog grouped by lifecycle role |
 
 ### Full Catalog Mode
 
-When context detection fails or when explicitly asked, `af-help` shows skills grouped by lifecycle:
+When context detection fails or when explicitly asked, `azure-functions-help` shows skills grouped by lifecycle:
 
 ```
 Azure Functions Skills
 
   Getting Started
-    af-setup        Verify prerequisites and set up your environment
-    af-discovery    Analyze this repo and find relevant skills
+    azure-functions-setup        Verify prerequisites and set up your environment
+    azure-functions-discovery    Analyze this repo and find relevant skills
 
   Build
-    af-create       Scaffold a new Functions project
-    af-python       Python-specific patterns and best practices
-    af-node         Node.js/TypeScript patterns and best practices
-    af-dotnet       .NET (isolated) patterns and best practices
-    af-durable      Durable Functions orchestration patterns
+    azure-functions-create       Scaffold a new Functions project
+    azure-functions-python       Python-specific patterns and best practices
+    azure-functions-node         Node.js/TypeScript patterns and best practices
+    azure-functions-dotnet       .NET (isolated) patterns and best practices
+    azure-functions-durable      Durable Functions orchestration patterns
 
   Ship
-    af-deploy       Deploy to Azure
-    af-hosting      Compare hosting plans (Flex, Premium, Consumption)
-    af-observability  Set up monitoring and alerting
+    azure-functions-deploy       Deploy to Azure
+    azure-functions-hosting      Compare hosting plans (Flex, Premium, Consumption)
+    azure-functions-observability  Set up monitoring and alerting
 
   Improve
-    af-feedback     Share feedback to improve these skills
+    azure-functions-feedback     Share feedback to improve these skills
 ```
 
 ## Skill Metadata
 
 ```yaml
-id: af-help
+id: azure-functions-help
 title: Azure Functions Help & Navigation
 intent:
   - get_help
@@ -71,10 +71,10 @@ completion_signals:
   - skill_list_shown
 suggestions:
   on_success:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "New user should start with environment setup."
       priority: 100
-    - target: af-discovery
+    - target: azure-functions-discovery
       reason: "If the user already has a project, discover what's relevant."
       priority: 80
   on_failure: []
@@ -84,7 +84,7 @@ entry_conditions:
 
 ## Context Detection Strategy
 
-`af-help` uses lightweight checks (no heavy scanning):
+`azure-functions-help` uses lightweight checks (no heavy scanning):
 
 1. **Azure CLI** — `az --version` exit code
 2. **Core Tools** — `func --version` exit code

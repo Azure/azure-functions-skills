@@ -1,8 +1,8 @@
-# F17: af-migrate — Programming Model Migration
+# F17: azure-functions-migrate — Programming Model Migration
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** N/A (discovered from func-emulate F21 migrate)  
-**Depends on:** F1 (Skill Graph Metadata), F4 (af-discovery)
+**Depends on:** F1 (Skill Graph Metadata), F4 (azure-functions-discovery)
 
 ## Problem
 
@@ -20,7 +20,7 @@ AI coding agents are ideal for this kind of structured transformation, but they 
 
 ## Feature
 
-`af-migrate` detects legacy Azure Functions programming models and guides migration to the current model. It provides deterministic conversion pattern instructions and decision support for complex cases.
+`azure-functions-migrate` detects legacy Azure Functions programming models and guides migration to the current model. It provides deterministic conversion pattern instructions and decision support for complex cases.
 
 ## Supported Migration Paths
 
@@ -110,13 +110,13 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
    → Confirm existing tests pass
 
 5. Post-migration suggestions (from graph)
-   → "Migration complete. Run af-doctor to verify project health."
+   → "Migration complete. Run azure-functions-doctor to verify project health."
 ```
 
 ## Skill Metadata
 
 ```yaml
-id: af-migrate
+id: azure-functions-migrate
 title: Azure Functions Model Migration
 intent:
   - migrate_programming_model
@@ -128,17 +128,17 @@ completion_signals:
   - all_functions_converted
 suggestions:
   on_success:
-    - target: af-doctor
+    - target: azure-functions-doctor
       reason: "Migration completed. Verify project health with diagnostics."
       priority: 100
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "Migrated app is ready for deployment."
       priority: 70
   on_failure:
-    - target: af-help
+    - target: azure-functions-help
       reason: "Migration encountered issues. Get guided assistance."
       priority: 80
-    - target: af-doctor
+    - target: azure-functions-doctor
       reason: "Run diagnostics to identify post-migration issues."
       priority: 90
 entry_conditions:

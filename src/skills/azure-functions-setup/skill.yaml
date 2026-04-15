@@ -1,4 +1,4 @@
-id: af-setup
+id: azure-functions-setup
 title: Azure Functions Setup
 description: Verify prerequisites and set up your environment for Azure Functions development
 category: entry

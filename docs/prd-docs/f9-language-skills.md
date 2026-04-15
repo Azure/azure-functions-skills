@@ -1,4 +1,4 @@
-# F9: Language Skills (af-python, af-node, af-dotnet)
+# F9: Language Skills (azure-functions-python, azure-functions-node, azure-functions-dotnet)
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 4.2, 6  
@@ -18,21 +18,21 @@ Azure Functions supports multiple languages, each with its own programming model
 
 Three language-specific skills that provide deep, idiomatic guidance:
 
-### af-python
+### azure-functions-python
 
 Python-specific patterns for Azure Functions v2 programming model.
 
-### af-node
+### azure-functions-node
 
 Node.js/TypeScript-specific patterns for Azure Functions v4 programming model.
 
-### af-dotnet
+### azure-functions-dotnet
 
 .NET-specific patterns for Azure Functions isolated worker model.
 
 ---
 
-## af-python
+## azure-functions-python
 
 ### Key Topics
 
@@ -48,7 +48,7 @@ Node.js/TypeScript-specific patterns for Azure Functions v4 programming model.
 ### Skill Metadata
 
 ```yaml
-id: af-python
+id: azure-functions-python
 title: Azure Functions Python
 intent:
   - python_functions_help
@@ -59,14 +59,14 @@ completion_signals:
   - python_issue_resolved
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "Python function is ready. Deploy to Azure."
       priority: 90
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Set up Python-specific logging and monitoring."
       priority: 70
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "Python issue may be caused by environment configuration."
       priority: 60
 entry_conditions:
@@ -98,7 +98,7 @@ def get_item(req: func.HttpRequest, item: func.DocumentList) -> func.HttpRespons
 
 ---
 
-## af-node
+## azure-functions-node
 
 ### Key Topics
 
@@ -114,7 +114,7 @@ def get_item(req: func.HttpRequest, item: func.DocumentList) -> func.HttpRespons
 ### Skill Metadata
 
 ```yaml
-id: af-node
+id: azure-functions-node
 title: Azure Functions Node.js/TypeScript
 intent:
   - node_functions_help
@@ -125,14 +125,14 @@ completion_signals:
   - node_issue_resolved
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "Node.js function is ready. Deploy to Azure."
       priority: 90
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Set up Node.js logging and tracing."
       priority: 70
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "Node.js issue may be caused by version or npm configuration."
       priority: 60
 entry_conditions:
@@ -165,7 +165,7 @@ app.timer('timerTrigger', { schedule: '0 */5 * * * *', handler: timerTrigger });
 
 ---
 
-## af-dotnet
+## azure-functions-dotnet
 
 ### Key Topics
 
@@ -181,7 +181,7 @@ app.timer('timerTrigger', { schedule: '0 */5 * * * *', handler: timerTrigger });
 ### Skill Metadata
 
 ```yaml
-id: af-dotnet
+id: azure-functions-dotnet
 title: Azure Functions .NET
 intent:
   - dotnet_functions_help
@@ -192,14 +192,14 @@ completion_signals:
   - dotnet_issue_resolved
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: ".NET function is ready. Deploy to Azure."
       priority: 90
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Set up .NET logging with ILogger and Application Insights."
       priority: 70
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: ".NET issue may be caused by SDK version or project configuration."
       priority: 60
 entry_conditions:

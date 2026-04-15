@@ -1,12 +1,12 @@
-# F16: af-doctor — Project Diagnostics
+# F16: azure-functions-doctor — Project Diagnostics
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** N/A (discovered from func-emulate F18 + fnx-diagnostics)  
-**Depends on:** F1 (Skill Graph Metadata), F3 (af-setup)
+**Depends on:** F1 (Skill Graph Metadata), F3 (azure-functions-setup)
 
 ## Problem
 
-`af-setup` (F3) handles initial environment checks (verifying the presence of Azure CLI, Core Tools, and runtimes), but **diagnosing `func start` failures during development** is an entirely different responsibility.
+`azure-functions-setup` (F3) handles initial environment checks (verifying the presence of Azure CLI, Core Tools, and runtimes), but **diagnosing `func start` failures during development** is an entirely different responsibility.
 
 `func start` failures have many possible causes:
 
@@ -23,11 +23,11 @@ Developers have no choice but to investigate these one by one manually, and begi
 
 ## Feature
 
-`af-doctor` is a diagnostic skill that checks Azure Functions project health across 8 structured categories and returns actionable fix suggestions for each issue.
+`azure-functions-doctor` is a diagnostic skill that checks Azure Functions project health across 8 structured categories and returns actionable fix suggestions for each issue.
 
-Difference from `af-setup`:
+Difference from `azure-functions-setup`:
 
-| Aspect | af-setup (F3) | af-doctor (F16) |
+| Aspect | azure-functions-setup (F3) | azure-functions-doctor (F16) |
 |--------|-------------|----------------|
 | **Timing** | Before development begins (initial setup) | When issues occur (during development) |
 | **Target** | Verify presence of global tools | Project-specific config and state |
@@ -79,7 +79,7 @@ Next Steps:
 ## Diagnostic Workflow (for AI agents)
 
 ```
-Step 1: Run af-doctor checks
+Step 1: Run azure-functions-doctor checks
   → Collect all 8 category results
 
 Step 2: If func start fails, reproduce with verbose output
@@ -111,7 +111,7 @@ Step 5: Provide fix with exact command and docs link
 ## Skill Metadata
 
 ```yaml
-id: af-doctor
+id: azure-functions-doctor
 title: Azure Functions Project Diagnostics
 intent:
   - diagnose_issue
@@ -123,17 +123,17 @@ completion_signals:
   - issue_identified_and_fixed
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "Project is healthy. Ready to deploy."
       priority: 80
-    - target: af-observability
+    - target: azure-functions-observability
       reason: "Set up monitoring for production readiness."
       priority: 60
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "Diagnostic failures may require environment reconfiguration."
       priority: 80
-    - target: af-help
+    - target: azure-functions-help
       reason: "Get guided assistance for unresolved issues."
       priority: 60
 entry_conditions:
@@ -142,10 +142,10 @@ entry_conditions:
   - project_not_working
 ```
 
-## Relationship to af-setup
+## Relationship to azure-functions-setup
 
 ```
-af-setup (F3)                    af-doctor (F16)
+azure-functions-setup (F3)                    azure-functions-doctor (F16)
 ─────────────                    ───────────────
 "Do I have the tools?"           "Is my project healthy?"
 

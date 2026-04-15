@@ -1,4 +1,4 @@
-# F11: af-feedback — Improvement Loop
+# F11: azure-functions-feedback — Improvement Loop
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 4.4, 6  
@@ -17,7 +17,7 @@ Without feedback, the skill graph can't evolve based on real usage.
 
 ## Feature
 
-`af-feedback` is a lightweight feedback collection skill that captures user experience signals and routes them to the skill improvement pipeline. It sits at the end of most skill chains as an optional next step.
+`azure-functions-feedback` is a lightweight feedback collection skill that captures user experience signals and routes them to the skill improvement pipeline. It sits at the end of most skill chains as an optional next step.
 
 ## Feedback Types
 
@@ -32,7 +32,7 @@ Without feedback, the skill graph can't evolve based on real usage.
 ## Skill Metadata
 
 ```yaml
-id: af-feedback
+id: azure-functions-feedback
 title: Azure Functions Skills Feedback
 intent:
   - provide_feedback
@@ -52,14 +52,14 @@ entry_conditions:
 
 ```
 1. Prompt appears after task completion
-   "How was your experience with af-deploy?"
+   "How was your experience with azure-functions-deploy?"
 
 2. Quick rating (optional)
    ⭐⭐⭐⭐⭐ (1-5)
 
 3. Specific questions (optional)
    "Did the deployment succeed?" → Yes/No
-   "Was the suggested next step (af-observability) useful?" → Yes/No
+   "Was the suggested next step (azure-functions-observability) useful?" → Yes/No
    "Any comments?" → Free text
 
 4. Submit
@@ -84,7 +84,7 @@ For the first version, use **local file storage** as the simplest option:
   "feedback": [
     {
       "timestamp": "2026-04-14T10:30:00Z",
-      "skill": "af-deploy",
+      "skill": "azure-functions-deploy",
       "rating": 4,
       "taskSuccess": true,
       "transitionUseful": true,
@@ -103,7 +103,7 @@ Feedback data informs graph evolution:
 - Skills with low success rates → review and improve content
 - Transitions marked "not useful" → reduce priority or remove edge
 - Frequently reported gaps → create new skills
-- High-rated skills → promote in `af-help` recommendations
+- High-rated skills → promote in `azure-functions-help` recommendations
 
 ## Cross-Target Implementation
 

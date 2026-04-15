@@ -29,7 +29,7 @@ describe('loadSkills', () => {
 
   it('skill IDs match directory names', () => {
     const ids = skills.map(s => s.id).sort();
-    expect(ids).toEqual(['af-create', 'af-deploy', 'af-setup']);
+    expect(ids).toEqual(['azure-functions-create', 'azure-functions-deploy', 'azure-functions-setup']);
   });
 });
 
@@ -93,9 +93,9 @@ describe('buildTarget — ghcp', () => {
     const instrPath = join(DIST_DIR, 'ghcp', '.github', 'copilot-instructions.md');
     expect(existsSync(instrPath)).toBe(true);
     const content = readFileSync(instrPath, 'utf-8');
-    expect(content).toContain('af-setup');
-    expect(content).toContain('af-create');
-    expect(content).toContain('af-deploy');
+    expect(content).toContain('azure-functions-setup');
+    expect(content).toContain('azure-functions-create');
+    expect(content).toContain('azure-functions-deploy');
   });
 
   it('generates mcp.json with servers', () => {
@@ -237,7 +237,7 @@ describe('buildTarget — claude', () => {
     const claudePath = join(DIST_DIR, 'claude', 'CLAUDE.md');
     expect(existsSync(claudePath)).toBe(true);
     const content = readFileSync(claudePath, 'utf-8');
-    expect(content).toContain('af-setup');
+    expect(content).toContain('azure-functions-setup');
   });
 
   it('generates .claude/settings.json with mcpServers', () => {
@@ -283,9 +283,9 @@ describe('buildTarget — codex', () => {
     const agentsPath = join(DIST_DIR, 'codex', 'AGENTS.md');
     expect(existsSync(agentsPath)).toBe(true);
     const content = readFileSync(agentsPath, 'utf-8');
-    expect(content).toContain('af-setup');
-    expect(content).toContain('af-create');
-    expect(content).toContain('af-deploy');
+    expect(content).toContain('azure-functions-setup');
+    expect(content).toContain('azure-functions-create');
+    expect(content).toContain('azure-functions-deploy');
   });
 
   it('generates skill files in .agents/skills/', () => {
@@ -353,10 +353,10 @@ describe('next-step suggestions', () => {
 
     const instrPath = join(DIST_DIR, 'ghcp', '.github', 'copilot-instructions.md');
     const content = readFileSync(instrPath, 'utf-8');
-    // af-setup should suggest af-create on success
-    expect(content).toContain('af-create');
-    // af-create should suggest af-deploy on success
-    expect(content).toContain('af-deploy');
+    // azure-functions-setup should suggest azure-functions-create on success
+    expect(content).toContain('azure-functions-create');
+    // azure-functions-create should suggest azure-functions-deploy on success
+    expect(content).toContain('azure-functions-deploy');
   });
 });
 

@@ -1,12 +1,12 @@
-id: af-deploy
+id: azure-functions-deploy
 title: Deploy Azure Functions
 suggestions:
   on_success:
-    - target: af-create
+    - target: azure-functions-create
       reason: "Add more functions to your deployed app."
       priority: 60
   on_failure:
-    - target: af-setup
+    - target: azure-functions-setup
       reason: "Deployment failed — verify Azure CLI login and subscription."
       priority: 80
 entry_conditions:

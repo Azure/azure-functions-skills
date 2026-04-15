@@ -1,4 +1,4 @@
-# F18: af-audit — Project Audit & Static Analysis
+# F18: azure-functions-audit — Project Audit & Static Analysis
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** N/A (discovered from func-emulate F21 audit)  
@@ -14,11 +14,11 @@ Azure Functions apps accumulate problems over time:
 - Using features not supported on the target SKU (e.g., Durable Timer on Flex Consumption)
 - Missing logging configuration, leaving no telemetry during production incidents
 
-Generic linters cannot detect these **Functions-specific issues**. `af-observability` (F7) handles production monitoring setup, while `af-audit` handles pre-deployment **static checks** — they operate at different layers.
+Generic linters cannot detect these **Functions-specific issues**. `azure-functions-observability` (F7) handles production monitoring setup, while `azure-functions-audit` handles pre-deployment **static checks** — they operate at different layers.
 
 ## Feature
 
-`af-audit` performs Functions domain-specific static analysis on Azure Functions projects, detecting security, SKU compatibility, performance, and best practice issues.
+`azure-functions-audit` performs Functions domain-specific static analysis on Azure Functions projects, detecting security, SKU compatibility, performance, and best practice issues.
 
 ## Rule Categories
 
@@ -94,7 +94,7 @@ Summary: 2 errors, 2 warnings, 2 info
 ## Skill Metadata
 
 ```yaml
-id: af-audit
+id: azure-functions-audit
 title: Azure Functions Project Audit
 intent:
   - audit_project
@@ -106,17 +106,17 @@ completion_signals:
   - issues_found_and_reported
 suggestions:
   on_success:
-    - target: af-deploy
+    - target: azure-functions-deploy
       reason: "Audit passed. Project is ready for deployment."
       priority: 90
-    - target: af-feedback
+    - target: azure-functions-feedback
       reason: "Share your audit experience."
       priority: 30
   on_failure:
-    - target: af-doctor
+    - target: azure-functions-doctor
       reason: "If audit found critical issues, run diagnostics."
       priority: 70
-    - target: af-help
+    - target: azure-functions-help
       reason: "Get guidance on fixing audit findings."
       priority: 60
 entry_conditions:
@@ -137,13 +137,13 @@ Target SKU detection order:
 
 ## CI Integration
 
-`af-audit` can be used in CI pipelines:
+`azure-functions-audit` can be used in CI pipelines:
 
 ```yaml
 # GitHub Actions example
 - name: Azure Functions Audit
   run: |
-    # AI agent runs af-audit and outputs in SARIF format
+    # AI agent runs azure-functions-audit and outputs in SARIF format
     # Integrates with GitHub Code Scanning
 ```
 
@@ -152,7 +152,7 @@ Output formats: `text` (default), `json`, `sarif` (GitHub Code Scanning compatib
 ## Relationship to Other Skills
 
 ```
-af-audit (F18)                     af-observability (F7)
+azure-functions-audit (F18)                     azure-functions-observability (F7)
 ──────────────                     ────────────────────
 Pre-deployment static checks        Post-deployment production monitoring
 
@@ -165,7 +165,7 @@ Timing: Before func start           Timing: After deployment
 ```
 
 ```
-af-audit (F18)                     af-doctor (F16)
+azure-functions-audit (F18)                     azure-functions-doctor (F16)
 ──────────────                     ───────────────
 Static analysis for quality/compat   Dynamic diagnostics for project health
 
