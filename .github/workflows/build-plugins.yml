@@ -1,0 +1,63 @@
+name: Build Plugins
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build plugins
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          echo "=== GHCP ==="
+          ls -la dist/ghcp/.github/
+          ls -la dist/ghcp/.vscode/
+          echo "=== Claude ==="
+          ls -la dist/claude/.claude/
+          ls -la dist/claude/.claude/skills/
+          echo "=== Codex ==="
+          ls -la dist/codex/
+
+      - name: Upload GHCP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-ghcp
+          path: dist/ghcp/
+
+      - name: Upload Claude artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-claude
+          path: dist/claude/
+
+      - name: Upload Codex artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-codex
+          path: dist/codex/

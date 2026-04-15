@@ -1,0 +1,17 @@
+# MCP Server Definitions
+# These are embedded into target-specific MCP config files by the build system.
+
+servers:
+  - id: azure-functions-templates
+    name: "Azure Functions Templates"
+    description: "Template discovery and scaffolding for Azure Functions"
+    type: stdio
+    command: npx
+    args: ["-y", "azure-functions-templates-mcp-server"]
+
+  - id: azure
+    name: "Azure MCP"
+    description: "Azure resource management — deploy, configure, monitor Functions apps"
+    type: stdio
+    command: npx
+    args: ["-y", "@azure/mcp@latest", "server", "start"]

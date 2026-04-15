@@ -1,0 +1,12 @@
+id: af-create
+title: Create Azure Functions App
+description: Scaffold a new Azure Functions project with language and template selection
+category: task
+targets:
+  ghcp: true
+  claude: true
+  codex: true
+tags:
+  - create
+  - scaffold
+  - template
