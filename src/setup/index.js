@@ -3,10 +3,11 @@
  * Usable as CLI (`npx @agent-loom/azure-functions-skills setup`) or library (VS Code extension).
  */
 
-import { existsSync, mkdirSync, cpSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../build/loader.js';
 import { buildTarget } from '../build/build-target.js';
 
@@ -72,7 +73,7 @@ export async function applySetup(targetDir, options = {}) {
   const data = { skills, mcpServers, agents: agentDefs, hooks };
 
   // Build each target to a temp location, then copy to targetDir
-  const tmpDir = join(targetDir, '.af-skills-tmp');
+  const tmpDir = join(tmpdir(), `af-skills-tmp-${Date.now()}`);
   let totalFiles = 0;
 
   try {
@@ -85,10 +86,13 @@ export async function applySetup(targetDir, options = {}) {
       totalFiles += copyRecursive(agentDir, targetDir);
     }
   } finally {
-    // Cleanup temp dir
-    if (existsSync(tmpDir)) {
-      const { rmSync } = await import('node:fs');
-      rmSync(tmpDir, { recursive: true, force: true });
+    // Cleanup temp dir (in OS temp, no lock issues)
+    try {
+      if (existsSync(tmpDir)) {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    } catch {
+      // Best-effort cleanup — OS temp dir will be cleaned eventually
     }
   }
 
