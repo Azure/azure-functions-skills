@@ -4,20 +4,6 @@ description: "Azure Functions development guide — routes you to the right skil
 tools:
   - "*"
   - "azure-functions-templates/*"
-  - "azure/*"
-handoffs:
-  - label: "Setup Environment"
-    agent: functions-guide
-    prompt: "Run the azure-functions-setup skill to verify my environment has Azure CLI, Core Tools, and the right runtime installed."
-    send: false
-  - label: "Create Function"
-    agent: functions-guide
-    prompt: "Run the azure-functions-create skill to scaffold a new Azure Functions project."
-    send: false
-  - label: "Deploy to Azure"
-    agent: functions-guide
-    prompt: "Run the azure-functions-deploy skill to deploy my app to Azure."
-    send: false
 ---
 
 # Azure Functions Guide
