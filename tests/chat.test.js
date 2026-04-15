@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildStartupPrompt, LAUNCHERS, detectCliAgents } from '../src/chat/index.js';
+import { buildStartupPrompt, LAUNCHERS, detectCliAgents, chat } from '../src/chat/index.js';
 
 const DIST_DIR = join(import.meta.dirname, '..', 'dist-test-chat');
 
@@ -97,4 +97,83 @@ describe('detectCliAgents', () => {
       expect(a.command).toBeTruthy();
     }
   });
+});
+
+// ─── Auto-setup tests ───
+
+describe('chat auto-setup', () => {
+  it('auto-installs ghcp skills when not present', async () => {
+    const testDir = join(import.meta.dirname, '..', 'dist-test-chat-ghcp');
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+    mkdirSync(testDir, { recursive: true });
+
+    try {
+      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test' });
+      if (result?.childProcess) result.childProcess.kill();
+    } catch {
+      // Expected: copilot binary not found — that's fine
+    }
+
+    // Skills should now be installed
+    expect(existsSync(join(testDir, '.github', 'copilot-instructions.md'))).toBe(true);
+    expect(existsSync(join(testDir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+  }, 15000);
+
+  it('auto-installs claude skills when not present', async () => {
+    const testDir = join(import.meta.dirname, '..', 'dist-test-chat-claude');
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+    mkdirSync(testDir, { recursive: true });
+
+    try {
+      const result = await chat({ agent: 'claude-code', dir: testDir, prompt: 'test' });
+      // If claude is installed, kill the spawned process immediately
+      if (result?.childProcess) result.childProcess.kill();
+    } catch {
+      // Expected: claude binary not found
+    }
+
+    expect(existsSync(join(testDir, 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup.md'))).toBe(true);
+  }, 15000);
+
+  it('auto-installs codex skills when not present', async () => {
+    const testDir = join(import.meta.dirname, '..', 'dist-test-chat-codex');
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+    mkdirSync(testDir, { recursive: true });
+
+    try {
+      const result = await chat({ agent: 'codex', dir: testDir, prompt: 'test' });
+      if (result?.childProcess) result.childProcess.kill();
+    } catch {
+      // Expected: codex binary not found
+    }
+
+    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(true);
+    expect(existsSync(join(testDir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+  }, 15000);
+
+  it('skips setup when skills are already present', async () => {
+    const testDir = join(import.meta.dirname, '..', 'dist-test-chat-skip');
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+    mkdirSync(testDir, { recursive: true });
+
+    // Pre-install skills
+    const { applySetup } = await import('../src/setup/index.js');
+    await applySetup(testDir, { agents: ['ghcp'] });
+
+    // Get content of instructions file
+    const instrPath = join(testDir, '.github', 'copilot-instructions.md');
+    const contentBefore = readFileSync(instrPath, 'utf-8');
+
+    try {
+      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test' });
+      if (result?.childProcess) result.childProcess.kill();
+    } catch {
+      // Expected
+    }
+
+    // File should not have been re-written (same content)
+    const contentAfter = readFileSync(instrPath, 'utf-8');
+    expect(contentAfter).toBe(contentBefore);
+  }, 15000);
 });

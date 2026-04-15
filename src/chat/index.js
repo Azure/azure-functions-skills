@@ -10,6 +10,7 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync, spawn } from 'node:child_process';
+import { applySetup } from '../setup/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = join(__dirname, '..', 'prompts');
@@ -142,6 +143,20 @@ export async function chat(options = {}) {
     throw new Error(`Unknown agent: ${agentId}. Available: ${Object.keys(LAUNCHERS).join(', ')}`);
   }
 
+  // Auto-setup: ensure skills are installed before launching the agent
+  const agentToSetupTarget = {
+    'github-copilot': 'ghcp',
+    'claude-code': 'claude',
+    'codex': 'codex',
+  };
+  const setupTarget = agentToSetupTarget[agentId];
+  if (setupTarget && !isSetupDone(dir, setupTarget)) {
+    const result = await applySetup(dir, { agents: [setupTarget] });
+    if (result.filesWritten > 0) {
+      process.stderr.write(`📦 Installed ${result.filesWritten} skill files for ${setupTarget}\n`);
+    }
+  }
+
   const startupPrompt = options.prompt || await buildStartupPrompt(dir);
   const args = launcher.buildArgs({ startupPrompt });
 
@@ -151,14 +166,19 @@ export async function chat(options = {}) {
     shell: false,
   });
 
-  child.on('error', (err) => {
-    if (err.code === 'ENOENT') {
-      throw new Error(`${launcher.command} not found. Install it first.`);
-    }
-    throw err;
-  });
+  return new Promise((resolve, reject) => {
+    child.on('error', (err) => {
+      if (err.code === 'ENOENT') {
+        reject(new Error(`${launcher.command} not found. Install it first.`));
+      } else {
+        reject(err);
+      }
+    });
 
-  return { childProcess: child, agent: agentId, prompt: startupPrompt };
+    child.on('spawn', () => {
+      resolve({ childProcess: child, agent: agentId, prompt: startupPrompt });
+    });
+  });
 }
 
 async function pickAgent() {
@@ -172,4 +192,26 @@ async function pickAgent() {
     );
   }
   return agents[0].id;
+}
+
+/**
+ * Check if skill files are already present for a given target.
+ */
+function isSetupDone(dir, target) {
+  const checks = {
+    ghcp: [
+      join(dir, '.github', 'copilot-instructions.md'),
+      join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'),
+    ],
+    claude: [
+      join(dir, 'CLAUDE.md'),
+      join(dir, '.claude', 'skills', 'azure-functions-setup.md'),
+    ],
+    codex: [
+      join(dir, 'AGENTS.md'),
+      join(dir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'),
+    ],
+  };
+  const files = checks[target] || [];
+  return files.every(f => existsSync(f));
 }

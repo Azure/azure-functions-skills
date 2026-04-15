@@ -1,8 +1,6 @@
 node_modules/
 dist/
-dist-test/
-dist-test-chat/
-dist-test-plugin/
+dist-test*/
 *.log
 .DS_Store
 PLAN-*.md
