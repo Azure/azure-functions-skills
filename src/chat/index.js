@@ -13,7 +13,7 @@ import { execSync, spawn } from 'node:child_process';
 import { applySetup } from '../setup/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROMPTS_DIR = join(__dirname, '..', 'prompts');
+const PROMPTS_DIR = join(__dirname, '..', '..', 'templates', 'prompts');
 
 // ─── Launcher configurations ───
 

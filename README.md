@@ -232,7 +232,13 @@ dist/
 ### Architecture
 
 ```
-src/
+src/                     # CLI / builder source code (JavaScript)
+└── build/               # Build system
+    ├── build.js         #   Entry point
+    ├── loader.js        #   Canonical source loader
+    └── build-target.js  #   Per-target generators
+
+templates/               # Canonical plugin content (edited by hand)
 ├── skills/              # Canonical skill definitions
 │   ├── azure-functions-setup/        #   skill.yaml + graph.yaml + content.md
 │   ├── azure-functions-create/
@@ -244,10 +250,8 @@ src/
 │   └── welcome-setup.md #   First-run welcome + prereq check
 ├── mcp/                 # MCP server definitions
 │   └── servers.yaml
-└── build/               # Build system
-    ├── build.js         #   Entry point
-    ├── loader.js        #   Canonical source loader
-    └── build-target.js  #   Per-target generators
+└── prompts/             # Chat startup prompts
+    └── startup.md
 ```
 
 The build system reads canonical sources and generates target-specific artifacts. Each skill has:

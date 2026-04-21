@@ -12,7 +12,7 @@ import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../build/load
 import { buildTarget } from '../build/build-target.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC_DIR = join(__dirname, '..');
+const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 
 /**
  * Detect which coding agents are available in the environment.
@@ -66,10 +66,10 @@ export async function applySetup(targetDir, options = {}) {
   const agents = options.agents || await detectAgents();
 
   // Load canonical sources
-  const skills = loadSkills(join(SRC_DIR, 'skills'));
-  const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-  const agentDefs = loadAgents(join(SRC_DIR, 'agents'));
-  const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+  const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+  const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+  const agentDefs = loadAgents(join(TEMPLATES_DIR, 'agents'));
+  const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
   const data = { skills, mcpServers, agents: agentDefs, hooks };
 
   // Build each target to a temp location, then copy to targetDir

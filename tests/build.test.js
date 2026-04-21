@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../src/build/loader.js';
 import { buildTarget } from '../src/build/build-target.js';
 
-const SRC_DIR = join(import.meta.dirname, '..', 'src');
+const TEMPLATES_DIR = join(import.meta.dirname, '..', 'templates');
 const DIST_DIR = join(import.meta.dirname, '..', 'dist-test');
 
 // ─── Loader tests ───
 
 describe('loadSkills', () => {
   let skills;
-  beforeAll(() => { skills = loadSkills(join(SRC_DIR, 'skills')); });
+  beforeAll(() => { skills = loadSkills(join(TEMPLATES_DIR, 'skills')); });
 
   it('loads all three skills', () => {
     expect(skills).toHaveLength(3);
@@ -35,7 +35,7 @@ describe('loadSkills', () => {
 
 describe('loadMcpServers', () => {
   let servers;
-  beforeAll(() => { servers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml')); });
+  beforeAll(() => { servers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')); });
 
   it('loads MCP server definitions', () => {
     expect(servers.length).toBeGreaterThanOrEqual(1);
@@ -52,7 +52,7 @@ describe('loadMcpServers', () => {
 
 describe('loadAgents', () => {
   let agents;
-  beforeAll(() => { agents = loadAgents(join(SRC_DIR, 'agents')); });
+  beforeAll(() => { agents = loadAgents(join(TEMPLATES_DIR, 'agents')); });
 
   it('loads AGENTS.md', () => {
     expect(agents.agentsMd).toBeTruthy();
@@ -67,7 +67,7 @@ describe('loadAgents', () => {
 
 describe('loadHooks', () => {
   let hooks;
-  beforeAll(() => { hooks = loadHooks(join(SRC_DIR, 'hooks')); });
+  beforeAll(() => { hooks = loadHooks(join(TEMPLATES_DIR, 'hooks')); });
 
   it('loads welcome-setup hook', () => {
     expect(hooks.welcome).toBeTruthy();
@@ -84,10 +84,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates copilot-instructions.md', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const instrPath = join(DIST_DIR, 'ghcp', '.github', 'copilot-instructions.md');
@@ -99,10 +99,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates mcp.json with servers', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const mcpPath = join(DIST_DIR, 'ghcp', '.vscode', 'mcp.json');
@@ -113,10 +113,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates agent definition', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const agentPath = join(DIST_DIR, 'ghcp', '.github', 'agents', 'functions-guide.agent.md');
@@ -124,10 +124,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates AGENTS.md', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const agentsMdPath = join(DIST_DIR, 'ghcp', 'AGENTS.md');
@@ -135,10 +135,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates skill files in .github/skills/', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     for (const s of skills) {
@@ -152,10 +152,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates hooks in .github/hooks/', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const hooksPath = join(DIST_DIR, 'ghcp', '.github', 'hooks', 'welcome-setup.json');
@@ -166,10 +166,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates plugin.json manifest', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const manifestPath = join(DIST_DIR, 'ghcp', 'plugin.json');
@@ -181,10 +181,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates plugin skills/ directory', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     for (const s of skills) {
@@ -194,10 +194,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates plugin .mcp.json', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const mcpPluginPath = join(DIST_DIR, 'ghcp', '.mcp.json');
@@ -208,10 +208,10 @@ describe('buildTarget — ghcp', () => {
   });
 
   it('generates plugin hooks.json at plugin root', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const hooksPluginPath = join(DIST_DIR, 'ghcp', 'hooks.json');
@@ -228,10 +228,10 @@ describe('buildTarget — claude', () => {
   });
 
   it('generates CLAUDE.md', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('claude', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const claudePath = join(DIST_DIR, 'claude', 'CLAUDE.md');
@@ -241,10 +241,10 @@ describe('buildTarget — claude', () => {
   });
 
   it('generates .claude/settings.json with mcpServers', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('claude', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const settingsPath = join(DIST_DIR, 'claude', '.claude', 'settings.json');
@@ -254,10 +254,10 @@ describe('buildTarget — claude', () => {
   });
 
   it('generates skill files in .claude/skills/', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('claude', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     for (const s of skills) {
@@ -274,10 +274,10 @@ describe('buildTarget — codex', () => {
   });
 
   it('generates AGENTS.md with full instructions', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const agentsPath = join(DIST_DIR, 'codex', 'AGENTS.md');
@@ -289,10 +289,10 @@ describe('buildTarget — codex', () => {
   });
 
   it('generates skill files in .agents/skills/', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     for (const s of skills) {
@@ -307,10 +307,10 @@ describe('buildTarget — codex', () => {
   });
 
   it('generates .codex/config.toml with MCP servers', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const configPath = join(DIST_DIR, 'codex', '.codex', 'config.toml');
@@ -321,10 +321,10 @@ describe('buildTarget — codex', () => {
   });
 
   it('generates .codex/hooks.json with SessionStart hook', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const hooksPath = join(DIST_DIR, 'codex', '.codex', 'hooks.json');
@@ -345,10 +345,10 @@ describe('next-step suggestions', () => {
   });
 
   it('GHCP instructions include graph suggestions', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const instrPath = join(DIST_DIR, 'ghcp', '.github', 'copilot-instructions.md');
@@ -369,10 +369,10 @@ describe('Codex plugin manifest', () => {
   });
 
   it('generates .codex-plugin/plugin.json with correct structure', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const manifestPath = join(DIST_DIR, 'codex', '.codex-plugin', 'plugin.json');
@@ -387,10 +387,10 @@ describe('Codex plugin manifest', () => {
   });
 
   it('generates .mcp.json at plugin root', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const mcpPath = join(DIST_DIR, 'codex', '.mcp.json');
@@ -401,10 +401,10 @@ describe('Codex plugin manifest', () => {
   });
 
   it('generates marketplace.json', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const mpPath = join(DIST_DIR, 'codex', '.agents', 'plugins', 'marketplace.json');
@@ -415,10 +415,10 @@ describe('Codex plugin manifest', () => {
   });
 
   it('generates plugin skills under skills/ (plugin convention)', () => {
-    const skills = loadSkills(join(SRC_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(SRC_DIR, 'agents'));
-    const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     // Plugin convention: skills go under <plugin>/skills/<name>/SKILL.md
