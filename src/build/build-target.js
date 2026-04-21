@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -9,6 +9,30 @@ export function buildTarget(target, data, distDir) {
   const builder = builders[target];
   if (!builder) throw new Error(`Unknown target: ${target}`);
   builder(data, distDir);
+}
+
+/**
+ * Recursively copy a directory tree into destDir (created if missing).
+ * Used for skill `references/` subdirs. Keeps implementation local to the
+ * build module; `src/setup/index.js` has its own copyRecursive for install-time
+ * use. Consolidating them is out of scope (see issue #8).
+ */
+function copyDirRecursive(srcDir, destDir) {
+  mkdirSync(destDir, { recursive: true });
+  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+    const src = join(srcDir, entry.name);
+    const dest = join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirRecursive(src, dest);
+    } else if (entry.isFile()) {
+      copyFileSync(src, dest);
+    }
+  }
+}
+
+function copySkillReferences(skill, skillDestDir) {
+  if (!skill.referencesDir) return;
+  copyDirRecursive(skill.referencesDir, join(skillDestDir, 'references'));
 }
 
 // ─── GHCP ───
@@ -38,6 +62,7 @@ function buildGhcp({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, '.github', 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateGhcpSkillMd(skill));
+    copySkillReferences(skill, skillDir);
   }
 
   // .github/hooks/welcome-setup.json — SessionStart hook (workspace level)
@@ -59,6 +84,7 @@ function buildGhcp({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateGhcpSkillMd(skill));
+    copySkillReferences(skill, skillDir);
   }
 
   // agents/<name>.agent.md — Plugin-level agent
@@ -92,10 +118,12 @@ function buildClaude({ skills, mcpServers, agents, hooks }, distDir) {
   const settings = generateClaudeSettings(mcpServers);
   writeFileSync(join(base, '.claude', 'settings.json'), JSON.stringify(settings, null, 2));
 
-  // Skill files in .claude/skills/
+  // .claude/skills/<id>/SKILL.md — Agent Skills (agentskills.io standard, directory format)
   for (const skill of skills) {
-    const skillContent = generateSkillFile(skill);
-    writeFileSync(join(base, '.claude', 'skills', `${skill.id}.md`), skillContent);
+    const skillDir = join(base, '.claude', 'skills', skill.id);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'), generateClaudeSkillMd(skill));
+    copySkillReferences(skill, skillDir);
   }
 }
 
@@ -115,6 +143,7 @@ function buildCodex({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, '.agents', 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateCodexSkillMd(skill));
+    copySkillReferences(skill, skillDir);
   }
 
   // skills/<id>/SKILL.md — plugin-convention skills (for .codex-plugin)
@@ -122,6 +151,7 @@ function buildCodex({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateCodexSkillMd(skill));
+    copySkillReferences(skill, skillDir);
   }
 
   // .codex-plugin/plugin.json — plugin manifest
@@ -311,13 +341,16 @@ function generateClaudeSettings(mcpServers) {
   return { mcpServers: mcpEntries };
 }
 
-function generateSkillFile(skill) {
+function generateClaudeSkillMd(skill) {
   const next = skill.graph.suggestions.on_success
     .map(n => `→ **${n.target}**: ${n.reason || ''}`)
     .join('\n');
 
   return [
-    `# ${skill.id} — ${skill.title}`,
+    '---',
+    `name: ${skill.id}`,
+    `description: "${skill.description}"`,
+    '---',
     '',
     skill.content,
     '',

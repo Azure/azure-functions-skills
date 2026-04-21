@@ -135,7 +135,7 @@ describe('chat auto-setup', () => {
     }
 
     expect(existsSync(join(testDir, 'CLAUDE.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup.md'))).toBe(true);
+    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
   }, 15000);
 
   it('auto-installs codex skills when not present', async () => {

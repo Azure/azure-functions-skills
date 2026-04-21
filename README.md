@@ -163,11 +163,11 @@ hooks.json                                # Plugin hooks (Copilot format)
 ### Claude Code
 
 ```
-CLAUDE.md                            # Full instructions + skills inline
-.claude/settings.json                # MCP server configuration
-.claude/skills/azure-functions-setup.md           # Setup skill
-.claude/skills/azure-functions-create.md          # Create skill
-.claude/skills/azure-functions-deploy.md          # Deploy skill
+CLAUDE.md                                        # Full instructions + skills inline
+.claude/settings.json                            # MCP server configuration
+.claude/skills/azure-functions-setup/SKILL.md    # Setup skill (agentskills.io directory format)
+.claude/skills/azure-functions-create/SKILL.md   # Create skill
+.claude/skills/azure-functions-deploy/SKILL.md   # Deploy skill
 ```
 
 ### Codex (OpenAI)

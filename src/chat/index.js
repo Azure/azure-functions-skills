@@ -205,7 +205,7 @@ function isSetupDone(dir, target) {
     ],
     claude: [
       join(dir, 'CLAUDE.md'),
-      join(dir, '.claude', 'skills', 'azure-functions-setup.md'),
+      join(dir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'),
     ],
     codex: [
       join(dir, 'AGENTS.md'),
