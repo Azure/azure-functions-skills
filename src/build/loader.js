@@ -1,9 +1,9 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
  * Load all skills from the skills directory.
- * Each skill dir contains skill.yaml, graph.yaml, content.md.
+ * Each skill dir contains skill.yaml, graph.yaml, SKILL.md, and an optional references/ subdir.
  */
 export function loadSkills(skillsDir) {
   const dirs = readdirSync(skillsDir, { withFileTypes: true })
@@ -14,7 +14,11 @@ export function loadSkills(skillsDir) {
     const base = join(skillsDir, dir);
     const skillYaml = readFileSync(join(base, 'skill.yaml'), 'utf-8');
     const graphYaml = readFileSync(join(base, 'graph.yaml'), 'utf-8');
-    const content = readFileSync(join(base, 'content.md'), 'utf-8');
+    const content = readFileSync(join(base, 'SKILL.md'), 'utf-8');
+
+    const refsPath = join(base, 'references');
+    const referencesDir =
+      existsSync(refsPath) && statSync(refsPath).isDirectory() ? refsPath : null;
 
     return {
       id: parseYamlValue(skillYaml, 'id'),
@@ -23,6 +27,7 @@ export function loadSkills(skillsDir) {
       category: parseYamlValue(skillYaml, 'category'),
       content,
       graph: parseGraph(graphYaml),
+      referencesDir,
       raw: { skill: skillYaml, graph: graphYaml },
     };
   });

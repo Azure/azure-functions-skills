@@ -34,11 +34,12 @@ src/
 │   ├── azure-functions-help/
 │   │   ├── skill.yaml          # Metadata: id, title, description, targets
 │   │   ├── graph.yaml          # Graph edges: suggestions, entry conditions
-│   │   └── content.md          # Skill body (target-agnostic)
+│   │   ├── SKILL.md            # Skill body (target-agnostic, agentskills.io standard)
+│   │   └── references/         # Optional: longer supporting docs linked from SKILL.md
 │   ├── azure-functions-setup/
 │   │   ├── skill.yaml
 │   │   ├── graph.yaml
-│   │   └── content.md
+│   │   └── SKILL.md
 │   ├── azure-functions-create/
 │   │   └── ...
 │   └── ...
@@ -92,7 +93,7 @@ dist/
 ### Step 1: Read Source
 
 - Parse all `skill.yaml` and `graph.yaml` files
-- Parse `content.md` for skill body text
+- Parse `SKILL.md` for skill body text (plus optional `references/` subdirectory copied as-is)
 - Parse agent and hook definitions
 
 ### Step 2: Validate Graph

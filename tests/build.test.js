@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { readFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../src/build/loader.js';
 import { buildTarget } from '../src/build/build-target.js';
@@ -253,7 +253,7 @@ describe('buildTarget — claude', () => {
     expect(settings.mcpServers).toBeTruthy();
   });
 
-  it('generates skill files in .claude/skills/', () => {
+  it('generates skill files in .claude/skills/<id>/SKILL.md', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
@@ -261,7 +261,7 @@ describe('buildTarget — claude', () => {
     buildTarget('claude', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     for (const s of skills) {
-      const skillPath = join(DIST_DIR, 'claude', '.claude', 'skills', `${s.id}.md`);
+      const skillPath = join(DIST_DIR, 'claude', '.claude', 'skills', s.id, 'SKILL.md');
       expect(existsSync(skillPath)).toBe(true);
     }
   });
@@ -489,5 +489,78 @@ describe('setup module', () => {
     expect(result.agents).toContain('ghcp');
     expect(result.filesWritten).toBeGreaterThan(0);
     expect(result.welcomeMessage).toContain('Azure Functions');
+  });
+});
+
+// ─── references/ subdir support ───
+
+describe('skill references/ subdirectory', () => {
+  const FIXTURE_DIR = join(import.meta.dirname, '..', 'dist-test-refs-fixture');
+  const REF_DIST_DIR = join(import.meta.dirname, '..', 'dist-test-refs');
+
+  beforeEach(() => {
+    for (const d of [FIXTURE_DIR, REF_DIST_DIR]) {
+      if (existsSync(d)) rmSync(d, { recursive: true });
+    }
+    // Build a minimal skill fixture: skills/demo-skill/{skill.yaml, graph.yaml, SKILL.md, references/*}
+    const skillDir = join(FIXTURE_DIR, 'skills', 'demo-skill');
+    mkdirSync(join(skillDir, 'references', 'nested'), { recursive: true });
+    writeFileSync(
+      join(skillDir, 'skill.yaml'),
+      'id: demo-skill\ntitle: Demo\ndescription: "Demo skill with references"\ncategory: test\n',
+    );
+    writeFileSync(
+      join(skillDir, 'graph.yaml'),
+      'suggestions:\n  on_success: []\n',
+    );
+    writeFileSync(
+      join(skillDir, 'SKILL.md'),
+      '# Demo\nSee [more](references/extra.md).\n',
+    );
+    writeFileSync(join(skillDir, 'references', 'extra.md'), '# Extra reference\n');
+    writeFileSync(join(skillDir, 'references', 'nested', 'deep.md'), '# Nested ref\n');
+  });
+
+  it('loadSkills returns referencesDir when references/ exists', () => {
+    const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
+    expect(skills).toHaveLength(1);
+    expect(skills[0].referencesDir).toBeTruthy();
+    expect(skills[0].referencesDir.endsWith('references')).toBe(true);
+  });
+
+  it('loadSkills returns referencesDir=null when references/ is missing', () => {
+    // Remove references to test the negative case
+    rmSync(join(FIXTURE_DIR, 'skills', 'demo-skill', 'references'), { recursive: true });
+    const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
+    expect(skills[0].referencesDir).toBeNull();
+  });
+
+  // Minimal agents/hooks/mcp stubs for cross-target builds
+  function buildFixture(target) {
+    const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    buildTarget(target, { skills, mcpServers, agents, hooks }, REF_DIST_DIR);
+  }
+
+  it('ghcp build copies references/ under .github/skills/<id>/ and skills/<id>/', () => {
+    buildFixture('ghcp');
+    expect(existsSync(join(REF_DIST_DIR, 'ghcp', '.github', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
+    expect(existsSync(join(REF_DIST_DIR, 'ghcp', '.github', 'skills', 'demo-skill', 'references', 'nested', 'deep.md'))).toBe(true);
+    expect(existsSync(join(REF_DIST_DIR, 'ghcp', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
+  });
+
+  it('claude build emits .claude/skills/<id>/SKILL.md and copies references/', () => {
+    buildFixture('claude');
+    expect(existsSync(join(REF_DIST_DIR, 'claude', '.claude', 'skills', 'demo-skill', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(REF_DIST_DIR, 'claude', '.claude', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
+    expect(existsSync(join(REF_DIST_DIR, 'claude', '.claude', 'skills', 'demo-skill', 'references', 'nested', 'deep.md'))).toBe(true);
+  });
+
+  it('codex build copies references/ under .agents/skills/<id>/ and skills/<id>/', () => {
+    buildFixture('codex');
+    expect(existsSync(join(REF_DIST_DIR, 'codex', '.agents', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
+    expect(existsSync(join(REF_DIST_DIR, 'codex', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
   });
 });
