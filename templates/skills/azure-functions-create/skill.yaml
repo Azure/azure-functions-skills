@@ -6,6 +6,8 @@ targets:
   ghcp: true
   claude: true
   codex: true
+mcp_preferred:
+  - azure-functions-templates
 tags:
   - create
   - scaffold

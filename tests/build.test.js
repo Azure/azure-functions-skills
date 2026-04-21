@@ -151,6 +151,32 @@ describe('buildTarget — ghcp', () => {
     }
   });
 
+  it('azure-functions-create skill is MCP-primary and ships language-snippets reference', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
+
+    const skillPath = join(DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create', 'SKILL.md');
+    const body = readFileSync(skillPath, 'utf-8');
+    // MCP-primary: mentions the four templates MCP tool names
+    expect(body).toContain('get_languages_list');
+    expect(body).toContain('get_project_template');
+    expect(body).toContain('get_azure_functions_templates_list');
+    expect(body).toContain('get_azure_functions_template');
+    // Path structure + fallback notice
+    expect(body).toMatch(/Path A/);
+    expect(body).toMatch(/Path B/);
+    expect(body).toContain('fallback');
+    // References file ships alongside the skill
+    const refsPath = join(
+      DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create',
+      'references', 'language-snippets.md',
+    );
+    expect(existsSync(refsPath)).toBe(true);
+  });
+
   it('generates hooks in .github/hooks/', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
@@ -491,8 +517,6 @@ describe('setup module', () => {
     expect(result.welcomeMessage).toContain('Azure Functions');
   });
 });
-
-// ─── references/ subdir support ───
 
 describe('skill references/ subdirectory', () => {
   const FIXTURE_DIR = join(import.meta.dirname, '..', 'dist-test-refs-fixture');

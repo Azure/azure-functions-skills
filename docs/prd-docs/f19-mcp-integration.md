@@ -1,7 +1,7 @@
 # F19: MCP Integration — Template & Runtime MCP Server
 
-**Status:** 📋 Proposed  
-**Draft Spec Section:** N/A (discovered from func-emulate F6/F10)  
+**Status:** 🚧 Partially Implemented (Layer 1 — Templates MCP wired into `azure-functions-create`)
+**Draft Spec Section:** N/A (discovered from func-emulate F6/F10)
 **Depends on:** F1 (Skill Graph Metadata), F5 (azure-functions-create)
 
 ## Problem
@@ -31,9 +31,9 @@ Incorporating the Azure Functions Templates MCP Server into the skill ecosystem.
 |------|------------|-----------------|
 | `get_languages_list` | List of supported languages (runtime versions, template count) | azure-functions-create, azure-functions-help |
 | `get_project_template` | Project initialization files (host.json, package.json, etc.) | azure-functions-create |
-| `get_templates_list` | Template list by language (descriptions, categories) | azure-functions-create, azure-functions-help |
-| `get_template` | Full template source code + required app settings | azure-functions-create |
-| `get_sku_profile` | SKU profile (host/bundle versions) | azure-functions-hosting, azure-functions-audit |
+| `get_azure_functions_templates_list` | Template list by language (descriptions, categories) | azure-functions-create, azure-functions-help |
+| `get_azure_functions_template` | Full template source code + required app settings | azure-functions-create |
+| `get_sku_profile` | SKU profile (host/bundle versions) — *future* | azure-functions-hosting, azure-functions-audit |
 
 **Automatic MCP configuration generation:**
 
@@ -46,7 +46,7 @@ During `azure-functions-setup` (F3) workspace configuration, MCP settings are pl
     "azure-functions-templates": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "azure-functions-templates-mcp-server"]
+      "args": ["-y", "manvir-templates-mcp-server"]
     }
   }
 }
@@ -58,7 +58,7 @@ During `azure-functions-setup` (F3) workspace configuration, MCP settings are pl
   "mcpServers": {
     "azure-functions-templates": {
       "command": "npx",
-      "args": ["-y", "azure-functions-templates-mcp-server"]
+      "args": ["-y", "manvir-templates-mcp-server"]
     }
   }
 }
@@ -83,8 +83,8 @@ How each skill utilizes MCP tools:
 
 | Skill | MCP Tool | Purpose |
 |-------|----------|---------|
-| **azure-functions-create** (F5) | `get_languages_list`, `get_templates_list`, `get_template`, `get_project_template` | Template search, code generation, project scaffolding |
-| **azure-functions-help** (F2) | `get_languages_list`, `get_templates_list` | Display available template lists |
+| **azure-functions-create** (F5) | `get_languages_list`, `get_azure_functions_templates_list`, `get_azure_functions_template`, `get_project_template` | Template search, code generation, project scaffolding |
+| **azure-functions-help** (F2) | `get_languages_list`, `get_azure_functions_templates_list` | Display available template lists |
 | **azure-functions-hosting** (F8) | `get_sku_profile` | Retrieve SKU-specific constraint information |
 | **azure-functions-audit** (F18) | `get_sku_profile` | SKU compatibility checks |
 | **azure-functions-discovery** (F4) | `get_sku_profile` | Detailed information for detected SKU |
