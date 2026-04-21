@@ -44,26 +44,19 @@ jobs:
           zip -r "../azure-functions-skills-claude-${VERSION}.zip" claude/
           zip -r "../azure-functions-skills-codex-${VERSION}.zip" codex/
 
+      - name: Render release notes
+        run: |
+          export VERSION="${GITHUB_REF_NAME#v}"
+          envsubst '${VERSION}' < .github/RELEASE_NOTES_TEMPLATE.md > release_notes.md
+          echo "--- Rendered release notes ---"
+          cat release_notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          body_path: release_notes.md
           files: |
             azure-functions-skills-ghcp-*.zip
             azure-functions-skills-claude-*.zip
             azure-functions-skills-codex-*.zip
-          body: |
-            ## Install without npm
-
-            Download the zip for your AI assistant and extract it into your project:
-
-            | Assistant | Download | Extract to |
-            |-----------|----------|------------|
-            | **GitHub Copilot** | `azure-functions-skills-ghcp-${{ github.ref_name }}.zip` | Project root |
-            | **Claude Code** | `azure-functions-skills-claude-${{ github.ref_name }}.zip` | Project root |
-            | **Codex** | `azure-functions-skills-codex-${{ github.ref_name }}.zip` | Project root |
-
-            ### Quick install (with npm)
-            ```bash
-            npx @agent-loom/azure-functions-skills setup
-            ```
