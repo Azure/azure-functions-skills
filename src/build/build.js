@@ -16,7 +16,7 @@ import { buildTarget } from './build-target.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const SRC_DIR = join(ROOT, 'src');
+const TEMPLATES_DIR = join(ROOT, 'templates');
 const DIST_DIR = join(ROOT, 'dist');
 
 const TARGETS = ['ghcp', 'claude', 'codex'];
@@ -30,10 +30,10 @@ const selectedTargets = targetFlag >= 0 && args[targetFlag + 1]
 
 // Load canonical sources
 console.log('Loading canonical sources...');
-const skills = loadSkills(join(SRC_DIR, 'skills'));
-const mcpServers = loadMcpServers(join(SRC_DIR, 'mcp', 'servers.yaml'));
-const agents = loadAgents(join(SRC_DIR, 'agents'));
-const hooks = loadHooks(join(SRC_DIR, 'hooks'));
+const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
 
 console.log(`  ${skills.length} skills loaded`);
 console.log(`  ${mcpServers.length} MCP servers loaded`);
