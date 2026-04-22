@@ -7,7 +7,7 @@ targets:
   claude: true
   codex: true
 mcp_preferred:
-  - azure-functions-templates
+  - azure
 tags:
   - create
   - scaffold

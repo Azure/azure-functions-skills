@@ -24,20 +24,20 @@ The skill is designed with a clear primary / fallback split so it works across t
 
 ### Path A — MCP Primary (preferred)
 
-When the [`azure-functions-templates` MCP server](https://www.npmjs.com/package/manvir-templates-mcp-server) (Manvir Kaur) is wired into the agent, use it as the authoritative source of truth. This server ships 68+ officially maintained templates across C#, Java, Python, TypeScript and exposes four composable tools:
+When the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) is wired into the agent, use it as the authoritative source of truth. This server ships 68+ officially maintained templates across C#, Java, JavaScript, Python, TypeScript, and PowerShell, and exposes three composable tools:
 
-| Step | MCP Tool | Purpose |
+| Step | Azure MCP Tool | Purpose |
 |------|----------|---------|
-| Discover languages | `get_languages_list` | Supported languages + runtime versions + template counts |
-| Browse templates | `get_azure_functions_templates_list` | Language-specific template catalog with descriptions and categories |
-| Initialize project | `get_project_template` | Returns `host.json`, `local.settings.json`, `package.json` / `requirements.txt` / `pom.xml` / `.csproj`, etc. |
-| Add function | `get_azure_functions_template` | Full function source code + required app settings + additional packages |
+| Discover languages | `functions language list` | Supported languages + runtime versions + prerequisites |
+| Browse templates | `functions list or get template` (omit template name) | Language-specific template catalog with descriptions |
+| Initialize project | `functions project get` | Returns `host.json`, `local.settings.json`, `package.json` / `requirements.txt` / `pom.xml` / `.csproj`, etc. |
+| Add function | `functions list or get template` (with template name) | Full function source code + required app settings + additional packages |
 
 The skill instructs the agent to **never write function code from scratch** when these tools are available.
 
 ### Path B — `func` CLI Fallback (explicit)
 
-When the MCP server is not detected, the skill falls back to `func init` + `func new` and shows an explicit bilingual notice to the user that guides them toward enabling the MCP. Minimal per-language code examples live in `references/language-snippets.md` (loaded via the `references/` mechanism added in #8), keeping the main `SKILL.md` lean.
+When the Azure MCP tools are not detected, the skill falls back to `func init` + `func new` and shows an explicit bilingual notice to the user that guides them toward enabling the Azure MCP Server. Minimal per-language code examples live in `references/language-snippets.md` (loaded via the `references/` mechanism added in #8), keeping the main `SKILL.md` lean.
 
 ## Workflow
 
@@ -54,7 +54,7 @@ When the MCP server is not detected, the skill falls back to `func init` + `func
    → HTTP trigger (default) | Timer | Blob | Queue | Cosmos DB | Event Hub | ...
 
 4. Generate project files
-   → Path A: get_project_template + get_azure_functions_template (MCP)
+   → Path A: functions project get + functions list or get template (Azure MCP)
    → Path B: func init + func new (CLI)
 
 5. Post-creation suggestions (from graph metadata)

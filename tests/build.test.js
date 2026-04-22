@@ -109,7 +109,7 @@ describe('buildTarget — ghcp', () => {
     expect(existsSync(mcpPath)).toBe(true);
     const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'));
     expect(mcp.servers).toBeTruthy();
-    expect(mcp.servers['azure-functions-templates']).toBeTruthy();
+    expect(mcp.servers['azure']).toBeTruthy();
   });
 
   it('generates agent definition', () => {
@@ -160,11 +160,10 @@ describe('buildTarget — ghcp', () => {
 
     const skillPath = join(DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create', 'SKILL.md');
     const body = readFileSync(skillPath, 'utf-8');
-    // MCP-primary: mentions the four templates MCP tool names
-    expect(body).toContain('get_languages_list');
-    expect(body).toContain('get_project_template');
-    expect(body).toContain('get_azure_functions_templates_list');
-    expect(body).toContain('get_azure_functions_template');
+    // MCP-primary: mentions the Azure MCP tool names
+    expect(body).toContain('functions language list');
+    expect(body).toContain('functions project get');
+    expect(body).toContain('functions list or get template');
     // Path structure + fallback notice
     expect(body).toMatch(/Path A/);
     expect(body).toMatch(/Path B/);
@@ -230,7 +229,7 @@ describe('buildTarget — ghcp', () => {
     expect(existsSync(mcpPluginPath)).toBe(true);
     const mcp = JSON.parse(readFileSync(mcpPluginPath, 'utf-8'));
     expect(mcp.mcpServers).toBeTruthy();
-    expect(mcp.mcpServers['azure-functions-templates']).toBeTruthy();
+    expect(mcp.mcpServers['azure']).toBeTruthy();
   });
 
   it('generates plugin hooks.json at plugin root', () => {
@@ -342,7 +341,7 @@ describe('buildTarget — codex', () => {
     const configPath = join(DIST_DIR, 'codex', '.codex', 'config.toml');
     expect(existsSync(configPath)).toBe(true);
     const content = readFileSync(configPath, 'utf-8');
-    expect(content).toContain('[mcp_servers.azure-functions-templates]');
+    expect(content).toContain('[mcp_servers.azure]');
     expect(content).toContain('command = "npx"');
   });
 
@@ -422,8 +421,8 @@ describe('Codex plugin manifest', () => {
     const mcpPath = join(DIST_DIR, 'codex', '.mcp.json');
     expect(existsSync(mcpPath)).toBe(true);
     const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'));
-    expect(mcp['azure-functions-templates']).toBeTruthy();
-    expect(mcp['azure-functions-templates'].command).toBe('npx');
+    expect(mcp['azure']).toBeTruthy();
+    expect(mcp['azure'].command).toBe('npx');
   });
 
   it('generates marketplace.json', () => {

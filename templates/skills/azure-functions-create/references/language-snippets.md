@@ -1,6 +1,6 @@
 # Language Snippets — Azure Functions
 
-Minimal starter patterns for HTTP triggers. Use these only as a last-resort fallback when the `azure-functions-templates` MCP server is unavailable **and** `func new` does not produce the desired shape. Prefer the MCP `get_azure_functions_template` tool whenever possible — it ships maintained, complete templates.
+Minimal starter patterns for HTTP triggers. Use these only as a last-resort fallback when the Azure MCP tools are unavailable **and** `func new` does not produce the desired shape. Prefer the `functions list or get template` Azure MCP tool whenever possible — it returns maintained, complete templates.
 
 ## TypeScript (Node.js v4 model)
 
@@ -71,4 +71,4 @@ public HttpResponseMessage run(
 ## Notes
 
 - HTTP triggers default to `authLevel: 'function'`. Use `'anonymous'` only for explicitly public endpoints.
-- For non-HTTP triggers (Timer, Blob, Queue, Service Bus, Cosmos DB, Event Hub, etc.), always prefer the MCP `get_azure_functions_template` tool — binding configuration is error-prone to write by hand.
+- For non-HTTP triggers (Timer, Blob, Queue, Service Bus, Cosmos DB, Event Hub, etc.), always prefer the `functions list or get template` Azure MCP tool — binding configuration is error-prone to write by hand.
