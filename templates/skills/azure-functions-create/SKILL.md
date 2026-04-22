@@ -90,7 +90,7 @@ Use this path **only when the Azure MCP tools are not available**. When falling 
 
 #### B.1 Fallback algorithm
 
-Follow the **Fallback Path (Azure MCP Unavailable)** section in [composition.md](plugin/skills/azure-prepare/references/services/functions/templates/recipes/composition.md):
+Follow the **Fallback Path (Azure MCP Unavailable)** algorithm below (sourced from [composition.md](https://github.com/microsoft/GitHub-Copilot-for-Azure/blob/main/plugin/skills/azure-prepare/references/services/functions/templates/recipes/composition.md)):
 
 ```
 1. FETCH MANIFEST
