@@ -35,9 +35,9 @@ When the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mc
 
 The skill instructs the agent to **never write function code from scratch** when these tools are available.
 
-### Path B — `func` CLI Fallback (explicit)
+### Path B — Composition Algorithm Fallback (explicit)
 
-When the Azure MCP tools are not detected, the skill falls back to `func init` + `func new` and shows an explicit bilingual notice to the user that guides them toward enabling the Azure MCP Server. Minimal per-language code examples live in `references/language-snippets.md` (loaded via the `references/` mechanism added in #8), keeping the main `SKILL.md` lean.
+When the Azure MCP tools are not detected, the skill falls back to the **composition algorithm** from `plugin/skills/azure-prepare/references/services/functions/templates/recipes/composition.md`. This provides a comprehensive, step-by-step process for scaffolding projects using `azd init -t` with base templates and integration recipes (Cosmos DB, Event Hubs, Durable Functions, etc.), including proper UAMI configuration and IaC composition. Minimal per-language HTTP trigger snippets remain available in `references/language-snippets.md` as a last-resort fallback.
 
 ## Workflow
 
@@ -55,7 +55,7 @@ When the Azure MCP tools are not detected, the skill falls back to `func init` +
 
 4. Generate project files
    → Path A: functions project get + functions list or get template (Azure MCP)
-   → Path B: func init + func new (CLI)
+   → Path B: composition algorithm (azd init -t + recipes)
 
 5. Post-creation suggestions (from graph metadata)
    → "Next: azure-functions-deploy to deploy, or azure-functions-observability to set up monitoring"

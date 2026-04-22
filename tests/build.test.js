@@ -168,6 +168,7 @@ describe('buildTarget — ghcp', () => {
     expect(body).toMatch(/Path A/);
     expect(body).toMatch(/Path B/);
     expect(body).toContain('fallback');
+    expect(body).toContain('composition.md');
     // References file ships alongside the skill
     const refsPath = join(
       DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create',

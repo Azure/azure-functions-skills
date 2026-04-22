@@ -21,7 +21,7 @@ Check whether the following Azure MCP tools are available in your current tool l
 These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and cover 68+ officially maintained templates across C#, Java, JavaScript, Python, TypeScript, and PowerShell.
 
 - **If available** → proceed with **Path A (MCP primary)**.
-- **If not available** → proceed with **Path B (func CLI fallback)** and show the fallback notice to the user.
+- **If not available** → proceed with **Path B (composition algorithm fallback)**.
 
 ---
 
@@ -80,31 +80,34 @@ Then invoke the function (for HTTP triggers: `curl http://localhost:7071/api/<Fu
 
 ---
 
-### Path B — func CLI fallback
+### Path B — Composition algorithm fallback
 
 Use this path **only when the Azure MCP tools are not available**. When falling back, show this notice to the user verbatim (translate to the user's language if needed):
 
-> ℹ️ Azure MCP Server のツールが見つからないため、Azure Functions Core Tools (`func`) にフォールバックします。Azure MCP を有効化すると 68+ の最新テンプレートから選択できます。設定方法は `azure-functions-setup` を実行してください。
+> ℹ️ Azure MCP Server のツールが見つからないため、テンプレート合成アルゴリズムにフォールバックします。Azure MCP を有効化すると 68+ の最新テンプレートから動的に選択できます。設定方法は `azure-functions-setup` を実行してください。
 >
-> ℹ️ Azure MCP tools were not found; falling back to Azure Functions Core Tools (`func`). Enabling the Azure MCP Server unlocks selection from 68+ up-to-date templates. Run `azure-functions-setup` to configure it.
+> ℹ️ Azure MCP tools were not found; falling back to the composition algorithm. Enabling the Azure MCP Server unlocks dynamic selection from 68+ up-to-date templates. Run `azure-functions-setup` to configure it.
 
-#### B.1 Scaffold with Core Tools
+#### B.1 Follow the composition algorithm
 
-```bash
-# Create project
-func init <project-name> --<language-flag>
-#   --typescript | --python | --dotnet-isolated | --java | --javascript | --powershell
+Read and follow the composition algorithm at:
 
-# Add a function
-cd <project-name>
-func new --name <FunctionName> --template "HTTP trigger"
+```
+plugin/skills/azure-prepare/references/services/functions/templates/recipes/composition.md
 ```
 
-Common templates: `HTTP trigger`, `Timer trigger`, `Blob trigger`, `Queue trigger`, `Cosmos DB trigger`, `Event Hub trigger`, `Service Bus trigger`.
+This is the **authoritative process** for composing Azure Functions projects from base templates and integration recipes. It covers:
 
-#### B.2 Fill in the function body
+1. **Base template selection** — `azd init -t <template>` with language-specific templates (Bicep or Terraform)
+2. **Integration recipe** — Cosmos DB, Service Bus, Event Hubs, Timer, Blob, Durable, MCP, etc.
+3. **IaC module composition** — adding Bicep/Terraform modules for the chosen integration
+4. **UAMI (User Assigned Managed Identity)** — correct credential + clientId settings for all bindings
+5. **Source code replacement** — language-specific trigger code from recipe source files
+6. **Validation and deployment** — `azd up` with RBAC propagation handling
 
-For quick code patterns per language (minimal examples), see [references/language-snippets.md](references/language-snippets.md).
+#### B.2 Quick code reference
+
+For minimal HTTP trigger snippets per language (last-resort fallback when the composition algorithm is also unavailable), see [references/language-snippets.md](references/language-snippets.md).
 
 #### B.3 Verify
 
@@ -119,7 +122,7 @@ func start
 If `host.json` already exists, do **not** re-initialize. Instead:
 
 - **MCP path**: call `functions list or get template` with the same language as the existing project and specify the desired template name. Write the returned file.
-- **func path**: `func new --name <FunctionName> --template "<template name>"`
+- **Composition path**: read the relevant recipe from `plugin/skills/azure-prepare/references/services/functions/templates/recipes/{integration}/source/{language}.md` and apply the source code.
 
 ## After Creation
 
