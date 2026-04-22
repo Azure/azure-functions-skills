@@ -37,7 +37,7 @@ The skill instructs the agent to **never write function code from scratch** when
 
 ### Path B — Composition Algorithm Fallback (explicit)
 
-When the Azure MCP tools are not detected, the skill falls back to the **composition algorithm** from `plugin/skills/azure-prepare/references/services/functions/templates/recipes/composition.md`. This provides a comprehensive, step-by-step process for scaffolding projects using `azd init -t` with base templates and integration recipes (Cosmos DB, Event Hubs, Durable Functions, etc.), including proper UAMI configuration and IaC composition. Minimal per-language HTTP trigger snippets remain available in `references/language-snippets.md` as a last-resort fallback.
+When the Azure MCP tools are not detected, the skill falls back to the **manifest-based composition algorithm** from `composition.md`. This fetches the template manifest from `cdn.functions.azure.com` (or GitHub fallback), filters by language/resource/IaC, downloads templates, and composes them — including IaC merge, RBAC roles, and UAMI configuration. This ensures the agent can still produce production-ready projects without MCP. Minimal per-language HTTP trigger snippets remain available in `references/language-snippets.md` as a last-resort fallback when the manifest is also unavailable.
 
 ## Workflow
 
@@ -55,7 +55,7 @@ When the Azure MCP tools are not detected, the skill falls back to the **composi
 
 4. Generate project files
    → Path A: functions project get + functions list or get template (Azure MCP)
-   → Path B: composition algorithm (azd init -t + recipes)
+   → Path B: manifest-based composition (CDN fetch + template download + compose)
 
 5. Post-creation suggestions (from graph metadata)
    → "Next: azure-functions-deploy to deploy, or azure-functions-observability to set up monitoring"
