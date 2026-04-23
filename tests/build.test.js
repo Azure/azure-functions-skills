@@ -164,10 +164,15 @@ describe('buildTarget — ghcp', () => {
     expect(body).toContain('functions language list');
     expect(body).toContain('functions project get');
     expect(body).toContain('functions list or get template');
+    // Best practices tool reference
+    expect(body).toContain('get_azure_bestpractices');
+    expect(body).toContain('azurefunctions');
     // Path structure + fallback notice
     expect(body).toMatch(/Path A/);
     expect(body).toMatch(/Path B/);
     expect(body).toContain('fallback');
+    // Template count should NOT be hardcoded (no "68+")
+    expect(body).not.toMatch(/\d+\+?\s*officially maintained templates/);
     // References file ships alongside the skill
     const refsPath = join(
       DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create',

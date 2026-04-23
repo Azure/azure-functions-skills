@@ -18,7 +18,11 @@ Check whether the following Azure MCP tools are available in your current tool l
 - `functions project get`
 - `functions list or get template`
 
-These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and cover 68+ officially maintained templates across C#, Java, JavaScript, Python, TypeScript, and PowerShell.
+These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and return officially maintained templates across C#, Python, TypeScript, JavaScript, Java and PowerShell.
+
+Also check for the best practices tool:
+
+- `get_azure_bestpractices` with `resource: azurefunctions`
 
 - **If available** → proceed with **Path A (MCP primary)**.
 - **If not available** → proceed with **Path B (composition algorithm fallback)**.
@@ -29,11 +33,21 @@ These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/d
 
 Use the Azure MCP Server as the **authoritative source of truth** for Azure Functions templates. Do **not** write function code from scratch when these tools are available.
 
-#### A.1 Gather requirements
+#### A.1 Gather requirements & best practices
+
+If `get_azure_bestpractices` is available, call it first:
+
+```
+Tool: get_azure_bestpractices
+resource: azurefunctions
+action: code-generation
+```
+
+Apply the returned guidelines (programming models, extension bundles version, authentication levels, project structure, etc.) to every file you generate in the steps below.
 
 Ask the user (or detect from context):
 
-- **Language**: `csharp` | `java` | `javascript` | `python` | `typescript` | `powershell`
+- **Language**: `csharp` | `python` | `typescript` | `javascript` | `java` | `powershell`
 - **Trigger / template**: let the MCP list decide (step A.3)
 - **Project name**: directory name
 - **Runtime version** (optional): e.g. Node.js `22`, Python `3.11`, Java `21`
