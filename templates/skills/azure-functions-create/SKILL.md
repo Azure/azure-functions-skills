@@ -44,7 +44,7 @@ Call `functions language list`. Returns supported languages with runtime version
 
 #### A.3 Browse available templates
 
-Call `functions list or get template` with only the `Language` parameter (omit `Template name`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
+Call `functions list or get template` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
 
 #### A.4 Initialize the project
 
@@ -52,20 +52,21 @@ Call `functions project get`:
 
 ```
 Tool: functions project get
-Language: <chosen language, e.g. typescript>
+language: <chosen language, e.g. typescript>
 ```
 
 Returns project-level files (`host.json`, `local.settings.json`, `package.json` / `requirements.txt` / `pom.xml` / `.csproj`, `tsconfig.json`, etc.). Write these into the target directory.
 
 #### A.5 Add the function
 
-Call `functions list or get template` with both `Language` and `Template name`:
+Call `functions list or get template` with both `language` and `template`:
 
 ```
 Tool: functions list or get template
-Language: <chosen language, e.g. typescript>
-Template name: <chosen template, e.g. HTTP trigger>
-Runtime version: <optional>
+language: <chosen language, e.g. typescript>
+template: <chosen template, e.g. http-trigger-typescript-azd>
+runtime-version: <optional, e.g. 22>
+output: <optional, "New" (default) or "Add" for existing projects>
 ```
 
 Returns the full function source code plus any required app settings and additional package dependencies. Write the returned file(s) into the project and merge any extra settings into `local.settings.json` and any extra packages into the dependency manifest.
