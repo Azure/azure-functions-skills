@@ -99,8 +99,6 @@ Then invoke the function (for HTTP triggers: `curl http://localhost:7071/api/<Fu
 
 Use this path **only when the Azure MCP tools are not available**. When falling back, show this notice to the user verbatim (translate to the user's language if needed):
 
-> ℹ️ Azure MCP Server のツールが見つからないため、テンプレートマニフェストからのフォールバックパスを使用します。Azure MCP を有効化すると動的にテンプレートを発見・合成できます。設定方法は `azure-functions-setup` を実行してください。
->
 > ℹ️ Azure MCP tools were not found; using the manifest-based fallback path. Enabling the Azure MCP Server unlocks dynamic template discovery and composition. Run `azure-functions-setup` to configure it.
 
 #### B.1 Fallback algorithm
