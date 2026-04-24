@@ -109,7 +109,7 @@ describe('buildTarget — ghcp', () => {
     expect(existsSync(mcpPath)).toBe(true);
     const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'));
     expect(mcp.servers).toBeTruthy();
-    expect(mcp.servers['azure-functions-templates']).toBeTruthy();
+    expect(mcp.servers['azure']).toBeTruthy();
   });
 
   it('generates agent definition', () => {
@@ -149,6 +149,36 @@ describe('buildTarget — ghcp', () => {
       expect(content).toContain(`name: ${s.id}`);
       expect(content).toContain('description:');
     }
+  });
+
+  it('azure-functions-create skill is MCP-primary and ships language-snippets reference', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
+
+    const skillPath = join(DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create', 'SKILL.md');
+    const body = readFileSync(skillPath, 'utf-8');
+    // MCP-primary: mentions the Azure MCP tool names
+    expect(body).toContain('functions language list');
+    expect(body).toContain('functions project get');
+    expect(body).toContain('functions list or get template');
+    // Best practices tool reference
+    expect(body).toContain('get_azure_bestpractices');
+    expect(body).toContain('azurefunctions');
+    // Path structure + fallback notice
+    expect(body).toMatch(/Path A/);
+    expect(body).toMatch(/Path B/);
+    expect(body).toContain('fallback');
+    // Template count should NOT be hardcoded (no "68+")
+    expect(body).not.toMatch(/\d+\+?\s*officially maintained templates/);
+    // References file ships alongside the skill
+    const refsPath = join(
+      DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create',
+      'references', 'language-snippets.md',
+    );
+    expect(existsSync(refsPath)).toBe(true);
   });
 
   it('generates hooks in .github/hooks/', () => {
@@ -204,7 +234,7 @@ describe('buildTarget — ghcp', () => {
     expect(existsSync(mcpPluginPath)).toBe(true);
     const mcp = JSON.parse(readFileSync(mcpPluginPath, 'utf-8'));
     expect(mcp.mcpServers).toBeTruthy();
-    expect(mcp.mcpServers['azure-functions-templates']).toBeTruthy();
+    expect(mcp.mcpServers['azure']).toBeTruthy();
   });
 
   it('generates plugin hooks.json at plugin root', () => {
@@ -316,7 +346,7 @@ describe('buildTarget — codex', () => {
     const configPath = join(DIST_DIR, 'codex', '.codex', 'config.toml');
     expect(existsSync(configPath)).toBe(true);
     const content = readFileSync(configPath, 'utf-8');
-    expect(content).toContain('[mcp_servers.azure-functions-templates]');
+    expect(content).toContain('[mcp_servers.azure]');
     expect(content).toContain('command = "npx"');
   });
 
@@ -396,8 +426,8 @@ describe('Codex plugin manifest', () => {
     const mcpPath = join(DIST_DIR, 'codex', '.mcp.json');
     expect(existsSync(mcpPath)).toBe(true);
     const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'));
-    expect(mcp['azure-functions-templates']).toBeTruthy();
-    expect(mcp['azure-functions-templates'].command).toBe('npx');
+    expect(mcp['azure']).toBeTruthy();
+    expect(mcp['azure'].command).toBe('npx');
   });
 
   it('generates marketplace.json', () => {
@@ -491,8 +521,6 @@ describe('setup module', () => {
     expect(result.welcomeMessage).toContain('Azure Functions');
   });
 });
-
-// ─── references/ subdir support ───
 
 describe('skill references/ subdirectory', () => {
   const FIXTURE_DIR = join(import.meta.dirname, '..', 'dist-test-refs-fixture');

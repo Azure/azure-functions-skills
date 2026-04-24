@@ -10,88 +10,156 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 ## Workflow
 
-### 1. Gather Requirements
+### Step 1 — Detect Azure MCP tools
+
+Check whether the following Azure MCP tools are available in your current tool list:
+
+- `functions language list`
+- `functions project get`
+- `functions list or get template`
+
+These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and return officially maintained templates across C#, Python, TypeScript, JavaScript, Java and PowerShell.
+
+Also check for the best practices tool:
+
+- `get_azure_bestpractices` with `resource: azurefunctions`
+
+- **If available** → proceed with **Path A (MCP primary)**.
+- **If not available** → proceed with **Path B (composition algorithm fallback)**.
+
+---
+
+### Path A — MCP primary (recommended)
+
+Use the Azure MCP Server as the **authoritative source of truth** for Azure Functions templates. Do **not** write function code from scratch when these tools are available.
+
+#### A.1 Gather requirements & best practices
+
+If `get_azure_bestpractices` is available, call it first:
+
+```
+Tool: get_azure_bestpractices
+resource: azurefunctions
+action: code-generation
+```
+
+Apply the returned guidelines (programming models, extension bundles version, authentication levels, project structure, etc.) to every file you generate in the steps below.
 
 Ask the user (or detect from context):
 
-- **Language**: Node.js/TypeScript (default) | Python | .NET (isolated) | Java
-- **Trigger**: HTTP (default) | Timer | Blob | Queue | Cosmos DB | Event Hub
+- **Language**: `csharp` | `python` | `typescript` | `javascript` | `java` | `powershell`
+- **Trigger / template**: let the MCP list decide (step A.3)
 - **Project name**: directory name
+- **Runtime version** (optional): e.g. Node.js `22`, Python `3.11`, Java `21`
 
-### 2. Scaffold with Core Tools
+#### A.2 Discover supported languages
 
-```bash
-# Create project
-func init <project-name> --typescript
+Call `functions language list`. Returns supported languages with runtime versions, programming models, and prerequisites. Use this to confirm the user's language choice is supported and to suggest a default runtime version.
 
-# Add a function
-cd <project-name>
-func new --name <FunctionName> --template "HTTP trigger"
+#### A.3 Browse available templates
+
+Call `functions list or get template` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
+
+#### A.4 Initialize the project
+
+Call `functions project get`:
+
+```
+Tool: functions project get
+language: <chosen language, e.g. typescript>
 ```
 
-### 3. Language-Specific Patterns
+Returns project-level files (`host.json`, `local.settings.json`, `package.json` / `requirements.txt` / `pom.xml` / `.csproj`, `tsconfig.json`, etc.). Write these into the target directory.
 
-#### Node.js / TypeScript (v4 model)
+#### A.5 Add the function
 
-```typescript
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+Call `functions list or get template` with both `language` and `template`:
 
-export async function httpTrigger(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-    context.log(`Http function processed request for url "${request.url}"`);
-    const name = request.query.get('name') || await request.text() || 'world';
-    return { body: `Hello, ${name}!` };
-}
-
-app.http('httpTrigger', {
-    methods: ['GET', 'POST'],
-    authLevel: 'function',
-    handler: httpTrigger
-});
+```
+Tool: functions list or get template
+language: <chosen language, e.g. typescript>
+template: <chosen template, e.g. http-trigger-typescript-azd>
+runtime-version: <optional, e.g. 22>
+output: <optional, "New" (default) or "Add" for existing projects>
 ```
 
-#### Python (v2 model)
+Returns the full function source code plus any required app settings and additional package dependencies. Write the returned file(s) into the project and merge any extra settings into `local.settings.json` and any extra packages into the dependency manifest.
 
-```python
-import azure.functions as func
-import logging
-
-app = func.FunctionApp()
-
-@app.route(route="hello")
-def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('Python HTTP trigger function processed a request.')
-    name = req.params.get('name') or 'world'
-    return func.HttpResponse(f"Hello, {name}!")
-```
-
-#### .NET (isolated worker)
-
-```csharp
-[Function("HttpTrigger")]
-public HttpResponseData Run(
-    [HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequestData req)
-{
-    _logger.LogInformation("C# HTTP trigger function processed a request.");
-    var response = req.CreateResponse(HttpStatusCode.OK);
-    response.WriteString("Hello, world!");
-    return response;
-}
-```
-
-### 4. Verify
+#### A.6 Verify
 
 ```bash
 func start
-# Visit http://localhost:7071/api/<FunctionName>
 ```
 
-### 5. Adding Functions to Existing Projects
+Then invoke the function (for HTTP triggers: `curl http://localhost:7071/api/<FunctionName>`).
 
-If `host.json` already exists, use `func new` to add functions:
+---
+
+### Path B — Composition algorithm fallback
+
+Use this path **only when the Azure MCP tools are not available**. When falling back, show this notice to the user verbatim (translate to the user's language if needed):
+
+> ℹ️ Azure MCP tools were not found; using the manifest-based fallback path. Enabling the Azure MCP Server unlocks dynamic template discovery and composition. Run `azure-functions-setup` to configure it.
+
+#### B.1 Fallback algorithm
+
+Follow this manifest-based fallback algorithm:
+
+```
+1. FETCH MANIFEST
+   GET https://cdn.functions.azure.com/public/templates-manifest/manifest.json
+   If fetch fails → fall back to:
+     https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json
+   If both fail → fall back to known-good Azure-Samples/functions-quickstart-* repos
+   If all fail → report error and ask user to retry later
+
+2. FILTER TEMPLATES
+   Filter by: language, resource, iac
+
+3. CHECK SINGLE-TEMPLATE MATCH
+   If one template covers ALL requirements → use it alone
+
+4. SELECT TEMPLATES
+   - Trigger template (REQUIRED) — base project with IaC
+   - Binding templates (OPTIONAL) — extract patterns only
+
+5. DOWNLOAD TEMPLATES
+   For each template:
+   - If folderPath == "." → ZIP download + unzip
+   - If folderPath != "." → fetch tree + raw github url file downloads
+   - Fallback: git clone --depth 1
+
+6. COMPOSE
+   - Use trigger template as BASE
+   - EXTRACT binding patterns from binding templates
+   - MERGE IaC resources, RBAC roles and settings
+   - ADD user's custom business logic
+
+7. TRIM unused demo code (keep AzureWebJobsStorage)
+
+8. WRITE all files
+
+9. DEPLOY: azd up --no-prompt
+```
+
+#### B.2 Quick code reference
+
+For minimal HTTP trigger snippets per language (last-resort fallback when the manifest is also unavailable), see [references/language-snippets.md](references/language-snippets.md).
+
+#### B.3 Verify
 
 ```bash
-func new --name MyTimer --template "Timer trigger"
+func start
 ```
+
+---
+
+### Adding functions to existing projects
+
+If `host.json` already exists, do **not** re-initialize. Instead:
+
+- **MCP path**: call `functions list or get template` with the same language as the existing project and specify the desired template name. Write the returned file.
+- **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
 
 ## After Creation
 

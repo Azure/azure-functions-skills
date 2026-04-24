@@ -1,8 +1,8 @@
 # F5: azure-functions-create — Project Scaffolding
 
-**Status:** 📋 Proposed  
-**Draft Spec Section:** 5.1, 6, 8  
-**Depends on:** F1 (Skill Graph Metadata), F3 (azure-functions-setup recommended first)
+**Status:** ✅ Implemented (MCP-primary with `func` fallback)
+**Draft Spec Section:** 5.1, 6, 8
+**Depends on:** F1 (Skill Graph Metadata), F3 (azure-functions-setup recommended first), F19 (MCP Integration)
 
 ## Problem
 
@@ -17,6 +17,27 @@ After setting up the environment, the developer's next question is "how do I cre
 3. **Project structure** — `host.json`, language-specific config, `.gitignore`, entry point
 4. **Programming model** — v2 (Python/Node) vs. traditional, isolated worker (.NET)
 5. **Post-creation next steps** — directed transitions to `azure-functions-deploy`, `azure-functions-observability`, `azure-functions-hosting`
+
+## Execution Paths (MCP-Primary)
+
+The skill is designed with a clear primary / fallback split so it works across the full matrix of agent capabilities:
+
+### Path A — MCP Primary (preferred)
+
+When the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) is wired into the agent, use it as the authoritative source of truth. This server ships 68+ officially maintained templates across C#, Java, JavaScript, Python, TypeScript, and PowerShell, and exposes three composable tools:
+
+| Step | Azure MCP Tool | Purpose |
+|------|----------|---------|
+| Discover languages | `functions language list` | Supported languages + runtime versions + prerequisites |
+| Browse templates | `functions list or get template` (omit template name) | Language-specific template catalog with descriptions |
+| Initialize project | `functions project get` | Returns `host.json`, `local.settings.json`, `package.json` / `requirements.txt` / `pom.xml` / `.csproj`, etc. |
+| Add function | `functions list or get template` (with template name) | Full function source code + required app settings + additional packages |
+
+The skill instructs the agent to **never write function code from scratch** when these tools are available.
+
+### Path B — Composition Algorithm Fallback (explicit)
+
+When the Azure MCP tools are not detected, the skill falls back to the **manifest-based composition algorithm** from `composition.md`. This fetches the template manifest from `cdn.functions.azure.com` (or GitHub fallback), filters by language/resource/IaC, downloads templates, and composes them — including IaC merge, RBAC roles, and UAMI configuration. This ensures the agent can still produce production-ready projects without MCP. Minimal per-language HTTP trigger snippets remain available in `references/language-snippets.md` as a last-resort fallback when the manifest is also unavailable.
 
 ## Workflow
 
@@ -33,7 +54,8 @@ After setting up the environment, the developer's next question is "how do I cre
    → HTTP trigger (default) | Timer | Blob | Queue | Cosmos DB | Event Hub | ...
 
 4. Generate project files
-   → host.json, local.settings.json, language files, .gitignore
+   → Path A: functions project get + functions list or get template (Azure MCP)
+   → Path B: manifest-based composition (CDN fetch + template download + compose)
 
 5. Post-creation suggestions (from graph metadata)
    → "Next: azure-functions-deploy to deploy, or azure-functions-observability to set up monitoring"

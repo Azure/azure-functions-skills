@@ -1,7 +1,7 @@
-# F19: MCP Integration — Template & Runtime MCP Server
+# F19: MCP Integration — Azure MCP Server
 
-**Status:** 📋 Proposed  
-**Draft Spec Section:** N/A (discovered from func-emulate F6/F10)  
+**Status:** ✅ Implemented (Layer 1 — Azure MCP Server wired into `azure-functions-create`)
+**Draft Spec Section:** N/A (discovered from func-emulate F6/F10)
 **Depends on:** F1 (Skill Graph Metadata), F5 (azure-functions-create)
 
 ## Problem
@@ -11,29 +11,28 @@ For AI coding agents to access Azure Functions templates and function metadata, 
 1. **Embed patterns in skill files** — Static; skills need updating whenever templates change
 2. **Search web documentation** — Slow, inaccurate, and risks hallucination
 
-func-emulate solved this problem through **MCP (Model Context Protocol) servers**: exposing template catalogs, project scaffolding, and SKU profiles as MCP tools that AI agents can access programmatically.
+The solution is **MCP (Model Context Protocol) servers**: exposing template catalogs, project scaffolding, and runtime metadata as MCP tools that AI agents can access programmatically.
 
-The `azure-functions-templates-mcp-server` (by Manvir Kaur) already exists, providing 68+ templates across 4 languages via MCP. `azure-functions-skills` needs to design integration with this server so all skills can reference it.
+The official [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) now includes Azure Functions tools natively, providing 68+ templates across 6 languages (C#, Java, JavaScript, Python, TypeScript, PowerShell). `azure-functions-skills` integrates with these tools so all skills can reference them.
 
 ## Feature
 
-Integration design with MCP servers. Enables skills to leverage MCP tools for template search, code generation, and SKU compatibility checks.
+Integration design with the Azure MCP Server. Enables skills to leverage MCP tools for template search, code generation, and Azure resource management.
 
 ## Two Integration Layers
 
-### Layer 1: Templates MCP (existing external server)
+### Layer 1: Azure MCP Server — Azure Functions tools (implemented)
 
-Incorporating the Azure Functions Templates MCP Server into the skill ecosystem.
+The Azure MCP Server includes Azure Functions tools for template discovery and project scaffolding.
 
-**Available MCP Tools:**
+**Available Azure Functions MCP Tools:**
 
 | Tool | Description | Consuming Skills |
 |------|------------|-----------------|
-| `get_languages_list` | List of supported languages (runtime versions, template count) | azure-functions-create, azure-functions-help |
-| `get_project_template` | Project initialization files (host.json, package.json, etc.) | azure-functions-create |
-| `get_templates_list` | Template list by language (descriptions, categories) | azure-functions-create, azure-functions-help |
-| `get_template` | Full template source code + required app settings | azure-functions-create |
-| `get_sku_profile` | SKU profile (host/bundle versions) | azure-functions-hosting, azure-functions-audit |
+| `functions language list` | Discover supported languages, runtime versions, and prerequisites | azure-functions-create, azure-functions-help |
+| `functions project get` | Project initialization files (host.json, package.json, etc.) | azure-functions-create |
+| `functions list or get template` | List templates (omit template name) or get full template code (include template name) | azure-functions-create, azure-functions-help |
+| `function app list or get` | List or get details of existing Azure Functions apps | azure-functions-deploy, azure-functions-discovery |
 
 **Automatic MCP configuration generation:**
 
@@ -43,10 +42,10 @@ During `azure-functions-setup` (F3) workspace configuration, MCP settings are pl
 // .vscode/mcp.json (GitHub Copilot)
 {
   "servers": {
-    "azure-functions-templates": {
+    "azure": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "azure-functions-templates-mcp-server"]
+      "args": ["-y", "@azure/mcp@latest", "server", "start"]
     }
   }
 }
@@ -56,9 +55,9 @@ During `azure-functions-setup` (F3) workspace configuration, MCP settings are pl
 // .claude/settings.json (Claude Code)
 {
   "mcpServers": {
-    "azure-functions-templates": {
+    "azure": {
       "command": "npx",
-      "args": ["-y", "azure-functions-templates-mcp-server"]
+      "args": ["-y", "@azure/mcp@latest", "server", "start"]
     }
   }
 }
@@ -79,22 +78,21 @@ This layer can be implemented by wrapping the `/admin/functions` API from `func 
 
 ## Skill × MCP Integration Matrix
 
-How each skill utilizes MCP tools:
+How each skill utilizes Azure MCP tools:
 
-| Skill | MCP Tool | Purpose |
+| Skill | Azure MCP Tool | Purpose |
 |-------|----------|---------|
-| **azure-functions-create** (F5) | `get_languages_list`, `get_templates_list`, `get_template`, `get_project_template` | Template search, code generation, project scaffolding |
-| **azure-functions-help** (F2) | `get_languages_list`, `get_templates_list` | Display available template lists |
-| **azure-functions-hosting** (F8) | `get_sku_profile` | Retrieve SKU-specific constraint information |
-| **azure-functions-audit** (F18) | `get_sku_profile` | SKU compatibility checks |
-| **azure-functions-discovery** (F4) | `get_sku_profile` | Detailed information for detected SKU |
+| **azure-functions-create** (F5) | `functions language list`, `functions list or get template`, `functions project get` | Template search, code generation, project scaffolding |
+| **azure-functions-help** (F2) | `functions language list`, `functions list or get template` | Display available template lists |
+| **azure-functions-deploy** (F7) | `function app list or get` | Discover existing function apps |
+| **azure-functions-discovery** (F4) | `function app list or get` | Detailed information for detected apps |
 
 ## MCP Availability Detection
 
-Skills detect whether MCP tools are available and fall back to embedded patterns if not:
+Skills detect whether Azure MCP tools are available and fall back to embedded patterns if not:
 
 ```
-MCP tools available?
+Azure MCP tools available?
 ├── Yes → Retrieve templates via MCP (latest, accurate)
 └── No → Use embedded patterns/examples within the skill (static but reliable)
 ```
