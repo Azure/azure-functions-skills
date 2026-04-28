@@ -35,6 +35,16 @@ function copySkillReferences(skill, skillDestDir) {
   copyDirRecursive(skill.referencesDir, join(skillDestDir, 'references'));
 }
 
+function copySkillScripts(skill, skillDestDir) {
+  if (!skill.scriptsDir) return;
+  copyDirRecursive(skill.scriptsDir, join(skillDestDir, 'scripts'));
+}
+
+function copySkillAssets(skill, skillDestDir) {
+  copySkillReferences(skill, skillDestDir);
+  copySkillScripts(skill, skillDestDir);
+}
+
 // ─── GHCP ───
 
 function buildGhcp({ skills, mcpServers, agents, hooks }, distDir) {
@@ -62,7 +72,7 @@ function buildGhcp({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, '.github', 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateGhcpSkillMd(skill));
-    copySkillReferences(skill, skillDir);
+    copySkillAssets(skill, skillDir);
   }
 
   // .github/hooks/welcome-setup.json — SessionStart hook (workspace level)
@@ -84,7 +94,7 @@ function buildGhcp({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateGhcpSkillMd(skill));
-    copySkillReferences(skill, skillDir);
+    copySkillAssets(skill, skillDir);
   }
 
   // agents/<name>.agent.md — Plugin-level agent
@@ -123,7 +133,7 @@ function buildClaude({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, '.claude', 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateClaudeSkillMd(skill));
-    copySkillReferences(skill, skillDir);
+    copySkillAssets(skill, skillDir);
   }
 }
 
@@ -143,7 +153,7 @@ function buildCodex({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, '.agents', 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateCodexSkillMd(skill));
-    copySkillReferences(skill, skillDir);
+    copySkillAssets(skill, skillDir);
   }
 
   // skills/<id>/SKILL.md — plugin-convention skills (for .codex-plugin)
@@ -151,7 +161,7 @@ function buildCodex({ skills, mcpServers, agents, hooks }, distDir) {
     const skillDir = join(base, 'skills', skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateCodexSkillMd(skill));
-    copySkillReferences(skill, skillDir);
+    copySkillAssets(skill, skillDir);
   }
 
   // .codex-plugin/plugin.json — plugin manifest

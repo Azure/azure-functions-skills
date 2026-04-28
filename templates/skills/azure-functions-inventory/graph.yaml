@@ -1,0 +1,13 @@
+id: azure-functions-inventory
+title: Azure Functions Inventory
+suggestions:
+  on_success:
+    - target: azure-functions-health-status
+      reason: "Inventory collected. Check current health and telemetry next."
+      priority: 80
+  on_failure:
+    - target: azure-functions-diagnostics
+      reason: "Use diagnostics to triage missing/blocked inventory data."
+      priority: 60
+entry_conditions:
+  - app_identified

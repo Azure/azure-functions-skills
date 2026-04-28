@@ -20,6 +20,10 @@ export function loadSkills(skillsDir) {
     const referencesDir =
       existsSync(refsPath) && statSync(refsPath).isDirectory() ? refsPath : null;
 
+    const scriptsPath = join(base, 'scripts');
+    const scriptsDir =
+      existsSync(scriptsPath) && statSync(scriptsPath).isDirectory() ? scriptsPath : null;
+
     return {
       id: parseYamlValue(skillYaml, 'id'),
       title: parseYamlValue(skillYaml, 'title'),
@@ -28,6 +32,7 @@ export function loadSkills(skillsDir) {
       content,
       graph: parseGraph(graphYaml),
       referencesDir,
+      scriptsDir,
       raw: { skill: skillYaml, graph: graphYaml },
     };
   });

@@ -1,0 +1,14 @@
+id: azure-functions-health-status
+title: Azure Functions Health Status
+description: "Use when investigating current Azure Functions app status and health: Running/Stopped state, Resource Health, plan status, Azure Monitor metrics, Application Insights/Log Analytics requests, failures, exceptions, traces, dependencies, and recent Activity Log. Do not use for static inventory-only requests."
+category: task
+targets:
+  ghcp: true
+  claude: true
+  codex: true
+mcp_preferred:
+  - azure
+tags:
+  - health
+  - telemetry
+  - monitoring

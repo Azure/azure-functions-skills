@@ -1,0 +1,13 @@
+id: azure-functions-common
+title: Azure Functions Common References
+description: "Shared Azure Functions reference material for the Azure Functions skill suite: runtime/language routing, trigger/binding extension references, official docs and repository pointers. Use only when another Azure Functions skill needs reusable language or binding context. Not intended as a standalone user-facing workflow."
+category: reference
+targets:
+  ghcp: true
+  claude: true
+  codex: true
+tags:
+  - reference
+  - shared
+  - languages
+  - extensions
