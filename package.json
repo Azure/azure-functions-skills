@@ -6,13 +6,24 @@
   "bin": {
     "azure-functions-skills": "bin/azure-functions-skills.js"
   },
+  "types": "./lib/setup/index.d.ts",
   "exports": {
-    ".": "./src/setup/index.js",
-    "./setup": "./src/setup/index.js",
-    "./chat": "./src/chat/index.js"
+    ".": {
+      "types": "./lib/setup/index.d.ts",
+      "default": "./lib/setup/index.js"
+    },
+    "./setup": {
+      "types": "./lib/setup/index.d.ts",
+      "default": "./lib/setup/index.js"
+    },
+    "./chat": {
+      "types": "./lib/chat/index.d.ts",
+      "default": "./lib/chat/index.js"
+    }
   },
   "files": [
     "bin/",
+    "lib/",
     "src/",
     "templates/",
     "dist/",
@@ -22,11 +33,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "node src/build/build.js",
+    "build": "npm run compile && node lib/build/build.js",
     "ci": "npm run lint && npm run typecheck && npm test && npm run build",
+    "compile": "tsc",
     "lint": "eslint .",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "npm run compile && vitest run",
+    "test:watch": "npm run compile && vitest",
     "typecheck": "tsc --noEmit",
     "setup": "node bin/azure-functions-skills.js setup"
   },

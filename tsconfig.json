@@ -5,20 +5,17 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
-    "allowJs": true,
-    "checkJs": false,
-    "noEmit": true,
+    "declaration": true,
+    "sourceMap": true,
     "outDir": "lib",
+    "rootDir": "src",
     "types": ["node", "vitest"],
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
   "include": [
-    "bin/**/*.js",
-    "src/**/*.js",
-    "tests/**/*.js",
-    "eslint.config.js"
+    "src/**/*.ts"
   ],
   "exclude": [
     "dist",

@@ -9,6 +9,24 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
+import type { BuildTargetName } from '../types.js';
+
+interface PluginInstallResult {
+  target: BuildTargetName;
+  method: string;
+  path: string;
+  instructions: string;
+}
+
+interface CodexMarketplacePlugin {
+  name: string;
+  [key: string]: unknown;
+}
+
+interface CodexMarketplace {
+  plugins?: CodexMarketplacePlugin[];
+  [key: string]: unknown;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(__dirname, '..', '..');
@@ -18,7 +36,7 @@ const PACKAGE_ROOT = join(__dirname, '..', '..');
  * @param {'ghcp' | 'claude' | 'codex'} target
  * @returns {string}
  */
-export function getPluginDir(target) {
+export function getPluginDir(target: BuildTargetName): string {
   return join(PACKAGE_ROOT, 'dist', target);
 }
 
@@ -27,7 +45,7 @@ export function getPluginDir(target) {
  * @param {string} pluginPath - Absolute path to the plugin directory
  * @returns {object} Settings to merge into .vscode/settings.json
  */
-export function generateVscodeSettings(pluginPath) {
+export function generateVscodeSettings(pluginPath: string): Record<string, unknown> {
   return {
     'chat.plugins.enabled': true,
     'chat.pluginLocations': {
@@ -41,7 +59,7 @@ export function generateVscodeSettings(pluginPath) {
  * @param {string} pluginPath - Absolute path to the plugin directory
  * @returns {object} Marketplace JSON
  */
-export function generateCodexMarketplaceEntry(pluginPath) {
+export function generateCodexMarketplaceEntry(pluginPath: string): CodexMarketplace {
   return {
     name: 'azure-functions-local',
     interface: {
@@ -70,7 +88,7 @@ export function generateCodexMarketplaceEntry(pluginPath) {
  * @param {string} pluginPath - Absolute path to the Claude plugin directory
  * @returns {object} Settings to merge
  */
-export function generateClaudeSettings(pluginPath) {
+export function generateClaudeSettings(pluginPath: string): Record<string, unknown> {
   return {
     pluginDir: pluginPath,
   };
@@ -82,7 +100,7 @@ export function generateClaudeSettings(pluginPath) {
  * @param {string} projectDir - The project directory
  * @returns {{target: string, method: string, path: string, instructions: string}}
  */
-export function installPlugin(target, projectDir) {
+export function installPlugin(target: BuildTargetName, projectDir: string): PluginInstallResult {
   const pluginPath = getPluginDir(target);
 
   if (!existsSync(pluginPath)) {
@@ -111,11 +129,11 @@ export function installPlugin(target, projectDir) {
       mkdirSync(mpDir, { recursive: true });
       const marketplace = generateCodexMarketplaceEntry(pluginPath);
       if (existsSync(mpPath)) {
-        const existing = JSON.parse(readFileSync(mpPath, 'utf-8'));
+        const existing = JSON.parse(readFileSync(mpPath, 'utf-8')) as CodexMarketplace;
         // Merge: add our plugin if not already present
         const names = existing.plugins?.map(p => p.name) || [];
         if (!names.includes('azure-functions-skills')) {
-          existing.plugins = [...(existing.plugins || []), ...marketplace.plugins];
+          existing.plugins = [...(existing.plugins || []), ...(marketplace.plugins || [])];
           writeFileSync(mpPath, JSON.stringify(existing, null, 2));
         }
       } else {
@@ -149,11 +167,11 @@ export function installPlugin(target, projectDir) {
   return result;
 }
 
-function mergeJsonFile(filePath, newEntries) {
-  let existing = {};
+function mergeJsonFile(filePath: string, newEntries: Record<string, unknown>): Record<string, unknown> {
+  let existing: Record<string, unknown> = {};
   if (existsSync(filePath)) {
     try {
-      existing = JSON.parse(readFileSync(filePath, 'utf-8'));
+      existing = JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
     } catch {
       // corrupt file, overwrite
     }

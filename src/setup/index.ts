@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../build/loader.js';
 import { buildTarget } from '../build/build-target.js';
+import type { BuildData, CliAgentName, SetupOptions, SetupResult } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
@@ -18,8 +19,8 @@ const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
  * Detect which coding agents are available in the environment.
  * Returns an array of agent identifiers: 'ghcp', 'claude', 'codex'.
  */
-export async function detectAgents() {
-  const agents = [];
+export async function detectAgents(): Promise<CliAgentName[]> {
+  const agents: CliAgentName[] = [];
 
   // IDE detection (file-based)
   if (existsSync('.vscode') || process.env.VSCODE_PID) {
@@ -27,7 +28,7 @@ export async function detectAgents() {
   }
 
   // CLI binary detection
-  const checks = [
+  const checks: Array<{ name: CliAgentName; cmd: string }> = [
     { name: 'claude', cmd: process.platform === 'win32' ? 'where claude' : 'which claude' },
     { name: 'codex', cmd: process.platform === 'win32' ? 'where codex' : 'which codex' },
   ];
@@ -62,7 +63,7 @@ export async function detectAgents() {
  * @param {string[]} options.agents - Agent identifiers to set up for
  * @returns {object} Summary with agents, filesWritten, welcomeMessage
  */
-export async function applySetup(targetDir, options = {}) {
+export async function applySetup(targetDir: string, options: SetupOptions = {}): Promise<SetupResult> {
   const agents = options.agents || await detectAgents();
 
   // Load canonical sources
@@ -70,7 +71,7 @@ export async function applySetup(targetDir, options = {}) {
   const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
   const agentDefs = loadAgents(join(TEMPLATES_DIR, 'agents'));
   const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-  const data = { skills, mcpServers, agents: agentDefs, hooks };
+  const data: BuildData = { skills, mcpServers, agents: agentDefs, hooks };
 
   // Build each target to a temp location, then copy to targetDir
   const tmpDir = join(tmpdir(), `af-skills-tmp-${Date.now()}`);
@@ -123,7 +124,7 @@ export async function applySetup(targetDir, options = {}) {
  * Copy all files from src to dest recursively.
  * Returns the number of files copied.
  */
-function copyRecursive(src, dest) {
+function copyRecursive(src: string, dest: string): number {
   if (!existsSync(src)) return 0;
   let count = 0;
 

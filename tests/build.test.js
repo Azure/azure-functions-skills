@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../src/build/loader.js';
-import { buildTarget } from '../src/build/build-target.js';
+import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../lib/build/loader.js';
+import { buildTarget } from '../lib/build/build-target.js';
 import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
 
 const TEMPLATES_DIR = join(import.meta.dirname, '..', 'templates');
@@ -478,7 +478,7 @@ describe('setup module', () => {
   let detectAgents, applySetup;
 
   beforeAll(async () => {
-    const mod = await import('../src/setup/index.js');
+    const mod = await import('../lib/setup/index.js');
     detectAgents = mod.detectAgents;
     applySetup = mod.applySetup;
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getPluginDir, generateVscodeSettings, generateCodexMarketplaceEntry, generateClaudeSettings } from '../src/setup/plugin-install.js';
+import { getPluginDir, generateVscodeSettings, generateCodexMarketplaceEntry, generateClaudeSettings } from '../lib/setup/plugin-install.js';
 
 describe('getPluginDir', () => {
   it('returns a path containing dist/', () => {

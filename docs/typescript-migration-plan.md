@@ -39,7 +39,17 @@ Branch: `ts-migration-test-automation`
   - [x] Run `npm test`.
   - [x] Run `npm run build`.
   - [x] Commit Step 2.
-- [ ] Step 3 / #35: Convert runtime source to TypeScript with shared domain types.
+- [x] Step 3 / #35: Convert runtime source to TypeScript with shared domain types.
+  - [x] Review Step 3 issue #35.
+  - [x] Define shared runtime domain types.
+  - [x] Convert `src/build/*`, `src/setup/*`, and `src/chat/*` from `.js` to `.ts`.
+  - [x] Preserve NodeNext `.js` import specifiers in TypeScript source.
+  - [x] Update package exports, files, and CLI wrapper to use compiled runtime output.
+  - [x] Run `npm run typecheck`.
+  - [x] Run `npm test`.
+  - [x] Run `npm run build`.
+  - [x] Run CLI smoke checks for `--help` and `build`.
+  - [x] Commit Step 3.
 - [ ] Step 4 / #36: Convert Vitest tests to TypeScript and shared helpers.
 - [ ] Step 5 / #37: Add automated validation for skill templates.
 - [ ] Step 6 / #38: Add new skill scaffolding and contributor workflow docs.
@@ -66,3 +76,6 @@ Implementation notes:
 - 2026-05-02: Committed Step 1 as `cee0d5f` and started Step 2 (#34).
 - 2026-05-02: Added TypeScript, ESLint, strict Node ESM config, CI quality gates, and verified lint/typecheck/test/build/audit.
 - 2026-05-02: Verified `npm run ci` passes and prepared Step 2 commit.
+- 2026-05-02: Committed Step 2 as `79241c0` and started Step 3 (#35).
+- 2026-05-02: Converted runtime source to TypeScript, added shared types, switched tests/CLI/package exports to compiled `lib/`, and verified typecheck/lint/test/build/CLI smoke checks.
+- 2026-05-02: Verified `npm run ci`, CLI `--help`, and CLI `build` pass, then prepared Step 3 commit.

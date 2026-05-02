@@ -10,7 +10,7 @@
  *   npx @agent-loom/azure-functions-skills build               # Build plugin artifacts
  */
 
-import { detectAgents, applySetup } from '../src/setup/index.js';
+import { detectAgents, applySetup } from '../lib/setup/index.js';
 import { join } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -66,14 +66,14 @@ if (command === 'setup') {
 
   if (asPlugin) {
     // Native plugin install — register with each platform
-    const { installPlugin, getPluginDir } = await import('../src/setup/plugin-install.js');
+    const { installPlugin, getPluginDir } = await import('../lib/setup/plugin-install.js');
 
     // Ensure plugins are built first
     const { existsSync } = await import('node:fs');
     if (!existsSync(getPluginDir('ghcp'))) {
       console.log('\n📦 Building plugins first...');
       const { execSync } = await import('node:child_process');
-      execSync('node src/build/build.js', { stdio: 'inherit', cwd: join(import.meta.dirname, '..') });
+      execSync('node lib/build/build.js', { stdio: 'inherit', cwd: join(import.meta.dirname, '..') });
     }
 
     console.log(`\n🔌 Installing as native plugins to: ${dir}\n`);
@@ -107,7 +107,7 @@ if (command === 'setup') {
     console.log(result.welcomeMessage);
   }
 } else if (command === 'chat') {
-  const { chat, detectCliAgents } = await import('../src/chat/index.js');
+  const { chat, detectCliAgents } = await import('../lib/chat/index.js');
 
   let agent = null;
   let prompt = null;
@@ -123,13 +123,13 @@ if (command === 'setup') {
 
   // If --as-plugin, ensure plugin is registered first
   if (asPlugin) {
-    const { installPlugin, getPluginDir } = await import('../src/setup/plugin-install.js');
+    const { installPlugin, getPluginDir } = await import('../lib/setup/plugin-install.js');
     const { existsSync } = await import('node:fs');
 
     if (!existsSync(getPluginDir('ghcp'))) {
       console.log('📦 Building plugins first...');
       const { execSync } = await import('node:child_process');
-      execSync('node src/build/build.js', { stdio: 'inherit', cwd: join(import.meta.dirname, '..') });
+      execSync('node lib/build/build.js', { stdio: 'inherit', cwd: join(import.meta.dirname, '..') });
     }
 
     // Map CLI agent names to targets
@@ -168,7 +168,7 @@ if (command === 'setup') {
 } else if (command === 'build') {
   // Delegate to build script
   const { execSync } = await import('node:child_process');
-  execSync('node src/build/build.js', { stdio: 'inherit' });
+  execSync('node lib/build/build.js', { stdio: 'inherit' });
 } else {
   console.error(`Unknown command: ${command}`);
   process.exit(1);
