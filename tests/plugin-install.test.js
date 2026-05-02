@@ -1,9 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { existsSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { describe, it, expect } from 'vitest';
 import { getPluginDir, generateVscodeSettings, generateCodexMarketplaceEntry, generateClaudeSettings } from '../src/setup/plugin-install.js';
-
-const TEST_DIR = join(import.meta.dirname, '..', 'dist-test-plugin');
 
 describe('getPluginDir', () => {
   it('returns a path containing dist/', () => {

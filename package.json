@@ -23,15 +23,22 @@
   },
   "scripts": {
     "build": "node src/build/build.js",
+    "ci": "npm run lint && npm run typecheck && npm test && npm run build",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "setup": "node bin/azure-functions-skills.js setup",
-    "lint": "echo 'TODO: add eslint'"
+    "typecheck": "tsc --noEmit",
+    "setup": "node bin/azure-functions-skills.js setup"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.6.0",
+    "eslint": "^10.3.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.1",
     "vitest": "^3.1.1"
   },
   "keywords": [

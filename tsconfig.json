@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "outDir": "lib",
+    "types": ["node", "vitest"],
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "bin/**/*.js",
+    "src/**/*.js",
+    "tests/**/*.js",
+    "eslint.config.js"
+  ],
+  "exclude": [
+    "dist",
+    "dist-test*",
+    "lib",
+    "node_modules"
+  ]
+}

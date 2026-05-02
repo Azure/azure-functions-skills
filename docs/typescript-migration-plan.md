@@ -27,7 +27,18 @@ Branch: `ts-migration-test-automation`
   - [x] Run `npm test -- tests/build.test.js`.
   - [x] Run `npm test`.
   - [x] Commit Step 1.
-- [ ] Step 2 / #34: Add TypeScript toolchain and CI quality gates.
+- [x] Step 2 / #34: Add TypeScript toolchain and CI quality gates.
+  - [x] Review Step 2 issue #34.
+  - [x] Add TypeScript and Node type dependencies.
+  - [x] Add strict Node ESM `tsconfig.json` without conflicting with plugin `dist/` output.
+  - [x] Add ESLint flat config for JavaScript and TypeScript.
+  - [x] Add `lint`, `typecheck`, and combined validation scripts.
+  - [x] Update CI trigger paths and quality gate steps.
+  - [x] Run `npm run lint`.
+  - [x] Run `npm run typecheck`.
+  - [x] Run `npm test`.
+  - [x] Run `npm run build`.
+  - [x] Commit Step 2.
 - [ ] Step 3 / #35: Convert runtime source to TypeScript with shared domain types.
 - [ ] Step 4 / #36: Convert Vitest tests to TypeScript and shared helpers.
 - [ ] Step 5 / #37: Add automated validation for skill templates.
@@ -52,3 +63,6 @@ Implementation notes:
 - 2026-05-02: Verified `npm test -- tests/build.test.js` passes (42 tests).
 - 2026-05-02: Verified `npm test` passes (62 tests).
 - 2026-05-02: Verified `npm run build` passes and prepared Step 1 commit.
+- 2026-05-02: Committed Step 1 as `cee0d5f` and started Step 2 (#34).
+- 2026-05-02: Added TypeScript, ESLint, strict Node ESM config, CI quality gates, and verified lint/typecheck/test/build/audit.
+- 2026-05-02: Verified `npm run ci` passes and prepared Step 2 commit.

@@ -131,7 +131,6 @@ export function installPlugin(target, projectDir) {
       const claudeDir = join(projectDir, '.claude');
       mkdirSync(claudeDir, { recursive: true });
       const settingsPath = join(claudeDir, 'settings.local.json');
-      const claudeSettings = generateClaudeSettings(pluginPath);
       // Write MCP + add-dir reference
       const mcpPath = join(pluginPath, '.claude', 'settings.json');
       if (existsSync(mcpPath)) {
