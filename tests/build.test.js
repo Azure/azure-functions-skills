@@ -13,8 +13,8 @@ describe('loadSkills', () => {
   let skills;
   beforeAll(() => { skills = loadSkills(join(TEMPLATES_DIR, 'skills')); });
 
-  it('loads all three skills', () => {
-    expect(skills).toHaveLength(3);
+  it('loads all skills', () => {
+    expect(skills).toHaveLength(7);
   });
 
   it('each skill has id, title, content, graph', () => {
@@ -29,7 +29,15 @@ describe('loadSkills', () => {
 
   it('skill IDs match directory names', () => {
     const ids = skills.map(s => s.id).sort();
-    expect(ids).toEqual(['azure-functions-create', 'azure-functions-deploy', 'azure-functions-setup']);
+    expect(ids).toEqual([
+      'azure-functions-common',
+      'azure-functions-create',
+      'azure-functions-deploy',
+      'azure-functions-diagnostics',
+      'azure-functions-health-status',
+      'azure-functions-inventory',
+      'azure-functions-setup',
+    ]);
   });
 });
 

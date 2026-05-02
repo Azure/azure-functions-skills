@@ -1,0 +1,13 @@
+id: azure-functions-health-status
+title: Azure Functions Health Status
+suggestions:
+  on_success:
+    - target: azure-functions-diagnostics
+      reason: "Use diagnostics to interpret findings and recommend fixes."
+      priority: 80
+  on_failure:
+    - target: azure-functions-inventory
+      reason: "Re-collect inventory to confirm app identity and configuration."
+      priority: 60
+entry_conditions:
+  - app_identified

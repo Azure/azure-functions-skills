@@ -1,0 +1,14 @@
+id: azure-functions-diagnostics
+title: Azure Functions Diagnostics
+description: "Use when diagnosing or resolving Azure Functions issues: deployment failures, runtime errors, trigger/binding failures, language worker issues, telemetry/log analysis, known issue research, source investigation, and remediation. Acts as a facade that routes to focused Azure Functions skills and small language/extension references."
+category: task
+targets:
+  ghcp: true
+  claude: true
+  codex: true
+mcp_preferred:
+  - azure
+tags:
+  - diagnose
+  - troubleshoot
+  - telemetry
