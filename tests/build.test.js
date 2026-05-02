@@ -1,11 +1,21 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { readFileSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../src/build/loader.js';
 import { buildTarget } from '../src/build/build-target.js';
+import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
 
 const TEMPLATES_DIR = join(import.meta.dirname, '..', 'templates');
-const DIST_DIR = join(import.meta.dirname, '..', 'dist-test');
+let DIST_DIR;
+
+function resetDistDir() {
+  DIST_DIR = resetDir(createTempDir('af-skills-build-'));
+}
+
+afterEach(() => {
+  removeDir(DIST_DIR);
+  DIST_DIR = null;
+});
 
 // ─── Loader tests ───
 
@@ -87,8 +97,7 @@ describe('loadHooks', () => {
 
 describe('buildTarget — ghcp', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('generates copilot-instructions.md', () => {
@@ -261,8 +270,7 @@ describe('buildTarget — ghcp', () => {
 
 describe('buildTarget — claude', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('generates CLAUDE.md', () => {
@@ -307,8 +315,7 @@ describe('buildTarget — claude', () => {
 
 describe('buildTarget — codex', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('generates AGENTS.md with full instructions', () => {
@@ -378,8 +385,7 @@ describe('buildTarget — codex', () => {
 
 describe('next-step suggestions', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('GHCP instructions include graph suggestions', () => {
@@ -402,8 +408,7 @@ describe('next-step suggestions', () => {
 
 describe('Codex plugin manifest', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('generates .codex-plugin/plugin.json with correct structure', () => {
@@ -479,8 +484,7 @@ describe('setup module', () => {
   });
 
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('detectAgents returns an array of detected agent names', async () => {
@@ -531,13 +535,12 @@ describe('setup module', () => {
 });
 
 describe('skill references/ subdirectory', () => {
-  const FIXTURE_DIR = join(import.meta.dirname, '..', 'dist-test-refs-fixture');
-  const REF_DIST_DIR = join(import.meta.dirname, '..', 'dist-test-refs');
+  let FIXTURE_DIR;
+  let REF_DIST_DIR;
 
   beforeEach(() => {
-    for (const d of [FIXTURE_DIR, REF_DIST_DIR]) {
-      if (existsSync(d)) rmSync(d, { recursive: true });
-    }
+    FIXTURE_DIR = createTempDir('af-skills-refs-fixture-');
+    REF_DIST_DIR = createTempDir('af-skills-refs-dist-');
     // Build a minimal skill fixture: skills/demo-skill/{skill.yaml, graph.yaml, SKILL.md, references/*}
     const skillDir = join(FIXTURE_DIR, 'skills', 'demo-skill');
     mkdirSync(join(skillDir, 'references', 'nested'), { recursive: true });
@@ -557,6 +560,13 @@ describe('skill references/ subdirectory', () => {
     writeFileSync(join(skillDir, 'references', 'nested', 'deep.md'), '# Nested ref\n');
   });
 
+  afterEach(() => {
+    removeDir(FIXTURE_DIR);
+    removeDir(REF_DIST_DIR);
+    FIXTURE_DIR = null;
+    REF_DIST_DIR = null;
+  });
+
   it('loadSkills returns referencesDir when references/ exists', () => {
     const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
     expect(skills).toHaveLength(1);
@@ -566,7 +576,7 @@ describe('skill references/ subdirectory', () => {
 
   it('loadSkills returns referencesDir=null when references/ is missing', () => {
     // Remove references to test the negative case
-    rmSync(join(FIXTURE_DIR, 'skills', 'demo-skill', 'references'), { recursive: true });
+    removeDir(join(FIXTURE_DIR, 'skills', 'demo-skill', 'references'));
     const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
     expect(skills[0].referencesDir).toBeNull();
   });
