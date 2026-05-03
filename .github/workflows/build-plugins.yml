@@ -13,6 +13,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
+      - 'tsconfig.typecheck.json'
+      - 'vitest.config.ts'
   pull_request:
     branches: [main]
     paths:
@@ -25,6 +27,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
+      - 'tsconfig.typecheck.json'
+      - 'vitest.config.ts'
 
 jobs:
   build:

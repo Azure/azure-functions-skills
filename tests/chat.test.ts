@@ -1,13 +1,13 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildStartupPrompt, LAUNCHERS, detectCliAgents, chat } from '../lib/chat/index.js';
+import { buildStartupPrompt, LAUNCHERS, detectCliAgents, chat } from '../src/chat/index.js';
 import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
 
-const TEMP_DIRS = [];
+const TEMP_DIRS: string[] = [];
 const DIST_DIR = makeTestDir('af-skills-chat-');
 
-function makeTestDir(prefix) {
+function makeTestDir(prefix: string): string {
   const dir = createTempDir(prefix);
   TEMP_DIRS.push(dir);
   return dir;
@@ -156,7 +156,7 @@ describe('chat auto-setup', () => {
     const testDir = makeTestDir('af-skills-chat-skip-');
 
     // Pre-install skills
-    const { applySetup } = await import('../lib/setup/index.js');
+    const { applySetup } = await import('../src/setup/index.js');
     await applySetup(testDir, { agents: ['ghcp'] });
 
     // Get content of instructions file

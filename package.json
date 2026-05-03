@@ -37,9 +37,9 @@
     "ci": "npm run lint && npm run typecheck && npm test && npm run build",
     "compile": "tsc",
     "lint": "eslint .",
-    "test": "npm run compile && vitest run",
-    "test:watch": "npm run compile && vitest",
-    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "setup": "node bin/azure-functions-skills.js setup"
   },
   "engines": {

@@ -1,30 +1,39 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../lib/build/loader.js';
-import { buildTarget } from '../lib/build/build-target.js';
+import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../src/build/loader.js';
+import { buildTarget } from '../src/build/build-target.js';
+import { detectAgents, applySetup } from '../src/setup/index.js';
 import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
+import type { AgentDefinitions, BuildTargetName, HookDefinitions, McpServer, Skill } from '../src/types.js';
 
 const TEMPLATES_DIR = join(import.meta.dirname, '..', 'templates');
-let DIST_DIR;
+let DIST_DIR = '';
 
 function resetDistDir() {
   DIST_DIR = resetDir(createTempDir('af-skills-build-'));
 }
 
+function expectedSkillIds(): string[] {
+  return readdirSync(join(TEMPLATES_DIR, 'skills'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => entry.name)
+    .sort();
+}
+
 afterEach(() => {
   removeDir(DIST_DIR);
-  DIST_DIR = null;
+  DIST_DIR = '';
 });
 
 // ─── Loader tests ───
 
 describe('loadSkills', () => {
-  let skills;
+  let skills: Skill[];
   beforeAll(() => { skills = loadSkills(join(TEMPLATES_DIR, 'skills')); });
 
   it('loads all skills', () => {
-    expect(skills).toHaveLength(7);
+    expect(skills).toHaveLength(expectedSkillIds().length);
   });
 
   it('each skill has id, title, content, graph', () => {
@@ -39,20 +48,12 @@ describe('loadSkills', () => {
 
   it('skill IDs match directory names', () => {
     const ids = skills.map(s => s.id).sort();
-    expect(ids).toEqual([
-      'azure-functions-common',
-      'azure-functions-create',
-      'azure-functions-deploy',
-      'azure-functions-diagnostics',
-      'azure-functions-health-status',
-      'azure-functions-inventory',
-      'azure-functions-setup',
-    ]);
+    expect(ids).toEqual(expectedSkillIds());
   });
 });
 
 describe('loadMcpServers', () => {
-  let servers;
+  let servers: McpServer[];
   beforeAll(() => { servers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')); });
 
   it('loads MCP server definitions', () => {
@@ -69,7 +70,7 @@ describe('loadMcpServers', () => {
 });
 
 describe('loadAgents', () => {
-  let agents;
+  let agents: AgentDefinitions;
   beforeAll(() => { agents = loadAgents(join(TEMPLATES_DIR, 'agents')); });
 
   it('loads AGENTS.md', () => {
@@ -84,7 +85,7 @@ describe('loadAgents', () => {
 });
 
 describe('loadHooks', () => {
-  let hooks;
+  let hooks: HookDefinitions;
   beforeAll(() => { hooks = loadHooks(join(TEMPLATES_DIR, 'hooks')); });
 
   it('loads welcome-setup hook', () => {
@@ -475,14 +476,6 @@ describe('Codex plugin manifest', () => {
 // ─── Setup CLI tests ───
 
 describe('setup module', () => {
-  let detectAgents, applySetup;
-
-  beforeAll(async () => {
-    const mod = await import('../lib/setup/index.js');
-    detectAgents = mod.detectAgents;
-    applySetup = mod.applySetup;
-  });
-
   beforeEach(() => {
     resetDistDir();
   });
@@ -535,8 +528,8 @@ describe('setup module', () => {
 });
 
 describe('skill references/ subdirectory', () => {
-  let FIXTURE_DIR;
-  let REF_DIST_DIR;
+  let FIXTURE_DIR = '';
+  let REF_DIST_DIR = '';
 
   beforeEach(() => {
     FIXTURE_DIR = createTempDir('af-skills-refs-fixture-');
@@ -563,15 +556,15 @@ describe('skill references/ subdirectory', () => {
   afterEach(() => {
     removeDir(FIXTURE_DIR);
     removeDir(REF_DIST_DIR);
-    FIXTURE_DIR = null;
-    REF_DIST_DIR = null;
+    FIXTURE_DIR = '';
+    REF_DIST_DIR = '';
   });
 
   it('loadSkills returns referencesDir when references/ exists', () => {
     const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
     expect(skills).toHaveLength(1);
     expect(skills[0].referencesDir).toBeTruthy();
-    expect(skills[0].referencesDir.endsWith('references')).toBe(true);
+    expect(skills[0].referencesDir?.endsWith('references')).toBe(true);
   });
 
   it('loadSkills returns referencesDir=null when references/ is missing', () => {
@@ -582,7 +575,7 @@ describe('skill references/ subdirectory', () => {
   });
 
   // Minimal agents/hooks/mcp stubs for cross-target builds
-  function buildFixture(target) {
+  function buildFixture(target: BuildTargetName) {
     const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));

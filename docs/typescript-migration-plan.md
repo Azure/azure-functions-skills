@@ -50,7 +50,17 @@ Branch: `ts-migration-test-automation`
   - [x] Run `npm run build`.
   - [x] Run CLI smoke checks for `--help` and `build`.
   - [x] Commit Step 3.
-- [ ] Step 4 / #36: Convert Vitest tests to TypeScript and shared helpers.
+- [x] Step 4 / #36: Convert Vitest tests to TypeScript and shared helpers.
+  - [x] Review Step 4 issue #36.
+  - [x] Convert Vitest tests and test helpers from `.js` to `.ts`.
+  - [x] Add test typecheck configuration.
+  - [x] Keep shared filesystem helper reuse.
+  - [x] Reduce hardcoded catalog expectations where practical.
+  - [x] Run `npm run lint`.
+  - [x] Run `npm run typecheck`.
+  - [x] Run `npm test`.
+  - [x] Run `npm run build`.
+  - [x] Commit Step 4.
 - [ ] Step 5 / #37: Add automated validation for skill templates.
 - [ ] Step 6 / #38: Add new skill scaffolding and contributor workflow docs.
 - [ ] Final TypeScript self-review and refactoring pass.
@@ -79,3 +89,5 @@ Implementation notes:
 - 2026-05-02: Committed Step 2 as `79241c0` and started Step 3 (#35).
 - 2026-05-02: Converted runtime source to TypeScript, added shared types, switched tests/CLI/package exports to compiled `lib/`, and verified typecheck/lint/test/build/CLI smoke checks.
 - 2026-05-02: Verified `npm run ci`, CLI `--help`, and CLI `build` pass, then prepared Step 3 commit.
+- 2026-05-02: Committed Step 3 as `7e13eee`, converted tests/helpers to TypeScript, added Vitest and test typecheck config, and verified lint/typecheck/test/build.
+- 2026-05-02: Committed Step 3 as `7e13eee` and started Step 4 (#36).
