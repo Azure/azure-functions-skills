@@ -1,13 +1,11 @@
 name: Publish & Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
   publish:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
