@@ -203,9 +203,13 @@ After installing the plugin for your preferred agent:
 
 ### Setup
 
+Run this once after cloning the repository, and any time `node_modules/` is removed:
+
 ```bash
 npm ci
 ```
+
+`npm ci` installs the development tools used by the scripts, including TypeScript's `tsc` command.
 
 ### Test (TDD)
 
@@ -215,8 +219,10 @@ npm run typecheck        # TypeScript strict typecheck for src/ and tests/
 npm test                 # run once
 npm run test:watch       # watch mode
 npm run validate:skills  # validate canonical skill templates
-npm run ci               # lint + typecheck + validate + test + build
+npm run check            # lint + typecheck + validate + test + build
 ```
+
+`npm run ci` is kept as an alias for CI systems, but `npm run check` is the clearer local command.
 
 ### Build
 
@@ -250,7 +256,7 @@ Before opening a PR, complete this checklist:
 - Write `templates/skills/<skill-id>/SKILL.md` workflow instructions.
 - Add optional `references/` or `scripts/` content if the skill needs supporting files.
 - Run `npm run validate:skills` to catch missing files, ID mismatches, and broken graph targets.
-- Run `npm run ci` to verify lint, typecheck, validation, tests, and build.
+- Run `npm run check` to verify lint, typecheck, validation, tests, and build.
 - Run `npm pack --dry-run` before release-related changes to inspect package contents.
 
 ### Architecture

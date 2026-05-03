@@ -34,7 +34,8 @@
   },
   "scripts": {
     "build": "npm run compile && node lib/build/build.js",
-    "ci": "npm run lint && npm run typecheck && npm run validate:skills && npm test && npm run build",
+    "check": "npm run lint && npm run typecheck && npm run validate:skills && npm test && npm run build",
+    "ci": "npm run check",
     "compile": "tsc",
     "lint": "eslint .",
     "new:skill": "npm run compile && node lib/build/new-skill.js",
