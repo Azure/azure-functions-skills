@@ -36,13 +36,13 @@ describe('loadSkills', () => {
     expect(skills).toHaveLength(expectedSkillIds().length);
   });
 
-  it('each skill has id, title, content, graph', () => {
+  it('each skill has id, title, description, category, and content', () => {
     for (const s of skills) {
       expect(s.id).toBeTruthy();
       expect(s.title).toBeTruthy();
+      expect(s.description).toBeTruthy();
+      expect(s.category).toBeTruthy();
       expect(s.content).toBeTruthy();
-      expect(s.graph).toBeTruthy();
-      expect(s.graph.suggestions).toBeTruthy();
     }
   });
 
@@ -386,14 +386,14 @@ describe('buildTarget — codex', () => {
   });
 });
 
-// ─── Next-step suggestion embedding ───
+// ─── Skill instruction embedding ───
 
-describe('next-step suggestions', () => {
+describe('skill instruction embedding', () => {
   beforeEach(() => {
     resetDistDir();
   });
 
-  it('GHCP instructions include graph suggestions', () => {
+  it('GHCP instructions include skill-authored next step guidance', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
@@ -402,10 +402,9 @@ describe('next-step suggestions', () => {
 
     const instrPath = join(DIST_DIR, 'ghcp', '.github', 'copilot-instructions.md');
     const content = readFileSync(instrPath, 'utf-8');
-    // azure-functions-setup should suggest azure-functions-create on success
-    expect(content).toContain('azure-functions-create');
-    // azure-functions-create should suggest azure-functions-deploy on success
-    expect(content).toContain('azure-functions-deploy');
+    expect(content).toContain('## Next steps');
+    expect(content).toContain('suggest `azure-functions-create`');
+    expect(content).toContain('suggest `azure-functions-deploy`');
   });
 });
 
@@ -561,20 +560,12 @@ describe('skill references/ subdirectory', () => {
   beforeEach(() => {
     FIXTURE_DIR = createTempDir('af-skills-refs-fixture-');
     REF_DIST_DIR = createTempDir('af-skills-refs-dist-');
-    // Build a minimal skill fixture: skills/demo-skill/{skill.yaml, graph.yaml, SKILL.md, references/*}
+    // Build a minimal skill fixture: skills/demo-skill/{SKILL.md, references/*}
     const skillDir = join(FIXTURE_DIR, 'skills', 'demo-skill');
     mkdirSync(join(skillDir, 'references', 'nested'), { recursive: true });
     writeFileSync(
-      join(skillDir, 'skill.yaml'),
-      'id: demo-skill\ntitle: Demo\ndescription: "Demo skill with references"\ncategory: test\n',
-    );
-    writeFileSync(
-      join(skillDir, 'graph.yaml'),
-      'suggestions:\n  on_success: []\n',
-    );
-    writeFileSync(
       join(skillDir, 'SKILL.md'),
-      '# Demo\nSee [more](references/extra.md).\n',
+      '---\nname: demo-skill\ntitle: Demo\ndescription: Demo skill with references\ncategory: test\n---\n\n# Demo\nSee [more](references/extra.md).\n',
     );
     writeFileSync(join(skillDir, 'references', 'extra.md'), '# Extra reference\n');
     writeFileSync(join(skillDir, 'references', 'nested', 'deep.md'), '# Nested ref\n');

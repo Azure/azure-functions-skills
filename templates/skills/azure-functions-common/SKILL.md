@@ -1,3 +1,10 @@
+---
+name: azure-functions-common
+title: Azure Functions Common References
+description: "Shared Azure Functions reference material for the Azure Functions skill suite: runtime/language routing, trigger/binding extension references, official docs and repository pointers. Use only when another Azure Functions skill needs reusable language or binding context. Not intended as a standalone user-facing workflow."
+category: reference
+---
+
 # Azure Functions Common References
 
 Use this suite-internal skill as the shared reference pack for Azure Functions skills.
@@ -13,6 +20,10 @@ Shared references include:
 - Routing rules in `references/routing.md`.
 
 Task-specific skills keep their own workflows, scripts, evidence checklists, and output formats. For example, diagnostics owns diagnostic workflow and health evidence rules; this skill only owns reusable Azure Functions reference material.
+
+## Next steps
+
+This is a shared reference skill. Return to the calling Azure Functions skill after loading only the relevant references.
 
 ## Loading rules
 

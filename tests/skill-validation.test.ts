@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateSkills } from '../src/build/validate-skills.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
@@ -16,21 +16,17 @@ function createFixture(): string {
 function writeSkill(
   skillsDir: string,
   dirName: string,
-  options: { yamlId?: string; graphTarget?: string } = {},
+  options: { frontmatterName?: string; includeFrontmatter?: boolean } = {},
 ): void {
   const skillDir = join(skillsDir, dirName);
   mkdirSync(skillDir, { recursive: true });
+  const includeFrontmatter = options.includeFrontmatter ?? true;
   writeFileSync(
-    join(skillDir, 'skill.yaml'),
-    `id: ${options.yamlId || dirName}\ntitle: ${dirName}\ndescription: "${dirName}"\ncategory: test\n`,
+    join(skillDir, 'SKILL.md'),
+    includeFrontmatter
+      ? `---\nname: ${options.frontmatterName || dirName}\ntitle: ${dirName}\ndescription: ${dirName}\ncategory: test\n---\n\n# ${dirName}\n`
+      : `# ${dirName}\n`,
   );
-  writeFileSync(
-    join(skillDir, 'graph.yaml'),
-    options.graphTarget
-      ? `suggestions:\n  on_success:\n    - target: ${options.graphTarget}\n      reason: "next"\n`
-      : 'suggestions:\n  on_success: []\n',
-  );
-  writeFileSync(join(skillDir, 'SKILL.md'), `# ${dirName}\n`);
 }
 
 afterEach(() => {
@@ -41,7 +37,7 @@ afterEach(() => {
 describe('validateSkills', () => {
   it('accepts valid skill templates', () => {
     const skillsDir = createFixture();
-    writeSkill(skillsDir, 'first-skill', { graphTarget: 'second-skill' });
+    writeSkill(skillsDir, 'first-skill');
     writeSkill(skillsDir, 'second-skill');
 
     const result = validateSkills(skillsDir);
@@ -50,26 +46,19 @@ describe('validateSkills', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('reports missing required files with clear errors', () => {
+  it('accepts skill templates without skill.yaml or graph.yaml', () => {
     const skillsDir = createFixture();
-    writeSkill(skillsDir, 'missing-graph');
-    rmSync(join(skillsDir, 'missing-graph', 'graph.yaml'));
+    writeSkill(skillsDir, 'metadata-in-skill-md');
 
     const result = validateSkills(skillsDir);
 
-    expect(result.valid).toBe(false);
-    expect(result.errors).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        skillId: 'missing-graph',
-        file: 'graph.yaml',
-        message: expect.stringContaining('Missing required file'),
-      }),
-    ]));
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it('reports skill IDs that do not match directory names', () => {
     const skillsDir = createFixture();
-    writeSkill(skillsDir, 'directory-name', { yamlId: 'different-id' });
+    writeSkill(skillsDir, 'directory-name', { frontmatterName: 'different-id' });
 
     const result = validateSkills(skillsDir);
 
@@ -77,22 +66,24 @@ describe('validateSkills', () => {
     expect(result.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({
         skillId: 'different-id',
+        file: 'SKILL.md',
         message: expect.stringContaining('does not match directory'),
       }),
     ]));
   });
 
-  it('reports graph targets that do not point to existing skills', () => {
+  it('reports missing SKILL.md frontmatter name', () => {
     const skillsDir = createFixture();
-    writeSkill(skillsDir, 'source-skill', { graphTarget: 'missing-skill' });
+    writeSkill(skillsDir, 'missing-frontmatter', { includeFrontmatter: false });
 
     const result = validateSkills(skillsDir);
 
     expect(result.valid).toBe(false);
     expect(result.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        skillId: 'source-skill',
-        message: expect.stringContaining('unknown skill target'),
+        skillId: 'missing-frontmatter',
+        file: 'SKILL.md',
+        message: expect.stringContaining('Missing required skill name'),
       }),
     ]));
   });

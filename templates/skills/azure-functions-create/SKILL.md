@@ -1,3 +1,10 @@
+---
+name: azure-functions-create
+title: Create Azure Functions App
+description: Scaffold a new Azure Functions project with language and template selection
+category: task
+---
+
 > **Language**: Always respond in the same language the user is using.
 
 # azure-functions-create — Create Azure Functions App
@@ -164,3 +171,8 @@ If `host.json` already exists, do **not** re-initialize. Instead:
 ## After Creation
 
 > ✅ Your project is scaffolded! Next: use **azure-functions-deploy** to deploy to Azure.
+
+## Next steps
+
+- On success, suggest `azure-functions-deploy` because the project is ready to deploy to Azure.
+- On failure, suggest `azure-functions-setup` to verify local tooling and prerequisites.

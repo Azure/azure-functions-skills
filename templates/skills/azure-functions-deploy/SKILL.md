@@ -1,3 +1,10 @@
+---
+name: azure-functions-deploy
+title: Deploy Azure Functions
+description: Deploy your Azure Functions app to Azure using official tools
+category: task
+---
+
 > **Language**: Always respond in the same language the user is using.
 
 # azure-functions-deploy — Deploy Azure Functions
@@ -97,3 +104,8 @@ curl https://myFunctionApp.azurewebsites.net/api/httpTrigger?name=World
 ## After Deployment
 
 > ✅ Your app is deployed! Consider setting up monitoring with Application Insights.
+
+## Next steps
+
+- On success, suggest `azure-functions-create` if the user wants to add more functions to the deployed app.
+- On failure, suggest `azure-functions-setup` to verify Azure CLI login, subscription access, and local prerequisites.

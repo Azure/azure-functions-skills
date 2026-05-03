@@ -1,3 +1,10 @@
+---
+name: azure-functions-health-status
+title: Azure Functions Health Status
+description: "Use when investigating current Azure Functions app status and health: Running/Stopped state, Resource Health, plan status, Azure Monitor metrics, Application Insights/Log Analytics requests, failures, exceptions, traces, dependencies, and recent Activity Log. Do not use for static inventory-only requests."
+category: task
+---
+
 # Azure Functions Health Status
 
 Use this skill to investigate the current status and health of an existing Azure Function App.
@@ -43,6 +50,11 @@ This skill should collect:
 - Gaps: missing telemetry, unsupported Resource Health, unavailable diagnostic data
 
 Do not perform full static inventory beyond fields needed to interpret health. Use the inventory skill for detailed specifications.
+
+## Next steps
+
+- On success, suggest `azure-functions-diagnostics` to interpret findings and recommend fixes when health signals are degraded or unclear.
+- On failure, suggest `azure-functions-inventory` to confirm app identity and configuration before retrying health checks.
 
 ## Interpretation rules
 

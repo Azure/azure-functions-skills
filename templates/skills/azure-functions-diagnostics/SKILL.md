@@ -1,3 +1,10 @@
+---
+name: azure-functions-diagnostics
+title: Azure Functions Diagnostics
+description: "Use when diagnosing or resolving Azure Functions issues: deployment failures, runtime errors, trigger/binding failures, language worker issues, telemetry/log analysis, known issue research, source investigation, and remediation. Acts as a facade that routes to focused Azure Functions skills and small language/extension references."
+category: task
+---
+
 # Azure Functions Diagnostics
 
 Use this skill to diagnose and resolve Azure Functions issues by orchestrating focused skills and loading only the references needed for the current app.
@@ -49,6 +56,11 @@ Use `azure-functions-common` for shared runtime, language, and trigger/binding r
 - Ask before cloning large repositories, using sparse checkout, deploying to Azure, restarting apps, changing configuration, or running disruptive commands.
 - Distinguish confirmed evidence from hypotheses.
 - For transient issues, state whether the current app is healthy and identify the historical evidence used.
+
+## Next steps
+
+- On success, suggest `azure-functions-inventory` if the app shape or configuration changed during remediation.
+- On failure, suggest `azure-functions-health-status` to re-check current health and telemetry before continuing diagnosis.
 
 ## Output shape
 
