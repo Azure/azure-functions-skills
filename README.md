@@ -85,7 +85,7 @@ npx @agent-loom/azure-functions-skills chat --prompt "Create an HTTP trigger fun
 
 ### Use as a Library (VS Code Extension)
 
-```javascript
+```typescript
 // Setup API
 import { applySetup, detectAgents } from '@agent-loom/azure-functions-skills';
 
@@ -210,8 +210,12 @@ npm ci
 ### Test (TDD)
 
 ```bash
-npm test          # run once
-npm run test:watch  # watch mode
+npm run lint             # ESLint for TypeScript and JavaScript
+npm run typecheck        # TypeScript strict typecheck for src/ and tests/
+npm test                 # run once
+npm run test:watch       # watch mode
+npm run validate:skills  # validate canonical skill templates
+npm run ci               # lint + typecheck + validate + test + build
 ```
 
 ### Build
@@ -229,18 +233,40 @@ dist/
 └── codex/    # Codex plugin
 ```
 
+### Add a new skill
+
+Scaffold the required skill files:
+
+```bash
+npm run new:skill -- azure-functions-my-skill \
+  --title "Azure Functions My Skill" \
+  --description "Guidance for my Azure Functions workflow"
+```
+
+Before opening a PR, complete this checklist:
+
+- Update `templates/skills/<skill-id>/skill.yaml` metadata.
+- Update `templates/skills/<skill-id>/graph.yaml` next-step edges.
+- Write `templates/skills/<skill-id>/SKILL.md` workflow instructions.
+- Add optional `references/` or `scripts/` content if the skill needs supporting files.
+- Run `npm run validate:skills` to catch missing files, ID mismatches, and broken graph targets.
+- Run `npm run ci` to verify lint, typecheck, validation, tests, and build.
+- Run `npm pack --dry-run` before release-related changes to inspect package contents.
+
 ### Architecture
 
 ```
-src/                     # CLI / builder source code (JavaScript)
+src/                     # CLI / builder source code (TypeScript)
 └── build/               # Build system
-    ├── build.js         #   Entry point
-    ├── loader.js        #   Canonical source loader
-    └── build-target.js  #   Per-target generators
+    ├── build.ts         #   Entry point
+    ├── loader.ts        #   Canonical source loader
+    ├── validate-skills.ts # Skill template validator
+    └── build-target.ts  #   Per-target generators
+lib/                     # Compiled runtime output used by package exports and CLI
 
 templates/               # Canonical plugin content (edited by hand)
 ├── skills/              # Canonical skill definitions
-│   ├── azure-functions-setup/        #   skill.yaml + graph.yaml + content.md
+│   ├── azure-functions-setup/        #   skill.yaml + graph.yaml + SKILL.md
 │   ├── azure-functions-create/
 │   └── azure-functions-deploy/
 ├── agents/              # Agent definitions
@@ -257,7 +283,7 @@ templates/               # Canonical plugin content (edited by hand)
 The build system reads canonical sources and generates target-specific artifacts. Each skill has:
 - `skill.yaml` — metadata (id, title, description, category, targets)
 - `graph.yaml` — directed graph edges (next-step suggestions on success/failure)
-- `content.md` — skill body (target-agnostic instructions)
+- `SKILL.md` — skill body (target-agnostic instructions)
 
 ### CI/CD
 
@@ -265,9 +291,12 @@ The GitHub Actions workflows:
 
 - **Build** (`.github/workflows/build-plugins.yml`) — runs on every push/PR to `main`:
   1. Install dependencies
-  2. Run tests
-  3. Build all three plugin targets
-  4. Upload artifacts
+  2. Run lint
+  3. Run TypeScript typecheck
+  4. Validate skill templates
+  5. Run tests
+  6. Build all three plugin targets
+  7. Upload artifacts
 
 - **Publish** (`.github/workflows/publish.yml`) — runs on version tags (`v*`):
   1. Run tests + build

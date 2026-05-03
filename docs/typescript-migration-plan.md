@@ -70,7 +70,15 @@ Branch: `ts-migration-test-automation`
   - [x] Run `npm run validate:skills`.
   - [x] Run `npm run ci`.
   - [x] Commit Step 5.
-- [ ] Step 6 / #38: Add new skill scaffolding and contributor workflow docs.
+- [x] Step 6 / #38: Add new skill scaffolding and contributor workflow docs.
+  - [x] Review Step 6 issue #38.
+  - [x] Add TDD coverage for new skill scaffolding.
+  - [x] Implement new skill scaffold script.
+  - [x] Add contributor workflow docs and checklist.
+  - [x] Update TypeScript development commands in README.
+  - [x] Run `npm run ci`.
+  - [x] Run package dry-run validation.
+  - [x] Commit Step 6.
 - [ ] Final TypeScript self-review and refactoring pass.
 
 ## Step 1 plan
@@ -100,4 +108,6 @@ Implementation notes:
 - 2026-05-02: Committed Step 3 as `7e13eee`, converted tests/helpers to TypeScript, added Vitest and test typecheck config, and verified lint/typecheck/test/build.
 - 2026-05-02: Committed Step 4 as `b5fba07` and started Step 5 (#37).
 - 2026-05-02: Added skill template validation with TDD coverage, wired `validate:skills` into CI, verified `npm run ci`, and prepared Step 5 commit.
+- 2026-05-02: Committed Step 5 as `89f2d5f` and started Step 6 (#38).
+- 2026-05-02: Added new skill scaffold command with TDD coverage, updated README workflow docs, verified `npm run ci` and `npm pack --dry-run`, and prepared Step 6 commit.
 - 2026-05-02: Committed Step 3 as `7e13eee` and started Step 4 (#36).
