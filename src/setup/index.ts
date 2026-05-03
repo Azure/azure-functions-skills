@@ -82,9 +82,12 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
       mkdirSync(tmpDir, { recursive: true });
       buildTarget(agent, data, tmpDir);
 
-      // Copy from tmpDir/<agent>/ to targetDir/
+      // Copy workspace files from tmpDir/<agent>/ to targetDir/.
+      // buildTarget also emits plugin package artifacts under the same target
+      // directory; those are useful for release packaging but would duplicate
+      // workspace skills/agents when installed directly into a project.
       const agentDir = join(tmpDir, agent);
-      totalFiles += copyRecursive(agentDir, targetDir);
+      totalFiles += copyWorkspaceFiles(agentDir, targetDir, agent);
     }
   } finally {
     // Cleanup temp dir (in OS temp, no lock issues)
@@ -120,11 +123,30 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
   };
 }
 
+function copyWorkspaceFiles(src: string, dest: string, agent: CliAgentName): number {
+  return copyRecursive(src, dest, relativePath => !isPluginOnlyArtifact(agent, relativePath));
+}
+
+function isPluginOnlyArtifact(agent: CliAgentName, relativePath: string): boolean {
+  const [topLevel, secondLevel] = relativePath.split(/[\\/]/);
+
+  if (agent === 'ghcp') {
+    return ['plugin.json', 'skills', 'agents', 'hooks.json', '.mcp.json'].includes(topLevel);
+  }
+
+  if (agent === 'codex') {
+    if (['.codex-plugin', 'skills', '.mcp.json'].includes(topLevel)) return true;
+    return topLevel === '.agents' && secondLevel === 'plugins';
+  }
+
+  return false;
+}
+
 /**
  * Copy all files from src to dest recursively.
  * Returns the number of files copied.
  */
-function copyRecursive(src: string, dest: string): number {
+function copyRecursive(src: string, dest: string, shouldCopy: (relativePath: string) => boolean, relativePath = ''): number {
   if (!existsSync(src)) return 0;
   let count = 0;
 
@@ -132,10 +154,13 @@ function copyRecursive(src: string, dest: string): number {
   for (const entry of entries) {
     const srcPath = join(src, entry.name);
     const destPath = join(dest, entry.name);
+    const entryRelativePath = relativePath ? join(relativePath, entry.name) : entry.name;
+
+    if (!shouldCopy(entryRelativePath)) continue;
 
     if (entry.isDirectory()) {
       mkdirSync(destPath, { recursive: true });
-      count += copyRecursive(srcPath, destPath);
+      count += copyRecursive(srcPath, destPath, shouldCopy, entryRelativePath);
     } else {
       mkdirSync(dirname(destPath), { recursive: true });
       cpSync(srcPath, destPath);

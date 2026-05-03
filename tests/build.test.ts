@@ -495,12 +495,34 @@ describe('setup module', () => {
     expect(existsSync(join(DIST_DIR, 'AGENTS.md'))).toBe(true);
   });
 
+  it('applySetup omits duplicate GHCP plugin directories from workspace root', async () => {
+    await applySetup(DIST_DIR, { agents: ['ghcp'] });
+
+    expect(existsSync(join(DIST_DIR, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-guide.agent.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'skills'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'agents'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'plugin.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'hooks.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(false);
+  });
+
   it('applySetup handles codex target', async () => {
     await applySetup(DIST_DIR, { agents: ['codex'] });
 
     expect(existsSync(join(DIST_DIR, 'AGENTS.md'))).toBe(true);
-    expect(existsSync(join(DIST_DIR, '.codex-plugin', 'plugin.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.codex', 'config.toml'))).toBe(true);
+  });
+
+  it('applySetup omits duplicate Codex plugin skills from workspace root', async () => {
+    await applySetup(DIST_DIR, { agents: ['codex'] });
+
+    expect(existsSync(join(DIST_DIR, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'skills'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.codex-plugin'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.agents', 'plugins'))).toBe(false);
   });
 
   it('applySetup handles claude target', async () => {
@@ -515,7 +537,7 @@ describe('setup module', () => {
 
     expect(existsSync(join(DIST_DIR, '.github', 'copilot-instructions.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
-    expect(existsSync(join(DIST_DIR, '.codex-plugin', 'plugin.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.codex', 'config.toml'))).toBe(true);
   });
 
   it('applySetup returns a summary with welcome message', async () => {
