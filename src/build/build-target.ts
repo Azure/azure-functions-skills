@@ -248,23 +248,7 @@ function generateVscodeMcp(mcpServers: McpServer[]) {
 }
 
 function generateGhcpSkillMd(skill: Skill): string {
-  const next = skill.graph.suggestions.on_success
-    .map(n => `→ **${n.target}**: ${n.reason || ''}`)
-    .join('\n');
-
-  return [
-    '---',
-    `name: ${skill.id}`,
-    `description: "${skill.description}"`,
-    '---',
-    '',
-    skill.content,
-    '',
-    '## Next Steps',
-    '',
-    next,
-    '',
-  ].join('\n');
+  return generateSkillMd(skill);
 }
 
 function generateGhcpHooks() {
@@ -312,6 +296,19 @@ function generatePluginMcpJson(mcpServers: McpServer[]) {
 }
 
 function generateClaudeMd(skills: Skill[], hooks: HookDefinitions, agents: AgentDefinitions): string {
+  return generateAgentMd(skills, hooks, agents, '## Available Skills');
+}
+
+function generateCodexAgents(skills: Skill[], hooks: HookDefinitions, agents: AgentDefinitions): string {
+  return generateAgentMd(skills, hooks, agents, '## Skills Reference');
+}
+
+function generateAgentMd(
+  skills: Skill[],
+  hooks: HookDefinitions,
+  agents: AgentDefinitions,
+  skillsHeading: string,
+): string {
   const lines = [
     '# Azure Functions Development',
     '',
@@ -321,7 +318,7 @@ function generateClaudeMd(skills: Skill[], hooks: HookDefinitions, agents: Agent
     '',
     hooks.welcome,
     '',
-    '## Available Skills',
+    skillsHeading,
     '',
   ];
 
@@ -355,58 +352,14 @@ function generateClaudeSettings(mcpServers: McpServer[]) {
 }
 
 function generateClaudeSkillMd(skill: Skill): string {
-  const next = skill.graph.suggestions.on_success
-    .map(n => `→ **${n.target}**: ${n.reason || ''}`)
-    .join('\n');
-
-  return [
-    '---',
-    `name: ${skill.id}`,
-    `description: "${skill.description}"`,
-    '---',
-    '',
-    skill.content,
-    '',
-    '## Next Steps',
-    '',
-    next,
-    '',
-  ].join('\n');
-}
-
-function generateCodexAgents(skills: Skill[], hooks: HookDefinitions, agents: AgentDefinitions): string {
-  const lines = [
-    '# Azure Functions Development',
-    '',
-    agents.agentsMd,
-    '',
-    '## First-Time Setup',
-    '',
-    hooks.welcome,
-    '',
-    '## Skills Reference',
-    '',
-  ];
-
-  for (const s of skills) {
-    const next = s.graph.suggestions.on_success
-      .map(n => `→ **${n.target}**: ${n.reason || ''}`)
-      .join('\n');
-    lines.push(`### ${s.id} — ${s.title}`);
-    lines.push('');
-    lines.push(s.content);
-    lines.push('');
-    lines.push('**Next steps:**');
-    lines.push(next);
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-  }
-
-  return lines.join('\n');
+  return generateSkillMd(skill);
 }
 
 function generateCodexSkillMd(skill: Skill): string {
+  return generateSkillMd(skill);
+}
+
+function generateSkillMd(skill: Skill): string {
   const next = skill.graph.suggestions.on_success
     .map(n => `→ **${n.target}**: ${n.reason || ''}`)
     .join('\n');

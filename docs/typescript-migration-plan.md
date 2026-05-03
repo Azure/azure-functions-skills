@@ -79,7 +79,12 @@ Branch: `ts-migration-test-automation`
   - [x] Run `npm run ci`.
   - [x] Run package dry-run validation.
   - [x] Commit Step 6.
-- [ ] Final TypeScript self-review and refactoring pass.
+- [x] Final TypeScript self-review and refactoring pass.
+  - [x] Review runtime TypeScript for unnecessary duplication.
+  - [x] Refactor duplicated target skill Markdown generation.
+  - [x] Run `npm run ci`.
+  - [x] Run CLI smoke checks.
+  - [x] Commit final review/refactor.
 
 ## Step 1 plan
 
@@ -110,4 +115,6 @@ Implementation notes:
 - 2026-05-02: Added skill template validation with TDD coverage, wired `validate:skills` into CI, verified `npm run ci`, and prepared Step 5 commit.
 - 2026-05-02: Committed Step 5 as `89f2d5f` and started Step 6 (#38).
 - 2026-05-02: Added new skill scaffold command with TDD coverage, updated README workflow docs, verified `npm run ci` and `npm pack --dry-run`, and prepared Step 6 commit.
+- 2026-05-02: Committed Step 6 as `73db63e` and started final TypeScript self-review.
+- 2026-05-02: Refactored duplicated skill/agent Markdown generators, verified `npm run ci`, CLI `--help`, and CLI `build`, then prepared final review commit.
 - 2026-05-02: Committed Step 3 as `7e13eee` and started Step 4 (#36).
