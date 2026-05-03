@@ -100,6 +100,7 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     }
   }
 
+  const skillLines = skills.map(skill => `    • ${skill.id} — ${skill.title}`);
   const welcomeMessage = [
     '',
     '⚡ Azure Functions Skills installed!',
@@ -108,9 +109,7 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     `  Files written: ${totalFiles}`,
     '',
     '  Skills available:',
-    '    • azure-functions-setup  — Verify prerequisites',
-    '    • azure-functions-create — Scaffold a new project',
-    '    • azure-functions-deploy — Deploy to Azure',
+    ...skillLines,
     '',
     '  Get started: Ask your AI assistant to "set up Azure Functions"',
     '',

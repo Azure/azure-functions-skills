@@ -11,6 +11,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync, spawn } from 'node:child_process';
 import { applySetup } from '../setup/index.js';
+import { loadSkills } from '../build/loader.js';
 import type { BuildTargetName, ChatOptions, ChatResult, DetectedCliAgent, Launcher, LauncherId } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -101,7 +102,9 @@ export async function buildStartupPrompt(dir: string): Promise<string> {
     ? `📂 Functions project detected (${project.language})`
     : '📂 No Functions project found — ready to create one';
 
-  const skillList = 'azure-functions-setup, azure-functions-create, azure-functions-deploy';
+  const skillList = loadSkills(join(__dirname, '..', '..', 'templates', 'skills'))
+    .map(skill => skill.id)
+    .join(', ');
 
   const suggestedActions = project
     ? [
