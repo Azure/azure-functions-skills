@@ -329,15 +329,28 @@ The GitHub Actions workflows:
   6. Build all three plugin targets
   7. Upload artifacts
 
-- **Publish** (`.github/workflows/publish.yml`) — runs on version tags (`v*`):
-  1. Run tests + build
-  2. Publish to npm as `@agent-loom/azure-functions-skills`
+- **Publish** (`.github/workflows/publish.yml`) — intentionally disabled. The workflow is kept as documentation/reference only because the repository permissions do not allow it to complete reliably.
 
-To release:
+### Local release
+
+Use the local release helper from a clean `main` checkout. It validates `main`, checks that the disabled publish workflow will not run on tag push, bumps the package version when needed, runs validation, creates the tag, publishes to npm, pushes the tag, and best-effort creates a GitHub Release with plugin bundle zips.
+
 ```bash
-npm version patch   # or minor / major
-git push --follow-tags
+npm run release:local -- 0.12.0 --yes
 ```
+
+Useful options:
+
+- `--dry-run` — print mutating commands without running them.
+- `--github-account <user>` — switch GitHub CLI account before creating the Release.
+- `--skip-github-release` — publish npm and push the tag without creating a Release.
+- `--require-github-release` — fail instead of skipping when GitHub Release creation is unavailable.
+
+Prerequisites for a full release:
+
+- `npm whoami` is authenticated with permission to publish `@agent-loom/azure-functions-skills`.
+- `gh auth status` is authenticated with permission to create releases in `Azure/azure-functions-skills`.
+- On non-Windows platforms, `zip` is available for packaging Release assets.
 
 ## Specification
 
