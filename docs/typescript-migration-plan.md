@@ -1,0 +1,120 @@
+# TypeScript Migration Plan
+
+Tracking issue: https://github.com/Azure/azure-functions-skills/issues/32
+Branch: `ts-migration-test-automation`
+
+## Working rules
+
+- Update this checklist at every step boundary.
+- Use one branch for the full migration.
+- Commit each implementation step separately.
+- Keep public CLI behavior and package exports compatible.
+- After lint/typecheck infrastructure exists, run unit tests and quality gates for every step.
+- Once E2E execution is available, verify existing behavior with E2E tests during conversion.
+- Use TDD for behavior-changing changes.
+- Finish with a TypeScript self-review and refactor duplicated or unnecessarily complex code.
+
+## Step checklist
+
+- [x] Review tracking issue #32.
+- [x] Review Step 1 issue #33.
+- [x] Create working branch.
+- [x] Create this plan file.
+- [x] Step 1 / #33: Stabilize Vitest output directories and Windows cleanup.
+  - [x] Add shared test filesystem helper.
+  - [x] Replace shared test output directories with isolated temp directories where needed.
+  - [x] Add robust Windows cleanup retry behavior.
+  - [x] Run `npm test -- tests/build.test.js`.
+  - [x] Run `npm test`.
+  - [x] Commit Step 1.
+- [x] Step 2 / #34: Add TypeScript toolchain and CI quality gates.
+  - [x] Review Step 2 issue #34.
+  - [x] Add TypeScript and Node type dependencies.
+  - [x] Add strict Node ESM `tsconfig.json` without conflicting with plugin `dist/` output.
+  - [x] Add ESLint flat config for JavaScript and TypeScript.
+  - [x] Add `lint`, `typecheck`, and combined validation scripts.
+  - [x] Update CI trigger paths and quality gate steps.
+  - [x] Run `npm run lint`.
+  - [x] Run `npm run typecheck`.
+  - [x] Run `npm test`.
+  - [x] Run `npm run build`.
+  - [x] Commit Step 2.
+- [x] Step 3 / #35: Convert runtime source to TypeScript with shared domain types.
+  - [x] Review Step 3 issue #35.
+  - [x] Define shared runtime domain types.
+  - [x] Convert `src/build/*`, `src/setup/*`, and `src/chat/*` from `.js` to `.ts`.
+  - [x] Preserve NodeNext `.js` import specifiers in TypeScript source.
+  - [x] Update package exports, files, and CLI wrapper to use compiled runtime output.
+  - [x] Run `npm run typecheck`.
+  - [x] Run `npm test`.
+  - [x] Run `npm run build`.
+  - [x] Run CLI smoke checks for `--help` and `build`.
+  - [x] Commit Step 3.
+- [x] Step 4 / #36: Convert Vitest tests to TypeScript and shared helpers.
+  - [x] Review Step 4 issue #36.
+  - [x] Convert Vitest tests and test helpers from `.js` to `.ts`.
+  - [x] Add test typecheck configuration.
+  - [x] Keep shared filesystem helper reuse.
+  - [x] Reduce hardcoded catalog expectations where practical.
+  - [x] Run `npm run lint`.
+  - [x] Run `npm run typecheck`.
+  - [x] Run `npm test`.
+  - [x] Run `npm run build`.
+  - [x] Commit Step 4.
+- [x] Step 5 / #37: Add automated validation for skill templates.
+  - [x] Review Step 5 issue #37.
+  - [x] Add TDD coverage for missing required files, ID/directory mismatch, and broken graph targets.
+  - [x] Implement reusable skill template validation.
+  - [x] Add `validate:skills` script.
+  - [x] Add validation to CI.
+  - [x] Run `npm run validate:skills`.
+  - [x] Run `npm run ci`.
+  - [x] Commit Step 5.
+- [x] Step 6 / #38: Add new skill scaffolding and contributor workflow docs.
+  - [x] Review Step 6 issue #38.
+  - [x] Add TDD coverage for new skill scaffolding.
+  - [x] Implement new skill scaffold script.
+  - [x] Add contributor workflow docs and checklist.
+  - [x] Update TypeScript development commands in README.
+  - [x] Run `npm run ci`.
+  - [x] Run package dry-run validation.
+  - [x] Commit Step 6.
+- [x] Final TypeScript self-review and refactoring pass.
+  - [x] Review runtime TypeScript for unnecessary duplication.
+  - [x] Refactor duplicated target skill Markdown generation.
+  - [x] Run `npm run ci`.
+  - [x] Run CLI smoke checks.
+  - [x] Commit final review/refactor.
+
+## Step 1 plan
+
+Issue: https://github.com/Azure/azure-functions-skills/issues/33
+
+Implementation notes:
+
+- Keep product source unchanged.
+- Introduce a reusable test helper for temporary directory allocation and cleanup.
+- Use per-test directories in build tests instead of deleting the same shared `dist-test` directory repeatedly.
+- Keep existing assertions intact so this is a test-infrastructure-only change.
+
+## Progress log
+
+- 2026-05-02: Created migration branch and plan file. Starting Step 1 (#33).
+- 2026-05-02: Added shared test filesystem helper and moved build/chat tests to isolated temp directories with retry cleanup.
+- 2026-05-02: Verified `npm test -- tests/build.test.js` passes (42 tests).
+- 2026-05-02: Verified `npm test` passes (62 tests).
+- 2026-05-02: Verified `npm run build` passes and prepared Step 1 commit.
+- 2026-05-02: Committed Step 1 as `cee0d5f` and started Step 2 (#34).
+- 2026-05-02: Added TypeScript, ESLint, strict Node ESM config, CI quality gates, and verified lint/typecheck/test/build/audit.
+- 2026-05-02: Verified `npm run ci` passes and prepared Step 2 commit.
+- 2026-05-02: Committed Step 2 as `79241c0` and started Step 3 (#35).
+- 2026-05-02: Converted runtime source to TypeScript, added shared types, switched tests/CLI/package exports to compiled `lib/`, and verified typecheck/lint/test/build/CLI smoke checks.
+- 2026-05-02: Verified `npm run ci`, CLI `--help`, and CLI `build` pass, then prepared Step 3 commit.
+- 2026-05-02: Committed Step 3 as `7e13eee`, converted tests/helpers to TypeScript, added Vitest and test typecheck config, and verified lint/typecheck/test/build.
+- 2026-05-02: Committed Step 4 as `b5fba07` and started Step 5 (#37).
+- 2026-05-02: Added skill template validation with TDD coverage, wired `validate:skills` into CI, verified `npm run ci`, and prepared Step 5 commit.
+- 2026-05-02: Committed Step 5 as `89f2d5f` and started Step 6 (#38).
+- 2026-05-02: Added new skill scaffold command with TDD coverage, updated README workflow docs, verified `npm run ci` and `npm pack --dry-run`, and prepared Step 6 commit.
+- 2026-05-02: Committed Step 6 as `73db63e` and started final TypeScript self-review.
+- 2026-05-02: Refactored duplicated skill/agent Markdown generators, verified `npm run ci`, CLI `--help`, and CLI `build`, then prepared final review commit.
+- 2026-05-02: Committed Step 3 as `7e13eee` and started Step 4 (#36).

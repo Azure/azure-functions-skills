@@ -11,13 +11,15 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync, spawn } from 'node:child_process';
 import { applySetup } from '../setup/index.js';
+import { loadSkills } from '../build/loader.js';
+import type { BuildTargetName, ChatOptions, ChatResult, DetectedCliAgent, Launcher, LauncherId } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = join(__dirname, '..', '..', 'templates', 'prompts');
 
 // ─── Launcher configurations ───
 
-export const LAUNCHERS = {
+export const LAUNCHERS: Record<LauncherId, Launcher> = {
   'github-copilot': {
     command: 'copilot',
     buildArgs: (ctx) => {
@@ -53,9 +55,9 @@ export const LAUNCHERS = {
  * Detect which CLI coding agents are installed.
  * @returns {Promise<Array<{id: string, command: string, description: string}>>}
  */
-export async function detectCliAgents() {
-  const found = [];
-  for (const [id, launcher] of Object.entries(LAUNCHERS)) {
+export async function detectCliAgents(): Promise<DetectedCliAgent[]> {
+  const found: DetectedCliAgent[] = [];
+  for (const [id, launcher] of Object.entries(LAUNCHERS) as Array<[LauncherId, Launcher]>) {
     const cmd = process.platform === 'win32'
       ? `where ${launcher.command}`
       : `which ${launcher.command}`;
@@ -71,7 +73,7 @@ export async function detectCliAgents() {
 
 // ─── Project detection ───
 
-function detectProject(dir) {
+function detectProject(dir: string): { language: string; hasHostJson: true } | null {
   const hostJsonPath = join(dir, 'host.json');
   if (!existsSync(hostJsonPath)) return null;
 
@@ -90,7 +92,7 @@ function detectProject(dir) {
  * @param {string} dir - Project directory to analyze
  * @returns {Promise<string>}
  */
-export async function buildStartupPrompt(dir) {
+export async function buildStartupPrompt(dir: string): Promise<string> {
   const templatePath = join(PROMPTS_DIR, 'startup.md');
   let template = await readFile(templatePath, 'utf8');
 
@@ -100,7 +102,9 @@ export async function buildStartupPrompt(dir) {
     ? `📂 Functions project detected (${project.language})`
     : '📂 No Functions project found — ready to create one';
 
-  const skillList = 'azure-functions-setup, azure-functions-create, azure-functions-deploy';
+  const skillList = loadSkills(join(__dirname, '..', '..', 'templates', 'skills'))
+    .map(skill => skill.id)
+    .join(', ');
 
   const suggestedActions = project
     ? [
@@ -134,7 +138,7 @@ export async function buildStartupPrompt(dir) {
  * @param {string} [options.dir] - Working directory
  * @returns {Promise<{childProcess: object, agent: string, prompt: string}>}
  */
-export async function chat(options = {}) {
+export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
   const dir = options.dir || process.cwd();
   const agentId = options.agent || (await pickAgent());
   const launcher = LAUNCHERS[agentId];
@@ -144,7 +148,7 @@ export async function chat(options = {}) {
   }
 
   // Auto-setup: ensure skills are installed before launching the agent
-  const agentToSetupTarget = {
+  const agentToSetupTarget: Record<LauncherId, BuildTargetName> = {
     'github-copilot': 'ghcp',
     'claude-code': 'claude',
     'codex': 'codex',
@@ -167,7 +171,7 @@ export async function chat(options = {}) {
   });
 
   return new Promise((resolve, reject) => {
-    child.on('error', (err) => {
+    child.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'ENOENT') {
         reject(new Error(`${launcher.command} not found. Install it first.`));
       } else {
@@ -181,7 +185,7 @@ export async function chat(options = {}) {
   });
 }
 
-async function pickAgent() {
+async function pickAgent(): Promise<LauncherId> {
   const agents = await detectCliAgents();
   if (agents.length === 0) {
     throw new Error(
@@ -197,7 +201,7 @@ async function pickAgent() {
 /**
  * Check if skill files are already present for a given target.
  */
-function isSetupDone(dir, target) {
+function isSetupDone(dir: string, target: BuildTargetName): boolean {
   const checks = {
     ghcp: [
       join(dir, '.github', 'copilot-instructions.md'),

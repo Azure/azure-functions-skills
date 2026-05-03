@@ -1,9 +1,23 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { existsSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { describe, it, expect, afterAll } from 'vitest';
+import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildStartupPrompt, LAUNCHERS, detectCliAgents, chat } from '../src/chat/index.js';
+import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
 
-const DIST_DIR = join(import.meta.dirname, '..', 'dist-test-chat');
+const TEMP_DIRS: string[] = [];
+const DIST_DIR = makeTestDir('af-skills-chat-');
+
+function makeTestDir(prefix: string): string {
+  const dir = createTempDir(prefix);
+  TEMP_DIRS.push(dir);
+  return dir;
+}
+
+afterAll(() => {
+  for (const dir of TEMP_DIRS) {
+    removeDir(dir);
+  }
+});
 
 // ─── Startup prompt tests ───
 
@@ -15,37 +29,27 @@ describe('buildStartupPrompt', () => {
   });
 
   it('includes project context when host.json exists', async () => {
-    const dir = join(DIST_DIR, 'with-project');
-    mkdirSync(dir, { recursive: true });
+    const dir = resetDir(join(DIST_DIR, 'with-project'));
     writeFileSync(join(dir, 'host.json'), '{"version":"2.0"}');
     writeFileSync(join(dir, 'package.json'), '{"dependencies":{"@azure/functions":"4.0.0"}}');
 
     const prompt = await buildStartupPrompt(dir);
     expect(prompt).toContain('Functions project detected');
-
-    // Cleanup
-    rmSync(dir, { recursive: true, force: true });
   });
 
   it('includes suggested actions for new project', async () => {
-    const dir = join(DIST_DIR, 'empty-dir');
-    mkdirSync(dir, { recursive: true });
+    const dir = resetDir(join(DIST_DIR, 'empty-dir'));
 
     const prompt = await buildStartupPrompt(dir);
     expect(prompt).toContain('azure-functions-create');
-
-    rmSync(dir, { recursive: true, force: true });
   });
 
   it('suggests deploy for existing project', async () => {
-    const dir = join(DIST_DIR, 'existing-project');
-    mkdirSync(dir, { recursive: true });
+    const dir = resetDir(join(DIST_DIR, 'existing-project'));
     writeFileSync(join(dir, 'host.json'), '{"version":"2.0"}');
 
     const prompt = await buildStartupPrompt(dir);
     expect(prompt).toContain('azure-functions-deploy');
-
-    rmSync(dir, { recursive: true, force: true });
   });
 });
 
@@ -105,9 +109,7 @@ describe('detectCliAgents', () => {
 
 describe('chat auto-setup', () => {
   it('auto-installs ghcp skills when not present', async () => {
-    const testDir = join(import.meta.dirname, '..', 'dist-test-chat-ghcp');
-    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
-    mkdirSync(testDir, { recursive: true });
+    const testDir = makeTestDir('af-skills-chat-ghcp-');
 
     try {
       const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test' });
@@ -122,9 +124,7 @@ describe('chat auto-setup', () => {
   }, 15000);
 
   it('auto-installs claude skills when not present', async () => {
-    const testDir = join(import.meta.dirname, '..', 'dist-test-chat-claude');
-    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
-    mkdirSync(testDir, { recursive: true });
+    const testDir = makeTestDir('af-skills-chat-claude-');
 
     try {
       const result = await chat({ agent: 'claude-code', dir: testDir, prompt: 'test' });
@@ -139,9 +139,7 @@ describe('chat auto-setup', () => {
   }, 15000);
 
   it('auto-installs codex skills when not present', async () => {
-    const testDir = join(import.meta.dirname, '..', 'dist-test-chat-codex');
-    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
-    mkdirSync(testDir, { recursive: true });
+    const testDir = makeTestDir('af-skills-chat-codex-');
 
     try {
       const result = await chat({ agent: 'codex', dir: testDir, prompt: 'test' });
@@ -155,9 +153,7 @@ describe('chat auto-setup', () => {
   }, 15000);
 
   it('skips setup when skills are already present', async () => {
-    const testDir = join(import.meta.dirname, '..', 'dist-test-chat-skip');
-    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
-    mkdirSync(testDir, { recursive: true });
+    const testDir = makeTestDir('af-skills-chat-skip-');
 
     // Pre-install skills
     const { applySetup } = await import('../src/setup/index.js');

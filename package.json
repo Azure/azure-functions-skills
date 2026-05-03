@@ -6,13 +6,24 @@
   "bin": {
     "azure-functions-skills": "bin/azure-functions-skills.js"
   },
+  "types": "./lib/setup/index.d.ts",
   "exports": {
-    ".": "./src/setup/index.js",
-    "./setup": "./src/setup/index.js",
-    "./chat": "./src/chat/index.js"
+    ".": {
+      "types": "./lib/setup/index.d.ts",
+      "default": "./lib/setup/index.js"
+    },
+    "./setup": {
+      "types": "./lib/setup/index.d.ts",
+      "default": "./lib/setup/index.js"
+    },
+    "./chat": {
+      "types": "./lib/chat/index.d.ts",
+      "default": "./lib/chat/index.js"
+    }
   },
   "files": [
     "bin/",
+    "lib/",
     "src/",
     "templates/",
     "dist/",
@@ -22,16 +33,27 @@
     "access": "public"
   },
   "scripts": {
-    "build": "node src/build/build.js",
+    "build": "npm run compile && node lib/build/build.js",
+    "check": "npm run lint && npm run typecheck && npm run validate:skills && npm test && npm run build",
+    "ci": "npm run check",
+    "compile": "tsc",
+    "lint": "eslint .",
+    "new:skill": "npm run compile && node lib/build/new-skill.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "setup": "node bin/azure-functions-skills.js setup",
-    "lint": "echo 'TODO: add eslint'"
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "validate:skills": "npm run compile && node lib/build/validate-skills.js",
+    "setup": "node bin/azure-functions-skills.js setup"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.6.0",
+    "eslint": "^10.3.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.1",
     "vitest": "^3.1.1"
   },
   "keywords": [

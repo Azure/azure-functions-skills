@@ -1,11 +1,14 @@
 import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { AgentDefinitions, BuildData, BuildTargetName, HookDefinitions, McpServer, Skill } from '../types.js';
+
+type TargetBuilder = (data: BuildData, distDir: string) => void;
 
 /**
  * Build output for a specific target (ghcp, claude, codex).
  */
-export function buildTarget(target, data, distDir) {
-  const builders = { ghcp: buildGhcp, claude: buildClaude, codex: buildCodex };
+export function buildTarget(target: BuildTargetName, data: BuildData, distDir: string): void {
+  const builders: Record<BuildTargetName, TargetBuilder> = { ghcp: buildGhcp, claude: buildClaude, codex: buildCodex };
   const builder = builders[target];
   if (!builder) throw new Error(`Unknown target: ${target}`);
   builder(data, distDir);
@@ -17,7 +20,7 @@ export function buildTarget(target, data, distDir) {
  * build module; `src/setup/index.js` has its own copyRecursive for install-time
  * use. Consolidating them is out of scope (see issue #8).
  */
-function copyDirRecursive(srcDir, destDir) {
+function copyDirRecursive(srcDir: string, destDir: string): void {
   mkdirSync(destDir, { recursive: true });
   for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
     const src = join(srcDir, entry.name);
@@ -30,24 +33,24 @@ function copyDirRecursive(srcDir, destDir) {
   }
 }
 
-function copySkillReferences(skill, skillDestDir) {
+function copySkillReferences(skill: Skill, skillDestDir: string): void {
   if (!skill.referencesDir) return;
   copyDirRecursive(skill.referencesDir, join(skillDestDir, 'references'));
 }
 
-function copySkillScripts(skill, skillDestDir) {
+function copySkillScripts(skill: Skill, skillDestDir: string): void {
   if (!skill.scriptsDir) return;
   copyDirRecursive(skill.scriptsDir, join(skillDestDir, 'scripts'));
 }
 
-function copySkillAssets(skill, skillDestDir) {
+function copySkillAssets(skill: Skill, skillDestDir: string): void {
   copySkillReferences(skill, skillDestDir);
   copySkillScripts(skill, skillDestDir);
 }
 
 // ─── GHCP ───
 
-function buildGhcp({ skills, mcpServers, agents, hooks }, distDir) {
+function buildGhcp({ skills, mcpServers, agents, hooks }: BuildData, distDir: string): void {
   const base = join(distDir, 'ghcp');
   mkdirSync(join(base, '.github', 'agents'), { recursive: true });
   mkdirSync(join(base, '.github', 'hooks'), { recursive: true });
@@ -116,7 +119,7 @@ function buildGhcp({ skills, mcpServers, agents, hooks }, distDir) {
 
 // ─── Claude Code ───
 
-function buildClaude({ skills, mcpServers, agents, hooks }, distDir) {
+function buildClaude({ skills, mcpServers, agents, hooks }: BuildData, distDir: string): void {
   const base = join(distDir, 'claude');
   mkdirSync(join(base, '.claude', 'skills'), { recursive: true });
 
@@ -139,7 +142,7 @@ function buildClaude({ skills, mcpServers, agents, hooks }, distDir) {
 
 // ─── Codex ───
 
-function buildCodex({ skills, mcpServers, agents, hooks }, distDir) {
+function buildCodex({ skills, mcpServers, agents, hooks }: BuildData, distDir: string): void {
   const base = join(distDir, 'codex');
   mkdirSync(base, { recursive: true });
   mkdirSync(join(base, '.codex'), { recursive: true });
@@ -193,7 +196,7 @@ function buildCodex({ skills, mcpServers, agents, hooks }, distDir) {
 
 // ─── Generators ───
 
-function generateInstructions(skills, hooks) {
+function generateInstructions(skills: Skill[], hooks: HookDefinitions): string {
   const lines = [
     '# Azure Functions Development',
     '',
@@ -232,8 +235,8 @@ function generateInstructions(skills, hooks) {
   return lines.join('\n');
 }
 
-function generateVscodeMcp(mcpServers) {
-  const servers = {};
+function generateVscodeMcp(mcpServers: McpServer[]) {
+  const servers: Record<string, { type: string; command: string; args: string[] }> = {};
   for (const s of mcpServers) {
     servers[s.id] = {
       type: s.type || 'stdio',
@@ -244,24 +247,8 @@ function generateVscodeMcp(mcpServers) {
   return { servers };
 }
 
-function generateGhcpSkillMd(skill) {
-  const next = skill.graph.suggestions.on_success
-    .map(n => `→ **${n.target}**: ${n.reason || ''}`)
-    .join('\n');
-
-  return [
-    '---',
-    `name: ${skill.id}`,
-    `description: "${skill.description}"`,
-    '---',
-    '',
-    skill.content,
-    '',
-    '## Next Steps',
-    '',
-    next,
-    '',
-  ].join('\n');
+function generateGhcpSkillMd(skill: Skill): string {
+  return generateSkillMd(skill);
 }
 
 function generateGhcpHooks() {
@@ -297,8 +284,8 @@ function generateGhcpPluginManifest() {
   };
 }
 
-function generatePluginMcpJson(mcpServers) {
-  const result = {};
+function generatePluginMcpJson(mcpServers: McpServer[]) {
+  const result: Record<string, { command: string; args: string[] }> = {};
   for (const s of mcpServers) {
     result[s.id] = {
       command: s.command,
@@ -308,7 +295,20 @@ function generatePluginMcpJson(mcpServers) {
   return { mcpServers: result };
 }
 
-function generateClaudeMd(skills, hooks, agents) {
+function generateClaudeMd(skills: Skill[], hooks: HookDefinitions, agents: AgentDefinitions): string {
+  return generateAgentMd(skills, hooks, agents, '## Available Skills');
+}
+
+function generateCodexAgents(skills: Skill[], hooks: HookDefinitions, agents: AgentDefinitions): string {
+  return generateAgentMd(skills, hooks, agents, '## Skills Reference');
+}
+
+function generateAgentMd(
+  skills: Skill[],
+  hooks: HookDefinitions,
+  agents: AgentDefinitions,
+  skillsHeading: string,
+): string {
   const lines = [
     '# Azure Functions Development',
     '',
@@ -318,7 +318,7 @@ function generateClaudeMd(skills, hooks, agents) {
     '',
     hooks.welcome,
     '',
-    '## Available Skills',
+    skillsHeading,
     '',
   ];
 
@@ -340,8 +340,8 @@ function generateClaudeMd(skills, hooks, agents) {
   return lines.join('\n');
 }
 
-function generateClaudeSettings(mcpServers) {
-  const mcpEntries = {};
+function generateClaudeSettings(mcpServers: McpServer[]) {
+  const mcpEntries: Record<string, { command: string; args: string[] }> = {};
   for (const s of mcpServers) {
     mcpEntries[s.id] = {
       command: s.command,
@@ -351,7 +351,15 @@ function generateClaudeSettings(mcpServers) {
   return { mcpServers: mcpEntries };
 }
 
-function generateClaudeSkillMd(skill) {
+function generateClaudeSkillMd(skill: Skill): string {
+  return generateSkillMd(skill);
+}
+
+function generateCodexSkillMd(skill: Skill): string {
+  return generateSkillMd(skill);
+}
+
+function generateSkillMd(skill: Skill): string {
   const next = skill.graph.suggestions.on_success
     .map(n => `→ **${n.target}**: ${n.reason || ''}`)
     .join('\n');
@@ -371,59 +379,7 @@ function generateClaudeSkillMd(skill) {
   ].join('\n');
 }
 
-function generateCodexAgents(skills, hooks, agents) {
-  const lines = [
-    '# Azure Functions Development',
-    '',
-    agents.agentsMd,
-    '',
-    '## First-Time Setup',
-    '',
-    hooks.welcome,
-    '',
-    '## Skills Reference',
-    '',
-  ];
-
-  for (const s of skills) {
-    const next = s.graph.suggestions.on_success
-      .map(n => `→ **${n.target}**: ${n.reason || ''}`)
-      .join('\n');
-    lines.push(`### ${s.id} — ${s.title}`);
-    lines.push('');
-    lines.push(s.content);
-    lines.push('');
-    lines.push('**Next steps:**');
-    lines.push(next);
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-  }
-
-  return lines.join('\n');
-}
-
-function generateCodexSkillMd(skill) {
-  const next = skill.graph.suggestions.on_success
-    .map(n => `→ **${n.target}**: ${n.reason || ''}`)
-    .join('\n');
-
-  return [
-    '---',
-    `name: ${skill.id}`,
-    `description: "${skill.description}"`,
-    '---',
-    '',
-    skill.content,
-    '',
-    '## Next Steps',
-    '',
-    next,
-    '',
-  ].join('\n');
-}
-
-function generateCodexConfigToml(mcpServers) {
+function generateCodexConfigToml(mcpServers: McpServer[]): string {
   const lines = [
     '# Azure Functions MCP Servers',
     '# Generated by azure-functions-skills build system',
@@ -479,8 +435,8 @@ function generateCodexPluginManifest() {
   };
 }
 
-function generateCodexMcpJson(mcpServers) {
-  const result = {};
+function generateCodexMcpJson(mcpServers: McpServer[]) {
+  const result: Record<string, { command: string; args: string[] }> = {};
   for (const s of mcpServers) {
     result[s.id] = {
       command: s.command,

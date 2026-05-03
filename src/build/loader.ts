@@ -1,11 +1,12 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import type { AgentDefinitions, HookDefinitions, McpServer, Skill, SkillGraph } from '../types.js';
 
 /**
  * Load all skills from the skills directory.
  * Each skill dir contains skill.yaml, graph.yaml, SKILL.md, and an optional references/ subdir.
  */
-export function loadSkills(skillsDir) {
+export function loadSkills(skillsDir: string): Skill[] {
   const dirs = readdirSync(skillsDir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name);
@@ -41,7 +42,7 @@ export function loadSkills(skillsDir) {
 /**
  * Load MCP server definitions from servers.yaml.
  */
-export function loadMcpServers(yamlPath) {
+export function loadMcpServers(yamlPath: string): McpServer[] {
   const raw = readFileSync(yamlPath, 'utf-8');
   const servers = [];
   // Split into server blocks by "- id:"
@@ -63,7 +64,7 @@ export function loadMcpServers(yamlPath) {
 /**
  * Load agent definitions from the agents directory.
  */
-export function loadAgents(agentsDir) {
+export function loadAgents(agentsDir: string): AgentDefinitions {
   const agentsMd = readFileSync(join(agentsDir, 'AGENTS.md'), 'utf-8');
   const guide = readFileSync(join(agentsDir, 'functions-guide.agent.md'), 'utf-8');
   return { agentsMd, guide };
@@ -72,36 +73,36 @@ export function loadAgents(agentsDir) {
 /**
  * Load hooks from the hooks directory.
  */
-export function loadHooks(hooksDir) {
+export function loadHooks(hooksDir: string): HookDefinitions {
   const welcome = readFileSync(join(hooksDir, 'welcome-setup.md'), 'utf-8');
   return { welcome };
 }
 
 // ─── Minimal YAML helpers (no dependencies) ───
 
-function parseYamlValue(yaml, key) {
+function parseYamlValue(yaml: string, key: string): string {
   const re = new RegExp(`^\\s*${key}:\\s*["']?(.+?)["']?\\s*$`, 'm');
   const m = yaml.match(re);
   return m ? m[1].trim() : '';
 }
 
-function parseYamlListItemValue(yaml, key) {
+function parseYamlListItemValue(yaml: string, key: string): string {
   // Matches "- id: value" (list item with dash prefix)
   const re = new RegExp(`^\\s*-\\s+${key}:\\s*["']?(.+?)["']?\\s*$`, 'm');
   const m = yaml.match(re);
   return m ? m[1].trim() : '';
 }
 
-function parseYamlArray(yaml, key) {
+function parseYamlArray(yaml: string, key: string): string[] {
   const re = new RegExp(`${key}:\\s*\\[([^\\]]+)\\]`);
   const m = yaml.match(re);
   if (!m) return [];
   return m[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
 }
 
-function parseGraph(graphYaml) {
-  const suggestions = { on_success: [], on_failure: [] };
-  let currentSection = null;
+function parseGraph(graphYaml: string): SkillGraph {
+  const suggestions: SkillGraph['suggestions'] = { on_success: [], on_failure: [] };
+  let currentSection: keyof SkillGraph['suggestions'] | null = null;
 
   for (const line of graphYaml.split('\n')) {
     if (line.includes('on_success:')) { currentSection = 'on_success'; continue; }

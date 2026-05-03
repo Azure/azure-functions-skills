@@ -1,9 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { existsSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { describe, it, expect } from 'vitest';
 import { getPluginDir, generateVscodeSettings, generateCodexMarketplaceEntry, generateClaudeSettings } from '../src/setup/plugin-install.js';
-
-const TEST_DIR = join(import.meta.dirname, '..', 'dist-test-plugin');
 
 describe('getPluginDir', () => {
   it('returns a path containing dist/', () => {
@@ -13,7 +9,7 @@ describe('getPluginDir', () => {
   });
 
   it('returns paths for all three targets', () => {
-    for (const target of ['ghcp', 'claude', 'codex']) {
+    for (const target of ['ghcp', 'claude', 'codex'] as const) {
       const dir = getPluginDir(target);
       expect(dir).toContain(target);
     }
@@ -24,9 +20,10 @@ describe('generateVscodeSettings', () => {
   it('returns settings JSON with pluginLocations', () => {
     const pluginPath = '/path/to/plugin';
     const settings = generateVscodeSettings(pluginPath);
+    const locations = settings['chat.pluginLocations'] as Record<string, boolean>;
     expect(settings['chat.plugins.enabled']).toBe(true);
-    expect(settings['chat.pluginLocations']).toBeTruthy();
-    expect(settings['chat.pluginLocations'][pluginPath]).toBe(true);
+    expect(locations).toBeTruthy();
+    expect(locations[pluginPath]).toBe(true);
   });
 });
 
@@ -34,10 +31,11 @@ describe('generateCodexMarketplaceEntry', () => {
   it('returns marketplace JSON with correct plugin reference', () => {
     const pluginPath = '/path/to/plugin';
     const mp = generateCodexMarketplaceEntry(pluginPath);
+    const plugin = mp.plugins?.[0] as { name: string; source: { path: string; source: string } };
     expect(mp.plugins).toBeInstanceOf(Array);
-    expect(mp.plugins[0].name).toBe('azure-functions-skills');
-    expect(mp.plugins[0].source.path).toBe(pluginPath);
-    expect(mp.plugins[0].source.source).toBe('local');
+    expect(plugin.name).toBe('azure-functions-skills');
+    expect(plugin.source.path).toBe(pluginPath);
+    expect(plugin.source.source).toBe('local');
   });
 });
 

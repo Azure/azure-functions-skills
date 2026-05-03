@@ -4,15 +4,31 @@ on:
   push:
     branches: [main]
     paths:
+      - '.github/workflows/**'
+      - 'bin/**'
       - 'src/**'
+      - 'templates/**'
       - 'tests/**'
+      - 'eslint.config.js'
       - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'tsconfig.typecheck.json'
+      - 'vitest.config.ts'
   pull_request:
     branches: [main]
     paths:
+      - '.github/workflows/**'
+      - 'bin/**'
       - 'src/**'
+      - 'templates/**'
       - 'tests/**'
+      - 'eslint.config.js'
       - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'tsconfig.typecheck.json'
+      - 'vitest.config.ts'
 
 jobs:
   build:
@@ -26,6 +42,15 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Validate skills
+        run: npm run validate:skills
 
       - name: Run tests
         run: npm test

@@ -13,20 +13,26 @@ import { fileURLToPath } from 'node:url';
 import { rmSync, mkdirSync } from 'node:fs';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from './loader.js';
 import { buildTarget } from './build-target.js';
+import type { BuildData, BuildTargetName } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const TEMPLATES_DIR = join(ROOT, 'templates');
 const DIST_DIR = join(ROOT, 'dist');
 
-const TARGETS = ['ghcp', 'claude', 'codex'];
+const TARGETS: BuildTargetName[] = ['ghcp', 'claude', 'codex'];
 
 // Parse args
 const args = process.argv.slice(2);
 const targetFlag = args.indexOf('--target');
-const selectedTargets = targetFlag >= 0 && args[targetFlag + 1]
-  ? [args[targetFlag + 1]]
+const selectedTargets: BuildTargetName[] = targetFlag >= 0 && args[targetFlag + 1]
+  ? [parseTarget(args[targetFlag + 1])]
   : TARGETS;
+
+function parseTarget(value: string): BuildTargetName {
+  if (value === 'ghcp' || value === 'claude' || value === 'codex') return value;
+  throw new Error(`Unknown target: ${value}`);
+}
 
 // Load canonical sources
 console.log('Loading canonical sources...');
@@ -46,7 +52,7 @@ for (const target of selectedTargets) {
 }
 
 // Build each target
-const data = { skills, mcpServers, agents, hooks };
+const data: BuildData = { skills, mcpServers, agents, hooks };
 for (const target of selectedTargets) {
   console.log(`\nBuilding ${target}...`);
   buildTarget(target, data, DIST_DIR);

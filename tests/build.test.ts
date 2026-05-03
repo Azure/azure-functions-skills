@@ -1,20 +1,39 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { readFileSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../src/build/loader.js';
 import { buildTarget } from '../src/build/build-target.js';
+import { detectAgents, applySetup } from '../src/setup/index.js';
+import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
+import type { AgentDefinitions, BuildTargetName, HookDefinitions, McpServer, Skill } from '../src/types.js';
 
 const TEMPLATES_DIR = join(import.meta.dirname, '..', 'templates');
-const DIST_DIR = join(import.meta.dirname, '..', 'dist-test');
+let DIST_DIR = '';
+
+function resetDistDir() {
+  DIST_DIR = resetDir(createTempDir('af-skills-build-'));
+}
+
+function expectedSkillIds(): string[] {
+  return readdirSync(join(TEMPLATES_DIR, 'skills'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => entry.name)
+    .sort();
+}
+
+afterEach(() => {
+  removeDir(DIST_DIR);
+  DIST_DIR = '';
+});
 
 // ─── Loader tests ───
 
 describe('loadSkills', () => {
-  let skills;
+  let skills: Skill[];
   beforeAll(() => { skills = loadSkills(join(TEMPLATES_DIR, 'skills')); });
 
   it('loads all skills', () => {
-    expect(skills).toHaveLength(7);
+    expect(skills).toHaveLength(expectedSkillIds().length);
   });
 
   it('each skill has id, title, content, graph', () => {
@@ -29,20 +48,12 @@ describe('loadSkills', () => {
 
   it('skill IDs match directory names', () => {
     const ids = skills.map(s => s.id).sort();
-    expect(ids).toEqual([
-      'azure-functions-common',
-      'azure-functions-create',
-      'azure-functions-deploy',
-      'azure-functions-diagnostics',
-      'azure-functions-health-status',
-      'azure-functions-inventory',
-      'azure-functions-setup',
-    ]);
+    expect(ids).toEqual(expectedSkillIds());
   });
 });
 
 describe('loadMcpServers', () => {
-  let servers;
+  let servers: McpServer[];
   beforeAll(() => { servers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')); });
 
   it('loads MCP server definitions', () => {
@@ -59,7 +70,7 @@ describe('loadMcpServers', () => {
 });
 
 describe('loadAgents', () => {
-  let agents;
+  let agents: AgentDefinitions;
   beforeAll(() => { agents = loadAgents(join(TEMPLATES_DIR, 'agents')); });
 
   it('loads AGENTS.md', () => {
@@ -74,7 +85,7 @@ describe('loadAgents', () => {
 });
 
 describe('loadHooks', () => {
-  let hooks;
+  let hooks: HookDefinitions;
   beforeAll(() => { hooks = loadHooks(join(TEMPLATES_DIR, 'hooks')); });
 
   it('loads welcome-setup hook', () => {
@@ -87,8 +98,7 @@ describe('loadHooks', () => {
 
 describe('buildTarget — ghcp', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('generates copilot-instructions.md', () => {
@@ -261,8 +271,7 @@ describe('buildTarget — ghcp', () => {
 
 describe('buildTarget — claude', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('generates CLAUDE.md', () => {
@@ -307,8 +316,7 @@ describe('buildTarget — claude', () => {
 
 describe('buildTarget — codex', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('generates AGENTS.md with full instructions', () => {
@@ -378,8 +386,7 @@ describe('buildTarget — codex', () => {
 
 describe('next-step suggestions', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('GHCP instructions include graph suggestions', () => {
@@ -402,8 +409,7 @@ describe('next-step suggestions', () => {
 
 describe('Codex plugin manifest', () => {
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('generates .codex-plugin/plugin.json with correct structure', () => {
@@ -470,17 +476,8 @@ describe('Codex plugin manifest', () => {
 // ─── Setup CLI tests ───
 
 describe('setup module', () => {
-  let detectAgents, applySetup;
-
-  beforeAll(async () => {
-    const mod = await import('../src/setup/index.js');
-    detectAgents = mod.detectAgents;
-    applySetup = mod.applySetup;
-  });
-
   beforeEach(() => {
-    if (existsSync(DIST_DIR)) rmSync(DIST_DIR, { recursive: true });
-    mkdirSync(DIST_DIR, { recursive: true });
+    resetDistDir();
   });
 
   it('detectAgents returns an array of detected agent names', async () => {
@@ -498,12 +495,34 @@ describe('setup module', () => {
     expect(existsSync(join(DIST_DIR, 'AGENTS.md'))).toBe(true);
   });
 
+  it('applySetup omits duplicate GHCP plugin directories from workspace root', async () => {
+    await applySetup(DIST_DIR, { agents: ['ghcp'] });
+
+    expect(existsSync(join(DIST_DIR, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-guide.agent.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'skills'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'agents'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'plugin.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'hooks.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(false);
+  });
+
   it('applySetup handles codex target', async () => {
     await applySetup(DIST_DIR, { agents: ['codex'] });
 
     expect(existsSync(join(DIST_DIR, 'AGENTS.md'))).toBe(true);
-    expect(existsSync(join(DIST_DIR, '.codex-plugin', 'plugin.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.codex', 'config.toml'))).toBe(true);
+  });
+
+  it('applySetup omits duplicate Codex plugin skills from workspace root', async () => {
+    await applySetup(DIST_DIR, { agents: ['codex'] });
+
+    expect(existsSync(join(DIST_DIR, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'skills'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.codex-plugin'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.agents', 'plugins'))).toBe(false);
   });
 
   it('applySetup handles claude target', async () => {
@@ -518,7 +537,7 @@ describe('setup module', () => {
 
     expect(existsSync(join(DIST_DIR, '.github', 'copilot-instructions.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
-    expect(existsSync(join(DIST_DIR, '.codex-plugin', 'plugin.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.codex', 'config.toml'))).toBe(true);
   });
 
   it('applySetup returns a summary with welcome message', async () => {
@@ -531,13 +550,12 @@ describe('setup module', () => {
 });
 
 describe('skill references/ subdirectory', () => {
-  const FIXTURE_DIR = join(import.meta.dirname, '..', 'dist-test-refs-fixture');
-  const REF_DIST_DIR = join(import.meta.dirname, '..', 'dist-test-refs');
+  let FIXTURE_DIR = '';
+  let REF_DIST_DIR = '';
 
   beforeEach(() => {
-    for (const d of [FIXTURE_DIR, REF_DIST_DIR]) {
-      if (existsSync(d)) rmSync(d, { recursive: true });
-    }
+    FIXTURE_DIR = createTempDir('af-skills-refs-fixture-');
+    REF_DIST_DIR = createTempDir('af-skills-refs-dist-');
     // Build a minimal skill fixture: skills/demo-skill/{skill.yaml, graph.yaml, SKILL.md, references/*}
     const skillDir = join(FIXTURE_DIR, 'skills', 'demo-skill');
     mkdirSync(join(skillDir, 'references', 'nested'), { recursive: true });
@@ -557,22 +575,29 @@ describe('skill references/ subdirectory', () => {
     writeFileSync(join(skillDir, 'references', 'nested', 'deep.md'), '# Nested ref\n');
   });
 
+  afterEach(() => {
+    removeDir(FIXTURE_DIR);
+    removeDir(REF_DIST_DIR);
+    FIXTURE_DIR = '';
+    REF_DIST_DIR = '';
+  });
+
   it('loadSkills returns referencesDir when references/ exists', () => {
     const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
     expect(skills).toHaveLength(1);
     expect(skills[0].referencesDir).toBeTruthy();
-    expect(skills[0].referencesDir.endsWith('references')).toBe(true);
+    expect(skills[0].referencesDir?.endsWith('references')).toBe(true);
   });
 
   it('loadSkills returns referencesDir=null when references/ is missing', () => {
     // Remove references to test the negative case
-    rmSync(join(FIXTURE_DIR, 'skills', 'demo-skill', 'references'), { recursive: true });
+    removeDir(join(FIXTURE_DIR, 'skills', 'demo-skill', 'references'));
     const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
     expect(skills[0].referencesDir).toBeNull();
   });
 
   // Minimal agents/hooks/mcp stubs for cross-target builds
-  function buildFixture(target) {
+  function buildFixture(target: BuildTargetName) {
     const skills = loadSkills(join(FIXTURE_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));

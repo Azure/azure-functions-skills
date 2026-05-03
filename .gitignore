@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-test*/
+lib/
 *.log
 .DS_Store
 PLAN-*.md
