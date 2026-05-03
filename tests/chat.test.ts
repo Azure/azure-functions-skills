@@ -65,7 +65,7 @@ describe('LAUNCHERS', () => {
   it('ghcp launcher uses --agent and copilot -i flag', () => {
     const args = LAUNCHERS['github-copilot'].buildArgs({ startupPrompt: 'hello' });
     expect(args).toContain('--agent');
-    expect(args).toContain('functions-guide');
+    expect(args).toContain('functions-copilot');
     expect(args).toContain('-i');
     expect(args).toContain('hello');
   });

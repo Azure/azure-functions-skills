@@ -66,8 +66,8 @@ export function loadMcpServers(yamlPath: string): McpServer[] {
  */
 export function loadAgents(agentsDir: string): AgentDefinitions {
   const agentsMd = readFileSync(join(agentsDir, 'AGENTS.md'), 'utf-8');
-  const guide = readFileSync(join(agentsDir, 'functions-guide.agent.md'), 'utf-8');
-  return { agentsMd, guide };
+  const copilot = readFileSync(join(agentsDir, 'functions-copilot.agent.md'), 'utf-8');
+  return { agentsMd, copilot };
 }
 
 /**

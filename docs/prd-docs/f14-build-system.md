@@ -18,7 +18,7 @@ A build pipeline (`build.ts` or `build.js`) that reads canonical skill metadata 
 2. Read graph metadata (`graph.yaml` per skill)
 3. Validate graph connectivity and constraints (F1 rules)
 4. Generate skill output per target with embedded next-step suggestions
-5. Generate `functions-guide` agent definition per target (F12)
+5. Generate `functions-copilot` agent definition per target (F12)
 6. Generate `post-task-suggester` hook scripts per target (F13)
 7. Generate repo templates per target
 8. Generate graph manifest (`graph-manifest.json`)
@@ -44,7 +44,7 @@ src/
 │   │   └── ...
 │   └── ...
 ├── agents/
-│   └── functions-guide/
+│   └── functions-copilot/
 │       └── agent.yaml          # Agent definition (target-agnostic)
 ├── hooks/
 │   └── post-task-suggester/
@@ -64,7 +64,7 @@ dist/
 │   │   ├── azure-functions-setup.md
 │   │   └── ...
 │   ├── agents/
-│   │   └── functions-guide.md  # GHCP custom agent
+│   │   └── functions-copilot.md  # GHCP custom agent
 │   ├── hooks/
 │   │   └── post-task-suggester.js
 │   └── repo-template/

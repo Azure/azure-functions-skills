@@ -115,7 +115,7 @@ suggestions:
 3. `completion_signals` are semantic — detected by the skill itself, not the graph engine
 4. `suggestions.on_success` is ordered by `priority` descending; consumers show top 3 max
 5. `suggestions.on_failure` always includes a fallback to `azure-functions-help` or `azure-functions-setup`
-6. `entry_conditions` inform the `functions-guide` agent and `azure-functions-help` skill
+6. `entry_conditions` inform the `functions-copilot` agent and `azure-functions-help` skill
 
 ## Graph Constraints
 
@@ -131,7 +131,7 @@ The build system (F14) reads all `graph.yaml` files and:
 1. Validates graph connectivity and constraint compliance
 2. Generates a merged `graph-manifest.json` for runtime consumers
 3. Embeds next-step suggestions into each skill's output text
-4. Generates routing tables for the `functions-guide` agent (F12)
+4. Generates routing tables for the `functions-copilot` agent (F12)
 5. Generates hook mappings for `post-task-suggester` (F13)
 
 ## Future Extensions

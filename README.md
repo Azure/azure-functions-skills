@@ -145,7 +145,7 @@ Register the extracted target directory with your agent. For GitHub Copilot, use
 
 Plus:
 
-- **functions-guide** agent — routes you to the right skill based on context
+- **functions-copilot** agent — routes you to the right skill based on context
 - **Welcome hook** — first-run prerequisite check + onboarding
 - **MCP integration** — Azure Functions Templates + Azure MCP servers
 - **AGENTS.md** — coding standards (linter, TDD, security, self-review)
@@ -157,7 +157,7 @@ Plus:
 **Workspace files** (copied to your project):
 ```
 .github/copilot-instructions.md           # Always-on instructions + welcome
-.github/agents/functions-guide.agent.md    # @functions-guide custom agent
+.github/agents/functions-copilot.agent.md  # @functions-copilot custom agent
 .github/skills/{skill-id}/SKILL.md         # Agent Skills standard; one directory per skill
 .github/skills/{skill-id}/references/      # Optional supporting references
 .github/skills/{skill-id}/scripts/         # Optional helper scripts
@@ -170,7 +170,7 @@ AGENTS.md                                 # Coding standards
 ```
 plugin.json                               # Plugin manifest
 skills/{skill-id}/SKILL.md                # Plugin-level skills
-agents/functions-guide.agent.md           # Plugin-level agent
+agents/functions-copilot.agent.md         # Plugin-level agent
 hooks.json                                # Plugin hooks (Copilot format)
 .mcp.json                                 # Plugin MCP servers (mcpServers key)
 ```
@@ -301,7 +301,7 @@ templates/               # Canonical plugin content (edited by hand)
 │   └── azure-functions-setup/
 ├── agents/              # Agent definitions
 │   ├── AGENTS.md        #   Coding standards
-│   └── functions-guide.agent.md
+│   └── functions-copilot.agent.md
 ├── hooks/               # Lifecycle hooks
 │   └── welcome-setup.md #   First-run welcome + prereq check
 ├── mcp/                 # MCP server definitions

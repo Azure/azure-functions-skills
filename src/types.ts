@@ -43,7 +43,7 @@ export interface McpServer {
 
 export interface AgentDefinitions {
   agentsMd: string;
-  guide: string;
+  copilot: string;
 }
 
 export interface HookDefinitions {
