@@ -78,9 +78,10 @@ describe('loadAgents', () => {
     expect(agents.agentsMd).toContain('Development Standards');
   });
 
-  it('loads functions-guide agent', () => {
-    expect(agents.guide).toBeTruthy();
-    expect(agents.guide).toContain('functions-guide');
+  it('loads functions-copilot agent', () => {
+    expect(agents.copilot).toBeTruthy();
+    expect(agents.copilot).toContain('functions-copilot');
+    expect(agents.copilot).toContain('azure-functions-diagnostics');
   });
 });
 
@@ -137,8 +138,11 @@ describe('buildTarget — ghcp', () => {
     const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
-    const agentPath = join(DIST_DIR, 'ghcp', '.github', 'agents', 'functions-guide.agent.md');
+    const agentPath = join(DIST_DIR, 'ghcp', '.github', 'agents', 'functions-copilot.agent.md');
     expect(existsSync(agentPath)).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.github', 'agents', 'functions-guide.agent.md'))).toBe(false);
+    const content = readFileSync(agentPath, 'utf-8');
+    expect(content).toContain('azure-functions-diagnostics');
   });
 
   it('generates AGENTS.md', () => {
@@ -499,7 +503,8 @@ describe('setup module', () => {
     await applySetup(DIST_DIR, { agents: ['ghcp'] });
 
     expect(existsSync(join(DIST_DIR, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
-    expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-guide.agent.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-guide.agent.md'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'skills'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'agents'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'plugin.json'))).toBe(false);

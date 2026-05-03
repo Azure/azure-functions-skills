@@ -47,7 +47,7 @@ azure-functions-skill-pack-ghcp/
 │   ├── azure-functions-durable.md
 │   └── azure-functions-feedback.md
 ├── agents/
-│   └── functions-guide.md
+│   └── functions-copilot.md
 ├── hooks/
 │   └── post-task-suggester.js
 └── manifest.json
@@ -146,7 +146,7 @@ This project uses Azure Functions with Python v2 programming model.
 
 ## Available Skills
 
-Use `@azure-functions` to access all skills, or `@functions-guide` for guided assistance.
+Use `@azure-functions` to access all skills, or `@functions-copilot` for guided assistance.
 ```
 
 ## Cross-Target Implementation

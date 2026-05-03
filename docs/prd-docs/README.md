@@ -23,7 +23,7 @@ The key differentiator is **Skill Graph** — skills are not a flat catalog but 
 | F9 | [Language Skills (azure-functions-python, azure-functions-node, azure-functions-dotnet)](./f9-language-skills.md) | 📋 Proposed | Language-specific guidance, patterns, and best practices |
 | F10 | [azure-functions-durable — Durable Functions](./f10-azure-functions-durable.md) | 📋 Proposed | Orchestration patterns, fan-out/fan-in, human interaction workflows |
 | F11 | [azure-functions-feedback — Improvement Loop](./f11-azure-functions-feedback.md) | 📋 Proposed | Collect usage signals and route to skill improvement pipeline |
-| F12 | [functions-guide Agent](./f12-functions-guide-agent.md) | 📋 Proposed | Custom agent that interprets user context and routes to skills |
+| F12 | [functions-copilot Agent](./f12-functions-copilot-agent.md) | 📋 Proposed | Custom agent that interprets user context and routes to skills |
 | F13 | [post-task-suggester Hook](./f13-post-task-suggester-hook.md) | 📋 Proposed | Post-completion hooks that surface next-step candidates |
 | F14 | [Build System — Cross-Target Generation](./f14-build-system.md) | 📋 Proposed | Build pipeline with agent path manifest for 10+ targets |
 | F15 | [Distribution — Plugin Packaging](./f15-distribution.md) | 📋 Proposed | Package and distribute plugins per target (GHCP, Claude, Codex) |
@@ -42,7 +42,7 @@ Skills are classified into four roles:
 | **Entry** | azure-functions-help, azure-functions-setup, azure-functions-discovery | First contact points for users |
 | **Task** | azure-functions-create, azure-functions-deploy, azure-functions-observability, azure-functions-hosting, azure-functions-python, azure-functions-node, azure-functions-dotnet, azure-functions-durable, azure-functions-migrate, azure-functions-audit | Concrete work execution |
 | **Diagnostic** | azure-functions-doctor | Troubleshooting and project health checks |
-| **Transition** | azure-functions-help, functions-guide agent, post-task-suggester hook | Navigate between skills |
+| **Transition** | azure-functions-help, functions-copilot agent, post-task-suggester hook | Navigate between skills |
 | **Infrastructure** | azure-functions-mcp (MCP Integration) | Connect AI agents to Functions tools |
 | **Feedback** | azure-functions-feedback | Route usage data to improvement loops |
 

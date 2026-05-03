@@ -65,7 +65,7 @@ function buildGhcp({ skills, mcpServers, agents, hooks }: BuildData, distDir: st
   writeFileSync(join(base, '.vscode', 'mcp.json'), JSON.stringify(mcpJson, null, 2));
 
   // Agent definition
-  writeFileSync(join(base, '.github', 'agents', 'functions-guide.agent.md'), agents.guide);
+  writeFileSync(join(base, '.github', 'agents', 'functions-copilot.agent.md'), agents.copilot);
 
   // AGENTS.md
   writeFileSync(join(base, 'AGENTS.md'), agents.agentsMd);
@@ -102,7 +102,7 @@ function buildGhcp({ skills, mcpServers, agents, hooks }: BuildData, distDir: st
 
   // agents/<name>.agent.md — Plugin-level agent
   mkdirSync(join(base, 'agents'), { recursive: true });
-  writeFileSync(join(base, 'agents', 'functions-guide.agent.md'), agents.guide);
+  writeFileSync(join(base, 'agents', 'functions-copilot.agent.md'), agents.copilot);
 
   // .mcp.json — Plugin MCP servers (mcpServers key)
   writeFileSync(

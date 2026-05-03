@@ -23,7 +23,7 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
   'github-copilot': {
     command: 'copilot',
     buildArgs: (ctx) => {
-      const args = ['--agent', 'functions-guide'];
+      const args = ['--agent', 'functions-copilot'];
       if (ctx.startupPrompt) args.push('-i', ctx.startupPrompt);
       return args;
     },
