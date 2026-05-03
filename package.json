@@ -43,7 +43,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "validate:skills": "npm run compile && node lib/build/validate-skills.js",
-    "setup": "node bin/azure-functions-skills.js setup"
+    "setup": "node bin/azure-functions-skills.js setup",
+    "release:local": "node scripts/release-local.mjs"
   },
   "engines": {
     "node": ">=18"
