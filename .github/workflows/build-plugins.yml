@@ -49,6 +49,9 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
+      - name: Validate skills
+        run: npm run validate:skills
+
       - name: Run tests
         run: npm test
 

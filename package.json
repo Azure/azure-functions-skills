@@ -34,12 +34,13 @@
   },
   "scripts": {
     "build": "npm run compile && node lib/build/build.js",
-    "ci": "npm run lint && npm run typecheck && npm test && npm run build",
+    "ci": "npm run lint && npm run typecheck && npm run validate:skills && npm test && npm run build",
     "compile": "tsc",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "validate:skills": "npm run compile && node lib/build/validate-skills.js",
     "setup": "node bin/azure-functions-skills.js setup"
   },
   "engines": {

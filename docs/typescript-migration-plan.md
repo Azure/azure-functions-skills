@@ -61,7 +61,15 @@ Branch: `ts-migration-test-automation`
   - [x] Run `npm test`.
   - [x] Run `npm run build`.
   - [x] Commit Step 4.
-- [ ] Step 5 / #37: Add automated validation for skill templates.
+- [x] Step 5 / #37: Add automated validation for skill templates.
+  - [x] Review Step 5 issue #37.
+  - [x] Add TDD coverage for missing required files, ID/directory mismatch, and broken graph targets.
+  - [x] Implement reusable skill template validation.
+  - [x] Add `validate:skills` script.
+  - [x] Add validation to CI.
+  - [x] Run `npm run validate:skills`.
+  - [x] Run `npm run ci`.
+  - [x] Commit Step 5.
 - [ ] Step 6 / #38: Add new skill scaffolding and contributor workflow docs.
 - [ ] Final TypeScript self-review and refactoring pass.
 
@@ -90,4 +98,6 @@ Implementation notes:
 - 2026-05-02: Converted runtime source to TypeScript, added shared types, switched tests/CLI/package exports to compiled `lib/`, and verified typecheck/lint/test/build/CLI smoke checks.
 - 2026-05-02: Verified `npm run ci`, CLI `--help`, and CLI `build` pass, then prepared Step 3 commit.
 - 2026-05-02: Committed Step 3 as `7e13eee`, converted tests/helpers to TypeScript, added Vitest and test typecheck config, and verified lint/typecheck/test/build.
+- 2026-05-02: Committed Step 4 as `b5fba07` and started Step 5 (#37).
+- 2026-05-02: Added skill template validation with TDD coverage, wired `validate:skills` into CI, verified `npm run ci`, and prepared Step 5 commit.
 - 2026-05-02: Committed Step 3 as `7e13eee` and started Step 4 (#36).
