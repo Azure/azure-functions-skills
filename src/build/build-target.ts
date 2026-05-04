@@ -208,15 +208,12 @@ function generateInstructions(skills: Skill[], hooks: HookDefinitions): string {
     '',
     '## Available Skills',
     '',
-    '| Skill | Description | Next Step |',
-    '|-------|-------------|-----------|',
+    '| Skill | Description |',
+    '|-------|-------------|',
   ];
 
   for (const s of skills) {
-    const nextSteps = s.graph.suggestions.on_success
-      .map(n => `**${n.target}**: ${n.reason || ''}`)
-      .join('; ');
-    lines.push(`| ${s.id} | ${s.description} | ${nextSteps} |`);
+    lines.push(`| ${s.id} | ${s.description} |`);
   }
 
   lines.push('');
@@ -323,15 +320,9 @@ function generateAgentMd(
   ];
 
   for (const s of skills) {
-    const next = s.graph.suggestions.on_success
-      .map(n => `→ **${n.target}**: ${n.reason || ''}`)
-      .join('\n');
     lines.push(`### ${s.id} — ${s.title}`);
     lines.push('');
     lines.push(s.content);
-    lines.push('');
-    lines.push('**Next steps:**');
-    lines.push(next);
     lines.push('');
     lines.push('---');
     lines.push('');
@@ -360,10 +351,6 @@ function generateCodexSkillMd(skill: Skill): string {
 }
 
 function generateSkillMd(skill: Skill): string {
-  const next = skill.graph.suggestions.on_success
-    .map(n => `→ **${n.target}**: ${n.reason || ''}`)
-    .join('\n');
-
   return [
     '---',
     `name: ${skill.id}`,
@@ -371,10 +358,6 @@ function generateSkillMd(skill: Skill): string {
     '---',
     '',
     skill.content,
-    '',
-    '## Next Steps',
-    '',
-    next,
     '',
   ].join('\n');
 }

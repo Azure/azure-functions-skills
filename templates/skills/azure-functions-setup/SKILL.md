@@ -1,3 +1,10 @@
+---
+name: azure-functions-setup
+title: Azure Functions Setup
+description: Verify prerequisites and set up your environment for Azure Functions development
+category: entry
+---
+
 > **Language**: Always respond in the same language the user is using.
 
 # azure-functions-setup — Azure Functions Environment Setup
@@ -49,3 +56,8 @@ For each failing check, provide:
 When all checks pass, suggest the next step:
 
 > ✅ Your environment is ready! Next: use **azure-functions-create** to scaffold a new Azure Functions project.
+
+## Next steps
+
+- On success, suggest `azure-functions-create` because the environment is ready to create an Azure Functions app.
+- On failure, keep the user in `azure-functions-setup`: explain fixes, then ask them to rerun setup verification.

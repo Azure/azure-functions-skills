@@ -163,11 +163,12 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
 
   const startupPrompt = options.prompt || await buildStartupPrompt(dir);
   const args = launcher.buildArgs({ startupPrompt });
+  const resolvedLauncher = resolveLauncherCommand(launcher.command);
 
-  const child = spawn(launcher.command, args, {
+  const child = spawn(resolvedLauncher.command, args, {
     cwd: dir,
     stdio: 'inherit',
-    shell: false,
+    shell: resolvedLauncher.shell,
   });
 
   return new Promise((resolve, reject) => {
@@ -198,24 +199,41 @@ async function pickAgent(): Promise<LauncherId> {
   return agents[0].id;
 }
 
+function resolveLauncherCommand(command: string): { command: string; shell: boolean } {
+  if (process.platform !== 'win32') {
+    return { command, shell: false };
+  }
+
+  try {
+    const resolved = execSync(`where ${command}`, { encoding: 'utf-8' })
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .find(Boolean);
+    if (!resolved) return { command, shell: false };
+    return { command: resolved, shell: /\.(cmd|bat)$/i.test(resolved) };
+  } catch {
+    return { command, shell: false };
+  }
+}
+
 /**
  * Check if skill files are already present for a given target.
  */
 function isSetupDone(dir: string, target: BuildTargetName): boolean {
-  const checks = {
+  const skillIds = loadSkills(join(__dirname, '..', '..', 'templates', 'skills')).map(skill => skill.id);
+  const checks: Record<BuildTargetName, string[]> = {
     ghcp: [
       join(dir, '.github', 'copilot-instructions.md'),
-      join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'),
+      ...skillIds.map(skillId => join(dir, '.github', 'skills', skillId, 'SKILL.md')),
     ],
     claude: [
       join(dir, 'CLAUDE.md'),
-      join(dir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'),
+      ...skillIds.map(skillId => join(dir, '.claude', 'skills', skillId, 'SKILL.md')),
     ],
     codex: [
       join(dir, 'AGENTS.md'),
-      join(dir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'),
+      ...skillIds.map(skillId => join(dir, '.agents', 'skills', skillId, 'SKILL.md')),
     ],
   };
-  const files = checks[target] || [];
-  return files.every(f => existsSync(f));
+  return checks[target].every(f => existsSync(f));
 }

@@ -31,9 +31,7 @@ export function createSkill(skillsDir: string, options: CreateSkillOptions): Cre
   mkdirSync(skillDir, { recursive: true });
 
   const files = [
-    writeSkillYaml(skillDir, { id, title, description, category }),
-    writeGraphYaml(skillDir),
-    writeSkillMarkdown(skillDir, { title, description }),
+    writeSkillMarkdown(skillDir, { id, title, description, category }),
   ];
 
   return { skillDir, files };
@@ -54,46 +52,21 @@ function toTitle(id: string): string {
     .join(' ');
 }
 
-function writeSkillYaml(
-  skillDir: string,
-  metadata: { id: string; title: string; description: string; category: string },
-): string {
-  const filePath = join(skillDir, 'skill.yaml');
-  writeFileSync(
-    filePath,
-    [
-      `id: ${metadata.id}`,
-      `title: ${metadata.title}`,
-      `description: "${metadata.description}"`,
-      `category: ${metadata.category}`,
-      '',
-    ].join('\n'),
-  );
-  return filePath;
-}
-
-function writeGraphYaml(skillDir: string): string {
-  const filePath = join(skillDir, 'graph.yaml');
-  writeFileSync(
-    filePath,
-    [
-      'suggestions:',
-      '  on_success: []',
-      '  on_failure: []',
-      '',
-    ].join('\n'),
-  );
-  return filePath;
-}
-
 function writeSkillMarkdown(
   skillDir: string,
-  metadata: { title: string; description: string },
+  metadata: { id: string; title: string; description: string; category: string },
 ): string {
   const filePath = join(skillDir, 'SKILL.md');
   writeFileSync(
     filePath,
     [
+      '---',
+      `name: ${metadata.id}`,
+      `title: ${quoteYamlString(metadata.title)}`,
+      `description: ${quoteYamlString(metadata.description)}`,
+      `category: ${metadata.category}`,
+      '---',
+      '',
       `# ${metadata.title}`,
       '',
       `> ${metadata.description}`,
@@ -109,6 +82,10 @@ function writeSkillMarkdown(
     ].join('\n'),
   );
   return filePath;
+}
+
+function quoteYamlString(value: string): string {
+  return JSON.stringify(value);
 }
 
 function parseArgs(args: string[]): CreateSkillOptions & { skillsDir?: string } {

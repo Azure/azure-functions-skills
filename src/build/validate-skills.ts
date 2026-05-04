@@ -3,7 +3,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { loadSkills } from './loader.js';
+import { parseMarkdownFrontmatter } from './loader.js';
 
 export interface SkillValidationError {
   skillId?: string;
@@ -16,7 +16,7 @@ export interface SkillValidationResult {
   errors: SkillValidationError[];
 }
 
-const REQUIRED_SKILL_FILES = ['skill.yaml', 'graph.yaml', 'SKILL.md'] as const;
+const REQUIRED_SKILL_FILES = ['SKILL.md'] as const;
 
 export function validateSkills(skillsDir: string): SkillValidationResult {
   const errors: SkillValidationError[] = [];
@@ -46,42 +46,22 @@ export function validateSkills(skillsDir: string): SkillValidationResult {
       }
     }
 
-    const skillYamlPath = join(skillDir, 'skill.yaml');
-    if (existsSync(skillYamlPath)) {
-      const declaredId = parseSkillId(readFileSync(skillYamlPath, 'utf-8'));
-      if (!declaredId) {
+    const skillMarkdownPath = join(skillDir, 'SKILL.md');
+    if (existsSync(skillMarkdownPath)) {
+      const { frontmatter } = parseMarkdownFrontmatter(readFileSync(skillMarkdownPath, 'utf-8'));
+      const declaredName = frontmatter.name || '';
+      if (!declaredName) {
         errors.push({
           skillId: dirName,
-          file: 'skill.yaml',
-          message: 'Missing required skill id in skill.yaml',
+          file: 'SKILL.md',
+          message: 'Missing required skill name in SKILL.md frontmatter',
         });
-      } else if (declaredId !== dirName) {
+      } else if (declaredName !== dirName) {
         errors.push({
-          skillId: declaredId,
-          file: 'skill.yaml',
-          message: `Skill id '${declaredId}' does not match directory '${dirName}'`,
+          skillId: declaredName,
+          file: 'SKILL.md',
+          message: `Skill name '${declaredName}' does not match directory '${dirName}'`,
         });
-      }
-    }
-  }
-
-  if (errors.length === 0) {
-    const skills = loadSkills(skillsDir);
-    const skillIds = new Set(skills.map(skill => skill.id));
-
-    for (const skill of skills) {
-      const graphTargets = [
-        ...skill.graph.suggestions.on_success,
-        ...skill.graph.suggestions.on_failure,
-      ];
-      for (const suggestion of graphTargets) {
-        if (!skillIds.has(suggestion.target)) {
-          errors.push({
-            skillId: skill.id,
-            file: 'graph.yaml',
-            message: `Graph references unknown skill target '${suggestion.target}'`,
-          });
-        }
       }
     }
   }
@@ -90,11 +70,6 @@ export function validateSkills(skillsDir: string): SkillValidationResult {
     valid: errors.length === 0,
     errors,
   };
-}
-
-function parseSkillId(skillYaml: string): string {
-  const match = skillYaml.match(/^\s*id:\s*["']?(.+?)["']?\s*$/m);
-  return match ? match[1].trim() : '';
 }
 
 function runCli(): void {

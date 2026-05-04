@@ -1,3 +1,10 @@
+---
+name: azure-functions-inventory
+title: Azure Functions Inventory
+description: "Use when collecting Azure Functions app specifications/inventory only: resource identity, SKU/plan, runtime, Function App config, network, identity, selected app settings, and function/trigger inventory. Do not use for runtime health, failures, metrics, or telemetry investigation."
+category: task
+---
+
 # Azure Functions Inventory
 
 Use this skill to collect the static specifications of an existing Azure Function App.
@@ -27,6 +34,11 @@ If subscription or resource group is unknown, discover them with Resource Graph.
 4. Report only inventory/specification data unless the user explicitly asks for health or telemetry.
 
 If a caller needs runtime or trigger interpretation after inventory collection, use `../azure-functions-common/references/routing.md` on demand. Do not load shared language/extension references for plain inventory output.
+
+## Next steps
+
+- On success, suggest `azure-functions-health-status` to check current health and telemetry next.
+- On failure, suggest `azure-functions-diagnostics` to triage missing or blocked inventory data.
 
 ## Scope boundary
 

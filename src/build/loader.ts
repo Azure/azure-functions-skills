@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AgentDefinitions, HookDefinitions, McpServer, Skill, SkillGraph } from '../types.js';
+import type { AgentDefinitions, HookDefinitions, McpServer, Skill } from '../types.js';
 
 /**
  * Load all skills from the skills directory.
- * Each skill dir contains skill.yaml, graph.yaml, SKILL.md, and an optional references/ subdir.
+ * Each skill dir contains SKILL.md with YAML frontmatter and optional references/ or scripts/ subdirs.
  */
 export function loadSkills(skillsDir: string): Skill[] {
   const dirs = readdirSync(skillsDir, { withFileTypes: true })
@@ -13,9 +13,8 @@ export function loadSkills(skillsDir: string): Skill[] {
 
   return dirs.map(dir => {
     const base = join(skillsDir, dir);
-    const skillYaml = readFileSync(join(base, 'skill.yaml'), 'utf-8');
-    const graphYaml = readFileSync(join(base, 'graph.yaml'), 'utf-8');
-    const content = readFileSync(join(base, 'SKILL.md'), 'utf-8');
+    const skillMarkdown = readFileSync(join(base, 'SKILL.md'), 'utf-8');
+    const { frontmatter, content } = parseMarkdownFrontmatter(skillMarkdown);
 
     const refsPath = join(base, 'references');
     const referencesDir =
@@ -26,17 +25,46 @@ export function loadSkills(skillsDir: string): Skill[] {
       existsSync(scriptsPath) && statSync(scriptsPath).isDirectory() ? scriptsPath : null;
 
     return {
-      id: parseYamlValue(skillYaml, 'id'),
-      title: parseYamlValue(skillYaml, 'title'),
-      description: parseYamlValue(skillYaml, 'description'),
-      category: parseYamlValue(skillYaml, 'category'),
+      id: frontmatter.name || dir,
+      title: frontmatter.title || toTitle(frontmatter.name || dir),
+      description: frontmatter.description || '',
+      category: frontmatter.category || 'development',
       content,
-      graph: parseGraph(graphYaml),
       referencesDir,
       scriptsDir,
-      raw: { skill: skillYaml, graph: graphYaml },
     };
   });
+}
+
+export interface MarkdownFrontmatterResult {
+  frontmatter: Record<string, string>;
+  content: string;
+}
+
+export function parseMarkdownFrontmatter(markdown: string): MarkdownFrontmatterResult {
+  const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match) {
+    return { frontmatter: {}, content: markdown };
+  }
+
+  const rawFrontmatter = match[1];
+  const content = markdown.slice(match[0].length);
+  const frontmatter: Record<string, string> = {};
+
+  for (const line of rawFrontmatter.split('\n')) {
+    const match = line.match(/^\s*([A-Za-z0-9_-]+):\s*(.*?)\s*$/);
+    if (!match) continue;
+    frontmatter[match[1]] = match[2].replace(/^['"]|['"]$/g, '').trim();
+  }
+
+  return { frontmatter, content };
+}
+
+function toTitle(id: string): string {
+  return id
+    .split('-')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 /**
@@ -98,35 +126,4 @@ function parseYamlArray(yaml: string, key: string): string[] {
   const m = yaml.match(re);
   if (!m) return [];
   return m[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
-}
-
-function parseGraph(graphYaml: string): SkillGraph {
-  const suggestions: SkillGraph['suggestions'] = { on_success: [], on_failure: [] };
-  let currentSection: keyof SkillGraph['suggestions'] | null = null;
-
-  for (const line of graphYaml.split('\n')) {
-    if (line.includes('on_success:')) { currentSection = 'on_success'; continue; }
-    if (line.includes('on_failure:')) { currentSection = 'on_failure'; continue; }
-    if (line.includes('entry_conditions:')) { currentSection = null; continue; }
-
-    if (currentSection) {
-      const targetMatch = line.match(/target:\s*(.+)/);
-      if (targetMatch) {
-        const target = targetMatch[1].trim();
-        suggestions[currentSection].push({ target });
-      }
-      const reasonMatch = line.match(/reason:\s*["'](.+)["']/);
-      if (reasonMatch && suggestions[currentSection].length > 0) {
-        const last = suggestions[currentSection][suggestions[currentSection].length - 1];
-        last.reason = reasonMatch[1];
-      }
-      const prioMatch = line.match(/priority:\s*(\d+)/);
-      if (prioMatch && suggestions[currentSection].length > 0) {
-        const last = suggestions[currentSection][suggestions[currentSection].length - 1];
-        last.priority = parseInt(prioMatch[1], 10);
-      }
-    }
-  }
-
-  return { suggestions };
 }

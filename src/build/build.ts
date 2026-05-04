@@ -18,7 +18,6 @@ import type { BuildData, BuildTargetName } from '../types.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const TEMPLATES_DIR = join(ROOT, 'templates');
-const DIST_DIR = join(ROOT, 'dist');
 
 const TARGETS: BuildTargetName[] = ['ghcp', 'claude', 'codex'];
 
@@ -28,6 +27,10 @@ const targetFlag = args.indexOf('--target');
 const selectedTargets: BuildTargetName[] = targetFlag >= 0 && args[targetFlag + 1]
   ? [parseTarget(args[targetFlag + 1])]
   : TARGETS;
+const distDirFlag = args.indexOf('--dist-dir');
+const distDir = distDirFlag >= 0 && args[distDirFlag + 1]
+  ? args[distDirFlag + 1]
+  : join(ROOT, 'dist');
 
 function parseTarget(value: string): BuildTargetName {
   if (value === 'ghcp' || value === 'claude' || value === 'codex') return value;
@@ -46,7 +49,7 @@ console.log(`  ${mcpServers.length} MCP servers loaded`);
 
 // Clean dist
 for (const target of selectedTargets) {
-  const targetDir = join(DIST_DIR, target);
+  const targetDir = join(distDir, target);
   rmSync(targetDir, { recursive: true, force: true });
   mkdirSync(targetDir, { recursive: true });
 }
@@ -55,8 +58,8 @@ for (const target of selectedTargets) {
 const data: BuildData = { skills, mcpServers, agents, hooks };
 for (const target of selectedTargets) {
   console.log(`\nBuilding ${target}...`);
-  buildTarget(target, data, DIST_DIR);
-  console.log(`  ✅ ${target} → dist/${target}/`);
+  buildTarget(target, data, distDir);
+  console.log(`  ✅ ${target} → ${join(distDir, target)}/`);
 }
 
 console.log('\nDone.');

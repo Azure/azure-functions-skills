@@ -36,6 +36,10 @@ if (!command || command === '--help' || command === '-h') {
     --dir <path>       Working directory (default: current directory)
     --as-plugin        Ensure plugin is registered before launching agent
 
+  Options (build):
+    --target <name>    Build target: ghcp, claude, codex
+    --dist-dir <path>  Output directory (default: dist)
+
   Examples:
     npx @agent-loom/azure-functions-skills setup
     npx @agent-loom/azure-functions-skills setup --as-plugin
@@ -167,8 +171,12 @@ if (command === 'setup') {
   await chat(options);
 } else if (command === 'build') {
   // Delegate to build script
-  const { execSync } = await import('node:child_process');
-  execSync('node lib/build/build.js', { stdio: 'inherit' });
+  const { execFileSync } = await import('node:child_process');
+  execFileSync(
+    process.execPath,
+    [join(import.meta.dirname, '..', 'lib', 'build', 'build.js'), ...args.slice(1)],
+    { stdio: 'inherit' },
+  );
 } else {
   console.error(`Unknown command: ${command}`);
   process.exit(1);

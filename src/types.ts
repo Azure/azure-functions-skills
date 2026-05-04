@@ -4,32 +4,14 @@ export type BuildTargetName = 'ghcp' | 'claude' | 'codex';
 export type CliAgentName = BuildTargetName;
 export type LauncherId = 'github-copilot' | 'claude-code' | 'codex';
 
-export interface GraphSuggestion {
-  target: string;
-  reason?: string;
-  priority?: number;
-}
-
-export interface SkillGraph {
-  suggestions: {
-    on_success: GraphSuggestion[];
-    on_failure: GraphSuggestion[];
-  };
-}
-
 export interface Skill {
   id: string;
   title: string;
   description: string;
   category: string;
   content: string;
-  graph: SkillGraph;
   referencesDir: string | null;
   scriptsDir: string | null;
-  raw: {
-    skill: string;
-    graph: string;
-  };
 }
 
 export interface McpServer {

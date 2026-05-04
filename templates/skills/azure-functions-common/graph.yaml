@@ -1,7 +1,0 @@
-id: azure-functions-common
-title: Azure Functions Common References
-suggestions:
-  on_success: []
-  on_failure: []
-entry_conditions:
-  - shared_reference_required

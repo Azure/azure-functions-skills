@@ -213,7 +213,7 @@ After installing the workspace files or registering the plugin for your preferre
    - The agent runs **azure-functions-setup** checks
    - Then guides you through **azure-functions-create** (language + trigger selection)
    - Finally suggests **azure-functions-deploy** to push to Azure
-4. Each step surfaces the **next logical action** from the skill graph
+4. Each skill surfaces the **next logical action** from its `SKILL.md` guidance
 
 ## Development
 
@@ -261,7 +261,7 @@ dist/
 
 ### Add a new skill
 
-Scaffold the required skill files:
+Scaffold the required skill file:
 
 ```bash
 npm run new:skill -- azure-functions-my-skill \
@@ -271,11 +271,10 @@ npm run new:skill -- azure-functions-my-skill \
 
 Before opening a PR, complete this checklist:
 
-- Update `templates/skills/<skill-id>/skill.yaml` metadata.
-- Update `templates/skills/<skill-id>/graph.yaml` next-step edges.
-- Write `templates/skills/<skill-id>/SKILL.md` workflow instructions.
+- Update `templates/skills/<skill-id>/SKILL.md` frontmatter metadata (`name`, `title`, `description`, `category`).
+- Write `templates/skills/<skill-id>/SKILL.md` workflow instructions and any next-step guidance.
 - Add optional `references/` or `scripts/` content if the skill needs supporting files.
-- Run `npm run validate:skills` to catch missing files, ID mismatches, and broken graph targets.
+- Run `npm run validate:skills` to catch missing files and frontmatter ID mismatches.
 - Run `npm run check` to verify lint, typecheck, validation, tests, and build.
 - Run `npm pack --dry-run` before release-related changes to inspect package contents.
 
@@ -292,7 +291,7 @@ lib/                     # Compiled runtime output used by package exports and C
 
 templates/               # Canonical plugin content (edited by hand)
 ├── skills/              # Canonical skill definitions
-│   ├── azure-functions-common/       #   skill.yaml + graph.yaml + SKILL.md + references/
+│   ├── azure-functions-common/       #   SKILL.md + references/
 │   ├── azure-functions-create/       #   includes references/
 │   ├── azure-functions-deploy/
 │   ├── azure-functions-diagnostics/  #   includes references/
@@ -311,9 +310,7 @@ templates/               # Canonical plugin content (edited by hand)
 ```
 
 The build system reads canonical sources and generates target-specific artifacts. Each skill has:
-- `skill.yaml` — metadata (id, title, description, category, targets)
-- `graph.yaml` — directed graph edges (next-step suggestions on success/failure)
-- `SKILL.md` — skill body (target-agnostic instructions)
+- `SKILL.md` — YAML frontmatter metadata plus target-agnostic workflow instructions
 - optional `references/` and `scripts/` directories copied into every target artifact
 
 ### CI/CD
