@@ -100,20 +100,15 @@ function assertWorkspaceLayout(root: string, target: BuildTargetName, expectedSk
 }
 
 function assertPluginLayout(root: string, target: BuildTargetName, expectedSkillIds: string[], expectedAgentFiles: string[]): void {
-  if (target === 'ghcp') {
-    expect(existsSync(join(root, 'plugin.json'))).toBe(true);
-    expect(existsSync(join(root, '.mcp.json'))).toBe(true);
-    expect(existsSync(join(root, 'hooks.json'))).toBe(true);
-    assertAgentFiles(join(root, 'agents'), expectedAgentFiles);
-    assertSkillDirectories(join(root, 'skills'), expectedSkillIds);
-    return;
-  }
-
-  if (target === 'codex') {
-    expect(existsSync(join(root, '.codex-plugin', 'plugin.json'))).toBe(true);
-    expect(existsSync(join(root, '.mcp.json'))).toBe(true);
-    assertSkillDirectories(join(root, 'skills'), expectedSkillIds);
-  }
+  expect(target).toBeTruthy();
+  expect(existsSync(join(root, '.plugin', 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, '.claude-plugin', 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, '.codex-plugin', 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, '.mcp.json'))).toBe(true);
+  expect(existsSync(join(root, 'hooks.json'))).toBe(true);
+  assertAgentFiles(join(root, 'agents'), expectedAgentFiles);
+  assertSkillDirectories(join(root, 'skills'), expectedSkillIds);
 }
 
 function runCli(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): void {
@@ -149,10 +144,11 @@ describe('CLI command E2E', () => {
     runCli(['build', '--dist-dir', distDir]);
 
     for (const target of TARGETS) {
-      const targetRoot = join(distDir, target);
+      const targetRoot = join(distDir, 'workspace', target);
       assertWorkspaceLayout(targetRoot, target, expectedSkillIds, expectedAgentFiles);
-      assertPluginLayout(targetRoot, target, expectedSkillIds, expectedAgentFiles);
     }
+
+    assertPluginLayout(join(distDir, 'plugin', 'azure-functions-skills'), 'ghcp', expectedSkillIds, expectedAgentFiles);
   });
 
   it('setup installs each target workspace layout into a temp project directory', () => {

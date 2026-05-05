@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../src/build/loader.js';
-import { buildTarget } from '../src/build/build-target.js';
+import { buildPluginMarketplaces, buildPluginPayload, buildTarget } from '../src/build/build-target.js';
 import { detectAgents, applySetup } from '../src/setup/index.js';
 import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
 import type { AgentDefinitions, BuildTargetName, HookDefinitions, McpServer, Skill } from '../src/types.js';
@@ -217,60 +217,21 @@ describe('buildTarget — ghcp', () => {
     expect(hooksJson.hooks.SessionStart).toBeTruthy();
   });
 
-  it('generates plugin.json manifest', () => {
+  it('does not mix plugin artifacts into the workspace layout', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
     const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
-    const manifestPath = join(DIST_DIR, 'ghcp', 'plugin.json');
-    expect(existsSync(manifestPath)).toBe(true);
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-    expect(manifest.name).toBe('azure-functions-skills');
-    expect(manifest.version).toBeTruthy();
-    expect(manifest.description).toBeTruthy();
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'ghcp', 'plugin.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'ghcp', 'skills'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'ghcp', 'agents'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.mcp.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'ghcp', 'hooks.json'))).toBe(false);
   });
 
-  it('generates plugin skills/ directory', () => {
-    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
-    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-    buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
-
-    for (const s of skills) {
-      const skillPath = join(DIST_DIR, 'ghcp', 'skills', s.id, 'SKILL.md');
-      expect(existsSync(skillPath)).toBe(true);
-    }
-  });
-
-  it('generates plugin .mcp.json', () => {
-    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
-    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-    buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
-
-    const mcpPluginPath = join(DIST_DIR, 'ghcp', '.mcp.json');
-    expect(existsSync(mcpPluginPath)).toBe(true);
-    const mcp = JSON.parse(readFileSync(mcpPluginPath, 'utf-8'));
-    expect(mcp.mcpServers).toBeTruthy();
-    expect(mcp.mcpServers['azure']).toBeTruthy();
-  });
-
-  it('generates plugin hooks.json at plugin root', () => {
-    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
-    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-    buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
-
-    const hooksPluginPath = join(DIST_DIR, 'ghcp', 'hooks.json');
-    expect(existsSync(hooksPluginPath)).toBe(true);
-    const hooksJson = JSON.parse(readFileSync(hooksPluginPath, 'utf-8'));
-    expect(hooksJson.hooks.SessionStart).toBeTruthy();
-  });
 });
 
 describe('buildTarget — claude', () => {
@@ -415,64 +376,89 @@ describe('Codex plugin manifest', () => {
     resetDistDir();
   });
 
-  it('generates .codex-plugin/plugin.json with correct structure', () => {
+  it('does not mix plugin artifacts into the workspace layout', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
     const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
-    const manifestPath = join(DIST_DIR, 'codex', '.codex-plugin', 'plugin.json');
-    expect(existsSync(manifestPath)).toBe(true);
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    expect(existsSync(join(DIST_DIR, 'codex', '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'codex', 'skills'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'codex', '.codex-plugin'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'codex', '.mcp.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'codex', '.agents', 'plugins'))).toBe(false);
+  });
+});
+
+describe('buildPluginPayload', () => {
+  beforeEach(() => {
+    resetDistDir();
+  });
+
+  it('generates a self-contained plugin payload without workspace layout files', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir);
+
+    expect(existsSync(join(payloadDir, '.plugin', 'plugin.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'plugin.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, '.claude-plugin', 'plugin.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, '.codex-plugin', 'plugin.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
+    expect(existsSync(join(payloadDir, '.github'))).toBe(false);
+    expect(existsSync(join(payloadDir, '.agents'))).toBe(false);
+    expect(existsSync(join(payloadDir, '.codex'))).toBe(false);
+
+    const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
     expect(manifest.name).toBe('azure-functions-skills');
-    expect(manifest.version).toBeTruthy();
+    expect(manifest.version).toBe('9.8.7');
     expect(manifest.skills).toBe('./skills/');
+    expect(manifest.agents).toBe('./agents/');
+    expect(manifest.hooks).toBe('./hooks.json');
     expect(manifest.mcpServers).toBe('./.mcp.json');
-    expect(manifest.interface).toBeTruthy();
-    expect(manifest.interface.displayName).toBeTruthy();
-  });
 
-  it('generates .mcp.json at plugin root', () => {
-    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
-    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-    buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
-
-    const mcpPath = join(DIST_DIR, 'codex', '.mcp.json');
-    expect(existsSync(mcpPath)).toBe(true);
-    const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'));
-    expect(mcp['azure']).toBeTruthy();
-    expect(mcp['azure'].command).toBe('npx');
-  });
-
-  it('generates marketplace.json', () => {
-    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
-    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-    buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
-
-    const mpPath = join(DIST_DIR, 'codex', '.agents', 'plugins', 'marketplace.json');
-    expect(existsSync(mpPath)).toBe(true);
-    const mp = JSON.parse(readFileSync(mpPath, 'utf-8'));
-    expect(mp.plugins).toBeInstanceOf(Array);
-    expect(mp.plugins[0].name).toBe('azure-functions-skills');
-  });
-
-  it('generates plugin skills under skills/ (plugin convention)', () => {
-    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
-    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
-    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-    buildTarget('codex', { skills, mcpServers, agents, hooks }, DIST_DIR);
-
-    // Plugin convention: skills go under <plugin>/skills/<name>/SKILL.md
     for (const s of skills) {
-      const skillPath = join(DIST_DIR, 'codex', 'skills', s.id, 'SKILL.md');
-      expect(existsSync(skillPath)).toBe(true);
+      expect(existsSync(join(payloadDir, 'skills', s.id, 'SKILL.md'))).toBe(true);
     }
+  });
+});
+
+describe('buildPluginMarketplaces', () => {
+  beforeEach(() => {
+    resetDistDir();
+  });
+
+  it('generates Copilot and Claude marketplace manifests pointing at the committed plugin payload', () => {
+    buildPluginMarketplaces(DIST_DIR, {
+      packageVersion: '9.8.7',
+      pluginSource: './.github/plugins/azure-functions-skills',
+    });
+
+    const copilotMarketplace = JSON.parse(readFileSync(join(DIST_DIR, '.plugin', 'marketplace.json'), 'utf-8'));
+    expect(copilotMarketplace.name).toBe('azure-functions-skills');
+    expect(copilotMarketplace.plugins[0].name).toBe('azure-functions-skills');
+    expect(copilotMarketplace.plugins[0].version).toBe('9.8.7');
+    expect(copilotMarketplace.plugins[0].source).toBe('./.github/plugins/azure-functions-skills');
+
+    const claudeMarketplace = JSON.parse(readFileSync(join(DIST_DIR, '.claude-plugin', 'marketplace.json'), 'utf-8'));
+    expect(claudeMarketplace.name).toBe('azure-functions-skills');
+    expect(claudeMarketplace.plugins[0].source).toBe('./.github/plugins/azure-functions-skills');
+  });
+});
+
+describe('npm package manifest', () => {
+  it('does not publish generated dist artifacts', () => {
+    const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf-8'));
+
+    expect(pkg.files).toContain('templates/');
+    expect(pkg.files).not.toContain('dist/');
   });
 });
 
@@ -601,11 +587,11 @@ describe('skill references/ subdirectory', () => {
     buildTarget(target, { skills, mcpServers, agents, hooks }, REF_DIST_DIR);
   }
 
-  it('ghcp build copies references/ under .github/skills/<id>/ and skills/<id>/', () => {
+  it('ghcp build copies references/ under .github/skills/<id>/', () => {
     buildFixture('ghcp');
     expect(existsSync(join(REF_DIST_DIR, 'ghcp', '.github', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
     expect(existsSync(join(REF_DIST_DIR, 'ghcp', '.github', 'skills', 'demo-skill', 'references', 'nested', 'deep.md'))).toBe(true);
-    expect(existsSync(join(REF_DIST_DIR, 'ghcp', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
+    expect(existsSync(join(REF_DIST_DIR, 'ghcp', 'skills'))).toBe(false);
   });
 
   it('claude build emits .claude/skills/<id>/SKILL.md and copies references/', () => {
@@ -615,9 +601,9 @@ describe('skill references/ subdirectory', () => {
     expect(existsSync(join(REF_DIST_DIR, 'claude', '.claude', 'skills', 'demo-skill', 'references', 'nested', 'deep.md'))).toBe(true);
   });
 
-  it('codex build copies references/ under .agents/skills/<id>/ and skills/<id>/', () => {
+  it('codex build copies references/ under .agents/skills/<id>/', () => {
     buildFixture('codex');
     expect(existsSync(join(REF_DIST_DIR, 'codex', '.agents', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
-    expect(existsSync(join(REF_DIST_DIR, 'codex', 'skills', 'demo-skill', 'references', 'extra.md'))).toBe(true);
+    expect(existsSync(join(REF_DIST_DIR, 'codex', 'skills'))).toBe(false);
   });
 });

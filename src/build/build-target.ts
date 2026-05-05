@@ -4,6 +4,11 @@ import type { AgentDefinitions, BuildData, BuildTargetName, HookDefinitions, Mcp
 
 type TargetBuilder = (data: BuildData, distDir: string) => void;
 
+interface PluginMarketplaceOptions {
+  packageVersion: string;
+  pluginSource: string;
+}
+
 /**
  * Build output for a specific target (ghcp, claude, codex).
  */
@@ -12,6 +17,53 @@ export function buildTarget(target: BuildTargetName, data: BuildData, distDir: s
   const builder = builders[target];
   if (!builder) throw new Error(`Unknown target: ${target}`);
   builder(data, distDir);
+}
+
+/**
+ * Build the self-contained plugin payload used for GitHub repository based
+ * plugin installation and release bundles. Unlike `buildTarget`, this does not
+ * emit workspace-specific files such as `.github/skills` or `.agents/skills`.
+ */
+export function buildPluginPayload(data: BuildData, pluginDir: string): void {
+  mkdirSync(pluginDir, { recursive: true });
+
+  const manifest = generatePluginManifest(data);
+  mkdirSync(join(pluginDir, '.plugin'), { recursive: true });
+  writeFileSync(join(pluginDir, '.plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
+  writeFileSync(join(pluginDir, 'plugin.json'), JSON.stringify(manifest, null, 2));
+
+  mkdirSync(join(pluginDir, '.claude-plugin'), { recursive: true });
+  writeFileSync(join(pluginDir, '.claude-plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
+
+  mkdirSync(join(pluginDir, '.codex-plugin'), { recursive: true });
+  writeFileSync(join(pluginDir, '.codex-plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
+
+  for (const skill of data.skills) {
+    const skillDir = join(pluginDir, 'skills', skill.id);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'), generateSkillMd(skill));
+    copySkillAssets(skill, skillDir);
+  }
+
+  mkdirSync(join(pluginDir, 'agents'), { recursive: true });
+  writeFileSync(join(pluginDir, 'agents', 'functions-copilot.agent.md'), data.agents.copilot);
+
+  writeFileSync(join(pluginDir, '.mcp.json'), JSON.stringify(generatePluginMcpJson(data.mcpServers), null, 2));
+  writeFileSync(join(pluginDir, 'hooks.json'), JSON.stringify(generateGhcpHooks(), null, 2));
+}
+
+/**
+ * Build Git-backed marketplace manifests that point to the committed plugin
+ * payload directory in this repository.
+ */
+export function buildPluginMarketplaces(repoRoot: string, options: PluginMarketplaceOptions): void {
+  const marketplace = generatePluginMarketplace(options);
+
+  mkdirSync(join(repoRoot, '.plugin'), { recursive: true });
+  writeFileSync(join(repoRoot, '.plugin', 'marketplace.json'), JSON.stringify(marketplace, null, 2));
+
+  mkdirSync(join(repoRoot, '.claude-plugin'), { recursive: true });
+  writeFileSync(join(repoRoot, '.claude-plugin', 'marketplace.json'), JSON.stringify(marketplace, null, 2));
 }
 
 /**
@@ -84,37 +136,6 @@ function buildGhcp({ skills, mcpServers, agents, hooks }: BuildData, distDir: st
     JSON.stringify(generateGhcpHooks(), null, 2),
   );
 
-  // ── Plugin format (for marketplace / Install From Source) ──
-
-  // plugin.json — Plugin manifest
-  writeFileSync(
-    join(base, 'plugin.json'),
-    JSON.stringify(generateGhcpPluginManifest(), null, 2),
-  );
-
-  // skills/<id>/SKILL.md — Plugin-level skills
-  for (const skill of skills) {
-    const skillDir = join(base, 'skills', skill.id);
-    mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, 'SKILL.md'), generateGhcpSkillMd(skill));
-    copySkillAssets(skill, skillDir);
-  }
-
-  // agents/<name>.agent.md — Plugin-level agent
-  mkdirSync(join(base, 'agents'), { recursive: true });
-  writeFileSync(join(base, 'agents', 'functions-copilot.agent.md'), agents.copilot);
-
-  // .mcp.json — Plugin MCP servers (mcpServers key)
-  writeFileSync(
-    join(base, '.mcp.json'),
-    JSON.stringify(generatePluginMcpJson(mcpServers), null, 2),
-  );
-
-  // hooks.json — Plugin hooks (Copilot format: at plugin root)
-  writeFileSync(
-    join(base, 'hooks.json'),
-    JSON.stringify(generateGhcpHooks(), null, 2),
-  );
 }
 
 // ─── Claude Code ───
@@ -158,34 +179,6 @@ function buildCodex({ skills, mcpServers, agents, hooks }: BuildData, distDir: s
     writeFileSync(join(skillDir, 'SKILL.md'), generateCodexSkillMd(skill));
     copySkillAssets(skill, skillDir);
   }
-
-  // skills/<id>/SKILL.md — plugin-convention skills (for .codex-plugin)
-  for (const skill of skills) {
-    const skillDir = join(base, 'skills', skill.id);
-    mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, 'SKILL.md'), generateCodexSkillMd(skill));
-    copySkillAssets(skill, skillDir);
-  }
-
-  // .codex-plugin/plugin.json — plugin manifest
-  mkdirSync(join(base, '.codex-plugin'), { recursive: true });
-  writeFileSync(
-    join(base, '.codex-plugin', 'plugin.json'),
-    JSON.stringify(generateCodexPluginManifest(), null, 2),
-  );
-
-  // .mcp.json — plugin MCP config (at plugin root, referenced by plugin.json)
-  writeFileSync(
-    join(base, '.mcp.json'),
-    JSON.stringify(generateCodexMcpJson(mcpServers), null, 2),
-  );
-
-  // .agents/plugins/marketplace.json — local marketplace
-  mkdirSync(join(base, '.agents', 'plugins'), { recursive: true });
-  writeFileSync(
-    join(base, '.agents', 'plugins', 'marketplace.json'),
-    JSON.stringify(generateCodexMarketplace(), null, 2),
-  );
 
   // .codex/config.toml — MCP server configuration
   writeFileSync(join(base, '.codex', 'config.toml'), generateCodexConfigToml(mcpServers));
@@ -261,11 +254,10 @@ function generateGhcpHooks() {
     },
   };
 }
-
-function generateGhcpPluginManifest() {
+function generatePluginManifest(data: BuildData) {
   return {
     name: 'azure-functions-skills',
-    version: '0.2.0',
+    version: data.packageVersion || '0.0.0-dev',
     description: 'Azure Functions skills for setup, create, and deploy workflows',
     skills: './skills/',
     agents: './agents/',
@@ -278,6 +270,29 @@ function generateGhcpPluginManifest() {
       category: 'Development',
       capabilities: ['Read', 'Write'],
     },
+  };
+}
+
+function generatePluginMarketplace({ packageVersion, pluginSource }: PluginMarketplaceOptions) {
+  return {
+    name: 'azure-functions-skills',
+    owner: {
+      name: 'Azure Functions Team',
+    },
+    metadata: {
+      description: 'Azure Functions coding agent skills and MCP guidance',
+      version: packageVersion,
+    },
+    plugins: [
+      {
+        name: 'azure-functions-skills',
+        source: pluginSource,
+        description: 'Azure Functions skills for setup, create, and deploy workflows',
+        version: packageVersion,
+        category: 'Development',
+        tags: ['azure-functions', 'serverless', 'mcp', 'coding-agent'],
+      },
+    ],
   };
 }
 
@@ -357,8 +372,7 @@ function generateSkillMd(skill: Skill): string {
     `description: "${skill.description}"`,
     '---',
     '',
-    skill.content,
-    '',
+    skill.content.trimEnd(),
   ].join('\n');
 }
 
@@ -398,56 +412,5 @@ function generateCodexHooks() {
         },
       ],
     },
-  };
-}
-
-function generateCodexPluginManifest() {
-  return {
-    name: 'azure-functions-skills',
-    version: '0.1.0',
-    description: 'Azure Functions skills for setup, create, and deploy workflows',
-    skills: './skills/',
-    mcpServers: './.mcp.json',
-    interface: {
-      displayName: 'Azure Functions Skills',
-      shortDescription: 'Guided setup → create → deploy workflow for Azure Functions',
-      developerName: 'Azure Functions Team',
-      category: 'Development',
-      capabilities: ['Read', 'Write'],
-    },
-  };
-}
-
-function generateCodexMcpJson(mcpServers: McpServer[]) {
-  const result: Record<string, { command: string; args: string[] }> = {};
-  for (const s of mcpServers) {
-    result[s.id] = {
-      command: s.command,
-      args: s.args,
-    };
-  }
-  return result;
-}
-
-function generateCodexMarketplace() {
-  return {
-    name: 'azure-functions',
-    interface: {
-      displayName: 'Azure Functions',
-    },
-    plugins: [
-      {
-        name: 'azure-functions-skills',
-        source: {
-          source: 'local',
-          path: './',
-        },
-        policy: {
-          installation: 'INSTALLED_BY_DEFAULT',
-          authentication: 'ON_INSTALL',
-        },
-        category: 'Development',
-      },
-    ],
   };
 }

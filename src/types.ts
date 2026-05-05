@@ -37,6 +37,7 @@ export interface BuildData {
   mcpServers: McpServer[];
   agents: AgentDefinitions;
   hooks: HookDefinitions;
+  packageVersion?: string;
 }
 
 export interface SetupOptions {

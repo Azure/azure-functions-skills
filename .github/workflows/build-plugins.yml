@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/**'
+      - '.github/plugins/**'
+      - '.plugin/**'
+      - '.claude-plugin/**'
       - 'bin/**'
       - 'src/**'
       - 'templates/**'
@@ -19,6 +22,9 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/**'
+      - '.github/plugins/**'
+      - '.plugin/**'
+      - '.claude-plugin/**'
       - 'bin/**'
       - 'src/**'
       - 'templates/**'
@@ -52,6 +58,9 @@ jobs:
       - name: Validate skills
         run: npm run validate:skills
 
+      - name: Verify plugin payload
+        run: npm run verify:plugin-payload
+
       - name: Run tests
         run: npm test
 
@@ -61,28 +70,38 @@ jobs:
       - name: Verify build output
         run: |
           echo "=== GHCP ==="
-          ls -la dist/ghcp/.github/
-          ls -la dist/ghcp/.vscode/
+          ls -la dist/workspace/ghcp/.github/
+          ls -la dist/workspace/ghcp/.vscode/
           echo "=== Claude ==="
-          ls -la dist/claude/.claude/
-          ls -la dist/claude/.claude/skills/
+          ls -la dist/workspace/claude/.claude/
+          ls -la dist/workspace/claude/.claude/skills/
           echo "=== Codex ==="
-          ls -la dist/codex/
+          ls -la dist/workspace/codex/
+          echo "=== Plugin payload ==="
+          ls -la dist/plugin/azure-functions-skills/
+          ls -la dist/plugin/azure-functions-skills/.plugin/
+          ls -la dist/plugin/azure-functions-skills/skills/
 
       - name: Upload GHCP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-ghcp
-          path: dist/ghcp/
+          name: workspace-ghcp
+          path: dist/workspace/ghcp/
 
       - name: Upload Claude artifact
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-claude
-          path: dist/claude/
+          name: workspace-claude
+          path: dist/workspace/claude/
 
       - name: Upload Codex artifact
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-codex
-          path: dist/codex/
+          name: workspace-codex
+          path: dist/workspace/codex/
+
+      - name: Upload plugin payload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-azure-functions-skills
+          path: dist/plugin/azure-functions-skills/
