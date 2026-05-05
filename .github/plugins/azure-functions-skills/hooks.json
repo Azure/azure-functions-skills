@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node -e \"const r=require('child_process').execSync;let o='⚡ Welcome to Azure Functions!\\n';try{r('az --version',{stdio:'ignore'});o+='✅ Azure CLI\\n'}catch{o+='❌ Azure CLI — install: https://aka.ms/installazurecli\\n'};try{r('func --version',{stdio:'ignore'});o+='✅ Core Tools\\n'}catch{o+='❌ Core Tools — install: npm i -g azure-functions-core-tools@4\\n'};try{r('node --version',{stdio:'ignore'});o+='✅ Node.js\\n'}catch{o+='❌ Node.js\\n'};console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:o}}))\"",
+        "timeout": 15
+      }
+    ]
+  }
+}

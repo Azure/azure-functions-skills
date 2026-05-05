@@ -1,0 +1,25 @@
+{
+  "name": "azure-functions-skills",
+  "owner": {
+    "name": "Azure Functions Team"
+  },
+  "metadata": {
+    "description": "Azure Functions coding agent skills and MCP guidance",
+    "version": "0.11.0"
+  },
+  "plugins": [
+    {
+      "name": "azure-functions-skills",
+      "source": "./.github/plugins/azure-functions-skills",
+      "description": "Azure Functions skills for setup, create, and deploy workflows",
+      "version": "0.11.0",
+      "category": "Development",
+      "tags": [
+        "azure-functions",
+        "serverless",
+        "mcp",
+        "coding-agent"
+      ]
+    }
+  ]
+}

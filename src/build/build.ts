@@ -8,11 +8,11 @@
  *   node src/build/build.js --target ghcp # build one target
  */
 
-import { join, dirname } from 'node:path';
+import { isAbsolute, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rmSync, mkdirSync } from 'node:fs';
+import { readFileSync, rmSync, mkdirSync } from 'node:fs';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from './loader.js';
-import { buildTarget } from './build-target.js';
+import { buildPluginMarketplaces, buildPluginPayload, buildTarget } from './build-target.js';
 import type { BuildData, BuildTargetName } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,10 +31,23 @@ const distDirFlag = args.indexOf('--dist-dir');
 const distDir = distDirFlag >= 0 && args[distDirFlag + 1]
   ? args[distDirFlag + 1]
   : join(ROOT, 'dist');
+const pluginOnly = args.includes('--plugin-only');
+const repoPluginDirFlag = args.indexOf('--repo-plugin-dir');
+const repoPluginDir = repoPluginDirFlag >= 0 && args[repoPluginDirFlag + 1]
+  ? args[repoPluginDirFlag + 1]
+  : null;
+const marketplaceRootFlag = args.indexOf('--marketplace-root');
+const marketplaceRoot = marketplaceRootFlag >= 0 && args[marketplaceRootFlag + 1]
+  ? args[marketplaceRootFlag + 1]
+  : null;
 
 function parseTarget(value: string): BuildTargetName {
   if (value === 'ghcp' || value === 'claude' || value === 'codex') return value;
   throw new Error(`Unknown target: ${value}`);
+}
+
+function resolveFromRoot(path: string): string {
+  return isAbsolute(path) ? path : join(ROOT, path);
 }
 
 // Load canonical sources
@@ -43,23 +56,49 @@ const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
 const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
 const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
 const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')) as { version: string };
 
 console.log(`  ${skills.length} skills loaded`);
 console.log(`  ${mcpServers.length} MCP servers loaded`);
 
-// Clean dist
-for (const target of selectedTargets) {
-  const targetDir = join(distDir, target);
-  rmSync(targetDir, { recursive: true, force: true });
-  mkdirSync(targetDir, { recursive: true });
+// Build each target
+const data: BuildData = { skills, mcpServers, agents, hooks, packageVersion: pkg.version };
+if (!pluginOnly) {
+  for (const target of selectedTargets) {
+    const targetDir = join(distDir, 'workspace', target);
+    rmSync(targetDir, { recursive: true, force: true });
+    mkdirSync(targetDir, { recursive: true });
+  }
+
+  for (const target of selectedTargets) {
+    console.log(`\nBuilding workspace ${target}...`);
+    buildTarget(target, data, join(distDir, 'workspace'));
+    console.log(`  ✅ ${target} → ${join(distDir, 'workspace', target)}/`);
+  }
+
+  const pluginDir = join(distDir, 'plugin', 'azure-functions-skills');
+  rmSync(pluginDir, { recursive: true, force: true });
+  console.log('\nBuilding plugin payload...');
+  buildPluginPayload(data, pluginDir);
+  console.log(`  ✅ plugin → ${pluginDir}/`);
 }
 
-// Build each target
-const data: BuildData = { skills, mcpServers, agents, hooks };
-for (const target of selectedTargets) {
-  console.log(`\nBuilding ${target}...`);
-  buildTarget(target, data, distDir);
-  console.log(`  ✅ ${target} → ${join(distDir, target)}/`);
+if (repoPluginDir) {
+  const outputDir = resolveFromRoot(repoPluginDir);
+  rmSync(outputDir, { recursive: true, force: true });
+  console.log('\nBuilding repository plugin payload...');
+  buildPluginPayload(data, outputDir);
+  console.log(`  ✅ repository plugin → ${outputDir}/`);
+}
+
+if (marketplaceRoot) {
+  const outputDir = resolveFromRoot(marketplaceRoot);
+  console.log('\nBuilding plugin marketplaces...');
+  buildPluginMarketplaces(outputDir, {
+    packageVersion: pkg.version,
+    pluginSource: './.github/plugins/azure-functions-skills',
+  });
+  console.log(`  ✅ marketplaces → ${outputDir}/`);
 }
 
 console.log('\nDone.');

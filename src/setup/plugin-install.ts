@@ -36,8 +36,8 @@ const PACKAGE_ROOT = join(__dirname, '..', '..');
  * @param {'ghcp' | 'claude' | 'codex'} target
  * @returns {string}
  */
-export function getPluginDir(target: BuildTargetName): string {
-  return join(PACKAGE_ROOT, 'dist', target);
+export function getPluginDir(_target: BuildTargetName): string {
+  return join(PACKAGE_ROOT, 'dist', 'plugin', 'azure-functions-skills');
 }
 
 /**
@@ -144,13 +144,11 @@ export function installPlugin(target: BuildTargetName, projectDir: string): Plug
       break;
     }
     case 'claude': {
-      // Claude: register as plugin via .claude/settings.json mcpServers + skills via --add-dir
-      // For now, write a .claude/settings.local.json pointing to our MCP servers
+      // Claude: register the self-contained plugin directory via --add-dir.
       const claudeDir = join(projectDir, '.claude');
       mkdirSync(claudeDir, { recursive: true });
       const settingsPath = join(claudeDir, 'settings.local.json');
-      // Write MCP + add-dir reference
-      const mcpPath = join(pluginPath, '.claude', 'settings.json');
+      const mcpPath = join(pluginPath, '.mcp.json');
       if (existsSync(mcpPath)) {
         const mcpSettings = JSON.parse(readFileSync(mcpPath, 'utf-8'));
         const merged = mergeJsonFile(settingsPath, mcpSettings);

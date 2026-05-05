@@ -2,17 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { getPluginDir, generateVscodeSettings, generateCodexMarketplaceEntry, generateClaudeSettings } from '../src/setup/plugin-install.js';
 
 describe('getPluginDir', () => {
-  it('returns a path containing dist/', () => {
+  it('returns the common plugin payload path under dist/', () => {
     const dir = getPluginDir('ghcp');
     expect(dir).toContain('dist');
-    expect(dir).toMatch(/ghcp$/);
+    expect(dir).toMatch(/dist[\\/]plugin[\\/]azure-functions-skills$/);
   });
 
-  it('returns paths for all three targets', () => {
-    for (const target of ['ghcp', 'claude', 'codex'] as const) {
-      const dir = getPluginDir(target);
-      expect(dir).toContain(target);
-    }
+  it('returns the same self-contained plugin payload for all targets', () => {
+    const dirs = (['ghcp', 'claude', 'codex'] as const).map(target => getPluginDir(target));
+
+    expect(new Set(dirs).size).toBe(1);
   });
 });
 

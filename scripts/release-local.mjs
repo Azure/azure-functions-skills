@@ -27,7 +27,7 @@ What it does:
   5. Creates a local annotated tag.
   6. Publishes @agent-loom/azure-functions-skills to npm.
   7. Pushes the tag.
-  8. Best-effort: creates a GitHub Release with plugin bundle zips.
+  8. Best-effort: creates a GitHub Release with plugin bundle zip.
 
 Options:
   --yes                     Skip the interactive confirmation prompt.
@@ -236,13 +236,11 @@ npx @agent-loom/azure-functions-skills@${version} chat
 
 ### Plugin bundles
 
-Download the zip for your AI assistant and register the extracted target directory with your agent's plugin-from-source flow.
+Download the plugin payload zip and register the extracted directory with your agent's plugin-from-source flow.
 
-| Assistant | Download |
+| Artifact | Download |
 | --- | --- |
-| GitHub Copilot | \`azure-functions-skills-ghcp-${version}.zip\` |
-| Claude Code | \`azure-functions-skills-claude-${version}.zip\` |
-| Codex | \`azure-functions-skills-codex-${version}.zip\` |
+| Cross-tool plugin payload | \`azure-functions-skills-plugin-${version}.zip\` |
 
 ### What's new
 
@@ -254,15 +252,13 @@ function createReleaseAssets(version, options) {
   const releaseDir = mkdtempSync(join(tmpdir(), `azure-functions-skills-v${version}-`));
   const assets = [];
 
-  for (const target of ['ghcp', 'claude', 'codex']) {
-    const sourceDir = join(process.cwd(), 'dist', target);
-    if (!existsSync(sourceDir) && !options.dryRun) {
-      throw new Error(`Missing ${sourceDir}. Run npm run build first.`);
-    }
-    const zipPath = join(releaseDir, `azure-functions-skills-${target}-${version}.zip`);
-    compressDirectory(sourceDir, zipPath, options);
-    assets.push(zipPath);
+  const sourceDir = join(process.cwd(), 'dist', 'plugin', 'azure-functions-skills');
+  if (!existsSync(sourceDir) && !options.dryRun) {
+    throw new Error(`Missing ${sourceDir}. Run npm run build first.`);
   }
+  const zipPath = join(releaseDir, `azure-functions-skills-plugin-${version}.zip`);
+  compressDirectory(sourceDir, zipPath, options);
+  assets.push(zipPath);
 
   const notesPath = join(releaseDir, 'release_notes.md');
   if (options.dryRun) console.log(`[dry-run] write ${notesPath}`);
@@ -327,7 +323,15 @@ async function main() {
 
   if (pkg.version !== version) {
     run('npm', ['version', version, '--no-git-tag-version'], { dryRun: options.dryRun });
-    run('git', ['add', 'package.json', 'package-lock.json'], { dryRun: options.dryRun });
+    run('npm', ['run', 'build:plugin-payload'], { dryRun: options.dryRun });
+    run('git', [
+      'add',
+      'package.json',
+      'package-lock.json',
+      '.github/plugins/azure-functions-skills',
+      '.plugin/marketplace.json',
+      '.claude-plugin/marketplace.json',
+    ], { dryRun: options.dryRun });
     run('git', ['commit', '-m', `chore: prepare ${tag} release`], { dryRun: options.dryRun });
     if (!options.skipPushMain) run('git', ['push', 'origin', 'main'], { dryRun: options.dryRun });
   } else {
