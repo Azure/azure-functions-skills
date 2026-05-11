@@ -81,6 +81,7 @@ describe('loadAgents', () => {
   it('loads functions-copilot agent', () => {
     expect(agents.copilot).toBeTruthy();
     expect(agents.copilot).toContain('functions-copilot');
+    expect(agents.copilot).toContain('azure-functions-best-practices');
     expect(agents.copilot).toContain('azure-functions-diagnostics');
   });
 });
