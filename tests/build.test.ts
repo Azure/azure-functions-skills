@@ -50,6 +50,27 @@ describe('loadSkills', () => {
     const ids = skills.map(s => s.id).sort();
     expect(ids).toEqual(expectedSkillIds());
   });
+
+  it('azure-functions-deploy proxies to the Azure Skills deployment workflow', () => {
+    const deploySkill = skills.find(skill => skill.id === 'azure-functions-deploy');
+    expect(deploySkill?.content).toContain('azure-prepare');
+    expect(deploySkill?.content).toContain('azure-validate');
+    expect(deploySkill?.content).toContain('azure-deploy');
+    expect(deploySkill?.content).toContain('.azure/deployment-plan.md');
+    expect(deploySkill?.content).toContain('Validated');
+    expect(deploySkill?.content).toContain('Flex Consumption');
+  });
+
+  it('azure-functions-setup documents Azure Skills plugin as a deployment prerequisite', () => {
+    const setupSkill = skills.find(skill => skill.id === 'azure-functions-setup');
+    expect(setupSkill?.content).toContain('Azure Skills plugin');
+    expect(setupSkill?.content).toContain('azure-prepare');
+    expect(setupSkill?.content).toContain('azure-validate');
+    expect(setupSkill?.content).toContain('azure-deploy');
+    expect(setupSkill?.content).toContain('/plugin install azure@azure-skills');
+    expect(setupSkill?.content).toContain('/plugin install azure@claude-plugins-official');
+    expect(setupSkill?.content).toContain('codex plugin marketplace add microsoft/azure-skills');
+  });
 });
 
 describe('loadMcpServers', () => {
@@ -83,6 +104,7 @@ describe('loadAgents', () => {
     expect(agents.copilot).toContain('functions-copilot');
     expect(agents.copilot).toContain('azure-functions-best-practices');
     expect(agents.copilot).toContain('azure-functions-diagnostics');
+    expect(agents.copilot).toContain('proxy to Azure Skills');
   });
 });
 
