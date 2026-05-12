@@ -29,12 +29,16 @@ if (!command || command === '--help' || command === '-h') {
     --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
     --dir <path>       Target directory (default: current directory)
     --as-plugin        Register as a native platform plugin (instead of copying files)
+    --check-prerequisites  Check external prerequisites without installing them
+    --skip-prerequisites   Skip external prerequisite checks
 
   Options (chat):
     --agent <name>     Agent: github-copilot, claude-code, codex (auto-detected if omitted)
     --prompt <text>    Custom prompt (overrides startup template)
     --dir <path>       Working directory (default: current directory)
     --as-plugin        Ensure plugin is registered before launching agent
+    --check-prerequisites  Check external prerequisites without installing them
+    --skip-prerequisites   Skip external prerequisite checks
 
   Options (build):
     --target <name>    Build target: ghcp, claude, codex
@@ -53,6 +57,7 @@ if (command === 'setup') {
   const agents = [];
   let dir = process.cwd();
   let asPlugin = false;
+  let prerequisites = 'auto';
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) {
@@ -61,6 +66,10 @@ if (command === 'setup') {
       dir = args[++i];
     } else if (args[i] === '--as-plugin') {
       asPlugin = true;
+    } else if (args[i] === '--check-prerequisites') {
+      prerequisites = 'check-only';
+    } else if (args[i] === '--skip-prerequisites') {
+      prerequisites = 'skip';
     }
   }
 
@@ -104,10 +113,18 @@ if (command === 'setup') {
     }
 
     console.log('\n⚡ Plugins registered! Updates will be picked up automatically when you update the npm package.');
+
+    const { ensurePrerequisites } = await import('../lib/setup/prerequisites/index.js');
+    const prerequisiteResults = await ensurePrerequisites({
+      targets: detectedAgents,
+      projectDir: dir,
+      mode: prerequisites,
+    });
+    printPrerequisiteResults(prerequisiteResults);
   } else {
     // File copy mode (original behavior)
     console.log(`\n📁 Installing to: ${dir}\n`);
-    const result = await applySetup(dir, { agents: detectedAgents });
+    const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
     console.log(result.welcomeMessage);
   }
 } else if (command === 'chat') {
@@ -117,12 +134,15 @@ if (command === 'setup') {
   let prompt = null;
   let dir = process.cwd();
   let asPlugin = false;
+  let prerequisites = 'auto';
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agent = args[++i];
     else if (args[i] === '--prompt' && args[i + 1]) prompt = args[++i];
     else if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
     else if (args[i] === '--as-plugin') asPlugin = true;
+    else if (args[i] === '--check-prerequisites') prerequisites = 'check-only';
+    else if (args[i] === '--skip-prerequisites') prerequisites = 'skip';
   }
 
   // If --as-plugin, ensure plugin is registered first
@@ -168,6 +188,7 @@ if (command === 'setup') {
 
   const options = { agent, dir };
   if (prompt) options.prompt = prompt;
+  options.prerequisites = prerequisites;
   await chat(options);
 } else if (command === 'build') {
   // Delegate to build script
@@ -180,4 +201,17 @@ if (command === 'setup') {
 } else {
   console.error(`Unknown command: ${command}`);
   process.exit(1);
+}
+
+function printPrerequisiteResults(results) {
+  const actionable = results.filter(result => result.status !== 'present' && result.status !== 'skipped');
+  if (actionable.length === 0) return;
+
+  console.log('\nExternal prerequisites:');
+  for (const result of actionable) {
+    console.log(`  ⚠️  ${result.id} (${result.target}): ${result.message}`);
+    for (const command of result.commands || []) {
+      console.log(`     → ${command}`);
+    }
+  }
 }

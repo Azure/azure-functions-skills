@@ -11,6 +11,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync, spawn } from 'node:child_process';
 import { applySetup } from '../setup/index.js';
+import { ensurePrerequisites } from '../setup/prerequisites/index.js';
 import { loadSkills } from '../build/loader.js';
 import type { BuildTargetName, ChatOptions, ChatResult, DetectedCliAgent, Launcher, LauncherId } from '../types.js';
 
@@ -156,10 +157,23 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
   };
   const setupTarget = agentToSetupTarget[agentId];
   if (setupTarget && !isSetupDone(dir, setupTarget)) {
-    const result = await applySetup(dir, { agents: [setupTarget] });
+    const result = await applySetup(dir, {
+      agents: [setupTarget],
+      prerequisites: options.prerequisites,
+      prerequisiteRunner: options.prerequisiteRunner,
+    });
     if (result.filesWritten > 0) {
       process.stderr.write(`📦 Installed ${result.filesWritten} skill files for ${setupTarget}\n`);
     }
+    writePrerequisiteStatus(result.prerequisites || []);
+  } else if (setupTarget) {
+    const prerequisiteResults = await ensurePrerequisites({
+      targets: [setupTarget],
+      projectDir: dir,
+      mode: options.prerequisites || 'auto',
+      runner: options.prerequisiteRunner,
+    });
+    writePrerequisiteStatus(prerequisiteResults);
   }
 
   const startupPrompt = options.prompt || await buildStartupPrompt(dir);
@@ -185,6 +199,16 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
       resolve({ childProcess: child, agent: agentId, prompt: startupPrompt });
     });
   });
+}
+
+function writePrerequisiteStatus(results: Awaited<ReturnType<typeof ensurePrerequisites>>): void {
+  for (const result of results) {
+    if (result.status === 'present' || result.status === 'skipped') continue;
+    process.stderr.write(`⚠️  ${result.id} (${result.target}): ${result.message}\n`);
+    for (const command of result.commands || []) {
+      process.stderr.write(`   → ${command}\n`);
+    }
+  }
 }
 
 async function pickAgent(): Promise<LauncherId> {

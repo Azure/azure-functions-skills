@@ -19,6 +19,7 @@ azure-functions-skills setup
 ```
 
 The CLI auto-detects which coding agents you have (GitHub Copilot, Claude Code, Codex) and installs the right files.
+For GitHub Copilot, `setup` also checks for the Azure Skills plugin used by the deployment workflow and installs it through the Copilot plugin CLI when available.
 
 ```
 🔍 Detecting coding agents...
@@ -41,6 +42,9 @@ The CLI auto-detects which coding agents you have (GitHub Copilot, Claude Code, 
     • azure-functions-inventory — Azure Functions Inventory
     • azure-functions-setup — Azure Functions Setup
 
+  External prerequisites:
+    • azure-skills (ghcp) — installed: Azure Skills plugin installed for GitHub Copilot.
+
   Get started: Ask your AI assistant to "set up Azure Functions"
 ```
 
@@ -50,7 +54,11 @@ The CLI auto-detects which coding agents you have (GitHub Copilot, Claude Code, 
 npx @agent-loom/azure-functions-skills setup --agent ghcp
 npx @agent-loom/azure-functions-skills setup --agent claude --agent codex
 npx @agent-loom/azure-functions-skills setup --dir ./my-app
+npx @agent-loom/azure-functions-skills setup --check-prerequisites
+npx @agent-loom/azure-functions-skills setup --skip-prerequisites
 ```
+
+`--check-prerequisites` reports missing external prerequisites without installing them. `--skip-prerequisites` disables external checks for CI or offline environments.
 
 ### Launch with Welcome Prompt (`chat`)
 
@@ -87,7 +95,11 @@ Specify an agent or custom prompt:
 npx @agent-loom/azure-functions-skills chat --agent github-copilot
 npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app
 npx @agent-loom/azure-functions-skills chat --prompt "Create an HTTP trigger function"
+npx @agent-loom/azure-functions-skills chat --check-prerequisites
+npx @agent-loom/azure-functions-skills chat --skip-prerequisites
 ```
+
+When `chat` launches GitHub Copilot CLI, it checks for Azure Skills before launch. If the shell-level Copilot plugin command is unavailable, it prints the manual plugin commands and continues.
 
 ### Use as a Library (VS Code Extension)
 

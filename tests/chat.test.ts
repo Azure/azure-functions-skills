@@ -113,7 +113,7 @@ describe('chat auto-setup', () => {
     const testDir = makeTestDir('af-skills-chat-ghcp-');
 
     try {
-      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test' });
+      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test', prerequisites: 'skip' });
       if (result?.childProcess) result.childProcess.kill();
     } catch {
       // Expected: copilot binary not found — that's fine
@@ -128,7 +128,7 @@ describe('chat auto-setup', () => {
     const testDir = makeTestDir('af-skills-chat-claude-');
 
     try {
-      const result = await chat({ agent: 'claude-code', dir: testDir, prompt: 'test' });
+      const result = await chat({ agent: 'claude-code', dir: testDir, prompt: 'test', prerequisites: 'skip' });
       // If claude is installed, kill the spawned process immediately
       if (result?.childProcess) result.childProcess.kill();
     } catch {
@@ -143,7 +143,7 @@ describe('chat auto-setup', () => {
     const testDir = makeTestDir('af-skills-chat-codex-');
 
     try {
-      const result = await chat({ agent: 'codex', dir: testDir, prompt: 'test' });
+      const result = await chat({ agent: 'codex', dir: testDir, prompt: 'test', prerequisites: 'skip' });
       if (result?.childProcess) result.childProcess.kill();
     } catch {
       // Expected: codex binary not found
@@ -158,14 +158,14 @@ describe('chat auto-setup', () => {
 
     // Pre-install skills
     const { applySetup } = await import('../src/setup/index.js');
-    await applySetup(testDir, { agents: ['ghcp'] });
+    await applySetup(testDir, { agents: ['ghcp'], prerequisites: 'skip' });
 
     // Get content of instructions file
     const instrPath = join(testDir, '.github', 'copilot-instructions.md');
     const contentBefore = readFileSync(instrPath, 'utf-8');
 
     try {
-      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test' });
+      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test', prerequisites: 'skip' });
       if (result?.childProcess) result.childProcess.kill();
     } catch {
       // Expected
@@ -174,5 +174,31 @@ describe('chat auto-setup', () => {
     // File should not have been re-written (same content)
     const contentAfter = readFileSync(instrPath, 'utf-8');
     expect(contentAfter).toBe(contentBefore);
+  }, 15000);
+
+  it('checks Azure Skills prerequisites before launching GitHub Copilot', async () => {
+    const testDir = makeTestDir('af-skills-chat-prereq-');
+    const calls: string[] = [];
+
+    try {
+      const result = await chat({
+        agent: 'github-copilot',
+        dir: testDir,
+        prompt: 'test',
+        prerequisiteRunner: async (command, args) => {
+          calls.push([command, ...args].join(' '));
+          return { exitCode: 0, stdout: '', stderr: '' };
+        },
+      });
+      if (result?.childProcess) result.childProcess.kill();
+    } catch {
+      // Expected if the launcher is unavailable.
+    }
+
+    expect(calls).toEqual([
+      'copilot plugin list',
+      'copilot plugin marketplace add microsoft/azure-skills',
+      'copilot plugin install azure@azure-skills',
+    ]);
   }, 15000);
 });

@@ -1,4 +1,5 @@
 import type { ChildProcess } from 'node:child_process';
+import type { CommandRunner, PrerequisiteMode, PrerequisiteResult } from './setup/prerequisites/types.js';
 
 export type BuildTargetName = 'ghcp' | 'claude' | 'codex';
 export type CliAgentName = BuildTargetName;
@@ -42,12 +43,15 @@ export interface BuildData {
 
 export interface SetupOptions {
   agents?: CliAgentName[];
+  prerequisites?: PrerequisiteMode;
+  prerequisiteRunner?: CommandRunner;
 }
 
 export interface SetupResult {
   agents: CliAgentName[];
   filesWritten: number;
   welcomeMessage: string;
+  prerequisites?: PrerequisiteResult[];
 }
 
 export interface LauncherContext {
@@ -70,6 +74,8 @@ export interface ChatOptions {
   agent?: LauncherId;
   prompt?: string;
   dir?: string;
+  prerequisites?: PrerequisiteMode;
+  prerequisiteRunner?: CommandRunner;
 }
 
 export interface ChatResult {

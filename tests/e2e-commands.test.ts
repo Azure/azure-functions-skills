@@ -158,7 +158,7 @@ describe('CLI command E2E', () => {
     for (const target of TARGETS) {
       const projectDir = makeTempDir(`af-skills-e2e-setup-${target}-`);
 
-      runCli(['setup', '--agent', target, '--dir', projectDir]);
+      runCli(['setup', '--agent', target, '--dir', projectDir, '--skip-prerequisites']);
 
       assertWorkspaceLayout(projectDir, target, expectedSkillIds, expectedAgentFiles);
     }
@@ -176,7 +176,7 @@ describe('CLI command E2E', () => {
     for (const { launcherId, setupTarget } of CHAT_AGENTS) {
       const projectDir = makeTempDir(`af-skills-e2e-chat-${setupTarget}-`);
 
-      runCli(['chat', '--agent', launcherId, '--dir', projectDir, '--prompt', 'e2e'], {
+      runCli(['chat', '--agent', launcherId, '--dir', projectDir, '--prompt', 'e2e', '--skip-prerequisites'], {
         env: {
           PATH: pathValue,
           Path: pathValue,
