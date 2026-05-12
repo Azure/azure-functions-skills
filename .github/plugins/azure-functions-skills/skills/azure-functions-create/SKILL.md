@@ -116,13 +116,19 @@ npm run build   # TypeScript / JavaScript
 # mvn package   # Java
 ```
 
-Then start and test locally:
+Then perform an end-to-end local verification, not just a host start:
 
 ```bash
 func start
 ```
 
-Invoke the function (for HTTP triggers: `curl http://localhost:7071/api/<FunctionName>`).
+After the host reports the function endpoints/listeners:
+
+- **HTTP triggers**: send an actual request to the local endpoint and verify the status code and response body, for example `curl http://localhost:7071/api/<FunctionName>?name=World`.
+- **Timer triggers**: verify the listener starts and, when practical, temporarily use a short development-only schedule or manual invocation approach; restore the user's intended schedule before finishing.
+- **Storage, Cosmos DB, SQL, Redis, Dapr, or other service-backed triggers/bindings**: load `azure-functions-common/references/local-emulators.md`, identify the required local emulator or development service, and run a realistic message/blob/document/event through the trigger when the user wants E2E verification.
+- **Before installing or starting any emulator/local service**: ask the user for confirmation. If the user says the emulator is not needed, unavailable, or should be skipped, do not install it; record that emulator-backed E2E was skipped and provide manual/Azure test steps instead.
+- **When no practical local emulator exists**: explain the limitation, suggest a temporary Azure dev resource or deployment-based test, and keep the local verification to build + host/listener startup.
 
 ---
 
@@ -179,9 +185,15 @@ For minimal HTTP trigger snippets per language (last-resort fallback when the ma
 
 #### B.3 Verify
 
+Build compiled projects first, then perform the same local E2E verification standard used in Path A:
+
 ```bash
 func start
 ```
+
+- For HTTP triggers, send a real request to the local endpoint and validate the response.
+- For non-HTTP triggers, consult `azure-functions-common/references/local-emulators.md` and use an emulator/local service when practical.
+- Ask before installing or starting emulators. If the user declines, skip emulator-backed E2E and document the skipped verification plus manual/Azure test steps.
 
 ---
 

@@ -2,12 +2,65 @@
 
 [![npm](https://img.shields.io/npm/v/@agent-loom/azure-functions-skills)](https://www.npmjs.com/package/@agent-loom/azure-functions-skills)
 
-AI assistant plugins for Azure Functions — **one command** to set up GitHub Copilot, Claude Code, or Codex with a guided `setup → create → deploy` workflow.
+Azure Functions Skills provides guided setup, create, deploy, diagnostics, and review workflows for coding agents such as GitHub Copilot CLI, Claude Code, and Codex.
 
-## Quick Start
+## Recommended: install as a plugin
+
+Use the plugin when your agent supports plugin installation. This keeps the Azure Functions agent, skills, hooks, and MCP configuration available without copying files into every workspace.
+
+GitHub Copilot CLI:
 
 ```bash
-# In your Azure Functions project (or any empty directory):
+copilot plugin marketplace add Azure/azure-functions-skills
+copilot plugin install azure-functions-skills@azure-functions-skills
+```
+
+Claude Code plugin-from-source:
+
+```bash
+git clone https://github.com/Azure/azure-functions-skills.git
+claude --add-dir ./azure-functions-skills/.github/plugins/azure-functions-skills
+```
+
+Codex CLI:
+
+```bash
+codex plugin marketplace add Azure/azure-functions-skills
+# Then install azure-functions-skills from /plugins.
+```
+
+For VS Code plugin-from-source flows, point the installer at:
+
+```text
+Azure/azure-functions-skills:.github/plugins/azure-functions-skills
+```
+
+After installing, ask your agent:
+
+```text
+@functions-copilot set up Azure Functions
+```
+
+For a guided overview first, ask:
+
+```text
+@functions-copilot Explain what Azure Functions Skills can do, when to use setup/create/deploy/diagnostics/best-practices/feedback, and which workflow I should start with.
+```
+
+## Plugin vs. `chat` vs. `setup`
+
+| Option | Use when | What it does |
+| --- | --- | --- |
+| Plugin | You want the normal, reusable experience | Registers the Azure Functions plugin payload from this repository with your agent. |
+| `chat` | You want to launch a CLI agent with Azure Functions context immediately | Detects the local project, prepares a startup prompt, checks prerequisites, and starts the selected CLI agent. |
+| `setup` | You need workspace-local files or your agent does not support plugins | Copies agent instructions, skills, hooks, and MCP config into the target workspace. |
+
+## CLI commands
+
+Run without global install:
+
+```bash
+npx @agent-loom/azure-functions-skills chat
 npx @agent-loom/azure-functions-skills setup
 ```
 
@@ -15,379 +68,81 @@ Or install globally:
 
 ```bash
 npm install -g @agent-loom/azure-functions-skills
+azure-functions-skills chat
 azure-functions-skills setup
 ```
 
-The CLI auto-detects which coding agents you have (GitHub Copilot, Claude Code, Codex) and installs the right files.
-For GitHub Copilot, `setup` also checks for the Azure Skills plugin used by the deployment workflow and installs it through the Copilot plugin CLI when available.
-
-```
-🔍 Detecting coding agents...
-  Found: ghcp, claude
-
-📁 Installing to: /home/user/my-functions-app
-
-⚡ Azure Functions Skills installed!
-
-  Agents configured: ghcp, claude
-  Files written: <count>
-
-  Skills available:
-    • azure-functions-common — Azure Functions Common References
-    • azure-functions-best-practices — Azure Functions Best Practices Review
-    • azure-functions-create — Create Azure Functions App
-    • azure-functions-deploy — Deploy Azure Functions
-    • azure-functions-diagnostics — Azure Functions Diagnostics
-    • azure-functions-health-status — Azure Functions Health Status
-    • azure-functions-inventory — Azure Functions Inventory
-    • azure-functions-setup — Azure Functions Setup
-
-  External prerequisites:
-    • azure-skills (ghcp) — installed: Azure Skills plugin installed for GitHub Copilot.
-
-  Get started: Ask your AI assistant to "set up Azure Functions"
-```
-
-### Specify Agents Manually
+Useful options:
 
 ```bash
-npx @agent-loom/azure-functions-skills setup --agent ghcp
-npx @agent-loom/azure-functions-skills setup --agent claude --agent codex
-npx @agent-loom/azure-functions-skills setup --dir ./my-app
+npx @agent-loom/azure-functions-skills chat --agent github-copilot --dir ./my-app
+npx @agent-loom/azure-functions-skills chat --prompt "Create an HTTP trigger function"
+npx @agent-loom/azure-functions-skills setup --agent ghcp --dir ./my-app
 npx @agent-loom/azure-functions-skills setup --check-prerequisites
 npx @agent-loom/azure-functions-skills setup --skip-prerequisites
 ```
 
-`--check-prerequisites` reports missing external prerequisites without installing them. `--skip-prerequisites` disables external checks for CI or offline environments.
+## Skills
 
-### Launch with Welcome Prompt (`chat`)
+| Skill | Purpose |
+| --- | --- |
+| `azure-functions-setup` | Verify local prerequisites such as Azure CLI, Azure Functions Core Tools, runtimes, and Azure Skills deployment dependency. |
+| `azure-functions-create` | Create new Functions projects or add functions by using Azure MCP template discovery first. |
+| `azure-functions-deploy` | Prepare, validate, and deploy through Azure Skills while adding Azure Functions-specific guidance. |
+| `azure-functions-best-practices` | Review an app for Azure Functions configuration, security, reliability, and production-readiness guidance. |
+| `azure-functions-diagnostics` | Investigate deployment, runtime, trigger, binding, language worker, logging, and telemetry issues. |
+| `azure-functions-health-status` | Collect current health, metrics, logs, Resource Health, and Activity Log evidence. |
+| `azure-functions-inventory` | Collect app specification and configuration inventory without diagnosing health. |
+| `azure-functions-common` | Shared language, trigger, binding, extension, routing, and local emulator references for the skill suite. |
+| `azure-functions-feedback` | Turn session findings into previewed issues or pull requests for this repository. |
 
-Start a CLI coding agent with Azure Functions context and a Welcome message:
+The `functions-copilot` agent routes user requests to the right skill and suggests the next step after each workflow.
 
-```bash
-npx @agent-loom/azure-functions-skills chat
-```
+## What `setup` writes
 
-The CLI auto-detects your agent (GHCP CLI / Claude Code / Codex), analyzes your project, and launches the agent with a startup prompt:
-
-```
-🔍 Detecting CLI coding agents...
-  Using: claude-code
-
-🚀 Launching claude-code with Azure Functions context...
-
-⚡ Azure Functions Skills
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📂 Functions project detected (node)
-🧩 Skills: azure-functions-setup, azure-functions-create, azure-functions-deploy
-
-🚀 Suggested next steps:
-  → Run azure-functions-deploy to deploy your app to Azure through Azure Skills
-  → Ensure the Azure Skills plugin is installed for prepare/validate/deploy workflows
-   → Run azure-functions-create to add another function
-
-💬 What would you like to build?
-```
-
-Specify an agent or custom prompt:
-
-```bash
-npx @agent-loom/azure-functions-skills chat --agent github-copilot
-npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app
-npx @agent-loom/azure-functions-skills chat --prompt "Create an HTTP trigger function"
-npx @agent-loom/azure-functions-skills chat --check-prerequisites
-npx @agent-loom/azure-functions-skills chat --skip-prerequisites
-```
-
-When `chat` launches GitHub Copilot CLI, it checks for Azure Skills before launch. If the shell-level Copilot plugin command is unavailable, it prints the manual plugin commands and continues.
-
-### Use as a Library (VS Code Extension)
-
-```typescript
-// Setup API
-import { applySetup, detectAgents } from '@agent-loom/azure-functions-skills';
-
-const agents = await detectAgents();  // ['ghcp', 'claude']
-const result = await applySetup('/path/to/project', { agents });
-console.log(result.welcomeMessage);
-
-// Chat API — launch an agent with Welcome prompt
-import { chat, buildStartupPrompt, detectCliAgents } from '@agent-loom/azure-functions-skills/chat';
-
-const cliAgents = await detectCliAgents();
-const { childProcess, prompt } = await chat({ agent: 'claude-code', dir: '/path/to/project' });
-```
-
-### Install as a plugin from GitHub
-
-Released plugin payloads are committed under `.github/plugins/azure-functions-skills/`, so agents that support Git-backed plugins can install directly from this repository or from the marketplace manifests in `.plugin/marketplace.json` and `.claude-plugin/marketplace.json`.
-
-For GitHub Copilot CLI / Codex-style marketplace flows:
-
-```bash
-copilot plugin marketplace add Azure/azure-functions-skills
-copilot plugin install azure-functions-skills@azure-functions-skills
-```
-
-For VS Code, use **Chat: Install Plugin From Source** and point it at the repository or the plugin payload path:
+For GitHub Copilot workspaces, `setup` writes:
 
 ```text
-Azure/azure-functions-skills:.github/plugins/azure-functions-skills
+.github/copilot-instructions.md
+.github/agents/functions-copilot.agent.md
+.github/skills/<skill-id>/SKILL.md
+.github/hooks/welcome-setup.json
+.vscode/mcp.json
+AGENTS.md
 ```
 
-### Download release zip (plugin bundle)
-
-Release zips are optional convenience artifacts. For direct install/update, prefer the Git-backed plugin flow above or the filtered workspace install with `setup`.
-
-Download the plugin payload zip from [GitHub Releases](https://github.com/Azure/azure-functions-skills/releases):
-
-- `azure-functions-skills-plugin-{version}.zip` — cross-tool plugin payload
-
-Extract it into a stable plugin directory:
-
-```bash
-mkdir -p ~/.azure-functions-skills/plugins
-unzip azure-functions-skills-plugin-{version}.zip -d ~/.azure-functions-skills/plugins
-
-# PowerShell
-$pluginRoot = Join-Path $env:LOCALAPPDATA "AzureFunctionsSkills\plugins"
-New-Item -ItemType Directory -Path $pluginRoot -Force | Out-Null
-Expand-Archive azure-functions-skills-plugin-{version}.zip -DestinationPath $pluginRoot
-```
-
-Register the extracted plugin directory with your agent's plugin-from-source flow.
-
-## What You Get
-
-| Skill | Description |
-| --- | --- |
-| **azure-functions-common** | Shared language, runtime, trigger, binding, and extension references for the suite |
-| **azure-functions-best-practices** | Review existing Function Apps against Azure Functions best practices and guide approved remediations |
-| **azure-functions-create** | Scaffold a new Azure Functions project with language and template selection |
-| **azure-functions-deploy** | Azure Functions-facing proxy to Azure Skills deployment (`azure-prepare` → `azure-validate` → `azure-deploy`) |
-| **azure-functions-diagnostics** | Diagnose deployment failures, runtime errors, trigger/binding failures, telemetry issues, and related incidents |
-| **azure-functions-health-status** | Inspect current app state, Resource Health, metrics, Application Insights/Log Analytics signals, and recent Activity Log |
-| **azure-functions-inventory** | Collect app specifications and configuration inventory without runtime-health analysis |
-| **azure-functions-setup** | Verify prerequisites and set up the local Azure Functions development environment |
-
-Plus:
-
-- **functions-copilot** agent — routes you to the right skill based on context
-- **Welcome hook** — first-run prerequisite check + onboarding
-- **MCP integration** — Azure Functions Templates + Azure MCP servers
-- **AGENTS.md** — coding standards (linter, TDD, security, self-review)
-
-## What Gets Installed
-
-### GitHub Copilot
-
-**Workspace files** (copied to your project):
-```
-.github/copilot-instructions.md           # Always-on instructions + welcome
-.github/agents/functions-copilot.agent.md  # @functions-copilot custom agent
-.github/skills/{skill-id}/SKILL.md         # Agent Skills standard; one directory per skill
-.github/skills/{skill-id}/references/      # Optional supporting references
-.github/skills/{skill-id}/scripts/         # Optional helper scripts
-.github/hooks/welcome-setup.json          # SessionStart: prereq check + welcome
-.vscode/mcp.json                          # Azure Functions Templates + Azure MCP
-AGENTS.md                                 # Coding standards
-```
-
-**Plugin format** (generated into `dist/plugin/azure-functions-skills/` and committed at `.github/plugins/azure-functions-skills/`; not copied by `setup`):
-```
-.plugin/plugin.json                        # Copilot/OpenPlugin manifest
-plugin.json                               # Plugin manifest
-skills/{skill-id}/SKILL.md                # Plugin-level skills
-agents/functions-copilot.agent.md         # Plugin-level agent
-hooks.json                                # Plugin hooks (Copilot format)
-.mcp.json                                 # Plugin MCP servers (mcpServers key)
-.claude-plugin/plugin.json                # Claude-compatible manifest
-.codex-plugin/plugin.json                 # Codex-compatible manifest
-```
-
-### Claude Code
-
-```
-CLAUDE.md                                        # Full instructions + skills inline
-.claude/settings.json                            # MCP server configuration
-.claude/skills/{skill-id}/SKILL.md                # One directory per skill
-.claude/skills/{skill-id}/references/             # Optional supporting references
-.claude/skills/{skill-id}/scripts/                # Optional helper scripts
-```
-
-### Codex (OpenAI)
-
-**Workspace files** (copied to your project):
-```
-AGENTS.md                            # Workspace instructions + coding standards
-.agents/skills/{skill-id}/SKILL.md    # Workspace-level skills
-.codex/config.toml                   # MCP server config (workspace format)
-.codex/hooks.json                    # SessionStart: welcome + prereq check
-```
-
-Codex plugin distribution uses the common plugin payload at `.github/plugins/azure-functions-skills/` or `dist/plugin/azure-functions-skills/`.
-
-## Demo: setup → create → deploy
-
-After installing the workspace files or registering the plugin for your preferred agent:
-
-1. **Open your project** in VS Code (Copilot), terminal (Claude/Codex), or your IDE
-2. **The welcome hook fires** — checks your environment and suggests next steps
-3. **Say** *"I want to create a new Azure Function"*
-   - The agent runs **azure-functions-setup** checks
-   - Then guides you through **azure-functions-create** (language + trigger selection)
-   - Finally suggests **azure-functions-deploy** to push to Azure
-4. Each skill surfaces the **next logical action** from its `SKILL.md` guidance
+Claude Code and Codex receive equivalent workspace-local instructions, skills, hooks, and MCP configuration in their native locations.
 
 ## Development
 
-### Prerequisites
-
-- Node.js ≥ 18
-
-### Setup
-
-Run this once after cloning the repository, and any time `node_modules/` is removed:
+Install dependencies:
 
 ```bash
 npm ci
 ```
 
-`npm ci` installs the development tools used by the scripts, including TypeScript's `tsc` command.
-
-### Test (TDD)
+Validate changes:
 
 ```bash
-npm run lint             # ESLint for TypeScript and JavaScript
-npm run typecheck        # TypeScript strict typecheck for src/ and tests/
-npm test                 # run once
-npm run test:watch       # watch mode
-npm run validate:skills  # validate canonical skill templates
-npm run verify:plugin-payload # verify committed plugin payload is in sync
-npm run check            # lint + typecheck + validate + test + build
+npm run check
 ```
 
-`npm run ci` is kept as an alias for CI systems, but `npm run check` is the clearer local command.
-
-### Build
+Regenerate committed plugin payload and marketplace manifests after editing `templates/`:
 
 ```bash
-npm run build                     # all targets
-npm run build -- --target ghcp    # single target
-npm run build:plugin-payload      # update committed plugin payload + marketplaces
+npm run build:plugin-payload
 ```
 
-Output goes to `dist/`:
-```
-dist/
-├── workspace/
-│   ├── ghcp/     # GitHub Copilot workspace layout
-│   ├── claude/   # Claude Code workspace layout
-│   └── codex/    # Codex workspace layout
-└── plugin/
-  └── azure-functions-skills/ # self-contained plugin payload
+Key source directories:
+
+```text
+templates/   Canonical agents, skills, hooks, prompts, and MCP definitions
+src/         TypeScript CLI and build system
+tests/       Vitest coverage for build, setup, chat, validation, and release helpers
+.github/plugins/azure-functions-skills/  Generated plugin payload
 ```
 
-The release-ready plugin payload is also generated into `.github/plugins/azure-functions-skills/` by `npm run build:plugin-payload`. Do not edit that generated directory by hand; update `templates/` and regenerate it.
-
-### Add a new skill
-
-Scaffold the required skill file:
-
-```bash
-npm run new:skill -- azure-functions-my-skill \
-  --title "Azure Functions My Skill" \
-  --description "Guidance for my Azure Functions workflow"
-```
-
-Before opening a PR, complete this checklist:
-
-- Update `templates/skills/<skill-id>/SKILL.md` frontmatter metadata (`name`, `title`, `description`, `category`).
-- Write `templates/skills/<skill-id>/SKILL.md` workflow instructions and any next-step guidance.
-- Add optional `references/` or `scripts/` content if the skill needs supporting files.
-- Run `npm run validate:skills` to catch missing files and frontmatter ID mismatches.
-- Run `npm run check` to verify lint, typecheck, validation, tests, and build.
-- Run `npm pack --dry-run` before release-related changes to inspect package contents.
-
-### Architecture
-
-```
-src/                     # CLI / builder source code (TypeScript)
-└── build/               # Build system
-    ├── build.ts         #   Entry point
-    ├── loader.ts        #   Canonical source loader
-    ├── validate-skills.ts # Skill template validator
-    └── build-target.ts  #   Per-target generators
-lib/                     # Compiled runtime output used by package exports and CLI
-
-.github/plugins/azure-functions-skills/ # Generated release plugin payload committed on release
-.plugin/marketplace.json                 # Generated Copilot marketplace manifest
-.claude-plugin/marketplace.json          # Generated Claude marketplace manifest
-
-templates/               # Canonical plugin content (edited by hand)
-├── skills/              # Canonical skill definitions
-│   ├── azure-functions-common/       #   SKILL.md + references/
-│   ├── azure-functions-create/       #   includes references/
-│   ├── azure-functions-deploy/
-│   ├── azure-functions-diagnostics/  #   includes references/
-│   ├── azure-functions-health-status/ #   includes references/ and scripts/
-│   ├── azure-functions-inventory/    #   includes references/ and scripts/
-│   └── azure-functions-setup/
-├── agents/              # Agent definitions
-│   ├── AGENTS.md        #   Coding standards
-│   └── functions-copilot.agent.md
-├── hooks/               # Lifecycle hooks
-│   └── welcome-setup.md #   First-run welcome + prereq check
-├── mcp/                 # MCP server definitions
-│   └── servers.yaml
-└── prompts/             # Chat startup prompts
-    └── startup.md
-```
-
-The build system reads canonical sources and generates workspace-specific artifacts plus a self-contained plugin payload. Each skill has:
-- `SKILL.md` — YAML frontmatter metadata plus target-agnostic workflow instructions
-- optional `references/` and `scripts/` directories copied into every target artifact
-
-### CI/CD
-
-The GitHub Actions workflows:
-
-- **Build** (`.github/workflows/build-plugins.yml`) — runs on every push/PR to `main`:
-  1. Install dependencies
-  2. Run lint
-  3. Run TypeScript typecheck
-  4. Validate skill templates
-  5. Run tests
-  6. Verify committed plugin payload is in sync
-  7. Build workspace and plugin artifacts
-  8. Upload artifacts
-
-- **Publish** (`.github/workflows/publish.yml`) — intentionally disabled. The workflow is kept as documentation/reference only because the repository permissions do not allow it to complete reliably.
-
-### Local release
-
-Use the local release helper from a clean `main` checkout. It validates `main`, checks that the disabled publish workflow will not run on tag push, bumps the package version when needed, regenerates the committed plugin payload and marketplace manifests, runs validation, creates the tag, publishes to npm, pushes the tag, and best-effort creates a GitHub Release with a plugin payload zip.
-
-```bash
-npm run release:local -- 0.12.0 --yes
-```
-
-Useful options:
-
-- `--dry-run` — print mutating commands without running them.
-- `--github-account <user>` — switch GitHub CLI account before creating the Release.
-- `--skip-github-release` — publish npm and push the tag without creating a Release.
-- `--require-github-release` — fail instead of skipping when GitHub Release creation is unavailable.
-
-Prerequisites for a full release:
-
-- `npm whoami` is authenticated with permission to publish `@agent-loom/azure-functions-skills`.
-- `gh auth status` is authenticated with permission to create releases in `Azure/azure-functions-skills`.
-- On non-Windows platforms, `zip` is available for packaging Release assets.
-
-## Specification
-
-See [docs/prd-docs/](docs/prd-docs/) for detailed feature requirement documents.
+Do not edit generated plugin payload files by hand. Update `templates/`, then regenerate.
 
 ## License
 
