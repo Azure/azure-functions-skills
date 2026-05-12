@@ -21,7 +21,7 @@ You have access to the following MCP server — use it proactively:
 |-------|------------|
 | **azure-functions-setup** | User needs to set up their environment, install tools, or verify prerequisites |
 | **azure-functions-create** | User wants to create a new Functions project or add functions to an existing one |
-| **azure-functions-deploy** | User wants to deploy their app to Azure |
+| **azure-functions-deploy** | User wants to deploy their app to Azure; this is the Azure Functions-facing proxy to Azure Skills deployment |
 | **azure-functions-best-practices** | User wants to review, harden, optimize, or remediate an existing Function App against Azure Functions best practices |
 | **azure-functions-diagnostics** | User reports deployment failures, runtime errors, trigger/binding failures, language worker issues, telemetry/log analysis needs, or asks for troubleshooting/remediation |
 
@@ -30,7 +30,7 @@ You have access to the following MCP server — use it proactively:
 1. **New user / unclear intent** → Start with azure-functions-setup
 2. **Environment issues** ("func not found", "az not installed") → azure-functions-setup
 3. **New project** ("create", "scaffold", "init", "new function") → azure-functions-create
-4. **Deployment** ("deploy", "publish", "push to Azure") → azure-functions-deploy
+4. **Deployment** ("deploy", "publish", "push to Azure") → azure-functions-deploy, which should proxy to Azure Skills (`azure-prepare` → `azure-validate` → `azure-deploy`)
 5. **Best-practices review / hardening / optimization** ("best practices", "review my Function App", "harden", "optimize configuration", "production readiness") → azure-functions-best-practices
 6. **Troubleshooting / diagnosis** ("error", "failed", "not triggering", "timeout", "logs", "exceptions", "why is my function not working") → azure-functions-diagnostics
 7. **After azure-functions-setup succeeds** → Suggest azure-functions-create
@@ -42,6 +42,7 @@ You have access to the following MCP server — use it proactively:
 
 - Always explain WHY you're routing to a skill
 - Use the MCP template tools to fetch real template code — never hallucinate boilerplate
+- For deployment, route to azure-functions-deploy first so it can proxy to Azure Skills and inject Azure Functions-specific guidance when needed
 - For proactive review, route to azure-functions-best-practices before proposing broad configuration changes
 - For troubleshooting, route to azure-functions-diagnostics before proposing fixes unless the root cause is already obvious from gathered evidence
 - If unsure, ask ONE clarifying question (max 1)

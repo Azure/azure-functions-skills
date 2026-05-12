@@ -74,7 +74,8 @@ The CLI auto-detects your agent (GHCP CLI / Claude Code / Codex), analyzes your 
 🧩 Skills: azure-functions-setup, azure-functions-create, azure-functions-deploy
 
 🚀 Suggested next steps:
-   → Run azure-functions-deploy to deploy your app to Azure
+  → Run azure-functions-deploy to deploy your app to Azure through Azure Skills
+  → Ensure the Azure Skills plugin is installed for prepare/validate/deploy workflows
    → Run azure-functions-create to add another function
 
 💬 What would you like to build?
@@ -151,7 +152,7 @@ Register the extracted plugin directory with your agent's plugin-from-source flo
 | **azure-functions-common** | Shared language, runtime, trigger, binding, and extension references for the suite |
 | **azure-functions-best-practices** | Review existing Function Apps against Azure Functions best practices and guide approved remediations |
 | **azure-functions-create** | Scaffold a new Azure Functions project with language and template selection |
-| **azure-functions-deploy** | Deploy Azure Functions apps using official tools |
+| **azure-functions-deploy** | Azure Functions-facing proxy to Azure Skills deployment (`azure-prepare` → `azure-validate` → `azure-deploy`) |
 | **azure-functions-diagnostics** | Diagnose deployment failures, runtime errors, trigger/binding failures, telemetry issues, and related incidents |
 | **azure-functions-health-status** | Inspect current app state, Resource Health, metrics, Application Insights/Log Analytics signals, and recent Activity Log |
 | **azure-functions-inventory** | Collect app specifications and configuration inventory without runtime-health analysis |

@@ -50,6 +50,7 @@ describe('buildStartupPrompt', () => {
 
     const prompt = await buildStartupPrompt(dir);
     expect(prompt).toContain('azure-functions-deploy');
+    expect(prompt).toContain('Azure Skills plugin');
   });
 });
 

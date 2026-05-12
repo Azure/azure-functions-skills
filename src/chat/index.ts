@@ -109,7 +109,8 @@ export async function buildStartupPrompt(dir: string): Promise<string> {
   const suggestedActions = project
     ? [
         '🚀 Suggested next steps:',
-        '   → Run azure-functions-deploy to deploy your app to Azure',
+        '   → Run azure-functions-deploy to deploy your app to Azure through the Azure Skills plugin',
+        '   → Ensure the Azure Skills plugin is installed for prepare/validate/deploy workflows',
         '   → Run azure-functions-create to add another function',
         '   → Ask about best practices for your project',
       ].join('\n')
