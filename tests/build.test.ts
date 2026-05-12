@@ -206,9 +206,9 @@ describe('buildTarget — ghcp', () => {
     const skillPath = join(DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create', 'SKILL.md');
     const body = readFileSync(skillPath, 'utf-8');
     // MCP-primary: mentions the Azure MCP tool names
-    expect(body).toContain('functions language list');
-    expect(body).toContain('functions project get');
-    expect(body).toContain('functions list or get template');
+    expect(body).toContain('functions_language_list');
+    expect(body).toContain('functions_project_get');
+    expect(body).toContain('functions_template_get');
     // Best practices tool reference
     expect(body).toContain('get_azure_bestpractices');
     expect(body).toContain('azurefunctions');

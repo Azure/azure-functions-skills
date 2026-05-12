@@ -20,15 +20,15 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 Check whether the following Azure MCP tools are available in your current tool list:
 
-- `functions language list`
-- `functions project get`
-- `functions list or get template`
+- `functions_language_list` — list supported languages and runtime versions
+- `functions_project_get` — scaffold project-level files
+- `functions_template_get` — list templates (language only) or get a specific template (language + template)
 
 These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and return officially maintained templates across C#, Python, TypeScript, JavaScript, Java and PowerShell.
 
 Also check for the best practices tool:
 
-- `get_azure_bestpractices` with `resource: azurefunctions`
+- `get_azure_bestpractices` / `get_azure_bestpractices_get` with `resource: azurefunctions`
 
 - **If available** → proceed with **Path A (MCP primary)**.
 - **If not available** → proceed with **Path B (composition algorithm fallback)**.
@@ -60,11 +60,11 @@ Ask the user (or detect from context):
 
 #### A.2 Discover supported languages
 
-Call `functions language list`. Returns supported languages with runtime versions, programming models, and prerequisites. Use this to confirm the user's language choice is supported and to suggest a default runtime version.
+Call `functions_language_list`. Returns supported languages with runtime versions, programming models, and prerequisites. Use this to confirm the user's language choice is supported and to suggest a default runtime version.
 
 #### A.3 Browse available templates
 
-Call `functions list or get template` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
+Call `functions_template_get` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
 
 Do **not** invent or guess template identifiers such as `HttpTrigger`. Azure MCP template IDs are versioned, language-specific strings returned by the template list. For example, the TypeScript HTTP trigger template is currently returned as `http-trigger-typescript-azd`.
 
@@ -77,14 +77,14 @@ When the user asks for a common trigger name, map it to one of the template IDs 
 | Blob trigger | `typescript` | `blob-eventgrid-trigger-typescript-azd` |
 | Queue / Service Bus trigger | `typescript` | `servicebus-trigger-typescript-azd` |
 
-If a template-get call fails with "template not found", immediately recover by calling `functions list or get template` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
+If a template-get call fails with "template not found", immediately recover by calling `functions_template_get` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
 
 #### A.4 Initialize the project
 
-Call `functions project get`:
+Call `functions_project_get`:
 
 ```
-Tool: functions project get
+Tool: functions_project_get
 language: <chosen language, e.g. typescript>
 ```
 
@@ -92,10 +92,10 @@ Returns project-level files (`host.json`, `local.settings.json`, `package.json` 
 
 #### A.5 Add the function
 
-Call `functions list or get template` with both `language` and `template`:
+Call `functions_template_get` with both `language` and `template`:
 
 ```
-Tool: functions list or get template
+Tool: functions_template_get
 language: <chosen language, e.g. typescript>
 template: <chosen returned template ID, e.g. http-trigger-typescript-azd>
 runtime-version: <optional, e.g. 22>
@@ -104,13 +104,25 @@ output: <optional, "New" (default) or "Add" for existing projects>
 
 Returns the full function source code plus any required app settings and additional package dependencies. Write the returned file(s) into the project and merge any extra settings into `local.settings.json` and any extra packages into the dependency manifest.
 
+> ⚠️ **Large template output**: Some templates (especially `*-azd` variants that include infrastructure files) can produce very large output (100KB+). If the tool output is truncated or saved to a temporary file, read the file, parse the JSON `files` array, and write each file individually. After writing files, run `npm install` (or the equivalent package manager command) to generate lock files rather than relying on lock files from the template output.
+
 #### A.6 Verify
+
+For TypeScript and other compiled-language projects, build first:
+
+```bash
+npm run build   # TypeScript / JavaScript
+# dotnet build  # C#
+# mvn package   # Java
+```
+
+Then start and test locally:
 
 ```bash
 func start
 ```
 
-Then invoke the function (for HTTP triggers: `curl http://localhost:7071/api/<FunctionName>`).
+Invoke the function (for HTTP triggers: `curl http://localhost:7071/api/<FunctionName>`).
 
 ---
 
@@ -177,7 +189,7 @@ func start
 
 If `host.json` already exists, do **not** re-initialize. Instead:
 
-- **MCP path**: call `functions list or get template` with the same language as the existing project and specify the desired template name. Write the returned file.
+- **MCP path**: call `functions_template_get` with the same language as the existing project and specify the desired template name. Write the returned file.
 - **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
 
 ## After Creation

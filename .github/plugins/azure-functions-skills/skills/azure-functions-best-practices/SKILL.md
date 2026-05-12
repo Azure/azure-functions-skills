@@ -53,7 +53,18 @@ Ask only for missing inputs needed to start:
 
 ## Workflow
 
-1. **Collect static evidence** with `azure-functions-inventory`.
+1. **Collect static evidence** with `azure-functions-inventory`. If `azure-functions-inventory` is unavailable, use these Azure CLI commands as fallback:
+
+   ```bash
+   # Function App details
+   az functionapp show --name <app> --resource-group <rg>
+   # Configuration
+   az functionapp config show --name <app> --resource-group <rg>
+   # App settings (names only — do not reveal values)
+   az functionapp config appsettings list --name <app> --resource-group <rg> --query "[].{name:name}"
+   # Deployed functions
+   az functionapp function list --name <app> --resource-group <rg>
+   ```
 2. **Collect runtime evidence when useful** with `azure-functions-health-status` for production readiness, performance, observability, or degraded apps.
 3. **Get current MCP guidance** from Azure Functions best-practices guidance (`get_azure_bestpractices` / `get_azure_bestpractices_get` with `resource: azurefunctions` and `action: all`) and cite whether it was loaded.
 4. **Route references** through `../azure-functions-common/references/routing.md` based on runtime and trigger/binding inventory.
