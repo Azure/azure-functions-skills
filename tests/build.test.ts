@@ -499,7 +499,7 @@ describe('setup module', () => {
   });
 
   it('applySetup copies files to target directory', async () => {
-    await applySetup(DIST_DIR, { agents: ['ghcp'] });
+    await applySetup(DIST_DIR, { agents: ['ghcp'], prerequisites: 'skip' });
 
     // Should have copilot-instructions.md
     expect(existsSync(join(DIST_DIR, '.github', 'copilot-instructions.md'))).toBe(true);
@@ -508,7 +508,7 @@ describe('setup module', () => {
   });
 
   it('applySetup omits duplicate GHCP plugin directories from workspace root', async () => {
-    await applySetup(DIST_DIR, { agents: ['ghcp'] });
+    await applySetup(DIST_DIR, { agents: ['ghcp'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
@@ -521,7 +521,7 @@ describe('setup module', () => {
   });
 
   it('applySetup handles codex target', async () => {
-    await applySetup(DIST_DIR, { agents: ['codex'] });
+    await applySetup(DIST_DIR, { agents: ['codex'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, 'AGENTS.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
@@ -529,7 +529,7 @@ describe('setup module', () => {
   });
 
   it('applySetup omits duplicate Codex plugin skills from workspace root', async () => {
-    await applySetup(DIST_DIR, { agents: ['codex'] });
+    await applySetup(DIST_DIR, { agents: ['codex'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, 'skills'))).toBe(false);
@@ -539,14 +539,14 @@ describe('setup module', () => {
   });
 
   it('applySetup handles claude target', async () => {
-    await applySetup(DIST_DIR, { agents: ['claude'] });
+    await applySetup(DIST_DIR, { agents: ['claude'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.claude', 'settings.json'))).toBe(true);
   });
 
   it('applySetup handles multiple agents at once', async () => {
-    await applySetup(DIST_DIR, { agents: ['ghcp', 'claude', 'codex'] });
+    await applySetup(DIST_DIR, { agents: ['ghcp', 'claude', 'codex'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, '.github', 'copilot-instructions.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
@@ -554,11 +554,30 @@ describe('setup module', () => {
   });
 
   it('applySetup returns a summary with welcome message', async () => {
-    const result = await applySetup(DIST_DIR, { agents: ['ghcp'] });
+    const result = await applySetup(DIST_DIR, { agents: ['ghcp'], prerequisites: 'skip' });
 
     expect(result.agents).toContain('ghcp');
     expect(result.filesWritten).toBeGreaterThan(0);
     expect(result.welcomeMessage).toContain('Azure Functions');
+  });
+
+  it('applySetup reports Azure Skills prerequisite installation results', async () => {
+    const calls: string[] = [];
+    const result = await applySetup(DIST_DIR, {
+      agents: ['ghcp'],
+      prerequisiteRunner: async (command, args) => {
+        calls.push([command, ...args].join(' '));
+        return { exitCode: 0, stdout: '', stderr: '' };
+      },
+    });
+
+    expect(calls).toEqual([
+      'copilot plugin list',
+      'copilot plugin marketplace add microsoft/azure-skills',
+      'copilot plugin install azure@azure-skills',
+    ]);
+    expect(result.prerequisites?.[0].status).toBe('installed');
+    expect(result.welcomeMessage).toContain('External prerequisites');
   });
 });
 
