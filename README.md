@@ -41,11 +41,31 @@ After installing, ask your agent:
 @functions-copilot set up Azure Functions
 ```
 
+With GitHub Copilot CLI, select the Functions agent explicitly:
+
+```bash
+copilot --agent functions-copilot
+```
+
+For a one-shot prompt:
+
+```bash
+copilot --agent functions-copilot -p "Explain what Azure Functions Skills can do and which workflow I should start with."
+```
+
+If you intentionally want the session to run without permission prompts, add `--yolo`:
+
+```bash
+copilot --agent functions-copilot --yolo
+```
+
 For a guided overview first, ask:
 
 ```text
 @functions-copilot Explain what Azure Functions Skills can do, when to use setup/create/deploy/diagnostics/best-practices/feedback, and which workflow I should start with.
 ```
+
+See [docs/usage-scenarios.md](docs/usage-scenarios.md) for customer-friendly scenario walkthroughs and expected results.
 
 ## Plugin vs. `chat` vs. `setup`
 
