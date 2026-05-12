@@ -67,6 +67,19 @@ Call `functions language list`. Returns supported languages with runtime version
 
 Call `functions list or get template` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
 
+Do **not** invent or guess template identifiers such as `HttpTrigger`. Azure MCP template IDs are versioned, language-specific strings returned by the template list. For example, the TypeScript HTTP trigger template is currently returned as `http-trigger-typescript-azd`.
+
+When the user asks for a common trigger name, map it to one of the template IDs returned by the MCP list before calling the template-get operation. Examples:
+
+| User intent | Language | Prefer a returned template ID like |
+| --- | --- | --- |
+| HTTP trigger | `typescript` | `http-trigger-typescript-azd` |
+| Timer trigger | `typescript` | `timer-trigger-typescript-azd` |
+| Blob trigger | `typescript` | `blob-eventgrid-trigger-typescript-azd` |
+| Queue / Service Bus trigger | `typescript` | `servicebus-trigger-typescript-azd` |
+
+If a template-get call fails with "template not found", immediately recover by calling `functions list or get template` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
+
 #### A.4 Initialize the project
 
 Call `functions project get`:
@@ -85,7 +98,7 @@ Call `functions list or get template` with both `language` and `template`:
 ```
 Tool: functions list or get template
 language: <chosen language, e.g. typescript>
-template: <chosen template, e.g. http-trigger-typescript-azd>
+template: <chosen returned template ID, e.g. http-trigger-typescript-azd>
 runtime-version: <optional, e.g. 22>
 output: <optional, "New" (default) or "Add" for existing projects>
 ```
