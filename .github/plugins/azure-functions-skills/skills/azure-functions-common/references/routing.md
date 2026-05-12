@@ -6,6 +6,7 @@ Reference files are bundled with `azure-functions-common`:
 
 - Language references: `references/languages/`
 - Extension references: `references/extensions/`
+- Local E2E references: `references/local-emulators.md`
 
 ## Language routing
 
@@ -59,3 +60,8 @@ For any trigger or binding investigation, include `azure-webjobs-sdk` when the s
 | Trigger not firing | Inventory trigger list, health/status traces, matching extension reference |
 | Runtime startup failure | Inventory runtime settings, health/status traces, matching language reference |
 | Network/connectivity failure | Inventory network shape, health dependencies/traces, matching extension reference |
+| Local E2E verification for non-HTTP triggers or bindings | `local-emulators.md`, matching extension reference |
+
+## Skill feedback routing
+
+Use `azure-functions-feedback` when the user asks to provide feedback, create an issue or PR for this skill suite, report confusing/incorrect skill guidance, or when a completed workflow reveals reusable improvements for any `azure-functions-*` skill.

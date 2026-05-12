@@ -17,6 +17,7 @@ Shared references include:
 
 - Language/runtime references in `references/languages/`.
 - Trigger/binding extension references in `references/extensions/`.
+- Local emulator and development-service guidance in `references/local-emulators.md`.
 - Routing rules in `references/routing.md`.
 
 Task-specific skills keep their own workflows, scripts, evidence checklists, and output formats. For example, diagnostics owns diagnostic workflow and health evidence rules; this skill only owns reusable Azure Functions reference material.
@@ -29,5 +30,6 @@ This is a shared reference skill. Return to the calling Azure Functions skill af
 
 - Load exactly one language reference when the runtime is known, plus Durable only when Durable is involved.
 - Load only extension references matching the app's triggers/bindings or the symptom.
+- Load `references/local-emulators.md` when local E2E verification involves a non-HTTP trigger, service-backed binding, emulator, container, or temporary development resource.
 - Load Extension Bundles only for non-.NET apps or extension-version/binding-resolution symptoms.
 - Prefer official documentation, official repositories, official samples, and package/container registries before broader web sources.
