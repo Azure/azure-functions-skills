@@ -1,6 +1,6 @@
 {
   "name": "@agent-loom/azure-functions-skills",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "AI assistant plugins for Azure Functions — one-command setup for GitHub Copilot, Claude Code, and Codex",
   "type": "module",
   "bin": {
