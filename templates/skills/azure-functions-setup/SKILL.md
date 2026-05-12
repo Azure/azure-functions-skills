@@ -32,6 +32,8 @@ Azure Functions deployment is proxied through the Azure Skills deployment workfl
 - `azure-validate`
 - `azure-deploy`
 
+**How to detect availability**: Check your current tool/skill list for the above skill names. If they appear in the list of available skills (e.g., in `<available_skills>` or equivalent plugin registry), they are installed. You do not need to run any commands — the presence of these skills in the agent's tool list is sufficient confirmation.
+
 If the Azure Skills plugin is missing, install it for the active host before using `azure-functions-deploy`.
 
 | Host | Install guidance |
