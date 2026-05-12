@@ -33,6 +33,7 @@ The CLI auto-detects which coding agents you have (GitHub Copilot, Claude Code, 
 
   Skills available:
     • azure-functions-common — Azure Functions Common References
+    • azure-functions-best-practices — Azure Functions Best Practices Review
     • azure-functions-create — Create Azure Functions App
     • azure-functions-deploy — Deploy Azure Functions
     • azure-functions-diagnostics — Azure Functions Diagnostics
@@ -148,6 +149,7 @@ Register the extracted plugin directory with your agent's plugin-from-source flo
 | Skill | Description |
 | --- | --- |
 | **azure-functions-common** | Shared language, runtime, trigger, binding, and extension references for the suite |
+| **azure-functions-best-practices** | Review existing Function Apps against Azure Functions best practices and guide approved remediations |
 | **azure-functions-create** | Scaffold a new Azure Functions project with language and template selection |
 | **azure-functions-deploy** | Deploy Azure Functions apps using official tools |
 | **azure-functions-diagnostics** | Diagnose deployment failures, runtime errors, trigger/binding failures, telemetry issues, and related incidents |
