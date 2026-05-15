@@ -1,0 +1,113 @@
+name: Skill Evaluation - Live Azure Login Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: Resource group to verify after Azure login
+        required: false
+        default: rg-afskills-live-e2e
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  azure-login-smoke:
+    name: Verify Azure OIDC login
+    environment: functions-skills-live-e2e
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CORE_OUTPUT: none
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      RESOURCE_GROUP_NAME: ${{ inputs.resource_group }}
+    steps:
+      - name: Mask configured Azure identifiers
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for value in "$AZURE_CLIENT_ID" "$AZURE_TENANT_ID" "$AZURE_SUBSCRIPTION_ID"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+
+      - name: Validate required environment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID RESOURCE_GROUP_NAME; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required configuration: $name" >&2
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Log in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify expected Azure account context
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          actual_subscription_id="$(az account show --query id -o tsv)"
+          actual_tenant_id="$(az account show --query tenantId -o tsv)"
+
+          if [ "$actual_subscription_id" != "$AZURE_SUBSCRIPTION_ID" ]; then
+            echo "Azure login succeeded, but the active subscription does not match AZURE_SUBSCRIPTION_ID." >&2
+            exit 1
+          fi
+
+          if [ "$actual_tenant_id" != "$AZURE_TENANT_ID" ]; then
+            echo "Azure login succeeded, but the active tenant does not match AZURE_TENANT_ID." >&2
+            exit 1
+          fi
+
+          echo "Azure login context matches the configured tenant and subscription."
+          az account show --query "{name:name,state:state,isDefault:isDefault}" -o table
+
+      - name: Verify live E2E resource group access
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          az group show \
+            --name "$RESOURCE_GROUP_NAME" \
+            --query "{name:name,location:location,provisioningState:properties.provisioningState}" \
+            -o table
+
+      - name: Write smoke test summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Live Azure login smoke test"
+            echo
+            echo "Azure OIDC login completed successfully."
+            echo
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| Protected environment | functions-skills-live-e2e |"
+            echo "| OIDC login | Passed |"
+            echo "| Subscription context | Matched configured value |"
+            echo "| Tenant context | Matched configured value |"
+            echo "| Resource group access | $RESOURCE_GROUP_NAME |"
+            echo
+            echo "No Azure resources were created or modified by this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
