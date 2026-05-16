@@ -1,0 +1,361 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Azure Functions Skills E2E 20260517T015931Z</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f6f8fb;color:#1f2937}header{background:linear-gradient(135deg,#0067b8,#773adc);color:white;padding:32px}.wrap{max-width:1180px;margin:auto;padding:24px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}.card{background:white;border-radius:14px;padding:18px;box-shadow:0 4px 16px #0001}table{width:100%;border-collapse:collapse;background:white;border-radius:14px;overflow:hidden;box-shadow:0 4px 16px #0001}th,td{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}.status{font-weight:700;border-radius:999px;padding:3px 9px}.pass{background:#dcfce7;color:#166534}.warning{background:#fef3c7;color:#92400e}.blocked,.fail{background:#fee2e2;color:#991b1b}.unsupported{background:#e5e7eb;color:#374151}section{background:white;margin:18px 0;padding:18px;border-radius:14px;box-shadow:0 4px 16px #0001}pre{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;padding:14px;border-radius:10px;overflow:auto}code{background:#eef2ff;padding:2px 5px;border-radius:5px}</style></head><body><header><h1>Azure Functions Skills Local E2E Report</h1><p>Run 20260517T015931Z • package 0.11.3 • commit a52a466 • Windows</p></header><main class="wrap"><div class="cards"><div class="card"><h2>12</h2><p>Scenarios</p></div><div class="card"><h2>9</h2><p>Dynamic skills</p></div><div class="card"><h2>58</h2><p>Plugin payload files</p></div><div class="card"><h2>pass: 6; fail: 4; blocked: 1; warning: 1</h2><p>Status counts</p></div></div><section><h2>Agent versions</h2><pre>copilot: GitHub Copilot CLI 1.0.49-0.
+Run &#39;copilot update&#39; to check for updates.
+claude: 2.1.142 (Claude Code)
+codex: codex-cli 0.130.0
+WARNING: proceeding, even though we could not update PATH: CODEX_HOME points to &quot;Q:\\repos\\functions-skills\\azure-functions-skills\\reports\\e2e\\20260517T015931Z\\workspaces\\version-codex-home\\.codex&quot;, but that path does not exist</pre></section><section><h2>Scenario matrix</h2><table><thead><tr><th>Scenario</th><th>Agent</th><th>Mode</th><th>Status</th><th>Checks</th></tr></thead><tbody><tr><td>setup-workspace-ghcp</td><td>github-copilot</td><td>setup</td><td><span class="status pass">pass</span></td><td>.github/copilot-instructions.md: pass<br>.github/agents/functions-copilot.agent.md: pass<br>.github/hooks/welcome-setup.json: pass<br>.vscode/mcp.json: pass<br>AGENTS.md: pass<br>.github/skills/azure-functions-best-practices/SKILL.md: pass<br>.github/skills/azure-functions-common/SKILL.md: pass<br>.github/skills/azure-functions-create/SKILL.md: pass<br>.github/skills/azure-functions-deploy/SKILL.md: pass<br>.github/skills/azure-functions-diagnostics/SKILL.md: pass<br>.github/skills/azure-functions-feedback/SKILL.md: pass<br>.github/skills/azure-functions-health-status/SKILL.md: pass<br>.github/skills/azure-functions-inventory/SKILL.md: pass<br>.github/skills/azure-functions-setup/SKILL.md: pass</td></tr>
+<tr><td>setup-workspace-claude</td><td>claude-code</td><td>setup</td><td><span class="status pass">pass</span></td><td>CLAUDE.md: pass<br>.claude/settings.json: pass<br>.claude/skills/azure-functions-best-practices/SKILL.md: pass<br>.claude/skills/azure-functions-common/SKILL.md: pass<br>.claude/skills/azure-functions-create/SKILL.md: pass<br>.claude/skills/azure-functions-deploy/SKILL.md: pass<br>.claude/skills/azure-functions-diagnostics/SKILL.md: pass<br>.claude/skills/azure-functions-feedback/SKILL.md: pass<br>.claude/skills/azure-functions-health-status/SKILL.md: pass<br>.claude/skills/azure-functions-inventory/SKILL.md: pass<br>.claude/skills/azure-functions-setup/SKILL.md: pass</td></tr>
+<tr><td>setup-workspace-codex</td><td>codex</td><td>setup</td><td><span class="status pass">pass</span></td><td>AGENTS.md: pass<br>.codex/config.toml: pass<br>.codex/hooks.json: pass<br>.agents/skills/azure-functions-best-practices/SKILL.md: pass<br>.agents/skills/azure-functions-common/SKILL.md: pass<br>.agents/skills/azure-functions-create/SKILL.md: pass<br>.agents/skills/azure-functions-deploy/SKILL.md: pass<br>.agents/skills/azure-functions-diagnostics/SKILL.md: pass<br>.agents/skills/azure-functions-feedback/SKILL.md: pass<br>.agents/skills/azure-functions-health-status/SKILL.md: pass<br>.agents/skills/azure-functions-inventory/SKILL.md: pass<br>.agents/skills/azure-functions-setup/SKILL.md: pass</td></tr>
+<tr><td>chat-welcome-ghcp</td><td>github-copilot</td><td>chat</td><td><span class="status pass">pass</span></td><td>chat command executed documented package flow: pass<br>chat auto-setup files: pass<br>startup/launch output references Azure Functions context: pass</td></tr>
+<tr><td>chat-welcome-claude</td><td>claude-code</td><td>chat</td><td><span class="status pass">pass</span></td><td>chat command executed documented package flow: pass<br>chat auto-setup files: pass<br>startup/launch output references Azure Functions context: pass</td></tr>
+<tr><td>chat-welcome-codex</td><td>codex</td><td>chat</td><td><span class="status fail">fail</span></td><td>chat command executed documented package flow: fail<br>chat auto-setup files: pass<br>startup/launch output references Azure Functions context: pass</td></tr>
+<tr><td>plugin-install-ghcp</td><td>github-copilot</td><td>plugin</td><td><span class="status fail">fail</span></td><td>marketplace add command: pass<br>plugin install command: pass<br>functions-copilot inspection: fail</td></tr>
+<tr><td>plugin-install-claude</td><td>claude-code</td><td>plugin</td><td><span class="status fail">fail</span></td><td>documented claude --add-dir command attempted: fail<br>Claude inspection with source directory: fail</td></tr>
+<tr><td>plugin-install-codex</td><td>codex</td><td>plugin</td><td><span class="status blocked">blocked</span></td><td>codex marketplace add command: blocked<br>codex plugin install/select capability discovery: pass<br>Codex inspection command: blocked</td></tr>
+<tr><td>docs-command-consistency</td><td>all</td><td>docs</td><td><span class="status pass">pass</span></td><td>README skill list and CLI/plugin examples: pass</td></tr>
+<tr><td>azure-skills-dependency</td><td>github-copilot,codex</td><td>setup/chat</td><td><span class="status warning">warning</span></td><td>Azure Skills dependency guidance present: warning</td></tr>
+<tr><td>npm-run-check</td><td>all</td><td>static</td><td><span class="status fail">fail</span></td><td>npm run check: fail</td></tr></tbody></table></section><section><h2>Capability surface matrix</h2><table><thead><tr><th>Agent</th><th>Plugin</th><th>Skills</th><th>Prompts</th><th>MCP</th><th>Hooks</th><th>Agents</th></tr></thead><tbody><tr><td>GitHub Copilot</td><td>documented flow attempted; see plugin scenario</td><td>setup pass</td><td>setup/chat evidence</td><td>setup pass</td><td>setup pass</td><td>setup pass</td></tr><tr><td>Claude Code</td><td>source-dir flow attempted; see plugin scenario</td><td>setup pass</td><td>setup/chat evidence</td><td>settings evidence</td><td>partial/unsupported unless native host proves hooks</td><td>CLAUDE.md guidance</td></tr><tr><td>Codex</td><td>marketplace flow attempted; see plugin scenario</td><td>setup pass</td><td>setup/chat evidence</td><td>config evidence</td><td>setup pass</td><td>AGENTS.md guidance</td></tr></tbody></table></section><section><h2>Failure, blocked, warning, and unsupported analysis</h2><ul><li><b>chat-welcome-codex</b>: fail — Chat launcher did not complete the documented flow or did not write expected files.</li>
+<li><b>plugin-install-ghcp</b>: fail — Documented GitHub Copilot plugin flow failed or did not prove functions-copilot visibility.</li>
+<li><b>plugin-install-claude</b>: fail — Claude Code plugin-from-source flow could not complete locally.</li>
+<li><b>plugin-install-codex</b>: blocked — Codex plugin flow could not complete locally.</li>
+<li><b>azure-skills-dependency</b>: warning — Dependency guidance is present, but local E2E did not prove dependent plugin installation across all agents.</li>
+<li><b>npm-run-check</b>: fail — npm run check failed.</li></ul></section><section><h2>Command evidence</h2><section><h3>setup-workspace-ghcp</h3><p>Status: <span class="status pass">pass</span>; Support: supported; Retention: deleted</p><details><summary>setup-workspace-ghcp — exit 0</summary><pre>Command: node bin/azure-functions-skills.js setup --agent ghcp --dir &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\setup-workspace-ghcp --skip-prerequisites
+CWD: &lt;repo&gt;
+Started: 2026-05-17T02:02:52.454Z
+Completed: 2026-05-17T02:02:52.845Z
+
+STDOUT
+🔍 Detecting coding agents...
+  Found: ghcp
+
+📁 Installing to: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\setup-workspace-ghcp
+
+
+⚡ Azure Functions Skills installed!
+
+  Agents configured: ghcp
+  Files written: 56
+
+  Skills available:
+    • azure-functions-best-practices — Azure Functions Best Practices Review
+    • azure-functions-common — Azure Functions Common References
+    • azure-functions-create — Create Azure Functions App
+    • azure-functions-deploy — Deploy Azure Functions
+    • azure-functions-diagnostics — Azure Functions Diagnostics
+    • azure-functions-feedback — Azure Functions Skills Feedback
+    • azure-functions-health-status — Azure Functions Health Status
+    • azure-functions-inventory — Azure Functions Inventory
+    • azure-functions-setup — Azure Functions Setup
+
+  External prerequisites:
+    • azure-skills (ghcp) — skipped: Azure Skills prerequisite check skipped.
+
+  Get started: Ask your AI assistant to &quot;set up Azure Functions&quot;
+
+
+
+STDERR
+</pre></details></section>
+<section><h3>setup-workspace-claude</h3><p>Status: <span class="status pass">pass</span>; Support: supported; Retention: deleted</p><details><summary>setup-workspace-claude — exit 0</summary><pre>Command: node bin/azure-functions-skills.js setup --agent claude --dir &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\setup-workspace-claude --skip-prerequisites
+CWD: &lt;repo&gt;
+Started: 2026-05-17T02:02:52.886Z
+Completed: 2026-05-17T02:02:53.278Z
+
+STDOUT
+🔍 Detecting coding agents...
+  Found: claude
+
+📁 Installing to: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\setup-workspace-claude
+
+
+⚡ Azure Functions Skills installed!
+
+  Agents configured: claude
+  Files written: 53
+
+  Skills available:
+    • azure-functions-best-practices — Azure Functions Best Practices Review
+    • azure-functions-common — Azure Functions Common References
+    • azure-functions-create — Create Azure Functions App
+    • azure-functions-deploy — Deploy Azure Functions
+    • azure-functions-diagnostics — Azure Functions Diagnostics
+    • azure-functions-feedback — Azure Functions Skills Feedback
+    • azure-functions-health-status — Azure Functions Health Status
+    • azure-functions-inventory — Azure Functions Inventory
+    • azure-functions-setup — Azure Functions Setup
+
+  External prerequisites:
+    • azure-skills (claude) — skipped: Azure Skills prerequisite check skipped.
+
+  Get started: Ask your AI assistant to &quot;set up Azure Functions&quot;
+
+
+
+STDERR
+</pre></details></section>
+<section><h3>setup-workspace-codex</h3><p>Status: <span class="status pass">pass</span>; Support: supported; Retention: deleted</p><details><summary>setup-workspace-codex — exit 0</summary><pre>Command: node bin/azure-functions-skills.js setup --agent codex --dir &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\setup-workspace-codex --skip-prerequisites
+CWD: &lt;repo&gt;
+Started: 2026-05-17T02:02:53.326Z
+Completed: 2026-05-17T02:02:53.729Z
+
+STDOUT
+🔍 Detecting coding agents...
+  Found: codex
+
+📁 Installing to: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\setup-workspace-codex
+
+
+⚡ Azure Functions Skills installed!
+
+  Agents configured: codex
+  Files written: 54
+
+  Skills available:
+    • azure-functions-best-practices — Azure Functions Best Practices Review
+    • azure-functions-common — Azure Functions Common References
+    • azure-functions-create — Create Azure Functions App
+    • azure-functions-deploy — Deploy Azure Functions
+    • azure-functions-diagnostics — Azure Functions Diagnostics
+    • azure-functions-feedback — Azure Functions Skills Feedback
+    • azure-functions-health-status — Azure Functions Health Status
+    • azure-functions-inventory — Azure Functions Inventory
+    • azure-functions-setup — Azure Functions Setup
+
+  External prerequisites:
+    • azure-skills (codex) — skipped: Azure Skills prerequisite check skipped.
+
+  Get started: Ask your AI assistant to &quot;set up Azure Functions&quot;
+
+
+
+STDERR
+</pre></details></section>
+<section><h3>chat-welcome-ghcp</h3><p>Status: <span class="status pass">pass</span>; Support: supported; Retention: deleted</p><details><summary>chat-welcome-ghcp — exit 0</summary><pre>Command: node bin/azure-functions-skills.js chat --agent github-copilot --dir &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\chat-welcome-ghcp --skip-prerequisites
+CWD: &lt;repo&gt;
+Started: 2026-05-17T02:02:53.771Z
+Completed: 2026-05-17T02:02:59.541Z
+
+STDOUT
+
+🚀 Launching github-copilot with Azure Functions context...
+
+
+
+STDERR
+📦 Installed 56 skill files for ghcp
+error: too many arguments. Expected 0 arguments but got 3.
+</pre></details></section>
+<section><h3>chat-welcome-claude</h3><p>Status: <span class="status pass">pass</span>; Support: supported; Retention: deleted</p><details><summary>chat-welcome-claude — exit 0</summary><pre>Command: node bin/azure-functions-skills.js chat --agent claude-code --dir &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\chat-welcome-claude --skip-prerequisites
+CWD: &lt;repo&gt;
+Started: 2026-05-17T02:02:59.582Z
+Completed: 2026-05-17T02:03:06.906Z
+
+STDOUT
+
+🚀 Launching claude-code with Azure Functions context...
+
+Not logged in · Please run /login
+
+
+STDERR
+📦 Installed 53 skill files for claude
+</pre></details></section>
+<section><h3>chat-welcome-codex</h3><p>Status: <span class="status fail">fail</span>; Support: unknown; Retention: retained for debugging</p><details><summary>chat-welcome-codex — exit 1</summary><pre>Command: node bin/azure-functions-skills.js chat --agent codex --dir &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\chat-welcome-codex --skip-prerequisites
+CWD: &lt;repo&gt;
+Started: 2026-05-17T02:03:06.943Z
+Completed: 2026-05-17T02:03:07.454Z
+
+STDOUT
+
+🚀 Launching codex with Azure Functions context...
+
+
+
+STDERR
+📦 Installed 54 skill files for codex
+file:///Q:/repos/functions-skills/azure-functions-skills/lib/chat/index.js:175
+                reject(new Error(`${launcher.command} not found. Install it first.`));
+                       ^
+
+Error: codex not found. Install it first.
+    at ChildProcess.&lt;anonymous&gt; (file:///Q:/repos/functions-skills/azure-functions-skills/lib/chat/index.js:175:24)
+    at ChildProcess.emit (node:events:518:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:291:12)
+    at onErrorNT (node:internal/child_process:483:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+
+Node.js v22.17.0
+</pre></details></section>
+<section><h3>plugin-install-ghcp</h3><p>Status: <span class="status fail">fail</span>; Support: unknown; Retention: retained for debugging</p><details><summary>plugin-install-ghcp-marketplace-add — exit 0</summary><pre>Command: copilot plugin marketplace add Azure/azure-functions-skills
+CWD: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-ghcp
+Started: 2026-05-17T02:03:07.458Z
+Completed: 2026-05-17T02:04:04.820Z
+
+STDOUT
+
+
+STDERR
+Failed to add marketplace: Failed to fetch GitHub marketplace Azure/azure-functions-skills: Error: Command failed: git clone --depth 1 --progress https://github.com/Azure/azure-functions-skills.git &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-ghcp-home\AppData\Local\copilot\marketplaces\Azure-azure-functions-skills
+Cloning into &#39;&lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-ghcp-home\AppData\Local\copilot\marketplaces\Azure-azure-functions-skills&#39;...
+remote: Enumerating objects: 186, done.        
+remote: Counting objects:   0% (1/186)        remote: Counting objects:   1% (2/186)        remote: Counting objects:   2% (4/186)        remote: Counting objects:   3% (6/186)        remote: Counting objects:   4% (8/186)        remote: Counting objects:   5% (10/186)        remote: Counting objects:   6% (12/186)        remote: Counting objects:   7% (14/186)        remote: Counting objects:   8% (15/186)        remote: Counting objects:   9% (17/186)        remote: Counting objects:  10% (19/186)        remote: Counting objects:  11% (21/186)        remote: Counting objects:  12% (23/186)        remote: Counting objects:  13% (25/186)        remote: Counting objects:  14% (27/186)        remote: Counting objects:  15% (28/186)        remote: Counting objects:  16% (30/186)        remote: Counting objects:  17% (32/186)        remote: Counting objects:  18% (34/186)        remote: Counting objects:  19% (36/186)        remote: Counting objects:  20% (38/186)        remote: Counting objects:  21% (40/186)        remote: Counting objects:  22% (41/186)        remote: Counting objects:  23% (43/186)        remote: Counting objects:  24% (45/186)        remote: Counting objects:  25% (47/186)        remote: Counting objects:  26% (49/186)        remote: Counting objects:  27% (51/186)        remote: Counting objects:  28% (53/186)        remote: Counting objects:  29% (54/186)        remote: Counting objects:  30% (56/186)        remote: Counting objects:  31% (58/186)        remote: Counting objects:  32% (60/186)        remote: Counting objects:  33% (62/186)        remote: Counting objects:  34% (64/186)        remote: Counting objects:  35% (66/186)        remote: Counting objects:  36% (67/186)        remote: Counting objects:  37% (69/186)        remote: Counting objects:  38% (71/186)        remote: Counting objects:  39% (73/186)        remote: Counting objects:  40% (75/186)        remote: Counting objects:  41% (77/186)        remote: Counting objects:  42% (79/186)        remote: Counting objects:  43% (80/186)        remote: Counting objects:  44% (82/186)        remote: Counting objects:  45% (84/186)        remote: Counting objects:  46% (86/186)        remote: Counting objects:  47% (88/186)        remote: Counting objects:  48% (90/186)        remote: Counting objects:  49% (92/186)        remote: Counting objects:  50% (93/186)        remote: Counting objects:  51% (95/186)        remote: Counting objects:  52% (97/186)        remote: Counting objects:  53% (99/186)        remote: Counting objects:  54% (101/186)        remote: Counting objects:  55% (103/186)        remote: Counting objects:  56% (105/186)        remote: Counting objects:  57% (107/186)        remote: Counting objects:  58% (108/186)        remote: Counting objects:  59% (110/186)        remote: Counting objects:  60% (112/186)        remote: Counting objects:  61% (114/186)        remote: Counting objects:  62% (116/186)        remote: Counting objects:  63% (118/186)        remote: Counting objects:  64% (120/186)        remote: Counting objects:  65% (121/186)        remote: Counting objects:  66% (123/186)        remote: Counting objects:  67% (125/186)        remote: Counting objects:  68% (127/186)        remote: Counting objects:  69% (129/186)        remote: Counting objects:  70% (131/186)        remote: Counting objects:  71% (133/186)        remote: Counting objects:  72% (134/186)        remote: Counting objects:  73% (136/186)        remote: Counting objects:  74% (138/186)        remote: Counting objects:  75% (140/186)        remote: Counting objects:  76% (142/186)        remote: Counting objects:  77% (144/186)        remote: Counting objects:  78% (146/186)        remote: Counting objects:  79% (147/186)        remote: Counting objects:  80% (149/186)        remote: Counting objects:  81% (151/186)        remote: Counting objects:  82% (153/186)        remote: Counting objects:  83% (155/186)        remote: Counting objects:  84% (157/186)        remote: Counting objects:  85% (159/186)        remote: Counting objects:  86% (160/186)        remote: Counting objects:  87% (162/186)        remote: Counting objects:  88% (164/186)        remote: Counting objects:  89% (166/186)        remote: Counting objects:  90% (168/186)        remote: Counting objects:  91% (170/186)        remote: Counting objects:  92% (172/186)        remote: Counting objects:  93% (173/186)        remote: Counting objects:  94% (175/186)        remote: Counting objects:  95% (177/186)        remote: Counting objects:  96% (179/186)        remote: Counting objects:  97% (181/186)        remote: Counting objects:  98% (183/186)        remote: Counting objects:  99% (185/186)        remote: Counting objects: 100% (186/186)        remote: Counting objects: 100% (186/186), done.        
+remote: Compressing objects:   0% (1/150)        remote: Compressing objects:   1% (2/150)        remote: Compressing objects:   2% (3/150)        remote: Compressing objects:   3% (5/150)        remote: Compressing objects:   4% (6/150)        remote: Compressing objects:   5% (8/150)        remote: Compressing objects:   6% (9/150)        remote: Compressing objects:   7% (11/150)        remote: Compressing objects:   8% (12/150)        remote: Compressing objects:   9% (14/150)        remote: Compressing objects:  10% (15/150)        remote: Compressing objects:  11% (17/150)        remote: Compressing objects:  12% (18/150)        remote: Compressing objects:  13% (20/150)        remote: Compressing objects:  14% (21/150)        remote: Compressing objects:  15% (23/150)        remote: Compressing objects:  16% (24/150)        remote: Compressing objects:  17% (26/150)        remote: Compressing objects:  18% (27/150)        remote: Compressing objects:  19% (29/150)        remote: Compressing objects:  20% (30/150)        remote: Compressing objects:  21% (32/150)        remote: Compressing objects:  22% (33/150)        remote: Compressing objects:  23% (35/150)        remote: Compressing objects:  24% (36/150)        remote: Compressing objects:  25% (38/150)        remote: Compressing objects:  26% (39/150)        remote: Compressing objects:  27% (41/150)        remote: Compressing objects:  28% (42/150)        remote: Compressing objects:  29% (44/150)        remote: Compressing objects:  30% (45/150)        remote: Compressing objects:  31% (47/150)        remote: Compressing objects:  32% (48/150)        remote: Compressing objects:  33% (50/150)        remote: Compressing objects:  34% (51/150)        remote: Compressing objects:  35% (53/150)        remote: Compressing objects:  36% (54/150)        remote: Compressing objects:  37% (56/150)        remote: Compressing objects:  38% (57/150)        remote: Compressing objects:  39% (59/150)        remote: Compressing objects:  40% (60/150)        remote: Compressing objects:  41% (62/150)        remote: Compressing objects:  42% (63/150)        remote: Compressing objects:  43% (65/150)        remote: Compressing objects:  44% (66/150)        remote: Compressing objects:  45% (68/150)        remote: Compressing objects:  46% (69/150)        remote: Compressing objects:  47% (71/150)        remote: Compressing objects:  48% (72/150)        remote: Compressing objects:  49% (74/150)        remote: Compressing objects:  50% (75/150)        remote: Compressing objects:  51% (77/150)        remote: Compressing objects:  52% (78/150)        remote: Compressing objects:  53% (80/150)        remote: Compressing objects:  54% (81/150)        remote: Compressing objects:  55% (83/150)        remote: Compressing objects:  56% (84/150)        remote: Compressing objects:  57% (86/150)        remote: Compressing objects:  58% (87/150)        remote: Compressing objects:  59% (89/150)        remote: Compressing objects:  60% (90/150)        remote: Compressing objects:  61% (92/150)        remote: Compressing objects:  62% (93/150)        remote: Compressing objects:  63% (95/150)        remote: Compressing objects:  64% (96/150)        remote: Compressing objects:  65% (98/150)        remote: Compressing objects:  66% (99/150)        remote: Compressing objects:  67% (101/150)        remote: Compressing objects:  68% (102/150)        remote: Compressing objects:  69% (104/150)        remote: Compressing objects:  70% (105/150)        remote: Compressing objects:  71% (107/150)        remote: Compressing objects:  72% (108/150)        remote: Compressing objects:  73% (110/150)        remote: Compressing objects:  74% (111/150)        remote: Compressing objects:  75% (113/150)        remote: Compressing objects:  76% (114/150)        remote: Compressing objects:  77% (116/150)        remote: Compressing objects:  78% (117/150)        remote: Compressing objects:  79% (119/150)        remote: Compressing objects:  80% (120/150)        remote: Compressing objects:  81% (122/150)        remote: Compressing objects:  82% (123/150)        remote: Compressing objects:  83% (125/150)        remote: Compressing objects:  84% (126/150)        remote: Compressing objects:  85% (128/150)        remote: Compressing objects:  86% (129/150)        remote: Compressing objects:  87% (131/150)        remote: Compressing objects:  88% (132/150)        remote: Compressing objects:  89% (134/150)        remote: Compressing objects:  90% (135/150)        remote: Compressing objects:  91% (137/150)        remote: Compressing objects:  92% (138/150)        remote: Compressing objects:  93% (140/150)        remote: Compressing objects:  94% (141/150)        remote: Compressing objects:  95% (143/150)        remote: Compressing objects:  96% (144/150)        remote: Compressing objects:  97% (146/150)        remote: Compressing objects:  98% (147/150)        remote: Compressing objects:  99% (149/150)        remote: Compressing objects: 100% (150/150)        remote: Compressing objects: 100% (150/150), done.        
+Receiving objects:   0% (1/186)Receiving objects:   1% (2/186)Receiving objects:   2% (4/186)Receiving objects:   3% (6/186)Receiving objects:   4% (8/186)Receiving objects:   5% (10/186)Receiving objects:   6% (12/186)Receiving objects:   7% (14/186)Receiving objects:   8% (15/186)Receiving objects:   9% (17/186)Receiving objects:  10% (19/186)Receiving objects:  11% (21/186)Receiving objects:  12% (23/186)Receiving objects:  13% (25/186)Receiving objects:  14% (27/186)Receiving objects:  15% (28/186)Receiving objects:  16% (30/186)Receiving objects:  17% (32/186)Receiving objects:  18% (34/186)Receiving objects:  19% (36/186)Receiving objects:  20% (38/186)Receiving objects:  21% (40/186)Receiving objects:  22% (41/186)Receiving objects:  23% (43/186)Receiving objects:  24% (45/186)Receiving objects:  25% (47/186)Receiving objects:  26% (49/186)Receiving objects:  27% (51/186)Receiving objects:  28% (53/186)Receiving objects:  29% (54/186)Receiving objects:  30% (56/186)Receiving objects:  31% (58/186)Receiving objects:  32% (60/186)Receiving objects:  33% (62/186)Receiving objects:  34% (64/186)Receiving objects:  35% (66/186)Receiving objects:  36% (67/186)Receiving objects:  37% (69/186)Receiving objects:  38% (71/186)Receiving objects:  39% (73/186)Receiving objects:  40% (75/186)Receiving objects:  41% (77/186)Receiving objects:  42% (79/186)Receiving objects:  43% (80/186)Receiving objects:  44% (82/186)Receiving objects:  45% (84/186)Receiving objects:  46% (86/186)Receiving objects:  47% (88/186)Receiving objects:  48% (90/186)Receiving objects:  49% (92/186)Receiving objects:  50% (93/186)Receiving objects:  51% (95/186)Receiving objects:  52% (97/186)Receiving objects:  53% (99/186)Receiving objects:  54% (101/186)Receiving objects:  55% (103/186)Receiving objects:  56% (105/186)Receiving objects:  57% (107/186)Receiving objects:  58% (108/186)Receiving objects:  59% (110/186)Receiving objects:  60% (112/186)Receiving objects:  61% (114/186)Receiving objects:  62% (116/186)Receiving objects:  63% (118/186)Receiving objects:  64% (120/186)Receiving objects:  65% (121/186)Receiving objects:  66% (123/186)Receiving objects:  67% (125/186)Receiving objects:  68% (127/186)Receiving objects:  69% (129/186)Receiving objects:  70% (131/186)Receiving objects:  71% (133/186)Receiving objects:  72% (134/186)Receiving objects:  73% (136/186)Receiving objects:  74% (138/186)Receiving objects:  75% (140/186)Receiving objects:  76% (142/186)Receiving objects:  77% (144/186)Receiving objects:  78% (146/186)Receiving objects:  79% (147/186)Receiving objects:  80% (149/186)Receiving objects:  81% (151/186)Receiving objects:  82% (153/186)Receiving objects:  83% (155/186)Receiving objects:  84% (157/186)Receiving objects:  85% (159/186)Receiving objects:  86% (160/186)Receiving objects:  87% (162/186)Receiving objects:  88% (164/186)Receiving objects:  89% (166/186)Receiving objects:  90% (168/186)Receiving objects:  91% (170/186)Receiving objects:  92% (172/186)Receiving objects:  93% (173/186)remote: Total 186 (delta 22), reused 120 (delta 19), pack-reused 0 (from 0)        
+Receiving objects:  94% (175/186)Receiving objects:  95% (177/186)Receiving objects:  96% (179/186)Receiving objects:  97% (181/186)Receiving objects:  98% (183/186)Receiving objects:  99% (185/186)Receiving objects: 100% (186/186)Receiving objects: 100% (186/186), 200.59 KiB | 12.54 MiB/s, done.
+Resolving deltas:   0% (0/22)Resolving deltas:   4% (1/22)Resolving deltas:   9% (2/22)Resolving deltas:  13% (3/22)Resolving deltas:  18% (4/22)Resolving deltas:  22% (5/22)Resolving deltas:  27% (6/22)Resolving deltas:  31% (7/22)Resolving deltas:  40% (9/22)Resolving deltas:  45% (10/22)Resolving deltas:  50% (11/22)Resolving deltas:  54% (12/22)Resolving deltas:  59% (13/22)Resolving deltas:  68% (15/22)Resolving deltas:  72% (16/22)Resolving deltas:  77% (17/22)Resolving deltas:  81% (18/22)Resolving deltas:  90% (20/22)Resolving deltas:  95% (21/22)Resolving deltas: 100% (22/22)Resolving deltas: 100% (22/22), done.
+fatal: cannot create directory at &#39;.github/plugins/azure-functions-skills/skills/azure-functions-best-practices&#39;: Filename too long
+warning: Clone succeeded, but checkout failed.
+You can inspect what was checked out with &#39;git status&#39;
+and retry with &#39;git restore --source=HEAD :/&#39;
+
+
+</pre></details>
+<details><summary>plugin-install-ghcp-plugin-install — exit 0</summary><pre>Command: copilot plugin install azure-functions-skills@azure-functions-skills
+CWD: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-ghcp
+Started: 2026-05-17T02:04:04.825Z
+Completed: 2026-05-17T02:04:07.740Z
+
+STDOUT
+
+
+STDERR
+Failed to install plugin: Marketplace &quot;azure-functions-skills&quot; not found
+</pre></details>
+<details><summary>plugin-install-ghcp-agent-inspection — exit 1</summary><pre>Command: copilot --agent functions-copilot -p &quot;Read only local configuration. Do not edit. In &lt;=120 words, report whether Azure Functions Skills surfaces are visible: skills, prompts/instructions, MCP, hooks, agents, plugin support, and Azure Skills dependency guidance.&quot;
+CWD: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-ghcp
+Started: 2026-05-17T02:04:07.743Z
+Completed: 2026-05-17T02:04:07.768Z
+
+STDOUT
+
+
+STDERR
+The system cannot find the file specified.
+</pre></details></section>
+<section><h3>plugin-install-claude</h3><p>Status: <span class="status fail">fail</span>; Support: unknown; Retention: retained for debugging</p><details><summary>plugin-install-claude-add-dir — exit 1</summary><pre>Command: claude --add-dir &lt;repo&gt;\.github\plugins\azure-functions-skills
+CWD: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-claude
+Started: 2026-05-17T02:04:07.772Z
+Completed: 2026-05-17T02:04:11.903Z
+
+STDOUT
+
+
+STDERR
+Error: Input must be provided either through stdin or as a prompt argument when using --print
+</pre></details>
+<details><summary>plugin-install-claude-agent-inspection — exit 1</summary><pre>Command: claude -p &quot;Read only local configuration. Do not edit. In &lt;=120 words, report whether Azure Functions Skills surfaces are visible: skills, prompts/instructions, MCP, hooks, agents, plugin support, and Azure Skills dependency guidance.&quot; --add-dir &lt;repo&gt;\.github\plugins\azure-functions-skills
+CWD: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-claude
+Started: 2026-05-17T02:04:11.907Z
+Completed: 2026-05-17T02:04:11.934Z
+
+STDOUT
+
+
+STDERR
+The system cannot find the file specified.
+</pre></details></section>
+<section><h3>plugin-install-codex</h3><p>Status: <span class="status blocked">blocked</span>; Support: unknown; Retention: retained for debugging</p><details><summary>plugin-install-codex-marketplace-add — exit 1</summary><pre>Command: codex plugin marketplace add Azure/azure-functions-skills
+CWD: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-codex
+Started: 2026-05-17T02:04:11.938Z
+Completed: 2026-05-17T02:04:12.120Z
+
+STDOUT
+
+
+STDERR
+WARNING: proceeding, even though we could not update PATH: CODEX_HOME points to &quot;Q:\\repos\\functions-skills\\azure-functions-skills\\reports\\e2e\\20260517T015931Z\\workspaces\\plugin-install-codex-home\\.codex&quot;, but that path does not exist
+Error: failed to resolve CODEX_HOME
+
+Caused by:
+    CODEX_HOME points to &quot;Q:\\repos\\functions-skills\\azure-functions-skills\\reports\\e2e\\20260517T015931Z\\workspaces\\plugin-install-codex-home\\.codex&quot;, but that path does not exist
+</pre></details>
+<details><summary>plugin-install-codex-plugin-help — exit 0</summary><pre>Command: codex plugin --help
+CWD: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-codex
+Started: 2026-05-17T02:04:12.123Z
+Completed: 2026-05-17T02:04:12.300Z
+
+STDOUT
+Manage Codex plugins
+
+Usage: codex plugin [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  marketplace  Manage plugin marketplaces for Codex
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -c, --config &lt;key=value&gt;
+          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.
+          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed
+          as TOML. If it fails to parse as TOML, the raw string is used as a literal.
+          
+          Examples: - `-c model=&quot;o3&quot;` - `-c &#39;sandbox_permissions=[&quot;disk-full-read-access&quot;]&#39;` - `-c
+          shell_environment_policy.inherit=all`
+
+      --enable &lt;FEATURE&gt;
+          Enable a feature (repeatable). Equivalent to `-c features.&lt;name&gt;=true`
+
+      --disable &lt;FEATURE&gt;
+          Disable a feature (repeatable). Equivalent to `-c features.&lt;name&gt;=false`
+
+  -h, --help
+          Print help (see a summary with &#39;-h&#39;)
+
+
+STDERR
+WARNING: proceeding, even though we could not update PATH: CODEX_HOME points to &quot;Q:\\repos\\functions-skills\\azure-functions-skills\\reports\\e2e\\20260517T015931Z\\workspaces\\plugin-install-codex-home\\.codex&quot;, but that path does not exist
+</pre></details>
+<details><summary>plugin-install-codex-agent-inspection — exit 1</summary><pre>Command: codex exec --sandbox read-only --cd &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-codex --skip-git-repo-check --ephemeral --color never &quot;Read only local configuration. Do not edit. In &lt;=120 words, report whether Azure Functions Skills surfaces are visible: skills, prompts/instructions, MCP, hooks, agents, plugin support, and Azure Skills dependency guidance.&quot;
+CWD: &lt;repo&gt;\reports\e2e\20260517T015931Z\workspaces\plugin-install-codex
+Started: 2026-05-17T02:04:12.304Z
+Completed: 2026-05-17T02:04:12.333Z
+
+STDOUT
+
+
+STDERR
+The system cannot find the file specified.
+</pre></details></section>
+<section><h3>docs-command-consistency</h3><p>Status: <span class="status pass">pass</span>; Support: supported; Retention: n/a</p></section>
+<section><h3>azure-skills-dependency</h3><p>Status: <span class="status warning">warning</span>; Support: partial; Retention: n/a</p></section>
+<section><h3>npm-run-check</h3><p>Status: <span class="status fail">fail</span>; Support: partial; Retention: n/a</p><details><summary>npm-run-check — exit 134</summary><pre>Command: npm run check
+CWD: &lt;repo&gt;
+Started: 2026-05-17T02:04:12.338Z
+Completed: 2026-05-17T02:07:33.083Z
+
+STDOUT
+
+&gt; @agent-loom/azure-functions-skills@0.11.3 check
+&gt; npm run lint &amp;&amp; npm run typecheck &amp;&amp; npm run validate:skills &amp;&amp; npm run verify:plugin-payload &amp;&amp; npm test &amp;&amp; npm run build
+
+
+&gt; @agent-loom/azure-functions-skills@0.11.3 lint
+&gt; eslint .
+
+
+
+STDERR
+
+&lt;--- Last few GCs ---&gt;
+
+[67240:00000166D66C1000]   195422 ms: Mark-Compact 4051.6 (4132.4) -&gt; 4041.8 (4138.6) MB, pooled: 0 MB, 2954.95 / 0.00 ms  (average mu = 0.217, current mu = 0.083) allocation failure; scavenge might not succeed
+[67240:00000166D66C1000]   199221 ms: Mark-Compact 4060.0 (4141.4) -&gt; 4047.8 (4144.6) MB, pooled: 0 MB, 3783.91 / 0.00 ms  (average mu = 0.107, current mu = 0.004) allocation failure; scavenge might not succeed
+
+
+&lt;--- JS stacktrace ---&gt;
+
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 00007FF7A38E542D node::SetCppgcReference+17693
+ 2: 00007FF7A3848248 SSL_get_quiet_shutdown+102712
+ 3: 00007FF7A43CED41 v8::Isolate::ReportExternalAllocationLimitReached+65
+ 4: 00007FF7A43BB9C6 v8::Function::Experimental_IsNopFunction+2870
+ 5: 00007FF7A4208B10 v8::internal::StrongRootAllocatorBase::StrongRootAllocatorBase+31456
+ 6: 00007FF7A4205B7A v8::internal::StrongRootAllocatorBase::StrongRootAllocatorBase+19274
+ 7: 00007FF7A421B3D1 v8::Isolate::GetHeapProfiler+7793
+ 8: 00007FF7A421BC78 v8::Isolate::GetHeapProfiler+10008
+ 9: 00007FF7A422C92B v8::Isolate::GetHeapProfiler+78795
+10: 00007FF7A3EF5A1B v8::base::AddressSpaceReservation::AddressSpaceReservation+322075
+11: 00007FF7A448A0CE v8::PropertyDescriptor::writable+725950
+12: 00007FF724AABA8E 
+</pre></details></section></section><section><h2>Cross-check</h2><p>Self-review completed. Non-pass scenarios retain evidence and issue analysis. Unsupported/blocked plugin behavior is not reported as pass. Obvious secret-like values were redacted before report submission.</p></section><section><h2>Recommended fixes</h2><ol><li>Add non-interactive/dry-run mode to <code>chat</code>.</li><li>Add target-specific plugin discovery E2E contracts and isolated config guidance.</li><li>Clarify Azure Skills dependency support for Claude/Codex.</li></ol></section></main></body></html>
