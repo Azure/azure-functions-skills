@@ -120,7 +120,7 @@ function runCli(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv
   });
 }
 
-function createFakeCliDirectory(): string {
+function createFakeAgentCliDirectory(): string {
   const fakeBinDir = makeTempDir('af-skills-e2e-bin-');
   for (const launcher of Object.values(LAUNCHERS)) {
     const commandPath = join(fakeBinDir, process.platform === 'win32' ? `${launcher.command}.cmd` : launcher.command);
@@ -131,11 +131,15 @@ function createFakeCliDirectory(): string {
         : '#!/usr/bin/env sh\nexit 0\n',
       { mode: 0o755 },
     );
+
+    if (process.platform === 'win32') {
+      writeFileSync(join(fakeBinDir, `${launcher.command}.ps1`), 'exit 0\r\n', { mode: 0o755 });
+    }
   }
   return fakeBinDir;
 }
 
-describe('CLI command E2E', () => {
+describe('CLI command integration', () => {
   it('build writes GHCP, Claude, and Codex layouts from current templates into a temp dist directory', () => {
     const distDir = makeTempDir('af-skills-e2e-build-');
     const expectedSkillIds = templateSkillIds();
@@ -165,7 +169,7 @@ describe('CLI command E2E', () => {
   });
 
   it('chat auto-installs each target workspace layout before launching the selected agent', () => {
-    const fakeBinDir = createFakeCliDirectory();
+    const fakeBinDir = createFakeAgentCliDirectory();
     const expectedSkillIds = templateSkillIds();
     const expectedAgentFiles = templateAgentFiles();
     const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;

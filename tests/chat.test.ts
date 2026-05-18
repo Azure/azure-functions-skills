@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildStartupPrompt, LAUNCHERS, detectCliAgents, chat } from '../src/chat/index.js';
+import { buildStartupPrompt, LAUNCHERS, detectCliAgents, chat, resolveLauncherCommand } from '../src/chat/index.js';
 import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
 
 const TEMP_DIRS: string[] = [];
@@ -86,6 +86,67 @@ describe('LAUNCHERS', () => {
       const args = launcher.buildArgs({});
       expect(args).toBeInstanceOf(Array);
     }
+  });
+});
+
+// ─── Launcher resolution tests ───
+
+describe('resolveLauncherCommand', () => {
+  it('leaves non-Windows launchers unchanged', () => {
+    const resolved = resolveLauncherCommand('codex', {
+      platform: 'linux',
+    });
+
+    expect(resolved).toEqual({ command: 'codex', argsPrefix: [], shell: false });
+  });
+
+  it('wraps cmd shims with cmd.exe on Windows to avoid shell quoting', () => {
+    const binDir = resetDir(join(DIST_DIR, 'launcher-cmd-ps1'));
+    writeFileSync(join(binDir, 'codex.ps1'), 'exit 0');
+    writeFileSync(join(binDir, 'codex.cmd'), '@echo off\r\nexit /b 0\r\n');
+    const resolved = resolveLauncherCommand('codex', {
+      platform: 'win32',
+      env: { Path: binDir, PATHEXT: '.CMD;.PS1' },
+    });
+
+    expect(resolved).toEqual({
+      command: 'cmd.exe',
+      argsPrefix: ['/d', '/s', '/c', join(binDir, 'codex.cmd')],
+      shell: false,
+    });
+  });
+
+  it('runs PowerShell shims through powershell.exe when no better shim is available', () => {
+    const binDir = resetDir(join(DIST_DIR, 'launcher-ps1'));
+    writeFileSync(join(binDir, 'copilot.ps1'), 'exit 0');
+    const resolved = resolveLauncherCommand('copilot', {
+      platform: 'win32',
+      env: { Path: binDir, PATHEXT: '.PS1' },
+    });
+
+    expect(resolved).toEqual({
+      command: 'powershell.exe',
+      argsPrefix: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(binDir, 'copilot.ps1')],
+      shell: false,
+    });
+  });
+
+  it('runs exe and extensionless Windows shims directly', () => {
+    const exeDir = resetDir(join(DIST_DIR, 'launcher-exe'));
+    const extensionlessDir = resetDir(join(DIST_DIR, 'launcher-extensionless'));
+    writeFileSync(join(exeDir, 'tool.exe'), 'fake');
+    writeFileSync(join(extensionlessDir, 'tool'), 'fake');
+    const exe = resolveLauncherCommand('tool', {
+      platform: 'win32',
+      env: { Path: exeDir, PATHEXT: '.EXE' },
+    });
+    const extensionless = resolveLauncherCommand('tool', {
+      platform: 'win32',
+      env: { Path: extensionlessDir, PATHEXT: '' },
+    });
+
+    expect(exe).toEqual({ command: join(exeDir, 'tool.exe'), argsPrefix: [], shell: false });
+    expect(extensionless).toEqual({ command: join(extensionlessDir, 'tool'), argsPrefix: [], shell: false });
   });
 });
 
