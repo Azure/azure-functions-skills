@@ -1,6 +1,8 @@
 # E2E Scenario Catalog
 
-Use this catalog to select scenarios for Azure Functions Skills E2E validation. Prefer running a small, focused set first, then expanding to the full matrix. Expected skills/prompts/MCP/hooks/agents must be discovered dynamically from the current repository files at run time, not hard-coded into a runner.
+Use this catalog to select scenarios for Azure Functions Skills E2E validation. Unless the user explicitly requests a narrower scope in the current request, run the full local matrix for GitHub Copilot, Claude Code, and Codex across setup, chat, plugin, docs consistency, basic help, and Azure Skills dependency checks. Expected skills/prompts/MCP/hooks/agents must be discovered dynamically from the current repository files at run time, not hard-coded into a runner.
+
+Do not remove a scenario from the matrix because it is likely to fail, previously failed, requires an interactive command, or requires approval. Keep it in the run checklist and classify it as `pass`, `warning`, `fail`, `blocked`, or `unsupported` with evidence.
 
 ## Matrix dimensions
 
@@ -25,6 +27,14 @@ Before running scenarios, inspect the current repository and record:
 
 The report should include the inventory counts and paths used for each run. If a template is added or removed, the E2E expectations should change automatically because they come from this inventory.
 
+## Workspace and cwd requirements
+
+All scenario commands that can write files must run from an isolated scenario workspace under `reports/e2e/<run-id>/workspaces/<scenario-id>/`. This includes setup commands, chat commands, real-agent inspection prompts, and any CLI help/discovery command that could accidentally execute setup or chat behavior. Do not run these commands from the repository root.
+
+When invoking this repository's CLI, pass `--dir <scenario-workspace>` explicitly and set the process cwd to that scenario workspace whenever practical. If a command must run from the repository root to access source files, record why it is read-only or otherwise safe, and verify afterward that no root-level `.agents`, `.claude`, `.codex`, `.github/agents`, `.github/hooks`, `.github/skills/<non-e2e>`, `AGENTS.md`, or `CLAUDE.md` artifacts were created.
+
+Run directories under `reports/e2e/<run-id>/` are analysis-only. The shareable commit artifact is `reports/e2e/current/report.html`, which should be overwritten with the reviewed report at the end of the run.
+
 ## Status values
 
 | Status | Meaning |
@@ -39,12 +49,37 @@ The report should include the inventory counts and paths used for each run. If a
 
 Setup and chat scenarios must prove both installation and runtime visibility:
 
-1. Install or prepare the workspace with the documented setup/chat command.
+1. Install or prepare the isolated scenario workspace with the documented setup/chat command. The command cwd and `--dir` target must be `reports/e2e/<run-id>/workspaces/<scenario-id>/` or an equivalent disposable workspace, never the repository root.
 2. Check the expected files from the dynamic inventory were written to the isolated workspace.
 3. Launch the real target coding-agent CLI with an inspection prompt.
 4. Require the agent response to report visible or usable `skills`, `prompts`, `mcp`, `hooks`, and `agents` surfaces, or explicitly classify unsupported surfaces.
 
 File checks alone are insufficient for `pass` because they do not prove the coding agent can load or use the installed surfaces. If the files exist but the agent cannot be launched or cannot confirm visibility, classify the scenario as `blocked` or `fail` with evidence.
+
+## Fresh plugin install requirements
+
+Plugin scenarios validate the installation flow, not reuse of a plugin that happened to be installed before the run. Every plugin scenario must capture these phases:
+
+1. **Pre-state discovery** — record installed plugins, registered marketplaces, source directories, or current CLI help/list output for the target host.
+2. **Target cleanup or isolation** — if `azure-functions-skills` is already installed or registered in a way that would satisfy the test without reinstalling, uninstall/remove only that target plugin with the official CLI after user approval, or use a documented isolated config/profile if the host supports one.
+3. **Fresh install/register** — run the README command contract after cleanup/isolation.
+4. **Post-state discovery** — record plugin list/details or equivalent evidence that the fresh install/register changed the active state.
+5. **Agent-visible inspection** — launch the real agent and ask it to report usable `agents`, `skills`, `prompts`, `mcp`, `hooks`, plugin surfaces, and Azure Skills dependency surfaces.
+
+Plugin scenario inspection commands must run from that scenario's workspace under `reports/e2e/<run-id>/workspaces/<scenario-id>/`. If plugin registration requires a repository plugin payload path, pass the payload path explicitly instead of changing cwd to the repository root.
+
+If cleanup would mutate user-level state and approval is unavailable, mark the cleanup check `blocked`. If a CLI does not expose uninstall/select/list commands outside an interactive UI, record the command/help output and classify the plugin scenario as `blocked` unless the user completes the interaction. Do not uninstall unrelated plugins. Do not uninstall the dependent `azure-skills` plugin unless the selected dependency scenario explicitly requires a missing-dependency state and the user approves it.
+
+## Automation-friendly command patterns
+
+Use noninteractive CLI modes whenever they can preserve the scenario contract:
+
+- Claude Code inspection prompts should use `claude -p` / `claude --print` with `--output-format json` when practical, `--no-session-persistence`, `--permission-mode dontAsk`, and a small tool allowlist such as `--tools Read,LS,Grep,Glob`.
+- Claude Code session-scoped plugin tests should prefer `--plugin-dir <plugin-payload-dir>` when available. This loads a plugin for the current run only and avoids manual/global install state. If the README command is still `--add-dir`, record whether `--add-dir` and `--plugin-dir` are equivalent or whether README needs to be updated.
+- Claude Code installed plugin tests should use `claude plugin list --json`, `claude plugin install <plugin> --scope local|project|user`, and `claude plugin uninstall|remove <plugin> --scope <scope> -y` for approved fresh-install cleanup.
+- Codex inspection prompts should use `codex exec --sandbox read-only --json --output-last-message <file> --ephemeral --skip-git-repo-check --cd <workspace> <prompt>` when practical.
+- Codex marketplace cleanup can use `codex plugin marketplace remove <name>` followed by `codex plugin marketplace add <source>` when approved. Current Codex CLI 0.130.0 exposes marketplace management but no noninteractive plugin install/select/list command; plugin activation from `/plugins` remains `blocked` unless the user completes the interaction or a newer CLI exposes an automation option.
+- If a TUI opens despite these options, capture the help output showing the missing noninteractive path and classify the scenario instead of waiting indefinitely.
 
 ## Initial scenarios
 
@@ -133,14 +168,18 @@ File checks alone are insufficient for `pass` because they do not prove the codi
 - Priority: P1
 - Purpose: verify repository plugin installation and discoverability in GitHub Copilot.
 - Command contract:
-  1. Clear or isolate existing GitHub Copilot plugin state for `azure-functions-skills` and dependent `azure-skills` when safe; otherwise ask the user or mark cleanup `blocked`.
-  2. Run `copilot plugin marketplace add Azure/azure-functions-skills`.
-  3. Run `copilot plugin install azure-functions-skills@azure-functions-skills`.
-  4. Run `copilot --agent functions-copilot -p "<inspection prompt>"` or the current documented equivalent from README/CLI help.
+  1. Run `copilot plugin marketplace list` and `copilot plugin list` or the current CLI equivalents and record whether `azure-functions-skills` is already registered/installed.
+  2. If `azure-functions-skills` is installed, run `copilot plugin uninstall azure-functions-skills` after approval, or use an isolated Copilot plugin config if the CLI supports it. If this cannot be done, mark cleanup `blocked` and do not mark the scenario `pass`.
+  3. Run `copilot plugin marketplace add Azure/azure-functions-skills`.
+  4. Run `copilot plugin install azure-functions-skills@azure-functions-skills`.
+  5. Run `copilot plugin list` and, when available, plugin details to prove post-install state.
+  6. Run `copilot --agent functions-copilot -p "<inspection prompt>"` or the current documented equivalent from README/CLI help.
 - Required checks:
-  - Existing plugin registration is cleared or isolated safely; if global cleanup is unsafe, record `blocked` for cleanup and continue with an isolated registration when possible.
+  - Existing plugin registration is discovered and then cleared or isolated safely; if global cleanup is unsafe, denied, or unsupported, record `blocked` for cleanup and continue only with a proven isolated registration when possible.
+  - The uninstall/remove command for the target plugin is recorded when the plugin was present before the run.
   - The documented marketplace add command completes or produces an auth/approval `blocked` result.
   - The documented plugin install command completes or produces an auth/approval `blocked` result.
+  - Post-install plugin state is recorded.
   - The post-install Copilot command runs with `--agent functions-copilot` and an inspection prompt.
   - `functions-copilot` agent is discoverable.
   - Every skill from the dynamic inventory is discoverable from the plugin payload or by the agent.
@@ -156,13 +195,15 @@ File checks alone are insufficient for `pass` because they do not prove the codi
 - Priority: P1
 - Purpose: verify plugin/source registration and discoverability in Claude Code, or explicitly report the current lack of native plugin support.
 - Command contract:
-  1. Clear or isolate existing Claude source/plugin registration when safe; otherwise ask the user or mark cleanup `blocked`.
-  2. Use the README plugin-from-source flow: `git clone https://github.com/Azure/azure-functions-skills.git` when testing from remote, or the local repository equivalent when testing the current branch.
-  3. Run `claude --add-dir ./azure-functions-skills/.github/plugins/azure-functions-skills` or the local equivalent plugin payload path.
-  4. Run Claude with an inspection prompt in the isolated workspace.
+  1. Run `claude plugin list` and `claude plugin marketplace list` when available, plus `claude plugin --help`, and record whether `azure-functions-skills` is already installed. For `--add-dir` source tests, also record the exact source directory being added.
+  2. If testing an installed Claude plugin and `azure-functions-skills` is already installed, run `claude plugin uninstall azure-functions-skills` or `claude plugin remove azure-functions-skills` after approval. If testing `--add-dir`, start from an isolated workspace and use a single explicit `--add-dir` source for this run.
+  3. Use the README plugin-from-source flow: `git clone https://github.com/Azure/azure-functions-skills.git` when testing from remote, or the local repository equivalent when testing the current branch.
+  4. Run `claude --add-dir ./azure-functions-skills/.github/plugins/azure-functions-skills` or the local equivalent plugin payload path from the README contract. When current Claude Code supports it, also run or prefer the session-scoped automation equivalent `claude -p --plugin-dir <plugin-payload-dir> --output-format json --no-session-persistence <inspection prompt>` to avoid manual/global plugin state.
+  5. Run Claude with an inspection prompt in the isolated workspace.
 - Required checks:
-  - Existing plugin/source registration is cleared or isolated safely; if global cleanup is unsafe, record `blocked` for cleanup and continue with an isolated registration when possible.
-  - The documented `--add-dir` command is attempted and recorded.
+  - Existing plugin/source registration is discovered and then cleared or isolated safely; if global cleanup is unsafe, denied, or unsupported, record `blocked` for cleanup and continue only with a proven isolated source registration when possible.
+  - If an installed target plugin was present before the run, the official uninstall/remove command is recorded or the cleanup check is `blocked`.
+  - The documented `--add-dir` command is attempted and recorded, or the report explicitly records that current Claude Code uses `--plugin-dir` as the noninteractive session-scoped equivalent and flags the README divergence in `docs-command-consistency`.
   - The post-registration Claude command runs with an inspection prompt, or the scenario is `blocked`/`unsupported` with evidence.
   - Every skill from the dynamic inventory is discoverable if the mode is supported.
   - MCP settings are discoverable or merged into local settings.
@@ -189,14 +230,18 @@ Every agent run should report the following surfaces, with direct file evidence 
 - Priority: P1
 - Purpose: verify plugin marketplace/source registration and discoverability in Codex.
 - Command contract:
-  1. Clear or isolate existing Codex plugin marketplace/install state for `azure-functions-skills` and dependent `azure-skills` when safe; otherwise ask the user or mark cleanup `blocked`.
-  2. Run `codex plugin marketplace add Azure/azure-functions-skills`.
-  3. Install/select `azure-functions-skills` from `/plugins` when the CLI supports it, or record the current documented/CLI-help equivalent.
-  4. Run Codex with an inspection prompt in the isolated workspace.
+  1. Run `codex plugin --help`, `codex plugin marketplace --help`, and any available `list`/`details` commands to record current install and marketplace support. Also record `codex exec --help` so the report shows which noninteractive inspection options were available.
+  2. If `azure-functions-skills` is already installed or registered in a way that would satisfy the scenario without reinstalling, remove only that target plugin/marketplace with the official CLI after approval, or use a documented isolated Codex config/profile. If current Codex only supports interactive `/plugins` for uninstall/select, record that and mark cleanup or install/select `blocked` unless the user completes the interaction.
+  3. Run `codex plugin marketplace add Azure/azure-functions-skills`.
+  4. Install/select `azure-functions-skills` from `/plugins` when the CLI supports it, or record the current documented/CLI-help equivalent.
+  5. Record post-install state using available list/details/help output.
+  6. Run Codex with an inspection prompt in the isolated workspace, preferably `codex exec --sandbox read-only --json --output-last-message <file> --ephemeral --skip-git-repo-check --cd <workspace> <inspection prompt>`.
 - Required checks:
-  - Existing plugin registration is cleared or isolated safely; if global cleanup is unsafe, record `blocked` for cleanup and continue with an isolated registration when possible.
+  - Existing plugin registration is discovered and then cleared or isolated safely; if global cleanup is unsafe, denied, interactive-only, or unsupported, record `blocked` for cleanup and continue only with a proven isolated registration when possible.
+  - If the target plugin or marketplace was present before the run, the official remove/uninstall command is recorded or the cleanup check is `blocked`.
   - The documented marketplace add command completes or produces an auth/approval `blocked` result.
   - The plugin install/select step is attempted or documented as unsupported by current CLI help.
+  - Post-install or post-registration state is recorded.
   - The post-install Codex command runs with an inspection prompt, or the scenario is `blocked`/`unsupported` with evidence.
   - Every skill from the dynamic inventory is discoverable from the plugin payload or by the agent.
   - MCP configuration is discoverable.
