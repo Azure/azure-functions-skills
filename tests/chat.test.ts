@@ -71,14 +71,41 @@ describe('LAUNCHERS', () => {
     expect(args).toContain('hello');
   });
 
+  it('ghcp launcher forwards CLI args and lets explicit prompt flags replace interactive startup prompt', () => {
+    const args = LAUNCHERS['github-copilot'].buildArgs({
+      startupPrompt: 'startup',
+      passthroughArgs: ['-p', 'headless', '--yolo', '--output-format', 'json'],
+    });
+
+    expect(args).toEqual(['--agent', 'functions-copilot', '-p', 'headless', '--yolo', '--output-format', 'json']);
+  });
+
   it('claude launcher passes prompt as first arg', () => {
     const args = LAUNCHERS['claude-code'].buildArgs({ startupPrompt: 'hello' });
     expect(args).toContain('hello');
   });
 
+  it('claude launcher forwards CLI args before the startup prompt', () => {
+    const args = LAUNCHERS['claude-code'].buildArgs({
+      startupPrompt: 'hello',
+      passthroughArgs: ['-p', '--permission-mode', 'bypassPermissions'],
+    });
+
+    expect(args).toEqual(['-p', 'hello', '--permission-mode', 'bypassPermissions']);
+  });
+
   it('codex launcher passes prompt as first arg', () => {
     const args = LAUNCHERS['codex'].buildArgs({ startupPrompt: 'hello' });
     expect(args).toContain('hello');
+  });
+
+  it('codex launcher forwards subcommands and CLI args before the startup prompt', () => {
+    const args = LAUNCHERS['codex'].buildArgs({
+      startupPrompt: 'hello',
+      passthroughArgs: ['exec', '--sandbox', 'read-only', '--json'],
+    });
+
+    expect(args).toEqual(['exec', '--sandbox', 'read-only', '--json', 'hello']);
   });
 
   it('launchers return empty args when no prompt', () => {
@@ -112,6 +139,35 @@ describe('resolveLauncherCommand', () => {
     expect(resolved).toEqual({
       command: 'cmd.exe',
       argsPrefix: ['/d', '/s', '/c', join(binDir, 'codex.cmd')],
+      shell: false,
+    });
+  });
+
+  it('prefers Windows batch shims over extensionless scripts in the same directory', () => {
+    const batDir = resetDir(join(DIST_DIR, 'launcher-extensionless-bat'));
+    const cmdDir = resetDir(join(DIST_DIR, 'launcher-extensionless-cmd'));
+    writeFileSync(join(batDir, 'copilot'), '#!/bin/sh\nexit 0\n');
+    writeFileSync(join(batDir, 'copilot.bat'), '@echo off\r\nexit /b 0\r\n');
+    writeFileSync(join(cmdDir, 'codex'), '#!/bin/sh\nexit 0\n');
+    writeFileSync(join(cmdDir, 'codex.cmd'), '@echo off\r\nexit /b 0\r\n');
+
+    const bat = resolveLauncherCommand('copilot', {
+      platform: 'win32',
+      env: { Path: batDir, PATHEXT: '.BAT' },
+    });
+    const cmd = resolveLauncherCommand('codex', {
+      platform: 'win32',
+      env: { Path: cmdDir, PATHEXT: '.CMD' },
+    });
+
+    expect(bat).toEqual({
+      command: 'cmd.exe',
+      argsPrefix: ['/d', '/s', '/c', join(batDir, 'copilot.bat')],
+      shell: false,
+    });
+    expect(cmd).toEqual({
+      command: 'cmd.exe',
+      argsPrefix: ['/d', '/s', '/c', join(cmdDir, 'codex.cmd')],
       shell: false,
     });
   });

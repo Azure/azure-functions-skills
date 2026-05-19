@@ -127,8 +127,8 @@ function createFakeAgentCliDirectory(): string {
     writeFileSync(
       commandPath,
       process.platform === 'win32'
-        ? '@echo off\r\nexit /b 0\r\n'
-        : '#!/usr/bin/env sh\nexit 0\n',
+        ? '@echo off\r\nif not "%AF_SKILLS_FAKE_ARGS_FILE%"=="" echo %*>>"%AF_SKILLS_FAKE_ARGS_FILE%"\r\nexit /b 0\r\n'
+        : '#!/usr/bin/env sh\nif [ -n "$AF_SKILLS_FAKE_ARGS_FILE" ]; then printf "%s\\n" "$*" >> "$AF_SKILLS_FAKE_ARGS_FILE"; fi\nexit 0\n',
       { mode: 0o755 },
     );
 
@@ -190,5 +190,35 @@ describe('CLI command integration', () => {
 
       assertWorkspaceLayout(projectDir, setupTarget, expectedSkillIds, expectedAgentFiles);
     }
+  });
+
+  it('chat forwards unknown arguments to the selected agent CLI', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-forward-codex-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+
+    runCli([
+      'chat',
+      '--agent', 'codex',
+      '--dir', projectDir,
+      '--prompt', 'hello',
+      '--skip-prerequisites',
+      'exec',
+      '--sandbox', 'read-only',
+      '--json',
+    ], {
+      env: {
+        PATH: pathValue,
+        Path: pathValue,
+        AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+        ...(pathext ? { PATHEXT: pathext } : {}),
+      },
+    });
+
+    expect(readFileSync(argsFile, 'utf-8').trim()).toBe('exec --sandbox read-only --json hello');
   });
 });

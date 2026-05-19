@@ -35,8 +35,9 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
   'github-copilot': {
     command: 'copilot',
     buildArgs: (ctx) => {
-      const args = ['--agent', 'functions-copilot'];
-      if (ctx.startupPrompt) args.push('-i', ctx.startupPrompt);
+      const passthroughArgs = ctx.passthroughArgs || [];
+      const args = ['--agent', 'functions-copilot', ...passthroughArgs];
+      if (ctx.startupPrompt && !hasCopilotPromptArg(passthroughArgs)) args.push('-i', ctx.startupPrompt);
       return args;
     },
     description: 'GitHub Copilot CLI',
@@ -44,8 +45,8 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
   'claude-code': {
     command: 'claude',
     buildArgs: (ctx) => {
-      const args = [];
-      if (ctx.startupPrompt) args.push(ctx.startupPrompt);
+      const args = [...(ctx.passthroughArgs || [])];
+      if (ctx.startupPrompt) insertClaudePrompt(args, ctx.startupPrompt);
       return args;
     },
     description: 'Claude Code',
@@ -53,13 +54,26 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
   'codex': {
     command: 'codex',
     buildArgs: (ctx) => {
-      const args = [];
+      const args = [...(ctx.passthroughArgs || [])];
       if (ctx.startupPrompt) args.push(ctx.startupPrompt);
       return args;
     },
     description: 'Codex CLI',
   },
 };
+
+function hasCopilotPromptArg(args: string[]): boolean {
+  return args.some(arg => arg === '-p' || arg === '--prompt' || arg === '-i' || arg === '--interactive');
+}
+
+function insertClaudePrompt(args: string[], startupPrompt: string): void {
+  const printIndex = args.findIndex(arg => arg === '-p' || arg === '--print');
+  if (printIndex >= 0) {
+    args.splice(printIndex + 1, 0, startupPrompt);
+    return;
+  }
+  args.push(startupPrompt);
+}
 
 // ─── Agent detection ───
 
@@ -188,7 +202,7 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
   }
 
   const startupPrompt = options.prompt || await buildStartupPrompt(dir);
-  const args = launcher.buildArgs({ startupPrompt });
+  const args = launcher.buildArgs({ startupPrompt, passthroughArgs: options.passthroughArgs });
   const resolvedLauncher = resolveLauncherCommand(launcher.command);
 
   const child = spawn(resolvedLauncher.command, [...resolvedLauncher.argsPrefix, ...args], {
@@ -273,7 +287,7 @@ function findWindowsLauncherCandidates(command: string, env: NodeJS.ProcessEnv):
     .map(extension => extension.trim())
     .filter(Boolean);
   const commandHasExtension = /\.[^\\/]+$/.test(command);
-  const commandNames = commandHasExtension ? [command] : [command, ...extensions.map(extension => `${command}${extension.toLowerCase()}`)];
+  const commandNames = commandHasExtension ? [command] : [...extensions.map(extension => `${command}${extension.toLowerCase()}`), command];
   const candidates: string[] = [];
 
   for (const directory of pathValue.split(';').map(entry => entry.trim()).filter(Boolean)) {

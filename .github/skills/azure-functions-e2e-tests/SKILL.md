@@ -33,6 +33,7 @@ This skill is intended for Agent mode, not passive chat.
 2. **Dynamic inventory** — derive expected `skills`, `prompts`, `mcp`, `hooks`, `agents`, plugin payload files, and Azure Skills dependency checks from the current repository files and docs at run time. Do not hard-code today's template names.
 3. **Scenario references first** — select scenarios from [scenarios.md](references/scenarios.md) and keep the run checklist inside `reports/e2e/<run-id>/`, not in the repository root.
 4. **Agent-visible proof required** — setup, chat, and plugin scenarios must prove that the target coding agent can see or use the installed `skills`, `prompts`, `mcp`, `hooks`, and `agents`; file existence alone is not enough.
+   Prefer a machine-readable inspection artifact for this proof. The artifact may be written by the runner from the agent's noninteractive output; do not require the agent itself to write the file when that would trigger local write approval.
 5. **Documented command contract** — plugin/setup/chat scenarios must use the documented command sequence from README or generated CLI help, then launch the target agent with an inspection prompt.
 6. **No silent scope reduction** — do not omit GitHub Copilot, Claude Code, Codex, setup, chat, plugin, docs consistency, basic help, or Azure Skills dependency scenarios unless the user explicitly narrows scope in the current request. If a scenario cannot run, execute the discovery/version/help command needed to prove why and record it as `blocked`, `unsupported`, or `fail`; never leave it out of the matrix.
 7. **Fresh plugin install semantics** — plugin scenarios test installation, not reuse. Before installing, inspect existing plugin state, uninstall/remove the target `azure-functions-skills` plugin with the official CLI when approved and supported, then reinstall through the documented flow. If cleanup is unsafe, denied, unsupported, or interactive-only, record the cleanup check and classify the plugin scenario as `blocked` unless an isolated config location proves a fresh install.
@@ -43,6 +44,52 @@ This skill is intended for Agent mode, not passive chat.
 12. **Beautiful report by the agent** — author the HTML report directly from evidence. Match the quality of the design report style: readable layout, summary cards, matrices, clear colors, failure analysis, and recommended fixes.
 13. **Review the review** — after drafting evidence and reports, perform a cross-check pass over commands, outputs, scenario statuses, and conclusions. Fix omitted scenarios and unsupported/blocked/fail classifications before presenting results.
 14. **No repository-root setup pollution** — never run `setup`, `chat`, agent inspection prompts, or generated help/discovery commands from the repository root when they can create files. Commands that may write agent files must run only inside `reports/e2e/<run-id>/workspaces/<scenario-id>/` or another explicitly isolated workspace. If checking CLI help, use command forms that cannot trigger setup/chat side effects, or run them from a disposable scenario workspace.
+15. **Final command list required** — every HTML report must include a `Command Evidence` section with the final execution command sequence for every scenario in the matrix, including pass, warning, blocked, unsupported, and failed scenarios. Do not collapse this down to generic patterns only; readers must be able to see exactly which command shape worked or did not work for each scenario.
+
+## Manual-first execution guidance
+
+When CLI behavior is uncertain, the user asks for a fresh manual run, or a prior automated runner has hidden failures, execute scenarios one at a time instead of batching the matrix behind a custom runner.
+
+- Create `reports/e2e/<run-id>/checklist.md` and `reports/e2e/<run-id>/evidence.md` first.
+- Run exactly one scenario in `reports/e2e/<run-id>/workspaces/<scenario-id>/`.
+- Immediately record the command, exit status, agent-visible response, and what made the scenario work before starting the next scenario.
+- Do not use a custom runner as the source of truth until the manual command shape is proven for that agent and scenario type.
+- If a command hangs, times out, or produces confusing output, stop that scenario, capture the failure, simplify the command, and rerun only that scenario.
+- Keep inspection prompts in a PowerShell variable so the prompt is passed as one argument on Windows.
+
+Stable Windows command shapes observed in manual E2E runs:
+
+```powershell
+# GitHub Copilot setup/plugin inspection
+copilot -C <workspace> --agent functions-copilot -p <inspection-prompt> --output-format json -s --allow-all --no-ask-user
+
+# GitHub Copilot chat inspection. The -p inspection prompt overrides chat startup prompt delivery,
+# so verify buildStartupPrompt(<workspace>) separately for startup-template assertions.
+azure-functions-skills chat --agent github-copilot --dir . --skip-prerequisites -p <inspection-prompt> --output-format json -s --allow-all --no-ask-user
+
+# Claude setup inspection
+claude -p <inspection-prompt> --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
+
+# Claude chat inspection. The wrapper inserts --prompt content after Claude's -p.
+azure-functions-skills chat --agent claude-code --dir . --skip-prerequisites --prompt <inspection-prompt> -p --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
+
+# Claude plugin/source inspection. Validate the payload separately.
+claude plugin validate <plugin-payload-dir>
+claude -p <inspection-prompt> --plugin-dir <plugin-payload-dir> --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
+
+# Codex setup inspection
+codex exec --sandbox read-only --json --output-last-message <workspace>\e2e-agent-inspection.json --ephemeral --skip-git-repo-check --cd <workspace> <inspection-prompt>
+
+# Codex chat inspection. The wrapper appends --prompt content as the final Codex prompt.
+azure-functions-skills chat --agent codex --dir . --skip-prerequisites --prompt <inspection-prompt> exec --sandbox workspace-write --json --output-last-message e2e-chat-inspection.json --ephemeral --skip-git-repo-check --cd .
+```
+
+Current CLI caveats to record in reports:
+
+- `azure-functions-skills setup --help` and `azure-functions-skills chat --help` may execute the subcommand rather than displaying subcommand help. Run those probes only in disposable workspaces, or use top-level `azure-functions-skills --help` for read-only discovery.
+- Claude Code may load a plugin with `--plugin-dir` even when `claude plugin validate` reports manifest errors. Treat validation failure as a warning or failure according to the scenario contract; do not let session-scoped load alone hide packaging issues.
+- Codex CLI 0.130.0 supports `codex plugin marketplace add/remove`, but exposes no noninteractive plugin install/list/select command. Marketplace registration alone is not enough for a plugin scenario pass.
+- Generated SessionStart hooks currently check `az`, `func`, and `node`; if a scenario evaluates deployment readiness, separately verify or report `azd` availability because deployment guidance depends on Azure Developer CLI.
 
 ## Execution policy
 
@@ -65,7 +112,7 @@ When the user asks to run or validate E2E tests:
    - Install or register `azure-functions-skills` using the documented flow for that mode.
    - Verify whether the dependent `azure-skills` surfaces are present or whether clear install guidance is shown.
    - Launch the actual coding-agent CLI with an inspection prompt. The prompt must ask it to report visible/usable `agents`, `skills`, `prompts`, `mcp`, `hooks`, plugin surfaces, and Azure Skills dependency surfaces. Treat missing agent-response evidence as `blocked` or `fail` according to the cause.
-   - For `chat`, also verify that startup loads the intended agent and welcome/startup message.
+   - For `chat`, use the `azure-functions-skills chat` command itself as the launcher under test and pass agent-specific noninteractive options through to the selected coding-agent CLI. Verify `chat` auto-setup, startup prompt delivery, launcher selection, and the resulting agent-visible artifact from the same command. Do not bypass `chat` with a direct `copilot`, `claude`, or `codex` command unless the pass-through command is unavailable or fails and you are collecting follow-up diagnosis.
 4. For plugin scenarios, the command sequence is part of the test contract:
    - Every plugin scenario must begin with pre-state discovery (`plugin list`, `marketplace list`, `plugin details`, or the closest current CLI help/list command), then a cleanup step, then install/register, then post-install state, then agent inspection.
    - GitHub Copilot CLI must follow README order after cleanup: `copilot plugin marketplace add Azure/azure-functions-skills`, then `copilot plugin install azure-functions-skills@azure-functions-skills`, then run Copilot with the Functions agent, for example `copilot --agent functions-copilot -p "<inspection prompt>"`.
@@ -78,6 +125,7 @@ When the user asks to run or validate E2E tests:
    - Command text, cwd, environment assumptions, start/end time, exit code, and redacted stdout/stderr excerpt.
    - The recorded `cwd` for setup/chat/agent-inspection commands must be the scenario workspace under `reports/e2e/<run-id>/workspaces/<scenario-id>/`. If a command is intentionally run from another directory, record why it was safe and why it could not write repository-root agent files.
    - In the HTML report, put command details and output in collapsed `<details><summary>...</summary>...</details>` sections so readers can inspect them without overwhelming the summary.
+   - Also include a scenario-by-scenario final command list in the HTML report's `Command Evidence` section. This list must cover every selected scenario, even when the result is `blocked`, `unsupported`, or `fail`, and must show the final command sequence used after any manual iteration or recovery.
 6. Workspace retention:
    - Before cleanup, ask the user whether to keep failed scenario workspaces, keep all workspaces, or delete all temporary workspaces.
    - If the user keeps workspaces, record retained paths in the evidence/report after redacting user-specific path segments where sharing externally.
@@ -86,10 +134,19 @@ When the user asks to run or validate E2E tests:
    - Because this starts as a local E2E workflow, it is acceptable to ask the user to authenticate, approve a CLI prompt, reload VS Code, or run a one-time login when a real agent/plugin flow is blocked by auth.
    - Do not mark auth-blocked scenarios as fail unless authentication should already have been available according to the scenario contract; otherwise use `blocked` with clear next steps.
 8. Prefer automation-friendly CLI options before asking the user for manual interaction:
+   - **Inspection artifacts**: require each setup/chat/plugin inspection prompt to produce or be captured into a parseable JSON artifact such as `e2e-chat-inspection.json`. The artifact should include `agent`, `workspaceRoot`, `startupContextVisible`, `skills`, `mcpServers`, `hooks`, `agents`, `passed`, and `notes`. The runner must parse this artifact and compare the reported surfaces against the dynamic inventory before marking the scenario `pass`.
+    - **Agent file writes**: for chat scenarios, prefer proving the new `chat` pass-through path by letting the real agent create `e2e-chat-inspection.json` or by using the agent's output-file option through `chat`. Grant write permissions only inside the isolated scenario workspace. For setup/plugin visibility checks that do not need to prove file editing, capture the noninteractive response to a file outside the agent, for example with shell redirection or an output-file CLI option.
+   - **Workspace root verification**: ask the agent to report the workspace root it inspected. If the reported root is the repository root or any directory outside the isolated scenario workspace, mark the inspection `fail` or rerun from a safer external disposable workspace and record the reason.
+    - **Chat pass-through inspection**: pass agent-specific headless options after the `chat` options. The `chat` command intentionally forwards unrecognized options to the selected agent CLI. Use this as the primary chat E2E path so the same command proves launcher behavior and agent-visible proof. If a pass-through command fails, record the exact command and stderr, then use a direct agent command only as a diagnostic comparison.
+       - GitHub Copilot example: `azure-functions-skills chat --agent github-copilot --dir <workspace> --skip-prerequisites -p "<inspection prompt>" --yolo --no-ask-user --output-format json --silent`.
+       - Claude Code example: `azure-functions-skills chat --agent claude-code --dir <workspace> --prompt "<inspection prompt>" --skip-prerequisites -p --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob,Write`.
+       - Codex example: `azure-functions-skills chat --agent codex --dir <workspace> --prompt "<inspection prompt>" --skip-prerequisites exec --sandbox workspace-write --json --output-last-message e2e-chat-inspection.txt --ephemeral --skip-git-repo-check --cd <workspace>`.
    - **Claude Code prompt runs**: use `claude -p` / `claude --print` so the command prints and exits. Prefer `--output-format json`, `--no-session-persistence`, `--permission-mode dontAsk`, and a minimal `--tools Read,LS,Grep,Glob` tool set for inspection prompts. Use `--include-hook-events` only with `--output-format=stream-json` when hook evidence is required.
+     For parseable inspection artifacts, `--output-format text` with a prompt that requires raw JSON can be easier to validate than Claude's wrapper JSON. For setup scenarios, use the installer target name `claude`; reserve `claude-code` for the `chat` launcher agent id unless CLI help documents otherwise.
    - **Claude Code plugin/source runs**: prefer session-scoped `--plugin-dir <plugin-payload-dir>` when the CLI supports it because it loads a plugin for the current run without mutating global plugin state. If the README still documents `--add-dir`, record both the README command contract and the current `--plugin-dir` automation equivalent, and classify any docs mismatch in `docs-command-consistency`.
    - **Claude Code installed plugin cleanup**: use `claude plugin list --json` for pre/post-state, `claude plugin install <plugin> --scope local|project|user` when testing installed plugin flows, and `claude plugin uninstall|remove <plugin> --scope <scope> -y` for approved cleanup. Use `--keep-data` when preserving plugin data matters.
    - **Codex prompt runs**: use `codex exec` for noninteractive inspection. Prefer `--sandbox read-only` for visibility checks, `--json` for machine-readable transcripts, `--output-last-message <file>` for concise report excerpts, `--ephemeral` to avoid session persistence, `--skip-git-repo-check` for empty isolated workspaces, and `--cd <workspace>` instead of relying on inherited cwd. Use `--dangerously-bypass-approvals-and-sandbox` only inside an external sandbox and only when the scenario explicitly requires write/execute behavior.
+       For visibility artifacts, combine `--output-last-message e2e-chat-inspection.json` with a prompt that requires raw JSON only, then parse that file and keep the full `--json` transcript as separate evidence.
    - **Codex plugin marketplace cleanup**: use `codex plugin marketplace remove <name>` and `codex plugin marketplace add <source>` for approved marketplace cleanup/re-registration. As of Codex CLI 0.130.0, `codex plugin --help` exposes marketplace management but no noninteractive plugin install/select/list command; if `/plugins` is required, record the help output and mark install/select `blocked` unless the user completes the interactive step.
    - **Alternate screen/TUI capture**: when a CLI still launches an interactive TUI, look for options such as Codex `--no-alt-screen` or a print/exec mode before asking the user to operate the UI. If no noninteractive route exists, record the TUI limitation as evidence.
 9. If an agent or mode cannot support a surface, report `unsupported` with a reason. If a CLI hangs, lacks authentication, or cannot safely isolate plugin state, report `blocked`. If a surface should work but does not, report `fail` with failure analysis.
@@ -138,6 +195,7 @@ At the end of every run, after cross-checking the report, overwrite `reports/e2e
    - Include scenario x agent support status, versions, test datetime, platform, failure evidence, unsupported reasons, and recommended fixes.
    - Include a capability surface matrix for GitHub Copilot, Claude Code, and Codex across `plugin`, `skills`, `prompts`, `mcp`, `hooks`, and `agents`.
    - Include detailed evidence for how each surface was checked: dynamic inventory source, generated file path, launch command, agent response excerpt, and unsupported/block/fail reason.
+   - Include the final execution commands for every scenario in `Command Evidence`. The section must show the actual scenario command sequence, not only reusable command patterns or examples.
    - Include collapsed command logs with command, cwd, exit code, and redacted output.
    - Include retained workspace paths or cleanup status for every scenario.
    - Include failure analysis that explains why a failure occurred and what should be fixed next.

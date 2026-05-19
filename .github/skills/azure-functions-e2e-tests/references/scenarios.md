@@ -56,6 +56,50 @@ Setup and chat scenarios must prove both installation and runtime visibility:
 
 File checks alone are insufficient for `pass` because they do not prove the coding agent can load or use the installed surfaces. If the files exist but the agent cannot be launched or cannot confirm visibility, classify the scenario as `blocked` or `fail` with evidence.
 
+### Inspection artifact requirement
+
+Setup, chat, and plugin scenarios should capture the real-agent inspection response into a parseable JSON artifact, normally `e2e-chat-inspection.json` or `e2e-agent-inspection.json`, in the scenario workspace. For chat scenarios, prefer producing the artifact through `azure-functions-skills chat` pass-through arguments so the test exercises the real chat launcher and the target agent in one command. The runner may write this artifact from noninteractive agent output when the scenario is not specifically testing write behavior.
+
+The inspection prompt should require raw JSON with these fields:
+
+```json
+{
+  "agent": "codex",
+  "workspaceRoot": "<scenario-workspace>",
+  "startupContextVisible": true,
+  "skills": [],
+  "mcpServers": [],
+  "hooks": [],
+  "agents": [],
+  "passed": true,
+  "notes": []
+}
+```
+
+The runner must parse the artifact, verify `workspaceRoot` is the isolated scenario workspace, and compare reported surfaces with the dynamic inventory. If the artifact is missing, invalid JSON, empty, reports the repository root instead of the scenario workspace, or omits required surfaces without an unsupported/block reason, classify the inspection check as `fail` or `blocked`.
+
+Do not rely on an interactive `chat` command to write this file. Use the `chat` command's pass-through behavior to select each agent's noninteractive mode instead. If pass-through fails, record that as chat evidence and use a direct agent command only as a diagnostic follow-up, not as a substitute for passing the chat scenario.
+
+Recommended chat inspection command shapes:
+
+```powershell
+# GitHub Copilot: pass noninteractive prompt and permission flags through chat.
+azure-functions-skills chat --agent github-copilot --dir <workspace> --skip-prerequisites `
+  -p "<inspection prompt>" --yolo --no-ask-user --output-format json --silent
+
+# Claude Code: chat inserts --prompt content after -p/--print and forwards the rest.
+azure-functions-skills chat --agent claude-code --dir <workspace> --skip-prerequisites `
+  --prompt "<inspection prompt>" -p --output-format text --no-session-persistence `
+  --permission-mode bypassPermissions --tools Read,LS,Grep,Glob,Write
+
+# Codex: pass the exec subcommand and output-file options through chat.
+azure-functions-skills chat --agent codex --dir <workspace> --skip-prerequisites `
+  --prompt "<inspection prompt>" exec --sandbox workspace-write --json `
+  --output-last-message e2e-chat-inspection.txt --ephemeral --skip-git-repo-check --cd <workspace>
+```
+
+For GitHub Copilot, parse JSONL stdout and preserve the `session.skills_loaded` and final assistant message events as evidence. For Claude Code, parse the requested raw JSON artifact or stdout text. For Codex, parse the `--output-last-message` file and keep the full `--json` transcript as command evidence.
+
 ## Fresh plugin install requirements
 
 Plugin scenarios validate the installation flow, not reuse of a plugin that happened to be installed before the run. Every plugin scenario must capture these phases:
@@ -75,9 +119,11 @@ If cleanup would mutate user-level state and approval is unavailable, mark the c
 Use noninteractive CLI modes whenever they can preserve the scenario contract:
 
 - Claude Code inspection prompts should use `claude -p` / `claude --print` with `--output-format json` when practical, `--no-session-persistence`, `--permission-mode dontAsk`, and a small tool allowlist such as `--tools Read,LS,Grep,Glob`.
+- Claude Code parseable artifact prompts may use `--output-format text` plus shell redirection to `e2e-chat-inspection.json` when the prompt requires raw JSON only. For chat scenarios, pass `-p --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob,Write` through `azure-functions-skills chat`; use `--prompt "<inspection prompt>"` for the inspection text. Use `setup --agent claude` for setup-mode installation; `claude-code` is the chat launcher id unless current CLI help says otherwise.
 - Claude Code session-scoped plugin tests should prefer `--plugin-dir <plugin-payload-dir>` when available. This loads a plugin for the current run only and avoids manual/global install state. If the README command is still `--add-dir`, record whether `--add-dir` and `--plugin-dir` are equivalent or whether README needs to be updated.
 - Claude Code installed plugin tests should use `claude plugin list --json`, `claude plugin install <plugin> --scope local|project|user`, and `claude plugin uninstall|remove <plugin> --scope <scope> -y` for approved fresh-install cleanup.
 - Codex inspection prompts should use `codex exec --sandbox read-only --json --output-last-message <file> --ephemeral --skip-git-repo-check --cd <workspace> <prompt>` when practical.
+- For Codex, keep the `--json` transcript as command evidence and parse the `--output-last-message` file as the concise inspection artifact. For chat scenarios, pass `exec --sandbox read-only|workspace-write --json --output-last-message <file> --ephemeral --skip-git-repo-check --cd <workspace>` through `azure-functions-skills chat`; do not use bare `codex <prompt>` for non-TTY E2E.
 - Codex marketplace cleanup can use `codex plugin marketplace remove <name>` followed by `codex plugin marketplace add <source>` when approved. Current Codex CLI 0.130.0 exposes marketplace management but no noninteractive plugin install/select/list command; plugin activation from `/plugins` remains `blocked` unless the user completes the interaction or a newer CLI exposes an automation option.
 - If a TUI opens despite these options, capture the help output showing the missing noninteractive path and classify the scenario instead of waiting indefinitely.
 

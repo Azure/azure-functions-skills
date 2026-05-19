@@ -56,6 +56,7 @@ export interface SetupResult {
 
 export interface LauncherContext {
   startupPrompt?: string;
+  passthroughArgs?: string[];
 }
 
 export interface Launcher {
@@ -74,6 +75,7 @@ export interface ChatOptions {
   agent?: LauncherId;
   prompt?: string;
   dir?: string;
+  passthroughArgs?: string[];
   prerequisites?: PrerequisiteMode;
   prerequisiteRunner?: CommandRunner;
 }
