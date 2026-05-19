@@ -30,9 +30,9 @@ The report should include the inventory counts and paths used for each run. If a
 
 ## Workspace and cwd requirements
 
-All scenario commands that can write files must run from an isolated scenario workspace under `reports/e2e/<run-id>/workspaces/<scenario-id>/`. This includes setup commands, chat commands, real-agent inspection prompts, and any CLI help/discovery command that could accidentally execute setup or chat behavior. Do not run these commands from the repository root.
+All scenario commands that can write files must run from an isolated scenario workspace under `reports/e2e/<run-id>/workspaces/<scenario-id>/`. This includes setup commands, chat commands, real-agent inspection prompts, and any CLI help/discovery command that could accidentally execute setup or chat behavior. Do not run these commands from the repository root. For this package, treat `setup --help` as unsafe from the repository root because it can follow the setup code path in current CLI versions; use top-level `--help` for read-only discovery, or run subcommand help probes inside a disposable scenario workspace.
 
-When invoking this repository's CLI, pass `--dir <scenario-workspace>` explicitly and set the process cwd to that scenario workspace whenever practical. If a command must run from the repository root to access source files, record why it is read-only or otherwise safe, and verify afterward that no root-level `.agents`, `.claude`, `.codex`, `.github/agents`, `.github/hooks`, `.github/skills/<non-e2e>`, `AGENTS.md`, or `CLAUDE.md` artifacts were created.
+When invoking this repository's CLI, pass `--dir <scenario-workspace>` explicitly and set the process cwd to that scenario workspace whenever practical. Avoid reusable examples that depend only on `--dir .`; if `--dir .` is used for an interactive manual step, the command block must first set and verify cwd as the scenario workspace. If a command must run from the repository root to access source files, record why it is read-only or otherwise safe, and verify afterward that no root-level `.agents`, `.claude`, `.codex`, `.github/agents`, `.github/hooks`, `.github/skills/<non-e2e>`, `AGENTS.md`, or `CLAUDE.md` artifacts were created.
 
 Resolve scenario paths from the repository root rather than hard-coding drive letters or host-specific absolute paths. Use `git rev-parse --show-toplevel`, `Join-Path` in PowerShell, and quoted variables in Bash. Do not keep relative `reports/e2e/...` variables after changing cwd; this causes nested scenario workspaces. If cwd drift creates a nested scenario workspace, mark that evidence harness-invalid and rerun the scenario from a clean sibling workspace.
 
@@ -46,7 +46,8 @@ $workspace = Join-Path $Workspaces '<scenario-id>'
 New-Item -ItemType Directory -Force -Path $workspace | Out-Null
 Push-Location $workspace
 try {
-  # scenario command with --dir . when practical
+  if ((Get-Location).Path -ne $workspace) { throw "cwd is not scenario workspace" }
+  # scenario command with --dir $workspace
 } finally {
   Pop-Location
 }
@@ -61,7 +62,8 @@ workspace="$run_dir/workspaces/<scenario-id>"
 mkdir -p "$workspace"
 (
   cd "$workspace"
-  # scenario command with --dir . when practical
+  test "$(pwd)" = "$workspace" || exit 1
+  # scenario command with --dir "$workspace"
 )
 ```
 
@@ -116,9 +118,10 @@ Recommended chat inspection command shapes:
 
 ```powershell
 # GitHub Copilot: exercise workspace-local agent discovery through chat's normal launcher.
-Push-Location <workspace>
+Push-Location $workspace
 try {
-  azure-functions-skills chat --agent github-copilot --dir . --skip-prerequisites `
+  if ((Get-Location).Path -ne $workspace) { throw "cwd is not scenario workspace" }
+  azure-functions-skills chat --agent github-copilot --dir $workspace --skip-prerequisites `
     --output-format json -s --allow-all --no-ask-user -p "Inspect visible Azure Functions skills, agents, MCP, hooks, startup context, and workspace root. Return raw JSON with passed=true when visible."
 } finally {
   Pop-Location
@@ -235,7 +238,7 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
   - Startup prompt detects existing `host.json` when present.
   - Launch command selects `functions-copilot`.
   - Azure Skills dependency check is attempted or clear manual guidance is shown.
-  - A real GitHub Copilot CLI run through `azure-functions-skills chat --agent github-copilot --dir .` with headless passthrough (`--output-format json -s --allow-all --no-ask-user -p <inspection prompt>`) or an artifact-writing prompt confirms the startup-loaded agent can see or use installed skills, prompts/instructions, MCP, hooks, and agent surfaces.
+  - A real GitHub Copilot CLI run through `azure-functions-skills chat --agent github-copilot --dir <scenario-workspace>` with headless passthrough (`--output-format json -s --allow-all --no-ask-user -p <inspection prompt>`) or an artifact-writing prompt confirms the startup-loaded agent can see or use installed skills, prompts/instructions, MCP, hooks, and agent surfaces. If a manual rerun uses `--dir .`, the command evidence must show the cwd was the scenario workspace, not the repository root.
   - Do not fail this scenario solely because a direct `copilot -p` headless diagnostic cannot select the workspace-local `functions-copilot` agent. That diagnostic uses a different discovery path than the chat launcher.
 
 ### `chat-welcome-claude`
