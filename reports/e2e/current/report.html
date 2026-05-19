@@ -3,216 +3,176 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Azure Functions Skills E2E Report - 20260517T184312Z</title>
+  <title>Azure Functions Skills E2E Report - 20260519T-manual</title>
   <style>
-    :root {
-      color-scheme: light;
-      --bg: #f6f8fb;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #5b6577;
-      --line: #d9e0ea;
-      --pass: #147d52;
-      --warn: #9a6700;
-      --fail: #c7352a;
-      --blocked: #6b4bb8;
-      --unsupported: #596579;
-      --accent: #1769aa;
-    }
-    body { margin: 0; font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; color: var(--ink); background: var(--bg); }
-    header { background: #15395b; color: white; padding: 28px 32px; }
-    header h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
-    header p { margin: 0; color: #d8e8f7; }
-    main { max-width: 1180px; margin: 0 auto; padding: 24px; }
-    section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin: 16px 0; }
-    h2 { margin: 0 0 12px; font-size: 20px; }
-    h3 { margin: 18px 0 8px; font-size: 15px; }
-    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-    .card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fbfcfe; }
-    .metric { font-size: 24px; font-weight: 700; }
-    .muted { color: var(--muted); }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
-    th { background: #eef3f8; }
-    .status { display: inline-block; padding: 2px 8px; border-radius: 999px; color: white; font-weight: 700; font-size: 12px; }
-    .pass { background: var(--pass); }
-    .warning { background: var(--warn); }
-    .fail { background: var(--fail); }
-    .blocked { background: var(--blocked); }
-    .unsupported { background: var(--unsupported); }
-    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
-    pre { white-space: pre-wrap; background: #101828; color: #f4f7fb; border-radius: 8px; padding: 12px; overflow: auto; }
-    details { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 10px 0; background: #fbfcfe; }
-    summary { cursor: pointer; font-weight: 700; }
-    ul { padding-left: 20px; }
-    @media (max-width: 800px) { .grid { grid-template-columns: 1fr 1fr; } main { padding: 12px; } }
+    :root { --ok:#137333; --warn:#b06000; --block:#7b1fa2; --fail:#b3261e; --ink:#1f2937; --muted:#5f6b7a; --line:#d7dde5; --bg:#f7f9fc; --card:#fff; }
+    body { margin:0; font-family:Segoe UI, Arial, sans-serif; color:var(--ink); background:var(--bg); }
+    header { background:#0f172a; color:white; padding:28px 36px; }
+    main { max-width:1160px; margin:0 auto; padding:28px 24px 48px; }
+    h1 { margin:0 0 8px; font-size:28px; }
+    h2 { margin:28px 0 12px; font-size:20px; }
+    h3 { margin:18px 0 8px; font-size:16px; }
+    p { line-height:1.55; }
+    .meta { color:#cbd5e1; margin:0; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
+    .metric { font-size:28px; font-weight:700; }
+    .ok { color:var(--ok); } .warn { color:var(--warn); } .block { color:var(--block); } .fail { color:var(--fail); }
+    table { width:100%; border-collapse:collapse; background:white; border:1px solid var(--line); }
+    th, td { border-bottom:1px solid var(--line); padding:10px 12px; text-align:left; vertical-align:top; }
+    th { background:#eef2f7; font-weight:600; }
+    tr:last-child td { border-bottom:none; }
+    .badge { display:inline-block; border-radius:999px; padding:2px 9px; font-size:12px; font-weight:700; border:1px solid currentColor; }
+    .small { color:var(--muted); font-size:13px; }
+    code { background:#eef2f7; padding:1px 4px; border-radius:4px; }
+    pre { white-space:pre-wrap; overflow:auto; background:#111827; color:#e5e7eb; padding:12px; border-radius:8px; }
+    details { background:white; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:10px 0; }
+    summary { cursor:pointer; font-weight:600; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Azure Functions Skills E2E Report</h1>
-    <p>Run ID 20260517T184312Z - fresh local matrix on Windows - package 0.11.3 - commit 330629ea</p>
-  </header>
-  <main>
-    <section>
-      <h2>Executive Summary</h2>
-      <div class="grid">
-        <div class="card"><div class="metric">12</div><div class="muted">Scenario records</div></div>
-        <div class="card"><div class="metric">3</div><div class="muted">Setup scenarios passed or warned</div></div>
-        <div class="card"><div class="metric">2</div><div class="muted">Chat launch failures</div></div>
-        <div class="card"><div class="metric">3</div><div class="muted">Plugin scenarios blocked/unsupported</div></div>
-      </div>
-      <p>The setup path is the strongest result: GitHub Copilot, Claude Code, and Codex all received workspace-local Azure Functions skill files, and real-agent inspection confirmed visibility. Chat and plugin paths need work: Windows PowerShell shim launch fails for Copilot/Codex chat, Claude chat blocks on MCP selection, and plugin installation is not automation-friendly enough to prove a fresh lifecycle.</p>
-    </section>
+<header>
+  <h1>Azure Functions Skills E2E Report</h1>
+  <p class="meta">Run ID: 20260519T-manual | Package: @agent-loom/azure-functions-skills 0.11.3 | OS: Windows | Method: manual one-scenario-at-a-time</p>
+</header>
+<main>
+  <section class="grid">
+    <div class="card"><div class="metric ok">8</div><div>Pass</div></div>
+    <div class="card"><div class="metric warn">3</div><div>Warning</div></div>
+    <div class="card"><div class="metric block">1</div><div>Blocked</div></div>
+    <div class="card"><div class="metric fail">0</div><div>Fail</div></div>
+  </section>
 
-    <section>
-      <h2>Environment</h2>
-      <table>
-        <tr><th>Item</th><th>Value</th></tr>
-        <tr><td>Platform</td><td>Windows / PowerShell</td></tr>
-        <tr><td>Package</td><td>@agent-loom/azure-functions-skills 0.11.3</td></tr>
-        <tr><td>Node/npm</td><td>Node v22.17.0, npm 10.9.2</td></tr>
-        <tr><td>GitHub Copilot CLI</td><td>1.0.49-1</td></tr>
-        <tr><td>Claude Code</td><td>2.1.143</td></tr>
-        <tr><td>Codex CLI</td><td>0.130.0</td></tr>
-      </table>
-    </section>
+  <h2>Executive Summary</h2>
+  <div class="card">
+    <p>The full local E2E matrix was rerun from scratch without using previous result files or a custom runner. Each scenario was executed manually in its own workspace under <code>reports/e2e/20260519T-manual/workspaces/</code>, then recorded immediately in the checklist and evidence log.</p>
+    <p>Workspace setup and chat flows passed for GitHub Copilot, Claude Code, and Codex. GitHub Copilot plugin installation passed after target-only cleanup and fresh reinstall. Claude plugin loading worked through <code>--plugin-dir</code>, but native plugin validation failed. Codex marketplace registration worked, but plugin activation is blocked because Codex CLI 0.130.0 has no noninteractive plugin install/select/list command.</p>
+  </div>
 
-    <section>
-      <h2>Dynamic Inventory</h2>
-      <p>Expected surfaces were derived from current repository files, not previous reports.</p>
-      <table>
-        <tr><th>Surface</th><th>Count</th><th>Source</th></tr>
-        <tr><td>Skills</td><td>9</td><td><code>templates/skills/*/SKILL.md</code></td></tr>
-        <tr><td>Prompts</td><td>1</td><td><code>templates/prompts/startup.md</code></td></tr>
-        <tr><td>MCP</td><td>1</td><td><code>templates/mcp/servers.yaml</code></td></tr>
-        <tr><td>Hooks</td><td>1</td><td><code>templates/hooks/welcome-setup.md</code></td></tr>
-        <tr><td>Agents</td><td>2</td><td><code>templates/agents/functions-copilot.agent.md</code>, <code>templates/agents/AGENTS.md</code></td></tr>
-        <tr><td>Plugin payload</td><td>present</td><td><code>.github/plugins/azure-functions-skills/</code></td></tr>
-      </table>
-    </section>
+  <h2>Scenario Matrix</h2>
+  <table>
+    <thead><tr><th>Scenario</th><th>Status</th><th>Evidence Summary</th></tr></thead>
+    <tbody>
+      <tr><td>setup-workspace-ghcp</td><td><span class="badge ok">pass</span></td><td>56 GitHub Copilot workspace files installed; real Copilot saw all 9 skills, MCP, hook, and functions-copilot agent.</td></tr>
+      <tr><td>setup-workspace-claude</td><td><span class="badge ok">pass</span></td><td>53 Claude files installed; real Claude saw all 9 skills and Azure MCP settings.</td></tr>
+      <tr><td>setup-workspace-codex</td><td><span class="badge ok">pass</span></td><td>54 Codex files installed; real Codex saw all 9 skills, MCP config, hooks, and AGENTS.md guidance.</td></tr>
+      <tr><td>chat-welcome-ghcp</td><td><span class="badge ok">pass</span></td><td>Chat auto-setup installed GHCP files and launched functions-copilot; separate startup prompt check detected host.json and deploy suggestion.</td></tr>
+      <tr><td>chat-welcome-claude</td><td><span class="badge ok">pass</span></td><td>Chat auto-setup installed Claude files; real Claude saw all 9 skills and Azure MCP context.</td></tr>
+      <tr><td>chat-welcome-codex</td><td><span class="badge ok">pass</span></td><td>Chat auto-setup installed Codex files; real Codex wrote parseable inspection JSON with all surfaces visible.</td></tr>
+      <tr><td>plugin-install-ghcp</td><td><span class="badge ok">pass</span></td><td>Target plugin and marketplace were removed, re-added, and reinstalled; Copilot reported pluginInstalled true and all 9 skills.</td></tr>
+      <tr><td>plugin-install-claude</td><td><span class="badge warn">warning</span></td><td><code>claude plugin validate</code> failed with manifest errors, but session-scoped <code>--plugin-dir</code> loading exposed all 9 skills.</td></tr>
+      <tr><td>plugin-install-codex</td><td><span class="badge block">blocked</span></td><td>Marketplace remove/add succeeded, but Codex CLI exposes no noninteractive install/list/select command.</td></tr>
+      <tr><td>docs-command-consistency</td><td><span class="badge warn">warning</span></td><td>README mostly matches real CLI behavior; subcommand <code>setup --help</code>/<code>chat --help</code> execute behavior, and Claude docs should consider <code>--plugin-dir</code>.</td></tr>
+      <tr><td>basic-help-prompt</td><td><span class="badge ok">pass</span></td><td>GHCP, Claude, and Codex all explained setup, create, deploy, diagnostics, best practices, and feedback without unsupported claims.</td></tr>
+      <tr><td>azure-skills-dependency</td><td><span class="badge warn">warning</span></td><td>GHCP confirmed Azure Skills present; Codex correctly reported dependency availability as blocked/warning rather than pass.</td></tr>
+    </tbody>
+  </table>
 
-    <section>
-      <h2>Scenario Matrix</h2>
-      <table>
-        <tr><th>Scenario</th><th>Agent</th><th>Mode</th><th>Status</th><th>Key evidence</th></tr>
-        <tr><td>setup-workspace-ghcp</td><td>GitHub Copilot</td><td>setup</td><td><span class="status pass">pass</span></td><td>Copilot reported 9 skills, functions-copilot agent, instructions, MCP, and hook.</td></tr>
-        <tr><td>setup-workspace-claude</td><td>Claude Code</td><td>setup</td><td><span class="status pass">pass</span></td><td>Claude reported 9 skills, CLAUDE.md, and MCP settings.</td></tr>
-        <tr><td>setup-workspace-codex</td><td>Codex</td><td>setup</td><td><span class="status warning">warning</span></td><td>Codex reported surfaces; hook omits azd check.</td></tr>
-        <tr><td>chat-welcome-ghcp</td><td>GitHub Copilot</td><td>chat</td><td><span class="status fail">fail</span></td><td>Auto-setup wrote files, but launcher failed with copilot not found on Windows.</td></tr>
-        <tr><td>chat-welcome-claude</td><td>Claude Code</td><td>chat</td><td><span class="status blocked">blocked</span></td><td>Claude opened interactive MCP server selection.</td></tr>
-        <tr><td>chat-welcome-codex</td><td>Codex</td><td>chat</td><td><span class="status fail">fail</span></td><td>Auto-setup wrote files, but launcher failed with codex not found on Windows.</td></tr>
-        <tr><td>plugin-install-ghcp</td><td>GitHub Copilot</td><td>plugin</td><td><span class="status blocked">blocked</span></td><td>Plugin marketplace/install flow entered interactive or alternate-screen behavior.</td></tr>
-        <tr><td>plugin-install-claude</td><td>Claude Code</td><td>plugin</td><td><span class="status unsupported">unsupported</span></td><td>Current help did not expose documented plugin/add-dir support.</td></tr>
-        <tr><td>plugin-install-codex</td><td>Codex</td><td>plugin</td><td><span class="status blocked">blocked</span></td><td>Marketplace management exists, but install/select remains interactive.</td></tr>
-        <tr><td>docs-command-consistency</td><td>All</td><td>docs</td><td><span class="status fail">fail</span></td><td>README skill list matches; Claude plugin docs and Windows chat launch behavior do not.</td></tr>
-        <tr><td>basic-help-prompt</td><td>All</td><td>setup</td><td><span class="status warning">warning</span></td><td>Copilot and Codex help evidence passed; Claude durable transcript capture was incomplete.</td></tr>
-        <tr><td>azure-skills-dependency</td><td>Copilot/Codex</td><td>chat/plugin</td><td><span class="status pass">pass</span></td><td>Setup/deploy skills include Azure Skills install guidance and deployment dependency details.</td></tr>
-      </table>
-    </section>
+  <h2>Capability Surface</h2>
+  <table>
+    <thead><tr><th>Agent</th><th>Plugin</th><th>Setup</th><th>Chat</th><th>Skills</th><th>MCP</th><th>Hooks</th><th>Agents/Guidance</th></tr></thead>
+    <tbody>
+      <tr><td>GitHub Copilot</td><td class="ok">pass</td><td class="ok">pass</td><td class="ok">pass</td><td class="ok">9/9</td><td class="ok">azure</td><td class="ok">SessionStart</td><td class="ok">functions-copilot</td></tr>
+      <tr><td>Claude Code</td><td class="warn">warning</td><td class="ok">pass</td><td class="ok">pass</td><td class="ok">9/9</td><td class="ok">azure</td><td class="warn">plugin hook visible; native setup hook partial</td><td class="ok">CLAUDE.md/functions-copilot payload</td></tr>
+      <tr><td>Codex</td><td class="block">blocked</td><td class="ok">pass</td><td class="ok">pass</td><td class="ok">9/9 via setup/chat</td><td class="ok">azure via setup/chat</td><td class="ok">.codex/hooks.json</td><td class="ok">AGENTS.md</td></tr>
+    </tbody>
+  </table>
 
-    <section>
-      <h2>Capability Surface Matrix</h2>
-      <table>
-        <tr><th>Agent</th><th>Plugin</th><th>Skills</th><th>Prompts</th><th>MCP</th><th>Hooks</th><th>Agents</th></tr>
-        <tr><td>GitHub Copilot</td><td><span class="status blocked">blocked</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td></tr>
-        <tr><td>Claude Code</td><td><span class="status unsupported">unsupported</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status unsupported">unsupported</span></td><td><span class="status pass">pass</span></td></tr>
-        <tr><td>Codex</td><td><span class="status blocked">blocked</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status warning">warning</span></td><td><span class="status pass">pass</span></td></tr>
-      </table>
-    </section>
+  <h2>Key Findings</h2>
+  <div class="card">
+    <h3>Warnings</h3>
+    <p><strong>Claude plugin validation:</strong> <code>claude plugin validate</code> failed with <code>agents: Invalid input</code> and <code>root: Unrecognized key: "interface"</code>. Session-scoped loading still worked, so packaging validation should be fixed.</p>
+    <p><strong>Docs/help behavior:</strong> <code>azure-functions-skills setup --help</code> and <code>chat --help</code> executed setup/chat behavior in the isolated workspace. Use top-level help for read-only discovery until subcommand help is fixed.</p>
+    <p><strong>Azure Skills dependency:</strong> GitHub Copilot had <code>azure@azure-skills</code> installed. Codex correctly reported dependency availability as blocked/warning because noninteractive plugin activation is unavailable.</p>
+    <h3>Blocked</h3>
+    <p><strong>Codex plugin activation:</strong> Codex CLI 0.130.0 supports marketplace add/remove but not noninteractive plugin install/list/select. Marketplace registration alone cannot prove plugin activation.</p>
+  </div>
 
-    <section>
-      <h2>Failure Analysis</h2>
-      <h3>Windows chat launcher failures</h3>
-      <p><code>src/chat/index.ts</code> resolves launchers with <code>where</code>. On this machine, direct PowerShell discovery finds <code>copilot.ps1</code> and <code>codex.ps1</code>, but <code>chat</code> fails with <code>copilot not found</code> and <code>codex not found</code>. The resolver only treats <code>.cmd</code> and <code>.bat</code> as shell-backed commands, so PowerShell shims are not launched correctly.</p>
-      <h3>Claude chat blocks on MCP selection</h3>
-      <p>The chat command installs Claude files and launches Claude, but Claude displays an interactive MCP server selection prompt for <code>azure-functions-templates</code> and <code>azure</code>. That blocks unattended E2E completion.</p>
-      <h3>Plugin lifecycle cannot be proven</h3>
-      <p>Fresh plugin install semantics require pre-state, cleanup/isolation, install/register, post-state, and agent inspection. None of the plugin scenarios reached that full lifecycle noninteractively, so none are marked pass.</p>
-      <h3>Docs mismatch</h3>
-      <p>README skill and setup/chat examples mostly match the repository, but the Claude plugin-from-source command is not supported by the current CLI help observed in this run. README also does not warn about Windows PowerShell shim launch behavior for chat.</p>
-    </section>
+  <h2>Command Evidence</h2>
+  <p class="small">These are the final commands used for each scenario after manual iteration. They include both passing and warning/blocked flows so the working and non-working shapes are visible.</p>
+  <details open><summary>setup-workspace-ghcp - pass</summary>
+<pre>node bin/azure-functions-skills.js setup --agent ghcp --dir reports/e2e/20260519T-manual/workspaces/setup-workspace-ghcp --skip-prerequisites
+copilot -C reports/e2e/20260519T-manual/workspaces/setup-workspace-ghcp --agent functions-copilot -p &lt;inspection prompt&gt; --output-format json -s --allow-all --no-ask-user</pre>
+  </details>
+  <details><summary>setup-workspace-claude - pass</summary>
+<pre>node bin/azure-functions-skills.js setup --agent claude --dir reports/e2e/20260519T-manual/workspaces/setup-workspace-claude --skip-prerequisites
+claude -p &lt;inspection prompt&gt; --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob</pre>
+  </details>
+  <details><summary>setup-workspace-codex - pass</summary>
+<pre>node bin/azure-functions-skills.js setup --agent codex --dir reports/e2e/20260519T-manual/workspaces/setup-workspace-codex --skip-prerequisites
+codex exec --sandbox read-only --json --output-last-message reports/e2e/20260519T-manual/workspaces/setup-workspace-codex/e2e-agent-inspection.json --ephemeral --skip-git-repo-check --cd reports/e2e/20260519T-manual/workspaces/setup-workspace-codex &lt;inspection prompt&gt;</pre>
+  </details>
+  <details><summary>chat-welcome-ghcp - pass</summary>
+<pre>node bin/azure-functions-skills.js chat --agent github-copilot --dir . --skip-prerequisites -p &lt;inspection prompt&gt; --output-format json -s --allow-all --no-ask-user
+node --input-type=module -e "import('./lib/chat/index.js').then(async m =&gt; console.log(await m.buildStartupPrompt(process.argv[1])))" &lt;workspace&gt;</pre>
+  </details>
+  <details><summary>chat-welcome-claude - pass</summary>
+<pre>node bin/azure-functions-skills.js chat --agent claude-code --dir . --skip-prerequisites --prompt &lt;inspection prompt&gt; -p --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
+node --input-type=module -e "import('./lib/chat/index.js').then(async m =&gt; console.log(await m.buildStartupPrompt(process.argv[1])))" &lt;workspace&gt;</pre>
+  </details>
+  <details><summary>chat-welcome-codex - pass</summary>
+<pre>node bin/azure-functions-skills.js chat --agent codex --dir . --skip-prerequisites --prompt &lt;inspection prompt&gt; exec --sandbox workspace-write --json --output-last-message e2e-chat-inspection.json --ephemeral --skip-git-repo-check --cd .
+node --input-type=module -e "import('./lib/chat/index.js').then(async m =&gt; console.log(await m.buildStartupPrompt(process.argv[1])))" &lt;workspace&gt;</pre>
+  </details>
+  <details><summary>plugin-install-ghcp - pass</summary>
+<pre>copilot plugin --help
+copilot plugin marketplace --help
+copilot plugin list
+copilot plugin marketplace list
+copilot plugin uninstall azure-functions-skills
+copilot plugin marketplace remove azure-functions-skills
+copilot plugin marketplace add Azure/azure-functions-skills
+copilot plugin install azure-functions-skills@azure-functions-skills
+copilot plugin list
+copilot plugin marketplace list
+copilot --agent functions-copilot -p &lt;inspection prompt&gt; --output-format json -s --allow-all --no-ask-user</pre>
+  </details>
+  <details><summary>plugin-install-claude - warning</summary>
+<pre>claude plugin --help
+claude plugin list
+claude --help | Select-String -Pattern "plugin|add-dir" -Context 0,2
+claude plugin marketplace --help
+claude plugin validate &lt;plugin-payload-dir&gt;
+claude -p &lt;inspection prompt&gt; --plugin-dir &lt;plugin-payload-dir&gt; --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob</pre>
+  </details>
+  <details><summary>plugin-install-codex - blocked</summary>
+<pre>codex plugin --help
+codex plugin marketplace --help
+codex exec --help
+codex plugin marketplace list
+codex plugin marketplace remove azure-functions-skills
+codex plugin marketplace add Azure/azure-functions-skills
+codex exec --sandbox read-only --json --output-last-message e2e-plugin-inspection.json --ephemeral --skip-git-repo-check --cd . &lt;inspection prompt&gt;</pre>
+  </details>
+  <details><summary>docs-command-consistency - warning</summary>
+<pre>README.md command sections
+package.json scripts
+templates/skills/*/SKILL.md inventory
+copilot --help | Select-String -Pattern "yolo|allow-all|silent|output-format|agent|no-ask-user"
+node bin/azure-functions-skills.js --help
+node bin/azure-functions-skills.js setup --help
+node bin/azure-functions-skills.js chat --help</pre>
+  </details>
+  <details><summary>basic-help-prompt - pass</summary>
+<pre>copilot --agent functions-copilot -p &lt;basic-help prompt&gt; --output-format json -s --allow-all --no-ask-user
+claude -p &lt;basic-help prompt&gt; --plugin-dir &lt;plugin-payload-dir&gt; --output-format text --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
+node bin/azure-functions-skills.js setup --agent codex --dir &lt;workspace&gt; --skip-prerequisites
+codex exec --sandbox read-only --json --output-last-message e2e-basic-help.json --ephemeral --skip-git-repo-check --cd &lt;workspace&gt; &lt;basic-help prompt&gt;</pre>
+  </details>
+  <details><summary>azure-skills-dependency - warning</summary>
+<pre>copilot --agent functions-copilot -p &lt;dependency prompt&gt; --output-format json -s --allow-all --no-ask-user
+node bin/azure-functions-skills.js setup --agent codex --dir &lt;workspace&gt; --skip-prerequisites
+codex exec --sandbox read-only --json --output-last-message e2e-azure-skills-dependency.json --ephemeral --skip-git-repo-check --cd &lt;workspace&gt; &lt;dependency prompt&gt;</pre>
+  </details>
+  <details><summary>Retained workspaces</summary>
+    <p>All scenario workspaces were retained under <code>reports/e2e/20260519T-manual/workspaces/</code> for review. Date-stamped run directories are analysis artifacts; only this reviewed HTML is copied to <code>reports/e2e/current/report.html</code>.</p>
+  </details>
 
-    <section>
-      <h2>Command Evidence</h2>
-      <details open><summary>Environment and inventory</summary><pre>Get-Date
-  2026-05-17 18:43:12Z
-
-git rev-parse HEAD
-  330629ea...
-
-node --version; npm --version; npm pkg get version
-  v22.17.0
-  10.9.2
-  "0.11.3"
-
-Get-ChildItem templates/skills/**/SKILL.md
-  9 skill templates discovered
-
-Get-Command copilot, claude, codex
-  copilot 1.0.49-1
-  claude 2.1.143
-  codex 0.130.0</pre></details>
-      <details><summary>Setup inspection excerpts</summary><pre>copilot --agent functions-copilot -p "Inspect this workspace..."
-  Reported 9 skills, functions-copilot, .github/copilot-instructions.md, AGENTS.md, .vscode/mcp.json, and welcome-setup hook.
-
-claude -p "Inspect this workspace..." --output-format json --no-session-persistence
-  Reported 9 skills in .claude/skills, CLAUDE.md, and Azure MCP settings.
-
-codex exec --sandbox read-only --json --cd setup-codex "Inspect this workspace..."
-  Reported AGENTS.md, 9 skills, .codex/config.toml, .codex/hooks.json, and Azure Skills dependency guidance.</pre></details>
-      <details><summary>Chat excerpts</summary><pre>node bin/azure-functions-skills.js chat --agent github-copilot --dir .../chat-ghcp --prompt "Inspect startup context..."
-  Installed 56 skill files for ghcp
-  Error: copilot not found. Install it first.
-
-node bin/azure-functions-skills.js chat --agent claude-code --dir .../chat-claude --prompt "Inspect startup context..."
-  Installed 53 skill files for claude
-  Claude displayed interactive MCP server selection for azure-functions-templates and azure.
-
-node bin/azure-functions-skills.js chat --agent codex --dir .../chat-codex --prompt "Inspect startup context..."
-  Installed 54 skill files for codex
-  Error: codex not found.</pre></details>
-      <details><summary>Plugin excerpts</summary><pre>copilot plugin list / marketplace help/list
-  azure-functions-skills and azure-skills marketplaces observed; no completed fresh install lifecycle.
-
-copilot plugin marketplace add Azure/azure-functions-skills; copilot plugin install ...
-  Attempt entered interactive or alternate-screen behavior.
-
-claude --help; claude plugin --help
-  Current help did not expose the README-documented plugin/add-dir support.
-
-codex plugin --help; codex plugin marketplace --help
-  Marketplace management available; install/select remains interactive via /plugins.</pre></details>
-      <details><summary>Validation</summary><pre>npm run check
-  Completed successfully according to shared check execution summary.</pre></details>
-    </section>
-
-    <section>
-      <h2>Recommended Fixes</h2>
-      <ul>
-        <li>Fix Windows launcher resolution for <code>.ps1</code> shims in <code>src/chat/index.ts</code>.</li>
-        <li>Add an automation-friendly chat mode that uses <code>copilot -p</code>, <code>claude -p</code>, and <code>codex exec</code> for E2E inspection.</li>
-        <li>Re-verify and update Claude plugin-from-source README guidance for Claude Code 2.1.143.</li>
-        <li>Document noninteractive plugin install limitations for Copilot and Codex, or provide isolated profile/config instructions.</li>
-        <li>Include <code>azd</code> in generated Codex setup hook checks to match setup guidance.</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>Artifacts</h2>
-      <ul>
-        <li><code>reports/e2e/20260517T184312Z/evidence.json</code></li>
-        <li><code>reports/e2e/20260517T184312Z/skill-improvement.md</code></li>
-        <li><code>reports/e2e/20260517T184312Z/transcripts/setup-ghcp-help-prompt.txt</code></li>
-        <li><code>reports/e2e/20260517T184312Z/transcripts/setup-codex-last-message.txt</code></li>
-        <li><code>reports/e2e/20260517T184312Z/workspaces/</code> retained for debugging</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>Cross-check</h2>
-      <p>Self-review result: pass with known gaps. All default-scope scenario records are present and no plugin scenario is marked pass without a completed fresh lifecycle. Chat launch failures are marked fail where the CLI exists but launcher behavior failed. Interactive Claude chat and plugin installation paths are marked blocked or unsupported rather than warning.</p>
-    </section>
-  </main>
+  <h2>Cross-Check</h2>
+  <div class="card">
+    <p>The checklist contains all 12 default local scenarios. No scenario was omitted due to expected failure. All setup/chat/plugin commands that could write files were run in scenario workspaces. The only known incidental write from help probing occurred inside the disposable docs-command-consistency workspace and is recorded as a warning.</p>
+    <p>The E2E skill instructions were updated with the successful manual execution practices and current CLI caveats discovered during this run.</p>
+  </div>
+</main>
 </body>
 </html>

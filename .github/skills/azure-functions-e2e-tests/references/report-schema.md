@@ -75,6 +75,7 @@ Each scenario run should emit one JSON object.
   "issues": [],
   "artifacts": {
     "transcript": "reports/e2e/<run-id>/transcripts/chat-welcome-ghcp.md",
+    "inspectionJson": "reports/e2e/<run-id>/workspaces/chat-welcome-ghcp/e2e-chat-inspection.json",
     "workspaceDir": "<redacted-temp-workspace>"
   }
 }
@@ -119,6 +120,32 @@ Each scenario run should emit one JSON object.
 `surface` must be one of `plugin`, `skills`, `prompts`, `mcp`, `hooks`, `agents`, `agent-launch`, `agent-inspection`, `setup-files`, or `general`.
 Use `support: "unsupported"` for surfaces that the package or agent cannot support today. For example, Claude Code native plugin support must not be reported as passing unless the test actually launches Claude with the plugin loaded and proves the plugin surfaces are visible.
 Checks should cite dynamic inventory paths instead of assuming a fixed template list. If a template changes, the next run should discover the new inventory and update expectations automatically.
+
+## Inspection artifact record
+
+Agent-visible setup, chat, and plugin checks should include a parseable inspection artifact. The artifact can be the agent's raw JSON response captured by the runner; it does not have to be written by the agent with edit tools.
+
+```json
+{
+  "agent": "codex",
+  "workspaceRoot": "<redacted-temp-workspace>",
+  "startupContextVisible": true,
+  "skills": ["azure-functions-create"],
+  "mcpServers": [{ "name": "azure", "configPath": ".codex/config.toml" }],
+  "hooks": [{ "path": ".codex/hooks.json", "support": "supported" }],
+  "agents": [{ "name": "AGENTS.md guidance", "path": "AGENTS.md" }],
+  "passed": true,
+  "notes": []
+}
+```
+
+Validation rules:
+
+- The artifact file must exist, be non-empty, and parse as JSON.
+- `workspaceRoot` must identify the isolated scenario workspace or an explicitly documented external disposable workspace.
+- `skills`, `mcpServers`, `hooks`, and `agents` must be checked against the dynamic inventory and agent support matrix.
+- Missing surfaces require an explicit unsupported, blocked, or fail reason in `notes` or the scenario checks.
+- A scenario cannot be `pass` when the inspection artifact is missing, invalid, or only proves generated files without real-agent visibility.
 
 For plugin scenarios, command logs must prove the documented install sequence was attempted before any plugin visibility result is marked `pass` or `warning`. For example, GitHub Copilot plugin evidence must include `copilot plugin marketplace add Azure/azure-functions-skills`, `copilot plugin install azure-functions-skills@azure-functions-skills`, and a post-install `copilot --agent functions-copilot ...` inspection command. If those required commands are missing, fail, time out, or do not prove visibility, classify the scenario as `fail` or `blocked`, not `warning`.
 

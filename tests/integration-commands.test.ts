@@ -120,22 +120,26 @@ function runCli(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv
   });
 }
 
-function createFakeCliDirectory(): string {
+function createFakeAgentCliDirectory(): string {
   const fakeBinDir = makeTempDir('af-skills-e2e-bin-');
   for (const launcher of Object.values(LAUNCHERS)) {
     const commandPath = join(fakeBinDir, process.platform === 'win32' ? `${launcher.command}.cmd` : launcher.command);
     writeFileSync(
       commandPath,
       process.platform === 'win32'
-        ? '@echo off\r\nexit /b 0\r\n'
-        : '#!/usr/bin/env sh\nexit 0\n',
+        ? '@echo off\r\nif not "%AF_SKILLS_FAKE_ARGS_FILE%"=="" echo %*>>"%AF_SKILLS_FAKE_ARGS_FILE%"\r\nexit /b 0\r\n'
+        : '#!/usr/bin/env sh\nif [ -n "$AF_SKILLS_FAKE_ARGS_FILE" ]; then printf "%s\\n" "$*" >> "$AF_SKILLS_FAKE_ARGS_FILE"; fi\nexit 0\n',
       { mode: 0o755 },
     );
+
+    if (process.platform === 'win32') {
+      writeFileSync(join(fakeBinDir, `${launcher.command}.ps1`), 'exit 0\r\n', { mode: 0o755 });
+    }
   }
   return fakeBinDir;
 }
 
-describe('CLI command E2E', () => {
+describe('CLI command integration', () => {
   it('build writes GHCP, Claude, and Codex layouts from current templates into a temp dist directory', () => {
     const distDir = makeTempDir('af-skills-e2e-build-');
     const expectedSkillIds = templateSkillIds();
@@ -165,7 +169,7 @@ describe('CLI command E2E', () => {
   });
 
   it('chat auto-installs each target workspace layout before launching the selected agent', () => {
-    const fakeBinDir = createFakeCliDirectory();
+    const fakeBinDir = createFakeAgentCliDirectory();
     const expectedSkillIds = templateSkillIds();
     const expectedAgentFiles = templateAgentFiles();
     const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
@@ -186,5 +190,35 @@ describe('CLI command E2E', () => {
 
       assertWorkspaceLayout(projectDir, setupTarget, expectedSkillIds, expectedAgentFiles);
     }
+  });
+
+  it('chat forwards unknown arguments to the selected agent CLI', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-forward-codex-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+
+    runCli([
+      'chat',
+      '--agent', 'codex',
+      '--dir', projectDir,
+      '--prompt', 'hello',
+      '--skip-prerequisites',
+      'exec',
+      '--sandbox', 'read-only',
+      '--json',
+    ], {
+      env: {
+        PATH: pathValue,
+        Path: pathValue,
+        AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+        ...(pathext ? { PATHEXT: pathext } : {}),
+      },
+    });
+
+    expect(readFileSync(argsFile, 'utf-8').trim()).toBe('exec --sandbox read-only --json hello');
   });
 });

@@ -19,6 +19,7 @@ export default [
       'lib/**',
       'node_modules/**',
       'coverage/**',
+      'reports/e2e/**',
     ],
   },
   js.configs.recommended,

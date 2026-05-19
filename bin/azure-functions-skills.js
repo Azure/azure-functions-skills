@@ -39,6 +39,8 @@ if (!command || command === '--help' || command === '-h') {
     --as-plugin        Ensure plugin is registered before launching agent
     --check-prerequisites  Check external prerequisites without installing them
     --skip-prerequisites   Skip external prerequisite checks
+    -- <args...>       Pass remaining arguments through to the selected agent CLI
+    Other unrecognized chat arguments are also passed through to the agent CLI
 
   Options (build):
     --target <name>    Build target: ghcp, claude, codex
@@ -135,6 +137,7 @@ if (command === 'setup') {
   let dir = process.cwd();
   let asPlugin = false;
   let prerequisites = 'auto';
+  const passthroughArgs = [];
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agent = args[++i];
@@ -143,6 +146,12 @@ if (command === 'setup') {
     else if (args[i] === '--as-plugin') asPlugin = true;
     else if (args[i] === '--check-prerequisites') prerequisites = 'check-only';
     else if (args[i] === '--skip-prerequisites') prerequisites = 'skip';
+    else if (args[i] === '--') {
+      passthroughArgs.push(...args.slice(i + 1));
+      break;
+    } else {
+      passthroughArgs.push(args[i]);
+    }
   }
 
   // If --as-plugin, ensure plugin is registered first
@@ -188,6 +197,7 @@ if (command === 'setup') {
 
   const options = { agent, dir };
   if (prompt) options.prompt = prompt;
+  if (passthroughArgs.length > 0) options.passthroughArgs = passthroughArgs;
   options.prerequisites = prerequisites;
   await chat(options);
 } else if (command === 'build') {
