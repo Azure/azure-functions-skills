@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Azure Functions coding agent skills and MCP guidance",
-    "version": "0.11.3"
+    "version": "0.12.0"
   },
   "plugins": [
     {
       "name": "azure-functions-skills",
       "source": "./.github/plugins/azure-functions-skills",
       "description": "Azure Functions skills for setup, create, and deploy workflows",
-      "version": "0.11.3",
+      "version": "0.12.0",
       "category": "Development",
       "tags": [
         "azure-functions",
