@@ -16,7 +16,7 @@ import { join } from 'node:path';
 const args = process.argv.slice(2);
 const command = args[0];
 
-if (!command || command === '--help' || command === '-h') {
+function printHelp() {
   console.log(`
   @agent-loom/azure-functions-skills — AI assistant plugins for Azure Functions
 
@@ -52,6 +52,10 @@ if (!command || command === '--help' || command === '-h') {
     npx @agent-loom/azure-functions-skills chat
     npx @agent-loom/azure-functions-skills chat --as-plugin --agent claude-code
   `);
+}
+
+if (!command || command === '--help' || command === '-h') {
+  printHelp();
   process.exit(0);
 }
 
@@ -131,6 +135,13 @@ if (command === 'setup') {
   }
 } else if (command === 'chat') {
   const { chat, detectCliAgents } = await import('../lib/chat/index.js');
+
+  const separatorIndex = args.indexOf('--', 1);
+  const commandArgs = separatorIndex === -1 ? args.slice(1) : args.slice(1, separatorIndex);
+  if (commandArgs.includes('--help') || commandArgs.includes('-h')) {
+    printHelp();
+    process.exit(0);
+  }
 
   let agent = null;
   let prompt = null;

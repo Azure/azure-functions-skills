@@ -28,12 +28,13 @@ export function buildPluginPayload(data: BuildData, pluginDir: string): void {
   mkdirSync(pluginDir, { recursive: true });
 
   const manifest = generatePluginManifest(data);
+  const claudeManifest = generateClaudePluginManifest(data);
   mkdirSync(join(pluginDir, '.plugin'), { recursive: true });
   writeFileSync(join(pluginDir, '.plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
   writeFileSync(join(pluginDir, 'plugin.json'), JSON.stringify(manifest, null, 2));
 
   mkdirSync(join(pluginDir, '.claude-plugin'), { recursive: true });
-  writeFileSync(join(pluginDir, '.claude-plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
+  writeFileSync(join(pluginDir, '.claude-plugin', 'plugin.json'), JSON.stringify(claudeManifest, null, 2));
 
   mkdirSync(join(pluginDir, '.codex-plugin'), { recursive: true });
   writeFileSync(join(pluginDir, '.codex-plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
@@ -270,6 +271,17 @@ function generatePluginManifest(data: BuildData) {
       category: 'Development',
       capabilities: ['Read', 'Write'],
     },
+  };
+}
+
+function generateClaudePluginManifest(data: BuildData) {
+  return {
+    name: 'azure-functions-skills',
+    version: data.packageVersion || '0.0.0-dev',
+    description: 'Azure Functions skills for setup, create, and deploy workflows',
+    skills: './skills/',
+    hooks: './hooks.json',
+    mcpServers: './.mcp.json',
   };
 }
 

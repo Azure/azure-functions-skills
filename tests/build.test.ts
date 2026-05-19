@@ -451,6 +451,32 @@ describe('buildPluginPayload', () => {
       expect(existsSync(join(payloadDir, 'skills', s.id, 'SKILL.md'))).toBe(true);
     }
   });
+
+  it('emits a Claude plugin manifest without unsupported Copilot/Codex metadata', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir);
+
+    const defaultManifest = JSON.parse(readFileSync(join(payloadDir, 'plugin.json'), 'utf-8'));
+    const claudeManifest = JSON.parse(readFileSync(join(payloadDir, '.claude-plugin', 'plugin.json'), 'utf-8'));
+
+    expect(defaultManifest.agents).toBe('./agents/');
+    expect(defaultManifest.interface).toBeTruthy();
+    expect(claudeManifest).toMatchObject({
+      name: 'azure-functions-skills',
+      version: '9.8.7',
+      description: 'Azure Functions skills for setup, create, and deploy workflows',
+      skills: './skills/',
+      hooks: './hooks.json',
+      mcpServers: './.mcp.json',
+    });
+    expect(claudeManifest).not.toHaveProperty('agents');
+    expect(claudeManifest).not.toHaveProperty('interface');
+  });
 });
 
 describe('buildPluginMarketplaces', () => {
@@ -543,6 +569,18 @@ describe('setup module', () => {
 
     expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.claude', 'settings.json'))).toBe(true);
+  });
+
+  it('applySetup omits Claude plugin payload files from workspace setup', async () => {
+    await applySetup(DIST_DIR, { agents: ['claude'], prerequisites: 'skip' });
+
+    expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.claude-plugin'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'plugin.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'agents'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'hooks.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(false);
   });
 
   it('applySetup handles multiple agents at once', async () => {
