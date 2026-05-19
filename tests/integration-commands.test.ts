@@ -112,11 +112,16 @@ function assertPluginLayout(root: string, target: BuildTargetName, expectedSkill
 }
 
 function runCli(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): void {
+  runCliOutput(args, options);
+}
+
+function runCliOutput(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): string {
   const env = { ...process.env, ...options.env };
-  execFileSync(process.execPath, [CLI_PATH, ...args], {
+  return execFileSync(process.execPath, [CLI_PATH, ...args], {
     cwd: options.cwd || ROOT_DIR,
     env,
     stdio: 'pipe',
+    encoding: 'utf-8',
   });
 }
 
@@ -220,5 +225,57 @@ describe('CLI command integration', () => {
     });
 
     expect(readFileSync(argsFile, 'utf-8').trim()).toBe('exec --sandbox read-only --json hello');
+  });
+
+  it('chat --help prints command help without launching an agent', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-help-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+
+    const output = runCliOutput(['chat', '--help'], {
+      env: {
+        PATH: pathValue,
+        Path: pathValue,
+        AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+        ...(pathext ? { PATHEXT: pathext } : {}),
+      },
+    });
+
+    expect(output).toContain('Options (chat):');
+    expect(output).toContain('-- <args...>');
+    expect(existsSync(argsFile)).toBe(false);
+  });
+
+  it('chat forwards --help after the pass-through separator', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-forward-help-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+
+    runCli([
+      'chat',
+      '--agent', 'codex',
+      '--dir', projectDir,
+      '--prompt', 'hello',
+      '--skip-prerequisites',
+      '--',
+      '--help',
+    ], {
+      env: {
+        PATH: pathValue,
+        Path: pathValue,
+        AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+        ...(pathext ? { PATHEXT: pathext } : {}),
+      },
+    });
+
+    expect(readFileSync(argsFile, 'utf-8').trim()).toBe('--help hello');
   });
 });

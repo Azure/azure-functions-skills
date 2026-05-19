@@ -123,7 +123,7 @@ Checks should cite dynamic inventory paths instead of assuming a fixed template 
 
 ## Inspection artifact record
 
-Agent-visible setup, chat, and plugin checks should include a parseable inspection artifact. The artifact can be the agent's raw JSON response captured by the runner; it does not have to be written by the agent with edit tools.
+Agent-visible setup, chat, and plugin checks should include a durable inspection artifact. Prefer parseable JSON. For GitHub Copilot chat, Markdown such as `artifact.md` is acceptable when it is produced through the normal `azure-functions-skills chat --agent github-copilot --prompt ...` launcher path and includes the required workspace root and surface inventory. The artifact can be the agent's raw response captured by the runner; it does not have to be written by the agent with edit tools unless the scenario uses artifact writing as the proof mechanism.
 
 ```json
 {
@@ -141,13 +141,13 @@ Agent-visible setup, chat, and plugin checks should include a parseable inspecti
 
 Validation rules:
 
-- The artifact file must exist, be non-empty, and parse as JSON.
+- The artifact file must exist and be non-empty. JSON artifacts must parse as JSON; Markdown artifacts must be explicitly allowed by the scenario and contain the required fields or clearly labeled equivalents.
 - `workspaceRoot` must identify the isolated scenario workspace or an explicitly documented external disposable workspace.
 - `skills`, `mcpServers`, `hooks`, and `agents` must be checked against the dynamic inventory and agent support matrix.
 - Missing surfaces require an explicit unsupported, blocked, or fail reason in `notes` or the scenario checks.
-- A scenario cannot be `pass` when the inspection artifact is missing, invalid, or only proves generated files without real-agent visibility.
+- A scenario cannot be `pass` when the inspection artifact is missing, invalid for its declared format, or only proves generated files without real-agent visibility.
 
-For plugin scenarios, command logs must prove the documented install sequence was attempted before any plugin visibility result is marked `pass` or `warning`. For example, GitHub Copilot plugin evidence must include `copilot plugin marketplace add Azure/azure-functions-skills`, `copilot plugin install azure-functions-skills@azure-functions-skills`, and a post-install `copilot --agent functions-copilot ...` inspection command. If those required commands are missing, fail, time out, or do not prove visibility, classify the scenario as `fail` or `blocked`, not `warning`.
+For plugin scenarios, command logs must prove the documented install sequence was attempted before any plugin visibility result is marked `pass` or `warning`. For example, GitHub Copilot plugin evidence must include pre-state discovery, target cleanup (`copilot plugin uninstall azure-functions-skills` and `copilot plugin marketplace remove azure-functions-skills`, or clean pre-state evidence), `copilot plugin marketplace add Azure/azure-functions-skills`, `copilot plugin install azure-functions-skills@azure-functions-skills`, post-state discovery, and a post-install qualified plugin-agent inspection such as `copilot --agent azure-functions-skills:functions-copilot ...`. If those required commands are missing, fail, time out, or do not prove visibility, classify the scenario as `fail` or `blocked`, not `warning`.
 
 Plugin scenarios must also prove fresh-install semantics. A plugin scenario cannot be `pass` unless evidence includes:
 
