@@ -206,6 +206,7 @@ The cross-check must include a default-scope coverage check:
 - Verify that every omitted scenario has an explicit user narrowing reason; otherwise add a `blocked`, `unsupported`, or `fail` scenario record before publishing.
 - Verify that every plugin scenario has `pluginLifecycle` pre-state, cleanup/isolation, install/register, post-state, and inspection evidence. If any phase is missing, the plugin scenario cannot be `pass` or `warning`.
 - Verify that command logs for setup/chat/agent-inspection scenarios use isolated scenario workspaces as cwd or document why a different cwd was safe.
+- Verify that final command evidence does not rely on `--dir .` unless the same command log proves cwd is the isolated scenario workspace. Prefer `--dir <scenario-workspace>` in reports.
 - Verify `git status --short` does not show generated root-level `.agents`, `.claude`, `.codex`, `.github/agents`, `.github/hooks`, `.github/skills/<non-e2e>`, `AGENTS.md`, or `CLAUDE.md` artifacts. If any appear and are confirmed untracked generated output, remove them before publishing.
 
 ## Redaction requirements
