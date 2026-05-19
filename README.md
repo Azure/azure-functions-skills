@@ -100,9 +100,25 @@ Useful options:
 ```bash
 npx @agent-loom/azure-functions-skills chat --agent github-copilot --dir ./my-app
 npx @agent-loom/azure-functions-skills chat --prompt "Create an HTTP trigger function"
+npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app -- exec --sandbox read-only --json
 npx @agent-loom/azure-functions-skills setup --agent ghcp --dir ./my-app
 npx @agent-loom/azure-functions-skills setup --check-prerequisites
 npx @agent-loom/azure-functions-skills setup --skip-prerequisites
+```
+
+`chat` launches the selected agent CLI and forwards extra arguments to that CLI. Use `--` to make the boundary explicit. Unrecognized `chat` options are also forwarded for compatibility with agent-specific flags. `setup` does not launch an agent; it installs workspace files and ignores unrelated agent CLI flags.
+
+Headless examples:
+
+```bash
+# GitHub Copilot CLI: pass a noninteractive prompt and JSON output flags through to copilot.
+npx @agent-loom/azure-functions-skills chat --agent github-copilot --dir ./my-app --skip-prerequisites -- --output-format json -s --allow-all --no-ask-user -p "Inspect visible Azure Functions skills and return JSON."
+
+# Claude Code: chat inserts --prompt content after -p/--print and forwards the rest.
+npx @agent-loom/azure-functions-skills chat --agent claude-code --dir ./my-app --skip-prerequisites --prompt "Inspect visible Azure Functions skills and return JSON." -- -p --output-format json --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
+
+# Codex CLI: pass the exec subcommand and noninteractive output options through to codex.
+npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app --skip-prerequisites --prompt "Inspect visible Azure Functions skills." -- exec --sandbox read-only --json --output-last-message e2e-chat-inspection.txt --ephemeral --skip-git-repo-check --cd .
 ```
 
 ## Skills
@@ -138,34 +154,7 @@ Claude Code and Codex receive equivalent workspace-local instructions, skills, h
 
 ## Development
 
-Install dependencies:
-
-```bash
-npm ci
-```
-
-Validate changes:
-
-```bash
-npm run check
-```
-
-Regenerate committed plugin payload and marketplace manifests after editing `templates/`:
-
-```bash
-npm run build:plugin-payload
-```
-
-Key source directories:
-
-```text
-templates/   Canonical agents, skills, hooks, prompts, and MCP definitions
-src/         TypeScript CLI and build system
-tests/       Vitest coverage for build, setup, chat, validation, and release helpers
-.github/plugins/azure-functions-skills/  Generated plugin payload
-```
-
-Do not edit generated plugin payload files by hand. Update `templates/`, then regenerate.
+See [docs/development.md](docs/development.md) for contributor prerequisites, validation commands, the template-to-plugin workflow, local smoke tests, and the CLI release process.
 
 ## License
 
