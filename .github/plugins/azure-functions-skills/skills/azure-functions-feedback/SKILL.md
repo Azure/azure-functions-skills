@@ -71,11 +71,15 @@ Ask the user to approve or edit the preview.
 
 ### 4. Issue path
 
-After approval, create an issue in `Azure/azure-functions-skills` using the preview content.
+After approval, search existing issues in `Azure/azure-functions-skills` before creating a new issue. Look for the preview title, affected area, and key symptom terms. Include both open and recently closed issues when the GitHub CLI or web UI supports it.
 
-Prefer the GitHub CLI when available. If it is unavailable, provide the prepared issue body and ask the user to create it manually.
+If an existing issue is the same topic, or is not identical but clearly similar enough to continue the conversation there, do not create a duplicate issue. Add a short comment with the new evidence or scenario instead. Report the existing issue URL to the user and explain that the feedback was added there.
 
-After creation, report the issue URL and any follow-up action.
+If no similar issue exists, create a new issue in `Azure/azure-functions-skills` using the preview content.
+
+Prefer the GitHub CLI when available. If it is unavailable, provide the prepared issue or comment body and ask the user to create or post it manually.
+
+After creating an issue or adding a comment, report the issue URL and any follow-up action.
 
 ### 5. Pull Request path
 
@@ -94,7 +98,7 @@ Do not include unrelated local docs, PLAN files, secrets, generated temp files, 
 
 End with:
 
-- Issue or PR URL, if created.
+- Issue or PR URL, if created or updated.
 - Files changed, if PR path was used.
 - Validation results.
 - Any intentionally skipped feedback.
