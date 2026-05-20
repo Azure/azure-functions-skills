@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azure Functions Skills Bug Bash Feedback Summary</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --soft: #eef5ff;
+      --text: #1d2635;
+      --muted: #5f6f86;
+      --line: #d9e2ef;
+      --azure: #0078d4;
+      --azure-dark: #005a9e;
+      --teal: #008575;
+      --orange: #c85f00;
+      --red: #c4314b;
+      --shadow: 0 18px 45px rgba(24, 39, 75, 0.10);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      line-height: 1.75;
+      letter-spacing: 0;
+    }
+
+    a { color: var(--azure-dark); text-underline-offset: 0.18em; }
+
+    code {
+      padding: 0.12rem 0.34rem;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f4f7fb;
+      font-family: Consolas, "Cascadia Code", monospace;
+      font-size: 0.92em;
+    }
+
+    .hero {
+      color: #ffffff;
+      background: linear-gradient(135deg, #005a9e 0%, #0078d4 52%, #008575 100%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .hero-inner, .layout, .footer {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .hero-inner { padding: 54px 0 36px; }
+
+    .kicker {
+      margin: 0 0 10px;
+      color: rgba(255, 255, 255, 0.84);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 960px;
+      margin: 0;
+      font-size: clamp(2.25rem, 5vw, 4.4rem);
+      line-height: 1.06;
+      letter-spacing: 0;
+    }
+
+    .hero-summary {
+      max-width: 930px;
+      margin: 20px 0 0;
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 1.06rem;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+      font-size: 0.9rem;
+    }
+
+    a.pill {
+      color: #ffffff;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    a.pill:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      gap: 28px;
+      margin-top: 28px;
+      margin-bottom: 56px;
+      align-items: start;
+    }
+
+    .toc {
+      position: sticky;
+      top: 18px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 10px 30px rgba(24, 39, 75, 0.06);
+    }
+
+    .toc h2 {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .toc a {
+      display: block;
+      padding: 8px 0;
+      border-top: 1px solid #edf1f7;
+      color: var(--text);
+      font-size: 0.92rem;
+      text-decoration: none;
+    }
+
+    .toc a:hover { color: var(--azure-dark); }
+
+    main { min-width: 0; }
+
+    section {
+      margin-bottom: 28px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 12px 36px rgba(24, 39, 75, 0.06);
+    }
+
+    .section-plain {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    h2, h3, h4 { line-height: 1.25; letter-spacing: 0; }
+    h2 { margin: 0 0 16px; color: #10243f; font-size: 1.6rem; }
+    h3 { margin: 24px 0 10px; color: #183a63; font-size: 1.18rem; }
+    h4 { margin: 0 0 8px; font-size: 1rem; }
+    p { margin: 0 0 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.35rem; }
+    li { margin: 7px 0; }
+    .lead { color: #33465e; font-size: 1.04rem; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .metric {
+      min-height: 120px;
+      padding: 16px;
+      border: 1px solid #cfe0f4;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, #ffffff, #f3f8ff);
+    }
+
+    .metric strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--azure-dark);
+      font-size: 1.55rem;
+      line-height: 1;
+    }
+
+    .metric span { display: block; color: #38506c; font-size: 0.9rem; line-height: 1.45; }
+
+    .split, .theme-grid, .issue-grid, .todo-grid, .link-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .note-box, .theme, .issue, .todo, .link-card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .note-box { border-left: 4px solid var(--azure); background: var(--soft); }
+    .note-box.warning { border-left-color: var(--orange); background: #fff7ed; }
+    .note-box.success { border-left-color: var(--teal); background: #eefaf7; }
+    .theme { border-top: 4px solid var(--azure); }
+    .issue { border-top: 4px solid #6f89a8; }
+    .issue.critical { border-top-color: var(--red); }
+    .issue.product { border-top-color: var(--azure); }
+    .issue.new-skill { border-top-color: var(--teal); }
+    .link-card { border-top: 4px solid var(--azure); }
+    .link-card h3 { margin-top: 0; }
+    .link-card .link-action { display: inline-flex; margin-top: 4px; font-weight: 700; }
+
+    .issue-meta, .todo-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0 12px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      color: #284057;
+      background: #eef2f7;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .tag.p0 { color: #8a1f32; background: #ffe8ed; }
+    .tag.p1 { color: #005a9e; background: #e4f1ff; }
+    .tag.p2 { color: #006b5e; background: #dcf8f2; }
+    .tag.p3 { color: #665100; background: #fff5c2; }
+    .todo-number { color: var(--azure-dark); font-weight: 800; }
+
+    .triage-list {
+      counter-reset: triage;
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .triage-list li {
+      counter-increment: triage;
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      margin: 12px 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+    }
+
+    .triage-list li::before {
+      content: counter(triage);
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border-radius: 50%;
+      color: #ffffff;
+      background: var(--azure);
+      font-weight: 800;
+    }
+
+    .footer {
+      margin-bottom: 40px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .layout { display: block; }
+      .toc { position: static; margin-bottom: 20px; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .theme-grid, .issue-grid, .todo-grid, .link-grid, .split { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 620px) {
+      .hero-inner, .layout, .footer { width: min(100% - 24px, 1180px); }
+      .hero-inner { padding: 38px 0 26px; }
+      section { padding: 20px; }
+      .summary-grid { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      body { background: #ffffff; }
+      .hero { color: #000000; background: #ffffff; }
+      .toc { display: none; }
+      .layout, .footer { width: 100%; margin: 0; }
+      section, .theme, .issue, .todo, .metric, .triage-list li { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="kicker">Bug Bash Feedback Summary</p>
+      <h1>Azure Functions Skills</h1>
+      <p class="hero-summary">会話記録と GitHub issue #68 以降を統合し、収集されたコメント、意見、アイデア、提案を議事内容として整理した HTML 版です。</p>
+      <div class="meta-row" aria-label="Document metadata">
+        <span class="pill">Date: 2026-05-19</span>
+        <span class="pill">Issues: #68-#79</span>
+        <span class="pill">Focus: Scope, UX, Routing, Quality</span>
+        <a class="pill" href="/bug-bash/">English default</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <a href="#summary">Executive Summary</a>
+      <a href="#sources">Input Sources</a>
+      <a href="#links">Useful Links</a>
+      <a href="#sentiment">Overall Sentiment</a>
+      <a href="#discussion">Discussion Notes</a>
+      <a href="#issues">GitHub Issues</a>
+      <a href="#themes">Themes and Directions</a>
+      <a href="#todo">Prioritized TODO</a>
+      <a href="#triage">Suggested Triage Order</a>
+    </nav>
+
+    <main>
+      <section id="summary">
+        <h2>1. Executive Summary</h2>
+        <p class="lead">今回の bug bash で集まったフィードバックは、単なる個別バグ修正ではなく、Azure Functions Skills をどのような責務を持つ skill suite として育てるか、という設計上の論点が中心だった。</p>
+        <p>全体として、Azure Functions に特化した Copilot/agent skills の方向性は好意的に受け止められている。特に、Azure Functions team が持つドメイン知識を、作成、診断、ベストプラクティス、アップグレード、運用レビューの形で agent に渡せることには価値がある、という認識が共有された。一方で、Azure Skills との重複、plugin install の UX、skill の多さによる routing の不透明さ、品質評価の難しさが大きな課題として挙がっている。</p>
+
+        <div class="summary-grid" aria-label="Top themes">
+          <div class="metric"><strong>1</strong><span>Azure Skills と Azure Functions Skills のスコープ境界を明確化する。</span></div>
+          <div class="metric"><strong>2</strong><span>100 個以上の skill が見える環境でも正しい skill が選ばれる routing/agent 体験を作る。</span></div>
+          <div class="metric"><strong>3</strong><span>install、reload、account、plugin/CLI 差分など導入 UX の摩擦を減らす。</span></div>
+          <div class="metric"><strong>4</strong><span>Functions team の推奨知識を実用 skill に落とし込む。</span></div>
+          <div class="metric"><strong>5</strong><span>E2E と agent-based eval を組み合わせ、品質を継続的に評価する。</span></div>
+        </div>
+      </section>
+
+      <section id="sources">
+        <h2>2. Input Sources</h2>
+        <ul>
+          <li>Local bug bash notes: <code>azure-functions-skills-bug-bash.md</code></li>
+          <li>GitHub issues reviewed: #68 through #79</li>
+          <li>GitHub issue comments: none were returned for #68 through #79 at the time of collection.</li>
+        </ul>
+      </section>
+
+      <section id="links">
+        <h2>3. Useful Links</h2>
+        <p class="lead">Bug Bash のフィードバック投稿、正式な issue/PR、関連する Azure Skills、VS Code extension 統合検討に使う重要リンクです。</p>
+        <div class="link-grid">
+          <article class="link-card">
+            <h3>1. フィードバック投稿スレッド（Teams）</h3>
+            <p><strong>概要:</strong> Bug Bash のフィードバックを投稿するためのメインスレッド。</p>
+            <p><strong>用途:</strong> Issue 以外の軽いフィードバックや議論はこちらに集約する。</p>
+            <a class="link-action" href="https://teams.microsoft.com/l/message/19:7e8b0770f3504455a6901a79742ac1e5@thread.tacv2/1779211330336?tenantId=72f988bf-86f1-41af-91ab-2d7cd011db47&amp;groupId=201c2bb2-812d-4986-ac92-9bfad0d6cc59&amp;parentMessageId=1779211330336&amp;teamName=Azure%20Functions%20Team&amp;channelName=Functions.ai%20%F0%9F%A4%96&amp;createdTime=1779211330336">Azure Functions Skills Bug Bash - Feedback Forum を開く</a>
+          </article>
+
+          <article class="link-card">
+            <h3>2. Azure Functions Skills GitHub Repository</h3>
+            <p><strong>概要:</strong> 今回テスト対象となるスキルのリポジトリ。</p>
+            <p><strong>用途:</strong> README で使い方を確認し、Issue / PR で正式なフィードバックを行う。</p>
+            <a class="link-action" href="https://github.com/Azure/azure-functions-skills/">Azure Functions Skills GitHub リポジトリを見る</a>
+          </article>
+
+          <article class="link-card">
+            <h3>3. Azure Skills ベーススキル リポジトリ</h3>
+            <p><strong>概要:</strong> Azure 全体のスキルを扱う、Functions 以外も含むベーススキルのリポジトリ。</p>
+            <p><strong>用途:</strong> Functions Skills の依存、特に deploy 系や共通ロジック、ベストプラクティスの参照に使う。</p>
+            <a class="link-action" href="https://github.com/microsoft/azure-skills/tree/main">Azure Skills リポジトリを見る</a>
+          </article>
+
+          <article class="link-card">
+            <h3>4. VS Code Copilot Extension の設定例</h3>
+            <p><strong>概要:</strong> 拡張機能に skills を組み込む方法の参考例。</p>
+            <p><strong>用途:</strong> extension 側に skills を含める設計検討や、enable/disable 制御の実装参考に使う。</p>
+            <a class="link-action" href="https://github.com/microsoft/vscode/blob/cf238f65873ac96d4d9f9e25a2f01c0d4b733636/extensions/copilot/package.json#L6648">VS Code Copilot package.json の skills 設定部分を見る</a>
+          </article>
+        </div>
+
+        <div class="note-box" style="margin-top: 16px;">
+          <h3>会話からの補足意図</h3>
+          <ul>
+            <li>フィードバックは Teams スレッドまたは GitHub issue の 2 系統で収集している。</li>
+            <li>Azure Functions Skills は Functions 特化の知識を担当し、Azure Skills はマルチリージョンなどの汎用 Azure パターンを担当する、という役割分担で設計されている。</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="sentiment">
+        <h2>4. Overall Sentiment</h2>
+        <div class="split">
+          <div class="note-box success">
+            <h3>Positive Signals</h3>
+            <ul>
+              <li>Azure Functions 専用の skill suite を持つこと自体は、複数参加者から肯定的に見られている。</li>
+              <li>汎用 Azure Skills では拾いきれない Functions-specific な設計、移行、診断、ベストプラクティスに価値がある。</li>
+              <li>workspace-local な CLI/setup 体験は、global plugin よりも競合を避けやすく、方向性として評価されている。</li>
+              <li>「skill そのもの」よりも「Azure Functions team の知識を agent が利用できること」が本質的価値だ、という理解が強い。</li>
+            </ul>
+          </div>
+          <div class="note-box warning">
+            <h3>Main Concerns</h3>
+            <ul>
+              <li>Azure Skills と Azure Functions Skills の境界が不明確で、create/deploy/best-practices/upgrade のような領域で重複や競合が起きる。</li>
+              <li>plugin install が global に効くため、ユーザーが意図しない skill routing や skill 衝突に遭遇する可能性がある。</li>
+              <li>install 手順や reload 要否がわかりにくく、GitHub Copilot CLI、VS Code、EMU/個人アカウント、plugin/CLI の体験差が混乱を生んでいる。</li>
+              <li>skill が増えるほど discoverability よりも selection/routing の問題が大きくなる。</li>
+              <li>LLM skill の品質評価は非決定的であり、通常の unit test だけでは十分ではない。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="discussion">
+        <h2>5. Detailed Discussion Notes</h2>
+        <h3>4.1 Scope: Azure Skills vs Azure Functions Skills</h3>
+        <p>最も重要な論点は、Azure Skills と Azure Functions Skills の責務分担である。Azure Functions 専用 skill を分離することには価値があるが、汎用 Azure Skills と同じ領域を二重実装すると、ユーザーも agent も混乱するという指摘があった。</p>
+        <p>特に <code>create</code>、<code>deploy</code>、<code>best practices</code>、<code>upgrade</code> は Azure Skills 側にも近い概念が存在する。Azure Functions Skills は、Azure 全般の一般論ではなく、Functions 固有の runtime、trigger/binding、language worker、hosting plan、scale behavior、diagnostics、migration path に寄せるべきだ、という方向性が見えている。</p>
+        <p>Madhura の整理として、Day 0 の作成や汎用 deployment preparation は Azure Skills に寄せ、Day 1+ の troubleshooting、upgrade、comparison、operational review は Azure Functions Skills が強く担当する、という考え方が重要である。</p>
+        <p>推奨される方向性は、明確な境界と routing contract を文書化することである。Functions-specific な問いは Functions Skills が直接処理し、共通 Azure pattern は Azure Skills へ redirect または delegate する。</p>
+
+        <h3>4.2 Routing and Skill Collision</h3>
+        <p>skill が増えるほど、ユーザーにとっての問題は「skill を見つけられるか」だけではなく、「正しい skill が選ばれるか」になる。bug bash では、100 個以上の skill が見える状況や、Functions 系と汎用 Azure 系の skill が混在する状況が指摘された。</p>
+        <p>plugin が global にインストールされる場合、別 workspace や別 task でも意図せず skill が routing 候補に入るため、衝突や誤選択が起きやすい。agent が router として機能し、visible な skill を agent や workspace の context によって絞る設計が必要である。</p>
+        <p>今後は、<code>functions-copilot</code> agent がどの user intent をどの skill に route するかを、routing table として明文化し、必要に応じて Azure Skills への delegation も含めるべきである。</p>
+
+        <h3>4.3 Installation and Onboarding UX</h3>
+        <p>install UX は大きな摩擦点として挙がった。特に GitHub Copilot CLI の plugin install において、自然言語に見える <code>copilot plugin marketplace add ...</code> が agent prompt として解釈され、不要な skill routing が発生して install が遅くなる、という issue #69 が作成されている。</p>
+        <p>期待される体験は、install が direct command として実行され、無関係な skill resolution を起こさないことである。そのため README などの手順は <code>/plugin marketplace add Azure/azure-functions-skills</code> のような slash command 形式に更新する必要がある。</p>
+        <p>install 後に reload/restart が必要な場合にそれが明示されない、skills list に反映されない、EMU と個人アカウントで挙動が異なる、CLI と plugin の体験差がある、という混乱も挙げられた。</p>
+        <ul>
+          <li>どの agent/host でどの install path を使うべきか。</li>
+          <li>install 後に reload/restart が必要か。</li>
+          <li>plugin install と workspace-local setup の違い。</li>
+          <li>global plugin が他 workspace に影響する可能性。</li>
+          <li>GitHub Copilot CLI、VS Code、Claude Code、Codex での差分。</li>
+        </ul>
+
+        <h3>4.4 Discoverability: VS Code, Portal, Marketplace</h3>
+        <p>skill をどこで発見し、どこから使うのかも未整理である。候補として、VS Code extension への統合、Azure Portal Copilot への統合、marketplace/plugin からの導入、CLI setup などが挙がっている。</p>
+        <p>ただし、この議論の本質は単なる露出面の増加ではない。露出が増えるほど、skill の重複と routing の問題も増える。そのため、discoverability の改善は routing、scope control、install guidance とセットで考える必要がある。</p>
+        <p>Azure Portal Copilot に入れる場合は、既に対象 resource context があるため inventory/health/best-practices/diagnostics と相性が良い。一方、VS Code extension 統合では local project context、code anti-pattern detection、test generation、migration assistance と相性が良い。</p>
+
+        <h3>4.5 Value Proposition: Best Practices, Diagnostics, Optimization</h3>
+        <p>参加者から強く支持された価値は、Azure Functions team の推奨を agent が proactive に提供することである。特に、StackOverflow や古い blog に残る outdated な知識より、Functions team の現在の推奨を参照できることが価値だという意見があった。</p>
+        <ul>
+          <li>outdated な programming model や runtime version を検出し、推奨移行先を提示する。</li>
+          <li>Python v1 model、Node.js v3 model、.NET in-process など、移行が必要な領域を明確にする。</li>
+          <li>HTTP client misuse、connection management、Service Bus message lock、retry/concurrency 設定など、customer code anti-pattern を検出する。</li>
+          <li>deployment 前に misconfiguration を見つける what-if/preflight 的なチェックを提供する。</li>
+          <li>concurrency、scale、hosting plan、trigger behavior に基づく cost/performance optimization を提案する。</li>
+          <li>event-driven architecture、Service Bus、Blob、Cosmos DB など、Functions の主用途に近い設計支援を行う。</li>
+        </ul>
+        <p>Finbar の観点として、CRI や production incident を未然に防ぐことが非常に重要である。Swapnil の観点として、Functions 利用者の churn の一因は「知らないこと」にある。</p>
+
+        <h3>4.6 Knowledge as the Asset</h3>
+        <p>bug bash では、「重要なのは skill そのものではなく domain knowledge である」という認識が繰り返し出ている。skill は知識を agent に届けるための packaging であり、価値の中心は Azure Functions team が持つ operational knowledge、known issues、migration paths、best practices、source-level references である。</p>
+        <p>Dobby、SRE agent、Azure Skills、Azure Functions Skills、docs repo、internal troubleshooting knowledge が別々に存在すると、同じ問いに対して異なる回答が出る可能性がある。理想は、Functions-specific knowledge をできるだけ single source of truth に寄せ、それを複数 agent/channel から利用できるようにすることである。</p>
+
+        <h3>4.7 Evaluation and Quality</h3>
+        <p>LLM skill の品質担保は未解決の大課題として挙がっている。通常の deterministic test と違い、agent は同じ prompt でも出力が揺れる。text-based skill の品質をどのように CI で検証するかは、今後の重要テーマである。</p>
+        <p>Zach のアイデアとして、outer agent が inner agent の出力を評価する agent-based eval が挙がった。これは、単純な string assertion では評価しにくい「正しい skill を使ったか」「必要な観点を含んだか」「危険な提案を避けたか」を判定するのに有効である。</p>
+        <ul>
+          <li>Static validation: SKILL.md、frontmatter、references、links、agent manifests の構造検証。</li>
+          <li>Unit/integration tests: CLI setup、plugin packaging、script behavior の deterministic test。</li>
+          <li>E2E smoke tests: agent が skill を認識し、期待される high-level output を返すか。</li>
+          <li>Agent-based eval: 出力品質、routing、coverage、safety を rubric で評価する。</li>
+        </ul>
+
+        <h3>4.8 Feedback Collection</h3>
+        <p>フィードバックは Teams thread、meeting chat、GitHub issues、feedback skill に分散している。Madhura からは、複数の場所から集約する必要があるという指摘があった。</p>
+        <p>今後は、feedback skill を使って chat/thread から issue draft を生成する、または bug bash summary を定期的に生成して GitHub issue に link するなど、単一の intake/triage flow を作るべきである。</p>
+      </section>
+
+      <section id="issues" class="section-plain">
+        <h2>6. GitHub Issues #68-#79</h2>
+        <div class="issue-grid">
+          <article class="issue product"><h3>#68: best-practices review dimensions expansion</h3><div class="issue-meta"><span class="tag">MadhuraBharadwaj-MSFT</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/68">Issue #68</a></div><p><code>azure-functions-best-practices</code> の full review に programming model version、runtime version、extension bundle range、reliability posture を自動的に含める提案。<code>review-checklist.md</code>、workflow routing、output shape の更新が必要。</p></article>
+          <article class="issue critical"><h3>#69: GHCP install instructions should use slash command</h3><div class="issue-meta"><span class="tag">MadhuraBharadwaj-MSFT</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/69">Issue #69</a></div><p>自然言語形式ではなく <code>/plugin marketplace add Azure/azure-functions-skills</code> を使うよう README と install docs を更新する。不要な skill routing による遅延を避ける。</p></article>
+          <article class="issue product"><h3>#70: New azure-functions-upgrade skill</h3><div class="issue-meta"><span class="tag">MadhuraBharadwaj-MSFT</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/70">Issue #70</a></div><p>language version、extension bundle、programming model、.NET isolated worker、runtime v4 migration を案内する新 skill。CV1 から Flex は Azure Skills の <code>azure-upgrade</code> へ route する。</p></article>
+          <article class="issue new-skill"><h3>#71: SDK-type bindings recommendation</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/71">Issue #71</a></div><p>Service Bus、Blob、Cosmos DB などで modern recommended approach として SDK-type bindings を推奨する提案。best-practices、create、diagnostics、common references に横断的に関係する。</p></article>
+          <article class="issue new-skill"><h3>#72: Functions testing skills</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/72">Issue #72</a></div><p>unit test、integration test、local emulator、trigger-specific test、CI validation を案内する Azure Functions testing skill の提案。</p></article>
+          <article class="issue new-skill"><h3>#73: OpenTelemetry skill for language support</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/73">Issue #73</a></div><p>言語ごとの OTEL setup、sampling、trace correlation、dependency tracking、logs/metrics/traces の guidance と validation を扱う新 skill 提案。</p></article>
+          <article class="issue critical"><h3>#74: Kudu API auth path improvements</h3><div class="issue-meta"><span class="tag">FinVamp1</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/74">Issue #74</a></div><p>Kudu VFS API を使う前に SCM basic auth publishing credentials が有効か確認し、無効な場合は App Service audience の Entra token に fallback する。</p></article>
+          <article class="issue new-skill"><h3>#75: EOL language migration skill</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/75">Issue #75</a></div><p>End-of-life language version からの migration を扱う新 skill 提案。まずは <code>azure-functions-upgrade</code> の language EOL dimension として統合するのが自然。</p></article>
+          <article class="issue new-skill"><h3>#76: Performance and scaling configuration skill</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/76">Issue #76</a></div><p>customer scenario に基づき performance と scaling configuration を提案する新 skill。cost optimization、concurrency tuning、scale behavior、event-driven design と重なる。</p></article>
+          <article class="issue critical"><h3>#77: Setup should warn about outdated tool versions</h3><div class="issue-meta"><span class="tag">MadhuraBharadwaj-MSFT</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/77">Issue #77</a></div><p><code>azure-functions-setup</code> が古い tool でも all-green を出す問題。latest/near-latest/outdated/missing-or-unsupported の tiered indicator と upgrade command が必要。</p></article>
+          <article class="issue critical"><h3>#78: Invalid FUNCTIONS_WORKER_RUNTIME attribution</h3><div class="issue-meta"><span class="tag">FinVamp1</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/78">Issue #78</a></div><p><code>WorkerConfig for runtime: node27 not found</code> を <code>WEBSITE_NODE_DEFAULT_VERSION</code> ではなく <code>FUNCTIONS_WORKER_RUNTIME=node27</code> の invalid value と診断すべき。</p></article>
+          <article class="issue critical"><h3>#79: Use Functions Host health check endpoints</h3><div class="issue-meta"><span class="tag">FinVamp1</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/79">Issue #79</a></div><p><code>/runtime/health</code>、<code>/runtime/health/live</code>、<code>/runtime/health/ready</code> を health-status workflow に追加し、direct host health を確認する。</p></article>
+        </div>
+      </section>
+
+      <section id="themes" class="section-plain">
+        <h2>7. Consolidated Themes and Proposed Directions</h2>
+        <div class="theme-grid">
+          <article class="theme"><h3>Theme A: Define the Product Boundary</h3><p>Azure Functions Skills は、Azure 全般 skill の subset ではなく、Functions 固有の domain layer として位置付ける。Scope matrix、skill ownership table、delegate-to-Azure-Skills rules を作る。</p></article>
+          <article class="theme"><h3>Theme B: Make Installation Boring and Predictable</h3><p>GHCP install 手順を slash command に修正し、install 後の verification prompt、plugin と workspace-local setup の選び方、reload/restart 要否を明確化する。</p></article>
+          <article class="theme"><h3>Theme C: Expand Best Practices</h3><p>runtime/model/bundle/reliability/identity/networking/security/observability/scale を横断して proactive に gap を見つける review に進化させる。</p></article>
+          <article class="theme"><h3>Theme D: Build Upgrade Workflow</h3><p>outdated/EOL を検出するだけでなく、migration path、code/config changes、validation steps を提供する <code>azure-functions-upgrade</code> を作る。</p></article>
+          <article class="theme"><h3>Theme E: Improve Diagnostics Evidence</h3><p>root cause attribution を正確にし、error string、setting value、valid values、next command を明示する evidence-first output を徹底する。</p></article>
+          <article class="theme"><h3>Theme F: Invest in New Skills</h3><p>Testing、OTEL/observability、performance/scaling は Functions 利用者の実務 pain に近く、次の skill backlog として優先度が高い。</p></article>
+        </div>
+      </section>
+
+      <section id="todo" class="section-plain">
+        <h2>8. Prioritized TODO</h2>
+        <div class="todo-grid">
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#69</span></div><h4><span class="todo-number">1.</span> Update GHCP install documentation to slash command syntax</h4><p>README、usage docs、plugin install examples を更新する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#77</span></div><h4><span class="todo-number">2.</span> Add outdated-version warning behavior to setup</h4><p>tiered indicator と upgrade command 表示を追加する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#78</span></div><h4><span class="todo-number">3.</span> Fix invalid FUNCTIONS_WORKER_RUNTIME diagnosis</h4><p>valid values reference、diagnostic pattern mapping、inventory/best-practices validation を追加する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#74</span></div><h4><span class="todo-number">4.</span> Add SCM credential policy check and Entra fallback</h4><p>inventory/health scripts、auth path docs、validation を更新する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#79</span></div><h4><span class="todo-number">5.</span> Add Functions Host health endpoints</h4><p>native liveness/readiness を direct host health evidence として health-status workflow に追加する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span><span class="tag">#68</span></div><h4><span class="todo-number">6.</span> Expand best-practices full review dimensions</h4><p>runtime/model/bundle/reliability を full review に追加する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span></div><h4><span class="todo-number">7.</span> Define Azure Skills vs Azure Functions Skills scope matrix</h4><p>skill ownership table と delegate-to-Azure-Skills rules を作る。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span></div><h4><span class="todo-number">8.</span> Create functions-copilot routing matrix</h4><p>agent instructions、intent-to-skill table、fallback/delegation guidance を整備する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span><span class="tag">#70</span><span class="tag">#75</span></div><h4><span class="todo-number">9.</span> Implement azure-functions-upgrade skill skeleton</h4><p>outdated/EOL detection から migration guidance へ進む中核 workflow として追加する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span><span class="tag">#71</span></div><h4><span class="todo-number">10.</span> Add SDK-type bindings recommendation references</h4><p>common references、binding checklist、language-specific notes を追加する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span><span class="tag">#72</span></div><h4><span class="todo-number">11.</span> Design Functions Testing skill</h4><p>trigger-specific testing と CI guidance の scope doc、sample prompts、trigger matrix を作る。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span><span class="tag">#73</span></div><h4><span class="todo-number">12.</span> Design OTEL/observability skill</h4><p>language support matrix、setup validation、App Insights/OTEL guidance を設計する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span><span class="tag">#76</span></div><h4><span class="todo-number">13.</span> Design performance/scaling optimization skill</h4><p>scenario intake questions、hosting plan/trigger tuning matrix、cost/performance checklist を作る。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span></div><h4><span class="todo-number">14.</span> Build feedback aggregation workflow</h4><p>Teams、chat、issues、feedback skill に分散した情報を集約する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span></div><h4><span class="todo-number">15.</span> Create layered eval strategy</h4><p>static/unit/E2E/agent eval を組み合わせる rubric と CI gating level を定義する。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p3">P3</span></div><h4><span class="todo-number">16.</span> Investigate VS Code and Azure Portal integration paths</h4><p>channel-specific user journeys と integration proposal を作る。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p3">P3</span></div><h4><span class="todo-number">17.</span> Establish a Functions knowledge registry plan</h4><p>knowledge ownership map、reference update process、shared docs/references strategy を作る。</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p3">P3</span></div><h4><span class="todo-number">18.</span> Clarify global plugin vs workspace-local setup recommendation</h4><p>decision guide、known limitations、recommended setup per scenario を明確化する。</p></article>
+        </div>
+      </section>
+
+      <section id="triage">
+        <h2>9. Suggested Triage Order</h2>
+        <ol class="triage-list">
+          <li>#69, #77, #78, #74, #79 の concrete fixes を先に片付ける。</li>
+          <li>#68 の best-practices expansion を実装し、best-practices を proactive review の中核にする。</li>
+          <li>Azure Skills vs Azure Functions Skills の scope/routing doc を作り、今後の skill 追加判断を安定させる。</li>
+          <li>#70/#75 を統合した <code>azure-functions-upgrade</code> を作る。</li>
+          <li>#71/#72/#73/#76 を新 skill backlog として整理し、testing、observability、performance/scaling の順で設計する。</li>
+          <li>E2E と agent-based eval の最小 rubric を作り、今後の skill 追加に対する quality gate にする。</li>
+        </ol>
+        <p>この順序にすると、短期的な UX/bug fix、既存 skill の価値向上、新 skill 投資、品質基盤の整備をバランスよく進められる。</p>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">
+    Generated from <code>docs/bug-bash-feedback-summary-20260519.md</code>. Standalone HTML for review and sharing.
+  </footer>
+</body>
+</html>
