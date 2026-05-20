@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/publish-e2e-report.yml'
+      - 'docs/bug-bash-feedback-summary-20260519.html'
+      - 'docs/bug-bash-feedback-summary-20260519-en.html'
       - 'reports/e2e/current/report.html'
   workflow_dispatch:
 
@@ -31,9 +33,15 @@ jobs:
         run: |
           set -euo pipefail
           test -f reports/e2e/current/report.html
+          test -f docs/bug-bash-feedback-summary-20260519.html
+          test -f docs/bug-bash-feedback-summary-20260519-en.html
           mkdir -p _site
+          mkdir -p _site/bug-bash
           cp reports/e2e/current/report.html _site/index.html
           cp reports/e2e/current/report.html _site/report.html
+          cp docs/bug-bash-feedback-summary-20260519-en.html _site/bug-bash/index.html
+          cp docs/bug-bash-feedback-summary-20260519-en.html _site/bug-bash/en.html
+          cp docs/bug-bash-feedback-summary-20260519.html _site/bug-bash/ja.html
           touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5

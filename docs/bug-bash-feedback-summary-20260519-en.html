@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azure Functions Skills Bug Bash Feedback Summary</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --soft: #eef5ff;
+      --text: #1d2635;
+      --muted: #5f6f86;
+      --line: #d9e2ef;
+      --azure: #0078d4;
+      --azure-dark: #005a9e;
+      --teal: #008575;
+      --orange: #c85f00;
+      --red: #c4314b;
+      --shadow: 0 18px 45px rgba(24, 39, 75, 0.10);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      line-height: 1.72;
+      letter-spacing: 0;
+    }
+
+    a { color: var(--azure-dark); text-underline-offset: 0.18em; }
+
+    code {
+      padding: 0.12rem 0.34rem;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f4f7fb;
+      font-family: Consolas, "Cascadia Code", monospace;
+      font-size: 0.92em;
+    }
+
+    .hero {
+      color: #ffffff;
+      background: linear-gradient(135deg, #005a9e 0%, #0078d4 52%, #008575 100%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .hero-inner, .layout, .footer {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .hero-inner { padding: 54px 0 36px; }
+
+    .kicker {
+      margin: 0 0 10px;
+      color: rgba(255, 255, 255, 0.84);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 960px;
+      margin: 0;
+      font-size: clamp(2.25rem, 5vw, 4.4rem);
+      line-height: 1.06;
+      letter-spacing: 0;
+    }
+
+    .hero-summary {
+      max-width: 930px;
+      margin: 20px 0 0;
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 1.06rem;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+      font-size: 0.9rem;
+    }
+
+    a.pill {
+      color: #ffffff;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    a.pill:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      gap: 28px;
+      margin-top: 28px;
+      margin-bottom: 56px;
+      align-items: start;
+    }
+
+    .toc {
+      position: sticky;
+      top: 18px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 10px 30px rgba(24, 39, 75, 0.06);
+    }
+
+    .toc h2 {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .toc a {
+      display: block;
+      padding: 8px 0;
+      border-top: 1px solid #edf1f7;
+      color: var(--text);
+      font-size: 0.92rem;
+      text-decoration: none;
+    }
+
+    .toc a:hover { color: var(--azure-dark); }
+
+    main { min-width: 0; }
+
+    section {
+      margin-bottom: 28px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 12px 36px rgba(24, 39, 75, 0.06);
+    }
+
+    .section-plain {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    h2, h3, h4 { line-height: 1.25; letter-spacing: 0; }
+    h2 { margin: 0 0 16px; color: #10243f; font-size: 1.6rem; }
+    h3 { margin: 24px 0 10px; color: #183a63; font-size: 1.18rem; }
+    h4 { margin: 0 0 8px; font-size: 1rem; }
+    p { margin: 0 0 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.35rem; }
+    li { margin: 7px 0; }
+    .lead { color: #33465e; font-size: 1.04rem; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .metric {
+      min-height: 120px;
+      padding: 16px;
+      border: 1px solid #cfe0f4;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, #ffffff, #f3f8ff);
+    }
+
+    .metric strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--azure-dark);
+      font-size: 1.55rem;
+      line-height: 1;
+    }
+
+    .metric span { display: block; color: #38506c; font-size: 0.9rem; line-height: 1.45; }
+
+    .split, .theme-grid, .issue-grid, .todo-grid, .link-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .note-box, .theme, .issue, .todo, .link-card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .note-box { border-left: 4px solid var(--azure); background: var(--soft); }
+    .note-box.warning { border-left-color: var(--orange); background: #fff7ed; }
+    .note-box.success { border-left-color: var(--teal); background: #eefaf7; }
+    .theme { border-top: 4px solid var(--azure); }
+    .issue { border-top: 4px solid #6f89a8; }
+    .issue.critical { border-top-color: var(--red); }
+    .issue.product { border-top-color: var(--azure); }
+    .issue.new-skill { border-top-color: var(--teal); }
+    .link-card { border-top: 4px solid var(--azure); }
+    .link-card h3 { margin-top: 0; }
+    .link-card .link-action { display: inline-flex; margin-top: 4px; font-weight: 700; }
+
+    .issue-meta, .todo-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0 12px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      color: #284057;
+      background: #eef2f7;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .tag.p0 { color: #8a1f32; background: #ffe8ed; }
+    .tag.p1 { color: #005a9e; background: #e4f1ff; }
+    .tag.p2 { color: #006b5e; background: #dcf8f2; }
+    .tag.p3 { color: #665100; background: #fff5c2; }
+    .todo-number { color: var(--azure-dark); font-weight: 800; }
+
+    .triage-list {
+      counter-reset: triage;
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .triage-list li {
+      counter-increment: triage;
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      margin: 12px 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+    }
+
+    .triage-list li::before {
+      content: counter(triage);
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border-radius: 50%;
+      color: #ffffff;
+      background: var(--azure);
+      font-weight: 800;
+    }
+
+    .footer {
+      margin-bottom: 40px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .layout { display: block; }
+      .toc { position: static; margin-bottom: 20px; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .theme-grid, .issue-grid, .todo-grid, .link-grid, .split { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 620px) {
+      .hero-inner, .layout, .footer { width: min(100% - 24px, 1180px); }
+      .hero-inner { padding: 38px 0 26px; }
+      section { padding: 20px; }
+      .summary-grid { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      body { background: #ffffff; }
+      .hero { color: #000000; background: #ffffff; }
+      .toc { display: none; }
+      .layout, .footer { width: 100%; margin: 0; }
+      section, .theme, .issue, .todo, .metric, .triage-list li { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="kicker">Bug Bash Feedback Summary</p>
+      <h1>Azure Functions Skills</h1>
+      <p class="hero-summary">This English version consolidates the bug bash conversation notes and GitHub issues #68 and later into structured meeting notes, feedback themes, proposals, and prioritized follow-up work.</p>
+      <div class="meta-row" aria-label="Document metadata">
+        <span class="pill">Date: 2026-05-19</span>
+        <span class="pill">Issues: #68-#79</span>
+        <span class="pill">Focus: Scope, UX, Routing, Quality</span>
+        <a class="pill" href="/bug-bash/ja.html">日本語版</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <a href="#summary">Executive Summary</a>
+      <a href="#sources">Input Sources</a>
+      <a href="#links">Useful Links</a>
+      <a href="#sentiment">Overall Sentiment</a>
+      <a href="#discussion">Discussion Notes</a>
+      <a href="#issues">GitHub Issues</a>
+      <a href="#themes">Themes and Directions</a>
+      <a href="#todo">Prioritized TODO</a>
+      <a href="#triage">Suggested Triage Order</a>
+    </nav>
+
+    <main>
+      <section id="summary">
+        <h2>1. Executive Summary</h2>
+        <p class="lead">The bug bash feedback was not only about individual bug fixes. The central discussion was about what kind of skill suite Azure Functions Skills should become, what responsibilities it should own, and how it should fit into the broader Azure Skills ecosystem.</p>
+        <p>Overall, the direction of having Copilot and agent skills dedicated to Azure Functions was received positively. Participants saw strong value in making the Azure Functions team's domain knowledge available to agents through setup, creation, diagnostics, best-practices review, upgrade guidance, and operational review workflows. At the same time, the discussion surfaced major concerns around overlap with Azure Skills, plugin installation UX, opaque routing when many skills are visible, and the difficulty of evaluating LLM-based skills.</p>
+
+        <div class="summary-grid" aria-label="Top themes">
+          <div class="metric"><strong>1</strong><span>Clarify the scope boundary between Azure Skills and Azure Functions Skills.</span></div>
+          <div class="metric"><strong>2</strong><span>Design routing so the right skill is selected even when 100+ skills are visible.</span></div>
+          <div class="metric"><strong>3</strong><span>Reduce onboarding friction around install, reload, accounts, and plugin versus CLI flows.</span></div>
+          <div class="metric"><strong>4</strong><span>Turn Azure Functions team recommendations into practical skills.</span></div>
+          <div class="metric"><strong>5</strong><span>Combine E2E tests and agent-based evals to continuously assess quality.</span></div>
+        </div>
+      </section>
+
+      <section id="sources">
+        <h2>2. Input Sources</h2>
+        <ul>
+          <li>Local bug bash notes: <code>azure-functions-skills-bug-bash.md</code></li>
+          <li>GitHub issues reviewed: #68 through #79</li>
+          <li>GitHub issue comments: none were returned for #68 through #79 at the time of collection.</li>
+          <li>Japanese source page: <code>docs/bug-bash-feedback-summary-20260519.html</code></li>
+        </ul>
+      </section>
+
+      <section id="links">
+        <h2>3. Useful Links</h2>
+        <p class="lead">Important links for bug bash feedback, formal issue/PR follow-up, Azure Skills references, and VS Code extension integration research.</p>
+        <div class="link-grid">
+          <article class="link-card">
+            <h3>1. Feedback Forum Thread in Teams</h3>
+            <p><strong>Summary:</strong> The main thread for posting Azure Functions Skills Bug Bash feedback.</p>
+            <p><strong>Use:</strong> Use this for lightweight feedback and discussion that does not yet need a formal GitHub issue.</p>
+            <a class="link-action" href="https://teams.microsoft.com/l/message/19:7e8b0770f3504455a6901a79742ac1e5@thread.tacv2/1779211330336?tenantId=72f988bf-86f1-41af-91ab-2d7cd011db47&amp;groupId=201c2bb2-812d-4986-ac92-9bfad0d6cc59&amp;parentMessageId=1779211330336&amp;teamName=Azure%20Functions%20Team&amp;channelName=Functions.ai%20%F0%9F%A4%96&amp;createdTime=1779211330336">Open the Azure Functions Skills Bug Bash Feedback Forum</a>
+          </article>
+
+          <article class="link-card">
+            <h3>2. Azure Functions Skills GitHub Repository</h3>
+            <p><strong>Summary:</strong> The repository for the skills tested during this bug bash.</p>
+            <p><strong>Use:</strong> Use the README for usage guidance, and GitHub issues or PRs for formal feedback.</p>
+            <a class="link-action" href="https://github.com/Azure/azure-functions-skills/">Open the Azure Functions Skills GitHub repository</a>
+          </article>
+
+          <article class="link-card">
+            <h3>3. Azure Skills Base Repository</h3>
+            <p><strong>Summary:</strong> The repository for broader Azure skills beyond Azure Functions.</p>
+            <p><strong>Use:</strong> Reference this for Azure Functions Skills dependencies, especially deploy workflows, shared logic, and generic Azure best practices.</p>
+            <a class="link-action" href="https://github.com/microsoft/azure-skills/tree/main">Open the Azure Skills repository</a>
+          </article>
+
+          <article class="link-card">
+            <h3>4. VS Code Copilot Extension Configuration Example</h3>
+            <p><strong>Summary:</strong> A reference example for including skills in an extension package.</p>
+            <p><strong>Use:</strong> Use this when exploring whether skills should be bundled with an extension and how enable/disable control might work.</p>
+            <a class="link-action" href="https://github.com/microsoft/vscode/blob/cf238f65873ac96d4d9f9e25a2f01c0d4b733636/extensions/copilot/package.json#L6648">View the skills configuration in VS Code Copilot package.json</a>
+          </article>
+        </div>
+
+        <div class="note-box" style="margin-top: 16px;">
+          <h3>Intent From the Conversation</h3>
+          <ul>
+            <li>Feedback is being collected through two channels: the Teams thread and GitHub issues.</li>
+            <li>Azure Functions Skills are intended to carry Azure Functions-specific knowledge, while Azure Skills should cover generic Azure patterns such as multi-region architecture.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="sentiment">
+        <h2>4. Overall Sentiment</h2>
+        <div class="split">
+          <div class="note-box success">
+            <h3>Positive Signals</h3>
+            <ul>
+              <li>Participants generally supported having a dedicated Azure Functions skill suite.</li>
+              <li>There is clear value in Functions-specific guidance that generic Azure Skills may not cover deeply enough.</li>
+              <li>The workspace-local CLI/setup experience was viewed positively because it reduces global plugin collision risk.</li>
+              <li>The core asset is not the skill file itself, but the Azure Functions team's domain knowledge made available to agents.</li>
+            </ul>
+          </div>
+          <div class="note-box warning">
+            <h3>Main Concerns</h3>
+            <ul>
+              <li>The boundary between Azure Skills and Azure Functions Skills is unclear, especially around create, deploy, best-practices, and upgrade workflows.</li>
+              <li>Global plugin installation can make skills visible in contexts where users did not intend to use them.</li>
+              <li>Install steps, reload requirements, account differences, and plugin/CLI differences can confuse users.</li>
+              <li>As the skill count grows, selection and routing become more important than simple discoverability.</li>
+              <li>LLM skill quality is non-deterministic, so unit tests alone are not enough.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="discussion">
+        <h2>5. Detailed Discussion Notes</h2>
+        <h3>5.1 Scope: Azure Skills vs Azure Functions Skills</h3>
+        <p>The most important topic was the responsibility split between Azure Skills and Azure Functions Skills. Participants agreed that a dedicated Azure Functions skill suite is valuable, but duplicating generic Azure workflows can confuse both users and agents.</p>
+        <p>Areas such as <code>create</code>, <code>deploy</code>, <code>best practices</code>, and <code>upgrade</code> already have related concepts in Azure Skills. Azure Functions Skills should focus on Functions-specific runtime behavior, triggers and bindings, language workers, hosting plans, scaling behavior, diagnostics, and migration paths.</p>
+        <p>Madhura's framing is especially important: Day 0 creation and generic deployment preparation should lean toward Azure Skills, while Day 1+ troubleshooting, upgrades, comparisons, and operational review should be strong Azure Functions Skills responsibilities.</p>
+        <p>The recommended direction is to document a clear boundary and routing contract. Functions-specific questions should be handled directly by Functions Skills, while generic Azure patterns should redirect or delegate to Azure Skills.</p>
+
+        <h3>5.2 Routing and Skill Collision</h3>
+        <p>As the number of skills grows, the problem becomes less about whether users can find a skill and more about whether the correct skill is selected. The bug bash highlighted situations where 100+ skills may be visible, with both Functions-specific and generic Azure skills competing for routing.</p>
+        <p>When a plugin is installed globally, its skills can become candidates in unrelated workspaces or tasks, increasing the risk of collisions and incorrect routing. The agent should act as a router, and the visible skill set should be scoped by agent and workspace context where possible.</p>
+        <p>The <code>functions-copilot</code> agent should have an explicit intent-to-skill routing table, including when to delegate to Azure Skills.</p>
+
+        <h3>5.3 Installation and Onboarding UX</h3>
+        <p>Installation UX was a major friction point. In particular, issue #69 notes that the natural-language-looking <code>copilot plugin marketplace add ...</code> form can be interpreted as an agent prompt, causing unnecessary skill routing and slow installation.</p>
+        <p>The expected experience is that installation runs as a direct command without unrelated skill resolution. Documentation should therefore use the slash command form <code>/plugin marketplace add Azure/azure-functions-skills</code>.</p>
+        <p>The docs should also clearly explain reload/restart requirements, skill list refresh behavior, EMU versus personal account differences, and CLI versus plugin behavior.</p>
+        <ul>
+          <li>Which install path to use for each agent or host.</li>
+          <li>Whether reload or restart is required after installation.</li>
+          <li>The difference between plugin install and workspace-local setup.</li>
+          <li>The possibility that global plugins affect other workspaces.</li>
+          <li>Differences across GitHub Copilot CLI, VS Code, Claude Code, and Codex.</li>
+        </ul>
+
+        <h3>5.4 Discoverability: VS Code, Portal, Marketplace</h3>
+        <p>Participants also discussed where skills should be discovered and launched: VS Code extension integration, Azure Portal Copilot, marketplace/plugin installation, and CLI setup were all mentioned.</p>
+        <p>The core issue is not simply increasing visibility. More visibility can also increase overlap and routing confusion, so discoverability must be designed together with routing, scope control, and installation guidance.</p>
+        <p>Azure Portal Copilot may work well for resource-context workflows such as inventory, health, best-practices review, and diagnostics. VS Code extension integration may be better suited for local project context, code anti-pattern detection, test generation, and migration assistance.</p>
+
+        <h3>5.5 Value Proposition: Best Practices, Diagnostics, Optimization</h3>
+        <p>The strongest value proposition is proactive access to current Azure Functions team recommendations. Participants noted that this is more valuable than relying on outdated community answers or older blog posts.</p>
+        <ul>
+          <li>Detect outdated programming models or runtime versions and recommend migration paths.</li>
+          <li>Highlight migration needs such as Python v1 model, Node.js v3 model, and .NET in-process.</li>
+          <li>Detect customer code anti-patterns such as HTTP client misuse, connection handling issues, Service Bus message lock problems, and retry/concurrency misconfiguration.</li>
+          <li>Provide what-if or preflight checks that catch misconfiguration before deployment.</li>
+          <li>Recommend cost and performance optimizations based on concurrency, scale, hosting plan, and trigger behavior.</li>
+          <li>Support event-driven architecture guidance for Service Bus, Blob, Cosmos DB, and related Functions scenarios.</li>
+        </ul>
+        <p>Finbar emphasized preventing CRIs and production incidents before they occur. Swapnil emphasized that user churn often comes from unknowns: runtime behavior, binding recommendations, testing approaches, and observability setup that users may not know to ask about.</p>
+
+        <h3>5.6 Knowledge as the Asset</h3>
+        <p>A repeated point was that the real value is domain knowledge, not the skill packaging itself. Skills are a way to deliver operational knowledge, known issues, migration paths, best practices, and source-level references to agents.</p>
+        <p>Knowledge fragmentation is a risk. If Dobby, SRE agents, Azure Skills, Azure Functions Skills, docs, and internal troubleshooting knowledge drift apart, the same question can receive different answers. The ideal direction is to move Functions-specific knowledge toward a single source of truth that multiple agents and channels can consume.</p>
+
+        <h3>5.7 Evaluation and Quality</h3>
+        <p>Quality evaluation for LLM-based skills remains a major open problem. Unlike deterministic code, agents can produce different outputs for the same prompt, so CI validation for text-based skills needs more than simple unit tests.</p>
+        <p>Zach proposed an agent-based evaluation model where an outer agent evaluates the output of an inner agent. This can help assess whether the right skill was used, whether key dimensions were covered, and whether unsafe or misleading recommendations were avoided.</p>
+        <ul>
+          <li>Static validation: SKILL.md, frontmatter, references, links, and agent manifest structure.</li>
+          <li>Unit/integration tests: deterministic checks for CLI setup, plugin packaging, and script behavior.</li>
+          <li>E2E smoke tests: whether the agent recognizes the skills and returns expected high-level output.</li>
+          <li>Agent-based eval: rubric-driven assessment of output quality, routing, coverage, and safety.</li>
+        </ul>
+
+        <h3>5.8 Feedback Collection</h3>
+        <p>Feedback is distributed across Teams threads, meeting chat, GitHub issues, and the feedback skill. Madhura pointed out that input needs to be aggregated from multiple places.</p>
+        <p>A better workflow would use the feedback skill to generate issue drafts from chat or thread content, or periodically generate bug bash summaries that link back to GitHub issues. The goal is a single intake and triage flow that does not lose context.</p>
+      </section>
+
+      <section id="issues" class="section-plain">
+        <h2>6. GitHub Issues #68-#79</h2>
+        <div class="issue-grid">
+          <article class="issue product"><h3>#68: best-practices review dimensions expansion</h3><div class="issue-meta"><span class="tag">MadhuraBharadwaj-MSFT</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/68">Issue #68</a></div><p>Expand <code>azure-functions-best-practices</code> full review to automatically include programming model version, runtime version, extension bundle range, and reliability posture. This requires updates to <code>review-checklist.md</code>, workflow routing, and report output shape.</p></article>
+          <article class="issue critical"><h3>#69: GHCP install instructions should use slash command</h3><div class="issue-meta"><span class="tag">MadhuraBharadwaj-MSFT</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/69">Issue #69</a></div><p>Update README and installation docs to use <code>/plugin marketplace add Azure/azure-functions-skills</code> instead of a natural-language-looking command that can trigger unrelated skill routing.</p></article>
+          <article class="issue product"><h3>#70: New azure-functions-upgrade skill</h3><div class="issue-meta"><span class="tag">MadhuraBharadwaj-MSFT</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/70">Issue #70</a></div><p>Create an upgrade skill for language versions, extension bundles, programming models, .NET isolated migration, and Functions runtime v4 migration. Route CV1 to Flex Consumption to Azure Skills <code>azure-upgrade</code>.</p></article>
+          <article class="issue new-skill"><h3>#71: SDK-type bindings recommendation</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/71">Issue #71</a></div><p>Recommend SDK-type bindings as the modern approach for Service Bus, Blob, Cosmos DB, and related bindings. This affects best-practices, create, diagnostics, and common references.</p></article>
+          <article class="issue new-skill"><h3>#72: Functions testing skills</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/72">Issue #72</a></div><p>Propose a Functions testing skill covering unit tests, integration tests, local emulators, trigger-specific tests, and CI validation.</p></article>
+          <article class="issue new-skill"><h3>#73: OpenTelemetry skill for language support</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/73">Issue #73</a></div><p>Propose a language-specific OpenTelemetry skill covering OTEL setup, sampling, trace correlation, dependency tracking, logs, metrics, traces, and validation.</p></article>
+          <article class="issue critical"><h3>#74: Kudu API auth path improvements</h3><div class="issue-meta"><span class="tag">FinVamp1</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/74">Issue #74</a></div><p>Before calling the Kudu VFS API, check whether SCM basic auth publishing credentials are enabled. If disabled, fall back to an Entra token for the App Service audience.</p></article>
+          <article class="issue new-skill"><h3>#75: EOL language migration skill</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/75">Issue #75</a></div><p>Propose a skill for migration away from end-of-life language versions. This likely belongs initially as a language EOL dimension in <code>azure-functions-upgrade</code>.</p></article>
+          <article class="issue new-skill"><h3>#76: Performance and scaling configuration skill</h3><div class="issue-meta"><span class="tag">swapnil-nagar</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/76">Issue #76</a></div><p>Propose scenario-based performance and scaling guidance, including cost optimization, concurrency tuning, scale behavior, and event-driven design.</p></article>
+          <article class="issue critical"><h3>#77: Setup should warn about outdated tool versions</h3><div class="issue-meta"><span class="tag">MadhuraBharadwaj-MSFT</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/77">Issue #77</a></div><p><code>azure-functions-setup</code> currently reports all-green even when tools are outdated. Add tiered indicators for up-to-date, near-latest, outdated, and missing or unsupported versions.</p></article>
+          <article class="issue critical"><h3>#78: Invalid FUNCTIONS_WORKER_RUNTIME attribution</h3><div class="issue-meta"><span class="tag">FinVamp1</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/78">Issue #78</a></div><p>Diagnose <code>WorkerConfig for runtime: node27 not found</code> as an invalid <code>FUNCTIONS_WORKER_RUNTIME=node27</code> value, not as <code>WEBSITE_NODE_DEFAULT_VERSION</code>.</p></article>
+          <article class="issue critical"><h3>#79: Use Functions Host health check endpoints</h3><div class="issue-meta"><span class="tag">FinVamp1</span><span class="tag">OPEN</span><a class="tag" href="https://github.com/Azure/azure-functions-skills/issues/79">Issue #79</a></div><p>Add <code>/runtime/health</code>, <code>/runtime/health/live</code>, and <code>/runtime/health/ready</code> to the health-status workflow so direct host health is checked before telemetry fallback.</p></article>
+        </div>
+      </section>
+
+      <section id="themes" class="section-plain">
+        <h2>7. Consolidated Themes and Proposed Directions</h2>
+        <div class="theme-grid">
+          <article class="theme"><h3>Theme A: Define the Product Boundary</h3><p>Position Azure Functions Skills as a Functions-specific domain layer, not merely a subset of generic Azure skills. Create a scope matrix, skill ownership table, and delegation rules for Azure Skills.</p></article>
+          <article class="theme"><h3>Theme B: Make Installation Boring and Predictable</h3><p>Use slash command installation guidance, provide verification prompts and expected output, clarify plugin versus workspace-local setup, and document reload or restart requirements.</p></article>
+          <article class="theme"><h3>Theme C: Expand Best Practices</h3><p>Evolve best-practices review into a proactive cross-cutting assessment across runtime, model, bundles, reliability, identity, networking, security, observability, and scale.</p></article>
+          <article class="theme"><h3>Theme D: Build Upgrade Workflow</h3><p>Create <code>azure-functions-upgrade</code> to provide migration paths, code and configuration changes, breaking-change awareness, and validation steps.</p></article>
+          <article class="theme"><h3>Theme E: Improve Diagnostics Evidence</h3><p>Make root cause attribution precise and evidence-first, including error strings, setting values, valid values, and next commands.</p></article>
+          <article class="theme"><h3>Theme F: Invest in New Skills</h3><p>Testing, OTEL/observability, and performance/scaling are high-value backlog items because they map directly to real customer pain.</p></article>
+        </div>
+      </section>
+
+      <section id="todo" class="section-plain">
+        <h2>8. Prioritized TODO</h2>
+        <div class="todo-grid">
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#69</span></div><h4><span class="todo-number">1.</span> Update GHCP install documentation to slash command syntax</h4><p>Update README, usage docs, and plugin install examples.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#77</span></div><h4><span class="todo-number">2.</span> Add outdated-version warning behavior to setup</h4><p>Add tiered indicators and upgrade command output.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#78</span></div><h4><span class="todo-number">3.</span> Fix invalid FUNCTIONS_WORKER_RUNTIME diagnosis</h4><p>Add valid value references, diagnostic pattern mapping, and inventory/best-practices validation.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#74</span></div><h4><span class="todo-number">4.</span> Add SCM credential policy check and Entra fallback</h4><p>Update inventory/health scripts, auth path docs, and validation coverage.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p0">P0</span><span class="tag">#79</span></div><h4><span class="todo-number">5.</span> Add Functions Host health endpoints</h4><p>Add native liveness/readiness evidence to the health-status workflow.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span><span class="tag">#68</span></div><h4><span class="todo-number">6.</span> Expand best-practices full review dimensions</h4><p>Add runtime, model, bundle, and reliability checks to full review.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span></div><h4><span class="todo-number">7.</span> Define Azure Skills vs Azure Functions Skills scope matrix</h4><p>Create a skill ownership table and delegation rules.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span></div><h4><span class="todo-number">8.</span> Create functions-copilot routing matrix</h4><p>Document agent instructions, intent-to-skill mapping, fallback, and delegation guidance.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span><span class="tag">#70</span><span class="tag">#75</span></div><h4><span class="todo-number">9.</span> Implement azure-functions-upgrade skill skeleton</h4><p>Add the core workflow that connects outdated/EOL detection to migration guidance.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p1">P1</span><span class="tag">#71</span></div><h4><span class="todo-number">10.</span> Add SDK-type bindings recommendation references</h4><p>Add common references, binding checklist updates, and language-specific notes.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span><span class="tag">#72</span></div><h4><span class="todo-number">11.</span> Design Functions Testing skill</h4><p>Create scope docs, sample prompts, and a trigger-specific testing matrix.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span><span class="tag">#73</span></div><h4><span class="todo-number">12.</span> Design OTEL/observability skill</h4><p>Design language support matrix, setup validation, and App Insights/OTEL guidance.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span><span class="tag">#76</span></div><h4><span class="todo-number">13.</span> Design performance/scaling optimization skill</h4><p>Create scenario intake questions, hosting plan/trigger tuning matrix, and cost/performance checklist.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span></div><h4><span class="todo-number">14.</span> Build feedback aggregation workflow</h4><p>Aggregate feedback from Teams, chat, issues, and the feedback skill.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p2">P2</span></div><h4><span class="todo-number">15.</span> Create layered eval strategy</h4><p>Define rubric and CI gating levels across static, unit, E2E, and agent-based evals.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p3">P3</span></div><h4><span class="todo-number">16.</span> Investigate VS Code and Azure Portal integration paths</h4><p>Create channel-specific user journeys and integration proposals.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p3">P3</span></div><h4><span class="todo-number">17.</span> Establish a Functions knowledge registry plan</h4><p>Define knowledge ownership, reference update process, and shared docs/reference strategy.</p></article>
+          <article class="todo"><div class="todo-meta"><span class="tag p3">P3</span></div><h4><span class="todo-number">18.</span> Clarify global plugin vs workspace-local setup recommendation</h4><p>Document decision guide, known limitations, and recommended setup per scenario.</p></article>
+        </div>
+      </section>
+
+      <section id="triage">
+        <h2>9. Suggested Triage Order</h2>
+        <ol class="triage-list">
+          <li>Complete the concrete fixes first: #69, #77, #78, #74, and #79.</li>
+          <li>Implement the #68 best-practices expansion and make best-practices the core proactive review workflow.</li>
+          <li>Create the Azure Skills versus Azure Functions Skills scope/routing document to stabilize future skill decisions.</li>
+          <li>Build <code>azure-functions-upgrade</code>, combining #70 and #75.</li>
+          <li>Organize #71, #72, #73, and #76 as a new-skill backlog, with testing, observability, and performance/scaling as the likely sequence.</li>
+          <li>Create a minimal E2E plus agent-based eval rubric and use it as a quality gate for future skill additions.</li>
+        </ol>
+        <p>This order balances short-term UX and bug fixes, improvement of existing skills, investment in new skills, and the quality infrastructure needed to keep the suite healthy.</p>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">
+    English version generated from <code>docs/bug-bash-feedback-summary-20260519.html</code>. Standalone HTML for review and sharing.
+  </footer>
+</body>
+</html>
