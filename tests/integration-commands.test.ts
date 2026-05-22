@@ -221,6 +221,24 @@ describe('CLI command integration', () => {
     }
   });
 
+  it('workspace apply --yes appends routing to an existing Claude instructions file', () => {
+    const projectDir = makeTempDir('af-skills-e2e-workspace-yes-');
+    writeFileSync(join(projectDir, 'CLAUDE.md'), '# Existing Claude rules\n');
+
+    runCli([
+      'workspace',
+      'apply',
+      '--agent', 'claude',
+      '--dir', projectDir,
+      '--mode', 'plugin-reference',
+      '--yes',
+    ]);
+
+    const content = readFileSync(join(projectDir, 'CLAUDE.md'), 'utf-8');
+    expect(content).toContain('# Existing Claude rules');
+    expect(content).toContain('<!-- azure-functions-skills:start');
+  });
+
   it('plugin install --dry-run prints plugin and workspace activation plans without writing files', () => {
     const projectDir = makeTempDir('af-skills-e2e-plugin-install-dry-run-');
 

@@ -45,6 +45,7 @@ export interface PluginOperationOptions {
   workspace?: boolean;
   runner?: CommandRunner;
   platform?: NodeJS.Platform;
+  yes?: boolean;
 }
 
 export interface PluginOperationStep {
@@ -268,6 +269,7 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
       mode: 'plugin-reference',
       mergeStrategy: 'managed-block',
       update: options.action === 'update',
+      yes: options.yes,
     });
     result.filesWritten += workspaceResult.filesWritten;
   }
