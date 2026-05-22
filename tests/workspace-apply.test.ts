@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadSkills } from '../src/build/loader.js';
 import { applyWorkspace } from '../src/setup/workspace.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TEMPLATES_DIR = join(__dirname, '..', 'templates');
 const TEMP_DIRS: string[] = [];
 
 function makeTempDir(): string {
@@ -48,9 +52,30 @@ describe('applyWorkspace', () => {
     expect(content).toContain('Keep this introduction.');
     expect(content).toContain('Keep this footer.');
     expect(content).toContain('<!-- azure-functions-skills:start');
-    expect(content).toContain('For Azure Functions setup, create, deploy, diagnostics, inventory, health, and best-practices tasks');
+    expect(content).toContain('For Azure Functions work, prefer the Azure Functions Skills plugin');
     expect(content).not.toContain('old generated content');
     expect(result.filesWritten).toBeGreaterThan(0);
+  });
+
+  it('generates routing guidance from current skill templates', async () => {
+    const dir = makeTempDir();
+
+    await applyWorkspace(dir, {
+      agents: ['claude'],
+      mode: 'plugin-reference',
+      mergeStrategy: 'managed-block',
+    });
+
+    const content = readFileSync(join(dir, 'CLAUDE.md'), 'utf-8');
+    const routedSkills = loadSkills(join(TEMPLATES_DIR, 'skills'))
+      .filter(skill => skill.category !== 'reference')
+      .map(skill => skill.id);
+
+    for (const skillId of routedSkills) {
+      expect(content).toContain(`- ${skillId}:`);
+    }
+    expect(content).not.toContain('- azure-functions-common:');
+    expect(content).not.toContain('{{skills}}');
   });
 
   it('plugin-reference mode writes activation files without copying skill bodies', async () => {

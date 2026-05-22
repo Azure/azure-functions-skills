@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadSkills } from '../build/loader.js';
 import { applySetup, detectAgents } from './index.js';
 import type { CliAgentName, MergeStrategy, WorkspaceApplyOptions, WorkspaceApplyResult, WorkspaceMode } from '../types.js';
 
@@ -167,7 +168,16 @@ function includeInstructionPath(filePath: string): string {
 }
 
 function routingBlock(agent: CliAgentName): string {
-  return readFileSync(join(TEMPLATES_DIR, 'routing', `${agent}.md`), 'utf-8').trimEnd();
+  const template = readFileSync(join(TEMPLATES_DIR, 'routing', `${agent}.md`), 'utf-8');
+  return template.replace('{{skills}}', skillRoutingList()).trimEnd();
+}
+
+function skillRoutingList(): string {
+  return loadSkills(join(TEMPLATES_DIR, 'skills'))
+    .filter(skill => skill.category !== 'reference')
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map(skill => `- ${skill.id}: ${skill.description || skill.title}`)
+    .join('\n');
 }
 
 function ghcpPluginSettings() {
