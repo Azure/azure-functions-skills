@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   getPluginDir,
@@ -7,7 +7,22 @@ import {
   generateCodexMarketplaceEntry,
   generateClaudeSettings,
   planPluginOperation,
+  runPluginOperation,
 } from '../src/setup/plugin-install.js';
+import type { CommandRunner } from '../src/setup/prerequisites/types.js';
+import { createTempDir, removeDir } from './helpers/fs.js';
+
+type TestRunner = CommandRunner & { calls: Array<{ command: string; args: string[] }> };
+
+function acceptingRunner(): TestRunner {
+  const calls: Array<{ command: string; args: string[] }> = [];
+  const runner = (async (command, args) => {
+    calls.push({ command, args });
+    return { exitCode: 0, stdout: 'ok\n', stderr: '' };
+  }) as TestRunner;
+  runner.calls = calls;
+  return runner;
+}
 
 describe('getPluginDir', () => {
   it('returns the common plugin payload path under dist/', () => {
@@ -86,7 +101,67 @@ describe('planPluginOperation', () => {
     expect(plan.dryRun).toBe(true);
     expect(plan.steps).toContainEqual(expect.objectContaining({ target: 'ghcp', kind: 'plugin-registration' }));
     expect(plan.steps).toContainEqual(expect.objectContaining({ target: 'ghcp', kind: 'workspace-activation' }));
+    expect(plan.steps.find(step => step.target === 'ghcp' && step.kind === 'plugin-registration')?.commands).toEqual([
+      'copilot plugin marketplace add Azure/azure-functions-skills',
+      'copilot plugin install azure-functions-skills@azure-functions-skills',
+    ]);
     expect(plan.steps.map(step => step.description).join('\n')).toContain('0.12.1');
+  });
+
+  it('plans official plugin install commands for each coding agent', () => {
+    const plan = planPluginOperation({
+      action: 'install',
+      agents: ['ghcp', 'claude', 'codex'],
+      projectDir: '/workspace/project',
+      dryRun: true,
+      scope: 'workspace',
+      workspace: false,
+    });
+
+    const pluginSteps = plan.steps.filter(step => step.kind === 'plugin-registration');
+    expect(pluginSteps.map(step => [step.target, step.commands])).toEqual([
+      ['ghcp', [
+        'copilot plugin marketplace add Azure/azure-functions-skills',
+        'copilot plugin install azure-functions-skills@azure-functions-skills',
+      ]],
+      ['claude', [
+        'claude plugin install Azure/azure-functions-skills --scope project',
+      ]],
+      ['codex', [
+        'codex plugin marketplace add Azure/azure-functions-skills',
+        'codex plugin add azure-functions-skills@azure-functions-skills',
+      ]],
+    ]);
+  });
+
+  it('runs official plugin install commands before workspace activation', async () => {
+    const dir = createTempDir('af-skills-plugin-official-install-');
+    const runner = acceptingRunner();
+    try {
+      const result = await runPluginOperation({
+        action: 'install',
+        agents: ['ghcp', 'claude', 'codex'],
+        projectDir: dir,
+        dryRun: false,
+        scope: 'workspace',
+        workspace: true,
+        runner,
+      });
+
+      expect(runner.calls).toEqual([
+        { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
+        { command: 'copilot', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills'] },
+        { command: 'claude', args: ['plugin', 'install', 'Azure/azure-functions-skills', '--scope', 'project'] },
+        { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
+        { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
+      ]);
+      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+      expect(result.filesWritten).toBeGreaterThan(0);
+    } finally {
+      removeDir(dir);
+    }
   });
 
   it('plans plugin update without workspace activation when disabled', () => {

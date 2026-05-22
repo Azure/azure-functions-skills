@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import type { BuildTargetName } from '../types.js';
+import type { CommandRunner } from './prerequisites/types.js';
 import { applyWorkspace } from './workspace.js';
 
 interface PluginInstallResult {
@@ -42,12 +43,14 @@ export interface PluginOperationOptions {
   source?: PluginOperationSource;
   version?: string;
   workspace?: boolean;
+  runner?: CommandRunner;
 }
 
 export interface PluginOperationStep {
   target: BuildTargetName;
   kind: 'plugin-registration' | 'workspace-activation';
   description: string;
+  commands?: string[];
   path?: string;
 }
 
@@ -60,6 +63,11 @@ export interface PluginOperationResult {
   version: string;
   steps: PluginOperationStep[];
   filesWritten: number;
+}
+
+interface PluginCommand {
+  command: string;
+  args: string[];
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -208,11 +216,13 @@ export function planPluginOperation(options: PluginOperationOptions): PluginOper
   const steps: PluginOperationStep[] = [];
 
   for (const target of options.agents) {
+    const commands = officialPluginCommands(target, scope);
     steps.push({
       target,
       kind: 'plugin-registration',
       path: source === 'local' ? getPluginDir(target) : undefined,
       description: pluginRegistrationDescription(options.action, target, scope, source, version),
+      commands: commands.map(formatCommand),
     });
 
     if (includeWorkspace) {
@@ -241,7 +251,12 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
   if (result.dryRun) return result;
 
   for (const target of result.agents) {
-    installPlugin(target, options.projectDir);
+    for (const pluginCommand of officialPluginCommands(target, result.scope)) {
+      const commandResult = await runCommand(options, pluginCommand);
+      if (commandResult.exitCode !== 0) {
+        throw new Error(`Plugin ${options.action} failed for ${target}: ${commandResult.stderr || commandResult.stdout}`);
+      }
+    }
   }
 
   if (options.workspace !== false) {
@@ -255,6 +270,63 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
   }
 
   return result;
+}
+
+function officialPluginCommands(target: BuildTargetName, scope: PluginOperationScope): PluginCommand[] {
+  if (target === 'ghcp') {
+    return [
+      { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
+      { command: 'copilot', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills'] },
+    ];
+  }
+
+  if (target === 'claude') {
+    return [
+      { command: 'claude', args: ['plugin', 'install', 'Azure/azure-functions-skills', '--scope', claudeScope(scope)] },
+    ];
+  }
+
+  return [
+    { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
+    { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
+  ];
+}
+
+function claudeScope(scope: PluginOperationScope): string {
+  return scope === 'workspace' ? 'project' : 'user';
+}
+
+function formatCommand(pluginCommand: PluginCommand): string {
+  return [pluginCommand.command, ...pluginCommand.args].join(' ');
+}
+
+async function runCommand(options: PluginOperationOptions, pluginCommand: PluginCommand) {
+  const runner = options.runner || defaultRunner;
+  return runner(pluginCommand.command, pluginCommand.args, { cwd: options.projectDir });
+}
+
+async function defaultRunner(command: string, args: string[]) {
+  const { execFileSync } = await import('node:child_process');
+  try {
+    const stdout = execFileSync(command, args, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    });
+    return { exitCode: 0, stdout, stderr: '' };
+  } catch (error) {
+    const err = error as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
+    return {
+      exitCode: err.status ?? 1,
+      stdout: bufferToString(err.stdout),
+      stderr: bufferToString(err.stderr) || err.message || '',
+    };
+  }
+}
+
+function bufferToString(value: Buffer | string | undefined): string {
+  if (!value) return '';
+  return typeof value === 'string' ? value : value.toString('utf-8');
 }
 
 function pluginRegistrationDescription(

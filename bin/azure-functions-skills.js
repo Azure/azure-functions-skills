@@ -320,7 +320,10 @@ if (command === 'setup') {
 
   if (dryRun) {
     console.log(`Planned plugin ${action}:`);
-    for (const step of result.steps) console.log(`  - ${step.target}: ${step.description}`);
+    for (const step of result.steps) {
+      console.log(`  - ${step.target}: ${step.description}`);
+      for (const command of step.commands || []) console.log(`      $ ${command}`);
+    }
   } else {
     console.log(`Plugin ${action} complete.`);
     console.log(`  Agents configured: ${result.agents.join(', ')}`);

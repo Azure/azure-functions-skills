@@ -216,6 +216,8 @@ describe('CLI command integration', () => {
 
     expect(output).toContain('Planned plugin install');
     expect(output).toContain('ghcp');
+    expect(output).toContain('copilot plugin marketplace add Azure/azure-functions-skills');
+    expect(output).toContain('copilot plugin install azure-functions-skills@azure-functions-skills');
     expect(output).toContain('workspace activation');
     expect(output).toContain('0.12.1');
     expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
