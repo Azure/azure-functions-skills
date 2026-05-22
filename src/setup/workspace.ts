@@ -1,8 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { applySetup, detectAgents } from './index.js';
 import type { CliAgentName, MergeStrategy, WorkspaceApplyOptions, WorkspaceApplyResult, WorkspaceMode } from '../types.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 const BLOCK_START = '<!-- azure-functions-skills:start';
 const BLOCK_END = '<!-- azure-functions-skills:end -->';
 
@@ -78,17 +81,17 @@ function plannedCopyFiles(agent: CliAgentName): string[] {
 function activationFiles(agent: CliAgentName, mode: WorkspaceMode): PlannedFile[] {
   const files: PlannedFile[] = [];
   if (agent === 'ghcp') {
-    files.push({ path: '.github/copilot-instructions.md', content: ghcpRoutingBlock(), merge: true });
+    files.push({ path: '.github/copilot-instructions.md', content: routingBlock(agent), merge: true });
     if (mode === 'plugin-reference') files.push({ path: '.github/copilot/settings.json', content: JSON.stringify(ghcpPluginSettings(), null, 2) });
   }
 
   if (agent === 'claude') {
-    files.push({ path: 'CLAUDE.md', content: claudeRoutingBlock(), merge: true });
+    files.push({ path: 'CLAUDE.md', content: routingBlock(agent), merge: true });
     if (mode === 'plugin-reference') files.push({ path: '.claude/settings.json', content: JSON.stringify(claudePluginSettings(), null, 2) });
   }
 
   if (agent === 'codex') {
-    files.push({ path: 'AGENTS.md', content: codexRoutingBlock(), merge: true });
+    files.push({ path: 'AGENTS.md', content: routingBlock(agent), merge: true });
     if (mode === 'plugin-reference') files.push({ path: '.agents/plugins/marketplace.json', content: JSON.stringify(codexMarketplace(), null, 2) });
   }
 
@@ -163,32 +166,8 @@ function includeInstructionPath(filePath: string): string {
   return `.azure-functions-skills/${fileName}`;
 }
 
-function ghcpRoutingBlock(): string {
-  return [
-    '# Azure Functions Skills',
-    '',
-    'For Azure Functions setup, create, deploy, diagnostics, inventory, health, and best-practices tasks, prefer Azure Functions Skills.',
-    'Route deployment through azure-functions-deploy, diagnostics through azure-functions-diagnostics, and static inventory through azure-functions-inventory.',
-  ].join('\n');
-}
-
-function claudeRoutingBlock(): string {
-  return [
-    '# Azure Functions Skills',
-    '',
-    'For Azure Functions setup, create, deploy, diagnostics, inventory, health, and best-practices tasks, prefer the Azure Functions Skills plugin.',
-    'Route deployment through azure-functions-deploy, diagnostics through azure-functions-diagnostics, and static inventory through azure-functions-inventory.',
-  ].join('\n');
-}
-
-function codexRoutingBlock(): string {
-  return [
-    '# Azure Functions Skills',
-    '',
-    'For Azure Functions work, use the Azure Functions Skills plugin or repo-local `.agents/skills` entries.',
-    'Prefer setup/create/deploy/diagnostics/best-practices skills by intent.',
-    'Do not treat generic Azure tasks as Azure Functions tasks unless the user mentions Function Apps, triggers, bindings, host.json, or Functions deployment/runtime errors.',
-  ].join('\n');
+function routingBlock(agent: CliAgentName): string {
+  return readFileSync(join(TEMPLATES_DIR, 'routing', `${agent}.md`), 'utf-8').trimEnd();
 }
 
 function ghcpPluginSettings() {
