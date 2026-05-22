@@ -123,7 +123,7 @@ npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app --skip-
 
 ## Skills
 
-For contributor guidance on the product boundary between Azure Skills and Azure Functions Skills, see [Azure Skills and Azure Functions Skills Boundary](docs/azure-skills-boundary.md) ([日本語版](docs/azure-skills-boundary-jp.md)).
+For contributor guidance on the product boundary between Azure Skills and Azure Functions Skills, see [Azure Skills and Azure Functions Skills Boundary](docs/azure-skills-boundary.md).
 
 | Skill | Purpose |
 | --- | --- |
