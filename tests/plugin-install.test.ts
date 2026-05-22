@@ -231,6 +231,31 @@ describe('planPluginOperation', () => {
     }
   });
 
+  it('checks required tools with command -v on Linux-like platforms', async () => {
+    const dir = createTempDir('af-skills-plugin-linux-preflight-');
+    const runner = acceptingRunner();
+    try {
+      await runPluginOperation({
+        action: 'install',
+        agents: ['claude'],
+        projectDir: dir,
+        dryRun: false,
+        workspace: false,
+        platform: 'linux',
+        runner,
+      });
+
+      expect(runner.calls.slice(0, 2)).toEqual([
+        { command: 'sh', args: ['-c', 'command -v git'] },
+        { command: 'sh', args: ['-c', 'command -v claude'] },
+      ]);
+      const installCalls = runner.calls.filter(call => !checkedToolName(call.command, call.args));
+      expect(installCalls.map(call => call.command)).toEqual(['git', 'claude']);
+    } finally {
+      removeDir(dir);
+    }
+  });
+
   it('uses the current repository plugin payload for Claude when source is local', () => {
     const plan = planPluginOperation({
       action: 'install',

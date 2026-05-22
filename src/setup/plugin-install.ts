@@ -44,6 +44,7 @@ export interface PluginOperationOptions {
   version?: string;
   workspace?: boolean;
   runner?: CommandRunner;
+  platform?: NodeJS.Platform;
 }
 
 export interface PluginOperationStep {
@@ -289,13 +290,13 @@ async function ensureRequiredTools(options: PluginOperationOptions): Promise<voi
 
 async function toolExists(options: PluginOperationOptions, tool: string): Promise<boolean> {
   const runner = options.runner || defaultRunner;
-  const checkCommand = toolCheckCommand(tool);
+  const checkCommand = toolCheckCommand(options, tool);
   const result = await runner(checkCommand.command, checkCommand.args, { cwd: options.projectDir });
   return result.exitCode === 0;
 }
 
-function toolCheckCommand(tool: string): PluginCommand {
-  if (process.platform === 'win32') return { command: 'where.exe', args: [tool] };
+function toolCheckCommand(options: PluginOperationOptions, tool: string): PluginCommand {
+  if (runtimePlatform(options) === 'win32') return { command: 'where.exe', args: [tool] };
   return { command: 'sh', args: ['-c', `command -v ${tool}`] };
 }
 
@@ -414,7 +415,7 @@ async function defaultRunner(command: string, args: string[]) {
     const stdout = execFileSync(command, args, {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32',
+      shell: runtimePlatform() === 'win32',
     });
     return { exitCode: 0, stdout, stderr: '' };
   } catch (error) {
@@ -425,6 +426,10 @@ async function defaultRunner(command: string, args: string[]) {
       stderr: bufferToString(err.stderr) || err.message || '',
     };
   }
+}
+
+function runtimePlatform(options?: PluginOperationOptions): NodeJS.Platform {
+  return options?.platform || process.platform;
 }
 
 function bufferToString(value: Buffer | string | undefined): string {
