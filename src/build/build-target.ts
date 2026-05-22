@@ -9,6 +9,10 @@ interface PluginMarketplaceOptions {
   pluginSource: string;
 }
 
+export interface PluginPayloadOptions {
+  profile?: 'skills-only' | 'full';
+}
+
 /**
  * Build output for a specific target (ghcp, claude, codex).
  */
@@ -24,11 +28,13 @@ export function buildTarget(target: BuildTargetName, data: BuildData, distDir: s
  * plugin installation and release bundles. Unlike `buildTarget`, this does not
  * emit workspace-specific files such as `.github/skills` or `.agents/skills`.
  */
-export function buildPluginPayload(data: BuildData, pluginDir: string): void {
+export function buildPluginPayload(data: BuildData, pluginDir: string, options: PluginPayloadOptions = {}): void {
+  const profile = options.profile || 'skills-only';
+  const fullPayload = profile === 'full';
   mkdirSync(pluginDir, { recursive: true });
 
-  const manifest = generatePluginManifest(data);
-  const claudeManifest = generateClaudePluginManifest(data);
+  const manifest = generatePluginManifest(data, { includeAgents: fullPayload, includeHooks: fullPayload, includeMcp: fullPayload });
+  const claudeManifest = generateClaudePluginManifest(data, { includeHooks: fullPayload, includeMcp: fullPayload });
   mkdirSync(join(pluginDir, '.plugin'), { recursive: true });
   writeFileSync(join(pluginDir, '.plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
   writeFileSync(join(pluginDir, 'plugin.json'), JSON.stringify(manifest, null, 2));
@@ -46,11 +52,13 @@ export function buildPluginPayload(data: BuildData, pluginDir: string): void {
     copySkillAssets(skill, skillDir);
   }
 
-  mkdirSync(join(pluginDir, 'agents'), { recursive: true });
-  writeFileSync(join(pluginDir, 'agents', 'functions-copilot.agent.md'), data.agents.copilot);
+  if (fullPayload) {
+    mkdirSync(join(pluginDir, 'agents'), { recursive: true });
+    writeFileSync(join(pluginDir, 'agents', 'functions-copilot.agent.md'), data.agents.copilot);
 
-  writeFileSync(join(pluginDir, '.mcp.json'), JSON.stringify(generatePluginMcpJson(data.mcpServers), null, 2));
-  writeFileSync(join(pluginDir, 'hooks.json'), JSON.stringify(generateGhcpHooks(), null, 2));
+    writeFileSync(join(pluginDir, '.mcp.json'), JSON.stringify(generatePluginMcpJson(data.mcpServers), null, 2));
+    writeFileSync(join(pluginDir, 'hooks.json'), JSON.stringify(generateGhcpHooks(), null, 2));
+  }
 }
 
 /**
@@ -255,15 +263,21 @@ function generateGhcpHooks() {
     },
   };
 }
-function generatePluginManifest(data: BuildData) {
+interface PluginManifestOptions {
+  includeAgents?: boolean;
+  includeHooks?: boolean;
+  includeMcp?: boolean;
+}
+
+function generatePluginManifest(data: BuildData, options: PluginManifestOptions = {}) {
   return {
     name: 'azure-functions-skills',
     version: data.packageVersion || '0.0.0-dev',
     description: 'Azure Functions skills for setup, create, and deploy workflows',
     skills: './skills/',
-    agents: './agents/',
-    hooks: './hooks.json',
-    mcpServers: './.mcp.json',
+    ...(options.includeAgents ? { agents: './agents/' } : {}),
+    ...(options.includeHooks ? { hooks: './hooks.json' } : {}),
+    ...(options.includeMcp ? { mcpServers: './.mcp.json' } : {}),
     interface: {
       displayName: 'Azure Functions Skills',
       shortDescription: 'Guided setup → create → deploy workflow for Azure Functions',
@@ -274,14 +288,14 @@ function generatePluginManifest(data: BuildData) {
   };
 }
 
-function generateClaudePluginManifest(data: BuildData) {
+function generateClaudePluginManifest(data: BuildData, options: PluginManifestOptions = {}) {
   return {
     name: 'azure-functions-skills',
     version: data.packageVersion || '0.0.0-dev',
     description: 'Azure Functions skills for setup, create, and deploy workflows',
     skills: './skills/',
-    hooks: './hooks.json',
-    mcpServers: './.mcp.json',
+    ...(options.includeHooks ? { hooks: './hooks.json' } : {}),
+    ...(options.includeMcp ? { mcpServers: './.mcp.json' } : {}),
   };
 }
 
