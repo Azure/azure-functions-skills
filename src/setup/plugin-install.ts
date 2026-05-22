@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import type { BuildTargetName } from '../types.js';
+import { applyWorkspace } from './workspace.js';
 
 interface PluginInstallResult {
   target: BuildTargetName;
@@ -26,6 +27,39 @@ interface CodexMarketplacePlugin {
 interface CodexMarketplace {
   plugins?: CodexMarketplacePlugin[];
   [key: string]: unknown;
+}
+
+export type PluginOperationAction = 'install' | 'update';
+export type PluginOperationScope = 'workspace' | 'user';
+export type PluginOperationSource = 'marketplace' | 'local' | 'github';
+
+export interface PluginOperationOptions {
+  action: PluginOperationAction;
+  agents: BuildTargetName[];
+  projectDir: string;
+  dryRun?: boolean;
+  scope?: PluginOperationScope;
+  source?: PluginOperationSource;
+  version?: string;
+  workspace?: boolean;
+}
+
+export interface PluginOperationStep {
+  target: BuildTargetName;
+  kind: 'plugin-registration' | 'workspace-activation';
+  description: string;
+  path?: string;
+}
+
+export interface PluginOperationResult {
+  action: PluginOperationAction;
+  agents: BuildTargetName[];
+  dryRun: boolean;
+  scope: PluginOperationScope;
+  source: PluginOperationSource;
+  version: string;
+  steps: PluginOperationStep[];
+  filesWritten: number;
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -163,6 +197,90 @@ export function installPlugin(target: BuildTargetName, projectDir: string): Plug
   }
 
   return result;
+}
+
+export function planPluginOperation(options: PluginOperationOptions): PluginOperationResult {
+  const dryRun = options.dryRun === true;
+  const scope = options.scope || 'workspace';
+  const source = options.source || 'marketplace';
+  const version = options.version || packageVersion();
+  const includeWorkspace = options.workspace !== false;
+  const steps: PluginOperationStep[] = [];
+
+  for (const target of options.agents) {
+    steps.push({
+      target,
+      kind: 'plugin-registration',
+      path: source === 'local' ? getPluginDir(target) : undefined,
+      description: pluginRegistrationDescription(options.action, target, scope, source, version),
+    });
+
+    if (includeWorkspace) {
+      steps.push({
+        target,
+        kind: 'workspace-activation',
+        description: `Apply workspace activation with workspace apply --agent ${target} --mode plugin-reference${options.action === 'update' ? ' --update' : ''}.`,
+      });
+    }
+  }
+
+  return {
+    action: options.action,
+    agents: options.agents,
+    dryRun,
+    scope,
+    source,
+    version,
+    steps,
+    filesWritten: 0,
+  };
+}
+
+export async function runPluginOperation(options: PluginOperationOptions): Promise<PluginOperationResult> {
+  const result = planPluginOperation(options);
+  if (result.dryRun) return result;
+
+  for (const target of result.agents) {
+    installPlugin(target, options.projectDir);
+  }
+
+  if (options.workspace !== false) {
+    const workspaceResult = await applyWorkspace(options.projectDir, {
+      agents: result.agents,
+      mode: 'plugin-reference',
+      mergeStrategy: 'managed-block',
+      update: options.action === 'update',
+    });
+    result.filesWritten += workspaceResult.filesWritten;
+  }
+
+  return result;
+}
+
+function pluginRegistrationDescription(
+  action: PluginOperationAction,
+  target: BuildTargetName,
+  scope: PluginOperationScope,
+  source: PluginOperationSource,
+  version: string,
+): string {
+  if (source === 'local') {
+    return `${capitalize(action)} ${target} plugin from local package build at ${scope} scope.`;
+  }
+  return `${capitalize(action)} ${target} plugin from ${source} source version ${version} at ${scope} scope.`;
+}
+
+function capitalize(value: string): string {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
+function packageVersion(): string {
+  try {
+    const packageJson = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf-8')) as { version?: string };
+    return packageJson.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 function mergeJsonFile(filePath: string, newEntries: Record<string, unknown>): Record<string, unknown> {

@@ -22,6 +22,8 @@ function printHelp() {
 
   Commands:
     setup    Detect coding agents and install skill files into your project
+    plugin install   Register Azure Functions Skills as a native plugin
+    plugin update    Refresh plugin registration and workspace activation
     workspace apply   Apply Azure Functions routing/activation files to a workspace
     workspace update  Update existing Azure Functions managed workspace routing blocks
     chat     Launch a CLI coding agent with Azure Functions Welcome prompt
@@ -42,6 +44,16 @@ function printHelp() {
     --update           Replace existing Azure Functions managed blocks
     --dry-run          Print planned changes without writing files
 
+  Options (plugin install/update):
+    --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
+    --dir <path>       Target directory (default: current directory)
+    --scope <name>     workspace or user (default: workspace)
+    --source <name>    marketplace, github, or local (default: marketplace)
+    --version <value>  Plugin version/ref to plan (default: package version)
+    --workspace        Apply workspace plugin-reference activation (default)
+    --no-workspace     Skip workspace activation
+    --dry-run          Print planned changes without writing files
+
   Options (chat):
     --agent <name>     Agent: github-copilot, claude-code, codex (auto-detected if omitted)
     --prompt <text>    Custom prompt (overrides startup template)
@@ -59,6 +71,7 @@ function printHelp() {
   Examples:
     npx @agent-loom/azure-functions-skills setup
     npx @agent-loom/azure-functions-skills setup --as-plugin
+    npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dry-run
     npx @agent-loom/azure-functions-skills workspace apply --agent codex --mode plugin-reference --dry-run
     npx @agent-loom/azure-functions-skills chat
     npx @agent-loom/azure-functions-skills chat --as-plugin --agent claude-code
@@ -262,6 +275,55 @@ if (command === 'setup') {
     console.log(`Workspace ${action} complete.`);
     console.log(`  Agents configured: ${result.agents.join(', ')}`);
     console.log(`  Mode: ${result.mode}`);
+    console.log(`  Files written: ${result.filesWritten}`);
+  }
+} else if (command === 'plugin') {
+  const action = args[1];
+  if (action !== 'install' && action !== 'update') {
+    console.error(`Unknown plugin command: ${action || ''}`.trim());
+    console.error('Usage: azure-functions-skills plugin install|update [options]');
+    process.exit(1);
+  }
+
+  const { detectAgents } = await import('../lib/setup/index.js');
+  const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
+  const agents = [];
+  let dir = process.cwd();
+  let scope = 'workspace';
+  let source = 'marketplace';
+  let version = undefined;
+  let workspace = true;
+  let dryRun = false;
+
+  for (let i = 2; i < args.length; i++) {
+    if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
+    else if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
+    else if (args[i] === '--scope' && args[i + 1]) scope = args[++i];
+    else if (args[i] === '--source' && args[i + 1]) source = args[++i];
+    else if (args[i] === '--version' && args[i + 1]) version = args[++i];
+    else if (args[i] === '--workspace') workspace = true;
+    else if (args[i] === '--no-workspace') workspace = false;
+    else if (args[i] === '--dry-run') dryRun = true;
+  }
+
+  const detectedAgents = agents.length > 0 ? agents : await detectAgents();
+  const result = await runPluginOperation({
+    action,
+    agents: detectedAgents,
+    projectDir: dir,
+    dryRun,
+    scope,
+    source,
+    version,
+    workspace,
+  });
+
+  if (dryRun) {
+    console.log(`Planned plugin ${action}:`);
+    for (const step of result.steps) console.log(`  - ${step.target}: ${step.description}`);
+  } else {
+    console.log(`Plugin ${action} complete.`);
+    console.log(`  Agents configured: ${result.agents.join(', ')}`);
     console.log(`  Files written: ${result.filesWritten}`);
   }
 } else if (command === 'build') {

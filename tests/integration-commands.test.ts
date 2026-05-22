@@ -200,6 +200,48 @@ describe('CLI command integration', () => {
     }
   });
 
+  it('plugin install --dry-run prints plugin and workspace activation plans without writing files', () => {
+    const projectDir = makeTempDir('af-skills-e2e-plugin-install-dry-run-');
+
+    const output = runCliOutput([
+      'plugin',
+      'install',
+      '--agent', 'ghcp',
+      '--dir', projectDir,
+      '--scope', 'workspace',
+      '--source', 'marketplace',
+      '--version', '0.12.1',
+      '--dry-run',
+    ]);
+
+    expect(output).toContain('Planned plugin install');
+    expect(output).toContain('ghcp');
+    expect(output).toContain('workspace activation');
+    expect(output).toContain('0.12.1');
+    expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
+    expect(existsSync(join(projectDir, '.github', 'copilot', 'settings.json'))).toBe(false);
+  });
+
+  it('plugin update --dry-run can skip workspace activation', () => {
+    const projectDir = makeTempDir('af-skills-e2e-plugin-update-dry-run-');
+
+    const output = runCliOutput([
+      'plugin',
+      'update',
+      '--agent', 'codex',
+      '--dir', projectDir,
+      '--source', 'local',
+      '--no-workspace',
+      '--dry-run',
+    ]);
+
+    expect(output).toContain('Planned plugin update');
+    expect(output).toContain('codex');
+    expect(output).not.toContain('workspace activation');
+    expect(existsSync(join(projectDir, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(projectDir, '.agents', 'plugins', 'marketplace.json'))).toBe(false);
+  });
+
   it('chat auto-installs each target workspace layout before launching the selected agent', () => {
     const fakeBinDir = createFakeAgentCliDirectory();
     const expectedSkillIds = templateSkillIds();
