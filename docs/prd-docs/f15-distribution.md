@@ -3,7 +3,7 @@
 **Status:** Proposed  
 **Draft Spec Section:** 10, 11  
 **Depends on:** F14 (Build System), F20 (CLI & Library)  
-**Research:** ../research/azure-functions-skills-installation-routing-design-20260521.md
+**Research:** ../research/en/20260521/azure-functions-skills-installation-routing-design-20260521.md
 
 ## Problem
 
