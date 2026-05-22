@@ -307,16 +307,22 @@ if (command === 'setup') {
   }
 
   const detectedAgents = agents.length > 0 ? agents : await detectAgents();
-  const result = await runPluginOperation({
-    action,
-    agents: detectedAgents,
-    projectDir: dir,
-    dryRun,
-    scope,
-    source,
-    version,
-    workspace,
-  });
+  let result;
+  try {
+    result = await runPluginOperation({
+      action,
+      agents: detectedAgents,
+      projectDir: dir,
+      dryRun,
+      scope,
+      source,
+      version,
+      workspace,
+    });
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
 
   if (dryRun) {
     console.log(`Planned plugin ${action}:`);

@@ -24,6 +24,28 @@ function acceptingRunner(): TestRunner {
   return runner;
 }
 
+function missingToolsRunner(missingTools: string[]): TestRunner {
+  const calls: Array<{ command: string; args: string[] }> = [];
+  const runner = (async (command, args) => {
+    calls.push({ command, args });
+    const checkedTool = checkedToolName(command, args);
+    if (checkedTool) {
+      return missingTools.includes(checkedTool)
+        ? { exitCode: 1, stdout: '', stderr: `${checkedTool} not found` }
+        : { exitCode: 0, stdout: checkedTool, stderr: '' };
+    }
+    return { exitCode: 0, stdout: 'ok\n', stderr: '' };
+  }) as TestRunner;
+  runner.calls = calls;
+  return runner;
+}
+
+function checkedToolName(command: string, args: string[]): string | undefined {
+  if (command === 'where.exe') return args[0];
+  if (command === 'sh' && args[0] === '-c') return args[1]?.replace(/^command -v /, '');
+  return undefined;
+}
+
 describe('getPluginDir', () => {
   it('returns the common plugin payload path under dist/', () => {
     const dir = getPluginDir('ghcp');
@@ -150,7 +172,8 @@ describe('planPluginOperation', () => {
         runner,
       });
 
-      expect(runner.calls).toEqual([
+      const installCalls = runner.calls.filter(call => !checkedToolName(call.command, call.args));
+      expect(installCalls).toEqual([
         { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'copilot', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills'] },
         { command: 'git', args: ['clone', 'https://github.com/Azure/azure-functions-skills.git', join(dir, '.azure-functions-skills', 'source', 'azure-functions-skills')] },
@@ -162,6 +185,47 @@ describe('planPluginOperation', () => {
       expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
       expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
       expect(result.filesWritten).toBeGreaterThan(0);
+    } finally {
+      removeDir(dir);
+    }
+  });
+
+  it('reports missing Claude prerequisites with install guidance before running install commands', async () => {
+    const dir = createTempDir('af-skills-plugin-missing-claude-');
+    const runner = missingToolsRunner(['git', 'claude']);
+    try {
+      await expect(runPluginOperation({
+        action: 'install',
+        agents: ['claude'],
+        projectDir: dir,
+        dryRun: false,
+        workspace: true,
+        runner,
+      })).rejects.toThrow(/Cannot install Azure Functions Skills plugin for Claude Code[\s\S]*git[\s\S]*claude[\s\S]*https:\/\/git-scm\.com\/downloads[\s\S]*https:\/\/claude\.ai\/download/);
+
+      expect(runner.calls.some(call => call.command === 'git' && call.args[0] === 'clone')).toBe(false);
+      expect(runner.calls.some(call => call.command === 'claude' && call.args[0] === 'plugin')).toBe(false);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(false);
+    } finally {
+      removeDir(dir);
+    }
+  });
+
+  it('reports missing GitHub Copilot CLI with retry guidance', async () => {
+    const dir = createTempDir('af-skills-plugin-missing-ghcp-');
+    const runner = missingToolsRunner(['copilot']);
+    try {
+      await expect(runPluginOperation({
+        action: 'install',
+        agents: ['ghcp'],
+        projectDir: dir,
+        dryRun: false,
+        workspace: true,
+        runner,
+      })).rejects.toThrow(/Cannot install Azure Functions Skills plugin for GitHub Copilot CLI[\s\S]*copilot[\s\S]*GitHub Copilot CLI[\s\S]*azure-functions-skills plugin install --agent ghcp/);
+
+      expect(runner.calls.some(call => call.command === 'copilot')).toBe(false);
+      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
     } finally {
       removeDir(dir);
     }

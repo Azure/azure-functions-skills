@@ -250,6 +250,8 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
   const result = planPluginOperation(options);
   if (result.dryRun) return result;
 
+  await ensureRequiredTools(options);
+
   for (const target of result.agents) {
     for (const pluginCommand of officialPluginCommands(target, options)) {
       const commandResult = await runCommand(options, pluginCommand);
@@ -270,6 +272,82 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
   }
 
   return result;
+}
+
+async function ensureRequiredTools(options: PluginOperationOptions): Promise<void> {
+  const requiredTools = unique(options.agents.flatMap(target => officialPluginCommands(target, options).map(pluginCommand => pluginCommand.command)));
+  const missingTools: string[] = [];
+
+  for (const tool of requiredTools) {
+    if (!await toolExists(options, tool)) missingTools.push(tool);
+  }
+
+  if (missingTools.length > 0) {
+    throw new Error(missingToolsMessage(options, missingTools));
+  }
+}
+
+async function toolExists(options: PluginOperationOptions, tool: string): Promise<boolean> {
+  const runner = options.runner || defaultRunner;
+  const checkCommand = toolCheckCommand(tool);
+  const result = await runner(checkCommand.command, checkCommand.args, { cwd: options.projectDir });
+  return result.exitCode === 0;
+}
+
+function toolCheckCommand(tool: string): PluginCommand {
+  if (process.platform === 'win32') return { command: 'where.exe', args: [tool] };
+  return { command: 'sh', args: ['-c', `command -v ${tool}`] };
+}
+
+function missingToolsMessage(options: PluginOperationOptions, missingTools: string[]): string {
+  return [
+    `Cannot ${options.action} Azure Functions Skills plugin for ${agentLabel(options.agents)}.`,
+    '',
+    'Missing required tools:',
+    ...missingTools.map(tool => `  - ${tool}: ${toolPurpose(tool)}`),
+    '',
+    'Install:',
+    ...missingTools.map(tool => `  - ${toolInstallLabel(tool)}: ${toolInstallUrl(tool)}`),
+    '',
+    'Then retry:',
+    `  azure-functions-skills plugin ${options.action}${options.agents.map(agent => ` --agent ${agent}`).join('')}`,
+  ].join('\n');
+}
+
+function agentLabel(agents: BuildTargetName[]): string {
+  return agents.map(agent => ({
+    ghcp: 'GitHub Copilot CLI',
+    claude: 'Claude Code',
+    codex: 'Codex',
+  })[agent]).join(', ');
+}
+
+function toolPurpose(tool: string): string {
+  if (tool === 'git') return 'required to clone https://github.com/Azure/azure-functions-skills.git for Claude plugin-from-source.';
+  if (tool === 'claude') return 'required to validate and load the Claude plugin payload.';
+  if (tool === 'copilot') return 'required to run GitHub Copilot plugin marketplace and install commands.';
+  if (tool === 'codex') return 'required to run Codex plugin marketplace and install commands.';
+  return 'required to install the plugin.';
+}
+
+function toolInstallLabel(tool: string): string {
+  if (tool === 'git') return 'Git';
+  if (tool === 'claude') return 'Claude Code';
+  if (tool === 'copilot') return 'GitHub Copilot CLI';
+  if (tool === 'codex') return 'Codex CLI';
+  return tool;
+}
+
+function toolInstallUrl(tool: string): string {
+  if (tool === 'git') return 'https://git-scm.com/downloads';
+  if (tool === 'claude') return 'https://claude.ai/download';
+  if (tool === 'copilot') return 'https://docs.github.com/copilot/github-copilot-in-the-cli/using-github-copilot-in-the-cli';
+  if (tool === 'codex') return 'https://developers.openai.com/codex/cli';
+  return 'See the tool documentation.';
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function officialPluginCommands(target: BuildTargetName, options: PluginOperationOptions): PluginCommand[] {
