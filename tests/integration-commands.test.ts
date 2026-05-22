@@ -173,6 +173,25 @@ describe('CLI command integration', () => {
     }
   });
 
+  it('workspace apply --dry-run prints planned plugin-reference changes without writing files', () => {
+    const projectDir = makeTempDir('af-skills-e2e-workspace-dry-run-');
+
+    const output = runCliOutput([
+      'workspace',
+      'apply',
+      '--agent', 'codex',
+      '--dir', projectDir,
+      '--mode', 'plugin-reference',
+      '--dry-run',
+    ]);
+
+    expect(output).toContain('Planned workspace changes');
+    expect(output).toContain('AGENTS.md');
+    expect(output).toContain('.agents/plugins/marketplace.json');
+    expect(existsSync(join(projectDir, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(projectDir, '.agents', 'plugins', 'marketplace.json'))).toBe(false);
+  });
+
   it('chat auto-installs each target workspace layout before launching the selected agent', () => {
     const fakeBinDir = createFakeAgentCliDirectory();
     const expectedSkillIds = templateSkillIds();

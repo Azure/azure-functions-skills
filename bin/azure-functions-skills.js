@@ -22,6 +22,8 @@ function printHelp() {
 
   Commands:
     setup    Detect coding agents and install skill files into your project
+    workspace apply   Apply Azure Functions routing/activation files to a workspace
+    workspace update  Update existing Azure Functions managed workspace routing blocks
     chat     Launch a CLI coding agent with Azure Functions Welcome prompt
     build    Build plugin artifacts for all targets (ghcp, claude, codex)
 
@@ -31,6 +33,14 @@ function printHelp() {
     --as-plugin        Register as a native platform plugin (instead of copying files)
     --check-prerequisites  Check external prerequisites without installing them
     --skip-prerequisites   Skip external prerequisite checks
+
+  Options (workspace apply/update):
+    --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
+    --dir <path>       Target directory (default: current directory)
+    --mode <name>      minimal, copy, plugin-reference (default: copy)
+    --merge-strategy <name> managed-block, include-file, fail-if-exists, append
+    --update           Replace existing Azure Functions managed blocks
+    --dry-run          Print planned changes without writing files
 
   Options (chat):
     --agent <name>     Agent: github-copilot, claude-code, codex (auto-detected if omitted)
@@ -49,6 +59,7 @@ function printHelp() {
   Examples:
     npx @agent-loom/azure-functions-skills setup
     npx @agent-loom/azure-functions-skills setup --as-plugin
+    npx @agent-loom/azure-functions-skills workspace apply --agent codex --mode plugin-reference --dry-run
     npx @agent-loom/azure-functions-skills chat
     npx @agent-loom/azure-functions-skills chat --as-plugin --agent claude-code
   `);
@@ -211,6 +222,48 @@ if (command === 'setup') {
   if (passthroughArgs.length > 0) options.passthroughArgs = passthroughArgs;
   options.prerequisites = prerequisites;
   await chat(options);
+} else if (command === 'workspace') {
+  const action = args[1];
+  if (action !== 'apply' && action !== 'update') {
+    console.error(`Unknown workspace command: ${action || ''}`.trim());
+    console.error('Usage: azure-functions-skills workspace apply|update [options]');
+    process.exit(1);
+  }
+
+  const { applyWorkspace } = await import('../lib/setup/workspace.js');
+  const agents = [];
+  let dir = process.cwd();
+  let mode = 'copy';
+  let mergeStrategy = 'managed-block';
+  let dryRun = false;
+  let update = action === 'update';
+
+  for (let i = 2; i < args.length; i++) {
+    if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
+    else if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
+    else if (args[i] === '--mode' && args[i + 1]) mode = args[++i];
+    else if (args[i] === '--merge-strategy' && args[i + 1]) mergeStrategy = args[++i];
+    else if (args[i] === '--dry-run') dryRun = true;
+    else if (args[i] === '--update') update = true;
+  }
+
+  const result = await applyWorkspace(dir, {
+    agents: agents.length > 0 ? agents : undefined,
+    mode,
+    mergeStrategy,
+    update,
+    dryRun,
+  });
+
+  if (dryRun) {
+    console.log('Planned workspace changes:');
+    for (const file of result.plannedFiles) console.log(`  - ${file}`);
+  } else {
+    console.log(`Workspace ${action} complete.`);
+    console.log(`  Agents configured: ${result.agents.join(', ')}`);
+    console.log(`  Mode: ${result.mode}`);
+    console.log(`  Files written: ${result.filesWritten}`);
+  }
 } else if (command === 'build') {
   // Delegate to build script
   const { execFileSync } = await import('node:child_process');
