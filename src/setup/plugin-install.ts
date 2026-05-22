@@ -216,7 +216,7 @@ export function planPluginOperation(options: PluginOperationOptions): PluginOper
   const steps: PluginOperationStep[] = [];
 
   for (const target of options.agents) {
-    const commands = officialPluginCommands(target, scope);
+    const commands = officialPluginCommands(target, options);
     steps.push({
       target,
       kind: 'plugin-registration',
@@ -251,7 +251,7 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
   if (result.dryRun) return result;
 
   for (const target of result.agents) {
-    for (const pluginCommand of officialPluginCommands(target, result.scope)) {
+    for (const pluginCommand of officialPluginCommands(target, options)) {
       const commandResult = await runCommand(options, pluginCommand);
       if (commandResult.exitCode !== 0) {
         throw new Error(`Plugin ${options.action} failed for ${target}: ${commandResult.stderr || commandResult.stdout}`);
@@ -272,7 +272,7 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
   return result;
 }
 
-function officialPluginCommands(target: BuildTargetName, scope: PluginOperationScope): PluginCommand[] {
+function officialPluginCommands(target: BuildTargetName, options: PluginOperationOptions): PluginCommand[] {
   if (target === 'ghcp') {
     return [
       { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
@@ -281,9 +281,7 @@ function officialPluginCommands(target: BuildTargetName, scope: PluginOperationS
   }
 
   if (target === 'claude') {
-    return [
-      { command: 'claude', args: ['plugin', 'install', 'Azure/azure-functions-skills', '--scope', claudeScope(scope)] },
-    ];
+    return claudePluginCommands(options);
   }
 
   return [
@@ -292,8 +290,35 @@ function officialPluginCommands(target: BuildTargetName, scope: PluginOperationS
   ];
 }
 
-function claudeScope(scope: PluginOperationScope): string {
-  return scope === 'workspace' ? 'project' : 'user';
+function claudePluginCommands(options: PluginOperationOptions): PluginCommand[] {
+  const pluginPath = claudePluginPayloadPath(options);
+  if (options.source === 'local') {
+    return [{ command: 'claude', args: ['plugin', 'validate', pluginPath] }];
+  }
+
+  const cloneDir = claudeRepositoryCloneDir(options.projectDir);
+  const syncCommand = options.action === 'update'
+    ? { command: 'git', args: ['-C', cloneDir, 'pull', '--ff-only'] }
+    : { command: 'git', args: ['clone', 'https://github.com/Azure/azure-functions-skills.git', cloneDir] };
+
+  return [
+    syncCommand,
+    { command: 'claude', args: ['plugin', 'validate', pluginPath] },
+  ];
+}
+
+function claudePluginPayloadPath(options: PluginOperationOptions): string {
+  if (options.source === 'local') return localPluginPayloadPath();
+  return join(claudeRepositoryCloneDir(options.projectDir), '.github', 'plugins', 'azure-functions-skills');
+}
+
+function claudeRepositoryCloneDir(projectDir: string): string {
+  return join(projectDir, '.azure-functions-skills', 'source', 'azure-functions-skills');
+}
+
+function localPluginPayloadPath(): string {
+  const repoPluginPath = join(PACKAGE_ROOT, '.github', 'plugins', 'azure-functions-skills');
+  return existsSync(repoPluginPath) ? repoPluginPath : getPluginDir('claude');
 }
 
 function formatCommand(pluginCommand: PluginCommand): string {

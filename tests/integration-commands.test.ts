@@ -224,6 +224,26 @@ describe('CLI command integration', () => {
     expect(existsSync(join(projectDir, '.github', 'copilot', 'settings.json'))).toBe(false);
   });
 
+  it('plugin install --dry-run shows Claude plugin-from-source payload loading', () => {
+    const projectDir = makeTempDir('af-skills-e2e-plugin-install-claude-dry-run-');
+
+    const output = runCliOutput([
+      'plugin',
+      'install',
+      '--agent', 'claude',
+      '--dir', projectDir,
+      '--dry-run',
+    ]);
+
+    expect(output).toContain('Planned plugin install');
+    expect(output).toContain('git clone https://github.com/Azure/azure-functions-skills.git');
+    expect(output).toContain('.github');
+    expect(output).toContain('plugins');
+    expect(output).toContain('claude plugin validate');
+    expect(output).toContain('workspace activation');
+    expect(existsSync(join(projectDir, 'CLAUDE.md'))).toBe(false);
+  });
+
   it('plugin update --dry-run can skip workspace activation', () => {
     const projectDir = makeTempDir('af-skills-e2e-plugin-update-dry-run-');
 

@@ -108,7 +108,7 @@ describe('planPluginOperation', () => {
     expect(plan.steps.map(step => step.description).join('\n')).toContain('0.12.1');
   });
 
-  it('plans official plugin install commands for each coding agent', () => {
+  it('plans official plugin install commands for GHCP and Codex plus Claude plugin-from-source validation', () => {
     const plan = planPluginOperation({
       action: 'install',
       agents: ['ghcp', 'claude', 'codex'],
@@ -119,13 +119,15 @@ describe('planPluginOperation', () => {
     });
 
     const pluginSteps = plan.steps.filter(step => step.kind === 'plugin-registration');
-    expect(pluginSteps.map(step => [step.target, step.commands])).toEqual([
+    const normalizedSteps = pluginSteps.map(step => [step.target, step.commands?.map(command => command.replaceAll('\\', '/'))]);
+    expect(normalizedSteps).toEqual([
       ['ghcp', [
         'copilot plugin marketplace add Azure/azure-functions-skills',
         'copilot plugin install azure-functions-skills@azure-functions-skills',
       ]],
       ['claude', [
-        'claude plugin install Azure/azure-functions-skills --scope project',
+        'git clone https://github.com/Azure/azure-functions-skills.git /workspace/project/.azure-functions-skills/source/azure-functions-skills',
+        'claude plugin validate /workspace/project/.azure-functions-skills/source/azure-functions-skills/.github/plugins/azure-functions-skills',
       ]],
       ['codex', [
         'codex plugin marketplace add Azure/azure-functions-skills',
@@ -151,7 +153,8 @@ describe('planPluginOperation', () => {
       expect(runner.calls).toEqual([
         { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'copilot', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills'] },
-        { command: 'claude', args: ['plugin', 'install', 'Azure/azure-functions-skills', '--scope', 'project'] },
+        { command: 'git', args: ['clone', 'https://github.com/Azure/azure-functions-skills.git', join(dir, '.azure-functions-skills', 'source', 'azure-functions-skills')] },
+        { command: 'claude', args: ['plugin', 'validate', join(dir, '.azure-functions-skills', 'source', 'azure-functions-skills', '.github', 'plugins', 'azure-functions-skills')] },
         { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
       ]);
@@ -162,6 +165,23 @@ describe('planPluginOperation', () => {
     } finally {
       removeDir(dir);
     }
+  });
+
+  it('uses the current repository plugin payload for Claude when source is local', () => {
+    const plan = planPluginOperation({
+      action: 'install',
+      agents: ['claude'],
+      projectDir: '/workspace/project',
+      source: 'local',
+      dryRun: true,
+      workspace: false,
+    });
+
+    const command = plan.steps[0].commands?.[0] || '';
+    expect(command).toContain('claude plugin validate');
+    expect(command).toContain('.github');
+    expect(command).toContain('plugins');
+    expect(command).toContain('azure-functions-skills');
   });
 
   it('plans plugin update without workspace activation when disabled', () => {
