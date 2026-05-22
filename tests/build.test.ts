@@ -419,7 +419,7 @@ describe('buildPluginPayload', () => {
     resetDistDir();
   });
 
-  it('generates a self-contained plugin payload without workspace layout files', () => {
+  it('generates a skills-only plugin payload by default without workspace layout files', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
@@ -432,9 +432,9 @@ describe('buildPluginPayload', () => {
     expect(existsSync(join(payloadDir, 'plugin.json'))).toBe(true);
     expect(existsSync(join(payloadDir, '.claude-plugin', 'plugin.json'))).toBe(true);
     expect(existsSync(join(payloadDir, '.codex-plugin', 'plugin.json'))).toBe(true);
-    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
-    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
-    expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
+    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(false);
+    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(false);
+    expect(existsSync(join(payloadDir, 'agents'))).toBe(false);
     expect(existsSync(join(payloadDir, '.github'))).toBe(false);
     expect(existsSync(join(payloadDir, '.agents'))).toBe(false);
     expect(existsSync(join(payloadDir, '.codex'))).toBe(false);
@@ -443,16 +443,16 @@ describe('buildPluginPayload', () => {
     expect(manifest.name).toBe('azure-functions-skills');
     expect(manifest.version).toBe('9.8.7');
     expect(manifest.skills).toBe('./skills/');
-    expect(manifest.agents).toBe('./agents/');
-    expect(manifest.hooks).toBe('./hooks.json');
-    expect(manifest.mcpServers).toBe('./.mcp.json');
+    expect(manifest).not.toHaveProperty('agents');
+    expect(manifest).not.toHaveProperty('hooks');
+    expect(manifest).not.toHaveProperty('mcpServers');
 
     for (const s of skills) {
       expect(existsSync(join(payloadDir, 'skills', s.id, 'SKILL.md'))).toBe(true);
     }
   });
 
-  it('emits a Claude plugin manifest without unsupported Copilot/Codex metadata', () => {
+  it('emits skills-only host plugin manifests by default', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
@@ -463,19 +463,50 @@ describe('buildPluginPayload', () => {
 
     const defaultManifest = JSON.parse(readFileSync(join(payloadDir, 'plugin.json'), 'utf-8'));
     const claudeManifest = JSON.parse(readFileSync(join(payloadDir, '.claude-plugin', 'plugin.json'), 'utf-8'));
+    const codexManifest = JSON.parse(readFileSync(join(payloadDir, '.codex-plugin', 'plugin.json'), 'utf-8'));
 
-    expect(defaultManifest.agents).toBe('./agents/');
     expect(defaultManifest.interface).toBeTruthy();
+    expect(defaultManifest).not.toHaveProperty('agents');
+    expect(defaultManifest).not.toHaveProperty('hooks');
+    expect(defaultManifest).not.toHaveProperty('mcpServers');
     expect(claudeManifest).toMatchObject({
       name: 'azure-functions-skills',
       version: '9.8.7',
       description: 'Azure Functions skills for setup, create, and deploy workflows',
       skills: './skills/',
-      hooks: './hooks.json',
-      mcpServers: './.mcp.json',
     });
     expect(claudeManifest).not.toHaveProperty('agents');
+    expect(claudeManifest).not.toHaveProperty('hooks');
+    expect(claudeManifest).not.toHaveProperty('mcpServers');
     expect(claudeManifest).not.toHaveProperty('interface');
+    expect(codexManifest).not.toHaveProperty('agents');
+    expect(codexManifest).not.toHaveProperty('hooks');
+    expect(codexManifest).not.toHaveProperty('mcpServers');
+  });
+
+  it('generates a full plugin payload when explicitly requested', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir, { profile: 'full' });
+
+    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
+
+    const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
+    expect(manifest.skills).toBe('./skills/');
+    expect(manifest.agents).toBe('./agents/');
+    expect(manifest.hooks).toBe('./hooks.json');
+    expect(manifest.mcpServers).toBe('./.mcp.json');
+
+    const claudeManifest = JSON.parse(readFileSync(join(payloadDir, '.claude-plugin', 'plugin.json'), 'utf-8'));
+    expect(claudeManifest.skills).toBe('./skills/');
+    expect(claudeManifest.hooks).toBe('./hooks.json');
+    expect(claudeManifest.mcpServers).toBe('./.mcp.json');
   });
 });
 

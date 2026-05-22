@@ -99,8 +99,19 @@ function assertWorkspaceLayout(root: string, target: BuildTargetName, expectedSk
   assertSkillDirectories(join(root, '.agents', 'skills'), expectedSkillIds);
 }
 
-function assertPluginLayout(root: string, target: BuildTargetName, expectedSkillIds: string[], expectedAgentFiles: string[]): void {
+function assertPluginLayout(root: string, target: BuildTargetName, expectedSkillIds: string[], _expectedAgentFiles: string[]): void {
   expect(target).toBeTruthy();
+  expect(existsSync(join(root, '.plugin', 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, '.claude-plugin', 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, '.codex-plugin', 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, '.mcp.json'))).toBe(false);
+  expect(existsSync(join(root, 'hooks.json'))).toBe(false);
+  expect(existsSync(join(root, 'agents'))).toBe(false);
+  assertSkillDirectories(join(root, 'skills'), expectedSkillIds);
+}
+
+function assertFullPluginLayout(root: string, expectedSkillIds: string[], expectedAgentFiles: string[]): void {
   expect(existsSync(join(root, '.plugin', 'plugin.json'))).toBe(true);
   expect(existsSync(join(root, 'plugin.json'))).toBe(true);
   expect(existsSync(join(root, '.claude-plugin', 'plugin.json'))).toBe(true);
@@ -158,6 +169,16 @@ describe('CLI command integration', () => {
     }
 
     assertPluginLayout(join(distDir, 'plugin', 'azure-functions-skills'), 'ghcp', expectedSkillIds, expectedAgentFiles);
+  });
+
+  it('build can opt into the full plugin payload profile', () => {
+    const distDir = makeTempDir('af-skills-e2e-build-full-plugin-');
+    const expectedSkillIds = templateSkillIds();
+    const expectedAgentFiles = templateAgentFiles();
+
+    runCli(['build', '--dist-dir', distDir, '--plugin-profile', 'full']);
+
+    assertFullPluginLayout(join(distDir, 'plugin', 'azure-functions-skills'), expectedSkillIds, expectedAgentFiles);
   });
 
   it('setup installs each target workspace layout into a temp project directory', () => {
