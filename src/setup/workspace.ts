@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadSkills } from '../build/loader.js';
+import { loadMcpServers, loadSkills } from '../build/loader.js';
 import { applySetup, detectAgents } from './index.js';
-import type { CliAgentName, MergeStrategy, WorkspaceApplyOptions, WorkspaceApplyResult, WorkspaceMode } from '../types.js';
+import type { CliAgentName, McpServer, MergeStrategy, WorkspaceApplyOptions, WorkspaceApplyResult, WorkspaceMode } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
@@ -21,6 +21,7 @@ export async function applyWorkspace(targetDir: string, options: WorkspaceApplyO
   const mode = options.mode || 'copy';
   const mergeStrategy = options.mergeStrategy || 'managed-block';
   const dryRun = options.dryRun === true;
+  const approved = options.yes === true;
 
   if (mode === 'copy') {
     if (dryRun) {
@@ -42,13 +43,13 @@ export async function applyWorkspace(targetDir: string, options: WorkspaceApplyO
     };
   }
 
-  const plannedFiles = agents.flatMap(agent => activationFiles(agent, mode));
+  const plannedFiles = agents.flatMap(agent => activationFiles(agent, mode, options));
   if (dryRun) {
     return {
       agents,
       mode,
       filesWritten: 0,
-      plannedFiles: plannedFiles.map(file => file.path),
+      plannedFiles: plannedFiles.flatMap(file => plannedWorkspacePaths(file, mergeStrategy)),
       dryRun,
     };
   }
@@ -57,11 +58,18 @@ export async function applyWorkspace(targetDir: string, options: WorkspaceApplyO
   for (const file of plannedFiles) {
     const fullPath = join(targetDir, file.path);
     const content = file.merge
-      ? mergeInstructionFile(fullPath, file.content, mergeStrategy, options.update === true)
+      ? mergeInstructionFile(fullPath, file.content, mergeStrategy, options.update === true, approved)
       : mergeJsonLikeFile(fullPath, file.content);
     mkdirSync(dirname(fullPath), { recursive: true });
     writeFileSync(fullPath, content);
     filesWritten++;
+
+    if (file.merge && mergeStrategy === 'include-file') {
+      const includeFullPath = join(targetDir, includeInstructionPath(file.path));
+      mkdirSync(dirname(includeFullPath), { recursive: true });
+      writeFileSync(includeFullPath, ensureTrailingNewline(file.content));
+      filesWritten++;
+    }
   }
 
   return {
@@ -79,27 +87,37 @@ function plannedCopyFiles(agent: CliAgentName): string[] {
   return ['AGENTS.md', '.agents/skills/<skill-id>/SKILL.md'];
 }
 
-function activationFiles(agent: CliAgentName, mode: WorkspaceMode): PlannedFile[] {
+function activationFiles(agent: CliAgentName, mode: WorkspaceMode, options: WorkspaceApplyOptions): PlannedFile[] {
   const files: PlannedFile[] = [];
   if (agent === 'ghcp') {
     files.push({ path: '.github/copilot-instructions.md', content: routingBlock(agent), merge: true });
     if (mode === 'plugin-reference') files.push({ path: '.github/copilot/settings.json', content: JSON.stringify(ghcpPluginSettings(), null, 2) });
+    if (options.includeMcp) files.push({ path: '.vscode/mcp.json', content: JSON.stringify(ghcpMcpSettings(), null, 2) });
+    if (options.includeHooks) files.push({ path: '.github/hooks/welcome-setup.json', content: JSON.stringify(crossPlatformHooks(), null, 2) });
   }
 
   if (agent === 'claude') {
     files.push({ path: 'CLAUDE.md', content: routingBlock(agent), merge: true });
     if (mode === 'plugin-reference') files.push({ path: '.claude/settings.json', content: JSON.stringify(claudePluginSettings(), null, 2) });
+    if (options.includeMcp) files.push({ path: '.claude/settings.json', content: JSON.stringify(claudeMcpSettings(), null, 2) });
   }
 
   if (agent === 'codex') {
     files.push({ path: 'AGENTS.md', content: routingBlock(agent), merge: true });
     if (mode === 'plugin-reference') files.push({ path: '.agents/plugins/marketplace.json', content: JSON.stringify(codexMarketplace(), null, 2) });
+    if (options.includeMcp) files.push({ path: '.codex/config.toml', content: codexMcpConfigToml() });
+    if (options.includeHooks) files.push({ path: '.codex/hooks.json', content: JSON.stringify(crossPlatformHooks(), null, 2) });
   }
 
   return files;
 }
 
-function mergeInstructionFile(filePath: string, generatedContent: string, strategy: MergeStrategy, update: boolean): string {
+function plannedWorkspacePaths(file: PlannedFile, strategy: MergeStrategy): string[] {
+  if (file.merge && strategy === 'include-file') return [file.path, includeInstructionPath(file.path)];
+  return [file.path];
+}
+
+function mergeInstructionFile(filePath: string, generatedContent: string, strategy: MergeStrategy, update: boolean, approved: boolean): string {
   const block = managedBlock(generatedContent);
   if (!existsSync(filePath)) return `${block}\n`;
 
@@ -112,6 +130,10 @@ function mergeInstructionFile(filePath: string, generatedContent: string, strate
 
   if (strategy === 'fail-if-exists') {
     throw new Error(`Refusing to modify existing customer-owned file: ${filePath}`);
+  }
+
+  if (!approved) {
+    throw new Error(`Refusing to modify existing customer-owned file without approval: ${filePath}. Re-run with --yes or use --merge-strategy fail-if-exists.`);
   }
 
   if (strategy === 'append' || strategy === 'managed-block') {
@@ -178,6 +200,64 @@ function skillRoutingList(): string {
     .sort((left, right) => left.id.localeCompare(right.id))
     .map(skill => `- ${skill.id}: ${skill.description || skill.title}`)
     .join('\n');
+}
+
+function mcpServers(): McpServer[] {
+  return loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+}
+
+function ghcpMcpSettings() {
+  const servers: Record<string, { type: string; command: string; args: string[] }> = {};
+  for (const server of mcpServers()) {
+    servers[server.id] = {
+      type: server.type || 'stdio',
+      command: server.command,
+      args: server.args,
+    };
+  }
+  return { servers };
+}
+
+function claudeMcpSettings() {
+  const servers: Record<string, { command: string; args: string[] }> = {};
+  for (const server of mcpServers()) {
+    servers[server.id] = {
+      command: server.command,
+      args: server.args,
+    };
+  }
+  return { mcpServers: servers };
+}
+
+function codexMcpConfigToml(): string {
+  const lines = [
+    '# Azure Functions MCP Servers',
+    '# Generated by azure-functions-skills workspace apply',
+    '',
+  ];
+
+  for (const server of mcpServers()) {
+    lines.push(`[mcp_servers.${server.id}]`);
+    lines.push(`command = "${server.command}"`);
+    if (server.args.length > 0) lines.push(`args = [${server.args.map(arg => `"${arg}"`).join(', ')}]`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+function crossPlatformHooks() {
+  return {
+    hooks: {
+      SessionStart: [
+        {
+          type: 'command',
+          command: 'node -e "const r=require(\'child_process\').execSync;let o=\'⚡ Welcome to Azure Functions!\\n\';for(const [n,c,u] of [[\'Azure CLI\',\'az --version\',\'https://aka.ms/installazurecli\'],[\'Core Tools\',\'func --version\',\'npm i -g azure-functions-core-tools@4\'],[\'Node.js\',\'node --version\',\'https://nodejs.org\']]){try{r(c,{stdio:\'ignore\'});o+=`✅ ${n}\\n`}catch{o+=`❌ ${n} — install: ${u}\\n`}};console.log(JSON.stringify({hookSpecificOutput:{hookEventName:\'SessionStart\',additionalContext:o}}))"',
+          timeout: 15,
+        },
+      ],
+    },
+  };
 }
 
 function ghcpPluginSettings() {

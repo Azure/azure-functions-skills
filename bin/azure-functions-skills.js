@@ -43,6 +43,7 @@ function printHelp() {
     --merge-strategy <name> managed-block, include-file, fail-if-exists, append
     --update           Replace existing Azure Functions managed blocks
     --dry-run          Print planned changes without writing files
+    --yes              Approve modifying existing instruction files without prompting
 
   Options (plugin install/update):
     --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
@@ -53,6 +54,7 @@ function printHelp() {
     --workspace        Apply workspace plugin-reference activation (default)
     --no-workspace     Skip workspace activation
     --dry-run          Print planned changes without writing files
+    --yes              Approve workspace activation changes to existing instruction files
 
   Options (chat):
     --agent <name>     Agent: github-copilot, claude-code, codex (auto-detected if omitted)
@@ -250,6 +252,7 @@ if (command === 'setup') {
   let mergeStrategy = 'managed-block';
   let dryRun = false;
   let update = action === 'update';
+  let yes = false;
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
@@ -258,15 +261,23 @@ if (command === 'setup') {
     else if (args[i] === '--merge-strategy' && args[i + 1]) mergeStrategy = args[++i];
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--update') update = true;
+    else if (args[i] === '--yes') yes = true;
   }
 
-  const result = await applyWorkspace(dir, {
-    agents: agents.length > 0 ? agents : undefined,
-    mode,
-    mergeStrategy,
-    update,
-    dryRun,
-  });
+  let result;
+  try {
+    result = await applyWorkspace(dir, {
+      agents: agents.length > 0 ? agents : undefined,
+      mode,
+      mergeStrategy,
+      update,
+      dryRun,
+      yes,
+    });
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
 
   if (dryRun) {
     console.log('Planned workspace changes:');
@@ -294,6 +305,7 @@ if (command === 'setup') {
   let version = undefined;
   let workspace = true;
   let dryRun = false;
+  let yes = false;
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
@@ -304,6 +316,7 @@ if (command === 'setup') {
     else if (args[i] === '--workspace') workspace = true;
     else if (args[i] === '--no-workspace') workspace = false;
     else if (args[i] === '--dry-run') dryRun = true;
+    else if (args[i] === '--yes') yes = true;
   }
 
   const detectedAgents = agents.length > 0 ? agents : await detectAgents();
@@ -318,6 +331,7 @@ if (command === 'setup') {
       source,
       version,
       workspace,
+      yes,
     });
   } catch (err) {
     console.error(err.message);

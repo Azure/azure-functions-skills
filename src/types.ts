@@ -62,6 +62,7 @@ export interface WorkspaceApplyOptions {
   mergeStrategy?: MergeStrategy;
   update?: boolean;
   dryRun?: boolean;
+  yes?: boolean;
   includeMcp?: boolean;
   includeHooks?: boolean;
   includeAgent?: boolean;
