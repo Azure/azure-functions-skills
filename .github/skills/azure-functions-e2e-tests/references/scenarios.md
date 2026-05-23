@@ -155,9 +155,11 @@ Plugin scenario inspection commands must run from that scenario's workspace unde
 
 Default plugin install scenarios must not fail only because MCP, hooks, or custom agent definitions are absent from the plugin payload. Those surfaces are intentionally opt-in after F15. Validate them through `workspace-activation-*` scenarios or an explicit full-profile payload build.
 
+Dry-run and local-source smoke scenarios are supporting evidence only. They can validate command planning, local payload validation, and workspace activation, but they do not satisfy `plugin-install-*` pass criteria. A `plugin-install-*` scenario cannot pass unless the current run proves fresh install/register behavior after cleanup or isolation.
+
 If cleanup would mutate user-level state and approval is unavailable, mark the cleanup check `blocked`. If a CLI does not expose uninstall/select/list commands outside an interactive UI, record the command/help output and classify the plugin scenario as `blocked` unless the user completes the interaction. Do not uninstall unrelated plugins. Do not uninstall the dependent `azure-skills` plugin unless the selected dependency scenario explicitly requires a missing-dependency state and the user approves it.
 
-Start plugin scenarios with cleanup after pre-state discovery. The cleanup command sequence is stable enough to document directly per host. Treat "not installed" or "not registered" as a clean pre-state for the target phase and continue. Treat existing installation as normal pre-state, not as a failure.
+Start plugin scenarios with cleanup after pre-state discovery. The cleanup command sequence is stable enough to document directly per host. Treat "not installed" or "not registered" as a clean pre-state for the target phase and continue. Treat existing installation as normal pre-state, not as a failure, but do not reuse it as proof of install success. If the target is installed and cleanup/isolation is not performed, classify the fresh plugin scenario as `blocked` when approval/isolation is unavailable, or `fail`/`harness-invalid` if the run incorrectly reuses the existing install.
 
 GitHub Copilot cleanup/install sequence:
 
@@ -195,6 +197,7 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
 - Install mode: `plugin`
 - Priority: P0
 - Purpose: verify CLI-mediated first-run planning is non-destructive and includes both host plugin commands and workspace activation.
+- This is a smoke scenario. It does not prove fresh plugin install lifecycle behavior.
 - Command contract:
   1. Run `azure-functions-skills install --agent ghcp --agent claude --agent codex --dir <scenario-workspace> --dry-run`.
   2. Record planned GHCP, Claude, and Codex host commands.
@@ -213,6 +216,7 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
 - Install mode: `setup`
 - Priority: P1
 - Purpose: verify `install --local` remains the full workspace-local setup compatibility path.
+- This is a setup compatibility scenario. It does not prove host plugin install lifecycle behavior.
 - Command contract:
   1. Run `azure-functions-skills install --local --agent <target> --dir <scenario-workspace> --skip-prerequisites`.
   2. Verify the same full workspace files expected from legacy `setup`.
@@ -227,6 +231,7 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
 - Install mode: `plugin`
 - Priority: P1
 - Purpose: verify `install -- <args>` can pass host CLI options for a single agent and rejects ambiguous multi-agent passthrough.
+- This is a CLI planning/argument scenario. It does not prove fresh plugin install lifecycle behavior.
 - Required checks:
   - Single-agent dry-run shows passthrough args on the final host plugin command.
   - Multi-agent dry-run with passthrough fails with clear guidance to run one agent at a time.
@@ -359,6 +364,7 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
   7. Run `copilot --agent azure-functions-skills:functions-copilot -p "<inspection prompt>" --output-format json -s --allow-all --no-ask-user` or the current qualified installed-plugin agent equivalent from CLI help/error output.
 - Required checks:
   - Existing plugin registration is discovered and then cleared or isolated safely; if global cleanup is unsafe, denied, or unsupported, record `blocked` for cleanup and continue only with a proven isolated registration when possible.
+  - If the target plugin was already installed, the scenario cannot pass unless the run records an official uninstall/remove or an isolated clean profile before reinstalling.
   - The uninstall/remove command for the target plugin is recorded when the plugin was present before the run.
   - The documented marketplace add command completes or produces an auth/approval `blocked` result.
   - The documented plugin install command completes or produces an auth/approval `blocked` result.
@@ -384,6 +390,7 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
   5. Run Claude with an inspection prompt in the isolated workspace.
 - Required checks:
   - Existing plugin/source registration is discovered and then cleared or isolated safely; if global cleanup is unsafe, denied, or unsupported, record `blocked` for cleanup and continue only with a proven isolated source registration when possible.
+  - If the target plugin/source was already installed, the scenario cannot pass unless the run records an official uninstall/remove or an isolated clean profile before reinstalling/reloading.
   - If an installed target plugin was present before the run, the official uninstall/remove command is recorded or the cleanup check is `blocked`.
   - The documented `--add-dir` command is attempted and recorded, or the report explicitly records that current Claude Code uses `--plugin-dir` as the noninteractive session-scoped equivalent and flags the README divergence in `docs-command-consistency`.
   - The post-registration Claude command runs with an inspection prompt, or the scenario is `blocked`/`unsupported` with evidence.
@@ -420,6 +427,7 @@ Every agent run should report the following surfaces, with direct file evidence 
   6. Run Codex with an inspection prompt in the isolated workspace, preferably `codex exec --sandbox read-only --json --output-last-message <file> --ephemeral --skip-git-repo-check --cd <workspace> <inspection prompt>`.
 - Required checks:
   - Existing plugin registration is discovered and then cleared or isolated safely; if global cleanup is unsafe, denied, interactive-only, or unsupported, record `blocked` for cleanup and continue only with a proven isolated registration when possible.
+  - If the target plugin or marketplace was already installed/registered, the scenario cannot pass unless the run records an official remove/uninstall or an isolated clean profile before reinstalling/registering.
   - If the target plugin or marketplace was present before the run, the official remove/uninstall command is recorded or the cleanup check is `blocked`.
   - The documented marketplace add command completes or produces an auth/approval `blocked` result.
   - The plugin install/select step is attempted or documented as unsupported by current CLI help.
