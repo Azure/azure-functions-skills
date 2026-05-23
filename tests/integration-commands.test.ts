@@ -239,6 +239,33 @@ describe('CLI command integration', () => {
     expect(content).toContain('<!-- azure-functions-skills:start');
   });
 
+  it('workspace apply can opt into MCP and hooks from the CLI', () => {
+    const projectDir = makeTempDir('af-skills-e2e-workspace-opt-in-');
+
+    runCli([
+      'workspace',
+      'apply',
+      '--agent', 'ghcp',
+      '--agent', 'claude',
+      '--agent', 'codex',
+      '--dir', projectDir,
+      '--mode', 'plugin-reference',
+      '--include-mcp',
+      '--include-hooks',
+      '--yes',
+    ]);
+
+    expect(existsSync(join(projectDir, '.vscode', 'mcp.json'))).toBe(true);
+    expect(existsSync(join(projectDir, '.github', 'hooks', 'welcome-setup.json'))).toBe(true);
+    expect(existsSync(join(projectDir, '.claude', 'settings.json'))).toBe(true);
+    expect(existsSync(join(projectDir, '.codex', 'config.toml'))).toBe(true);
+    expect(existsSync(join(projectDir, '.codex', 'hooks.json'))).toBe(true);
+
+    const codexHooks = readFileSync(join(projectDir, '.codex', 'hooks.json'), 'utf-8');
+    expect(codexHooks).toContain('node -e');
+    expect(codexHooks).not.toContain('bash -c');
+  });
+
   it('plugin install --dry-run prints plugin and workspace activation plans without writing files', () => {
     const projectDir = makeTempDir('af-skills-e2e-plugin-install-dry-run-');
 

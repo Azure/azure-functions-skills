@@ -119,6 +119,7 @@ Each scenario run should emit one JSON object.
 
 `surface` must be one of `plugin`, `skills`, `prompts`, `mcp`, `hooks`, `agents`, `agent-launch`, `agent-inspection`, `setup-files`, or `general`.
 Use `support: "unsupported"` for surfaces that the package or agent cannot support today. For example, Claude Code native plugin support must not be reported as passing unless the test actually launches Claude with the plugin loaded and proves the plugin surfaces are visible.
+For default plugin payload scenarios, do not require `mcp`, `hooks`, or `agents` checks to pass unless the scenario explicitly opted into workspace activation or full-profile payload generation. Record those surfaces as `not-in-default-payload`, `unsupported`, or validate them in a separate opt-in scenario.
 Checks should cite dynamic inventory paths instead of assuming a fixed template list. If a template changes, the next run should discover the new inventory and update expectations automatically.
 
 ## Inspection artifact record

@@ -1,4 +1,4 @@
-# F15: Distribution — Plugin Packaging
+# F15: Distribution — Installation and Workspace Routing
 
 **Status:** 📋 Proposed  
 **Draft Spec Section:** 10, 11  
@@ -6,15 +6,19 @@
 
 ## Problem
 
-Generated artifacts need to reach developers. Each target platform has its own distribution mechanism. Additionally, repo templates provide project-local instructions that enhance discoverability. The repository needs a clear packaging and distribution strategy that:
+Generated artifacts need to reach developers without polluting every global agent session. Each target platform has its own plugin mechanism, while repo-local instruction files are the best place for project-specific routing. The repository needs a distribution strategy that:
 
 - Avoids naming collisions between plugin skills and repo-local skills
 - Supports independent versioning per target
 - Enables both plugin-based and repo-template-based distribution
+- Keeps MCP, hooks, and agent guidance opt-in because those surfaces are not progressive disclosure in the same way skills are
 
 ## Feature
 
-A distribution strategy that packages build artifacts for each target platform and provides repo templates for project-level customization.
+A two-layer distribution strategy:
+
+1. **Plugin Skills Pack** — default global plugin payload containing skills and minimal host manifests only.
+2. **Workspace Activation Pack** — repo-local routing, plugin references, and opt-in MCP/hooks/agent guidance.
 
 ## Package Naming
 
@@ -30,30 +34,47 @@ Canonical repo: `azure-functions-skills` (one repo, one source of truth)
 
 ### 1. Plugin Distribution
 
-Skills and agents packaged as installable plugins per target:
+Skills packaged as installable plugins per target. The default payload is skills-only:
 
 ```
-azure-functions-skill-pack-ghcp/
+azure-functions-skills/
 ├── skills/
-│   ├── azure-functions-help.md
 │   ├── azure-functions-setup.md
 │   ├── azure-functions-create.md
 │   ├── azure-functions-deploy.md
-│   ├── azure-functions-observability.md
-│   ├── azure-functions-hosting.md
-│   ├── azure-functions-python.md
-│   ├── azure-functions-node.md
-│   ├── azure-functions-dotnet.md
-│   ├── azure-functions-durable.md
-│   └── azure-functions-feedback.md
-├── agents/
-│   └── functions-copilot.md
-├── hooks/
-│   └── post-task-suggester.js
-└── manifest.json
+│   └── ...
+├── plugin.json
+├── .plugin/plugin.json
+├── .claude-plugin/plugin.json
+└── .codex-plugin/plugin.json
 ```
 
-### 2. Repo Templates
+The full profile remains available for explicit builds:
+
+```bash
+node lib/build/build.js --plugin-profile full
+```
+
+Full profile includes MCP, hooks, and agent definitions for validation or advanced distribution scenarios.
+
+### 2. Workspace Activation
+
+Workspace activation adds project-local routing and optional surfaces after plugin install:
+
+```bash
+azure-functions-skills workspace apply --agent claude --mode plugin-reference --dry-run
+azure-functions-skills workspace apply --agent claude --mode plugin-reference --yes
+azure-functions-skills workspace apply --agent codex --mode plugin-reference --merge-strategy include-file --yes
+azure-functions-skills workspace apply --agent codex --mode plugin-reference --include-mcp --include-hooks --yes
+```
+
+Important instruction files are protected:
+
+- Existing `CLAUDE.md` / `AGENTS.md` without an Azure Functions managed block require `--yes` before appending.
+- Existing Azure Functions managed blocks are idempotent and can be refreshed with `workspace update`.
+- `include-file` keeps important instruction files small by writing routing content under `.azure-functions-skills/`.
+
+### 3. Repo Templates
 
 Project-level instructions that developers copy into their repo:
 
@@ -74,7 +95,7 @@ Repo template content includes:
 - Language-specific guidance based on detected runtime
 - Links to relevant skills
 
-### 3. azd Templates (Future)
+### 4. azd Templates (Future)
 
 Integration with Azure Developer CLI templates:
 
@@ -119,11 +140,9 @@ azure-functions-skills (canonical repo)
 4. CI validates graph integrity
 5. CI runs tests (generated output validation)
 6. Tag release on canonical repo
-7. Per-target publish:
-   ├── GHCP → GitHub Marketplace publish
-   ├── Claude → Claude registry publish
-   └── Codex → Codex registry publish
-8. Update repo templates in azd template gallery (optional)
+7. Per-target publish uses the skills-only default plugin payload
+8. Optional full-profile payloads are generated only for advanced validation or explicit distribution needs
+9. Update repo templates in azd template gallery (optional)
 ```
 
 ## Discoverability via Repo Templates

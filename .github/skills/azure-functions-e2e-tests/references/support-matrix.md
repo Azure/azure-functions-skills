@@ -27,7 +27,8 @@ Use these definitions to keep support status consistent across agents and scenar
 | --- | --- | --- | --- |
 | `setup-workspace-*` | Expected supported | Expected supported | Expected supported |
 | `chat-welcome-*` | Expected supported | Expected supported | Expected supported |
-| `plugin-install-*` | Expected supported only after cleanup-first README command sequence and qualified installed-plugin inspection such as `azure-functions-skills:functions-copilot` pass | Expected supported/partial only after README `claude --add-dir` flow and inspection pass; otherwise fail/blocked/unsupported | Expected supported/partial only after README Codex marketplace flow and inspection pass; otherwise fail/blocked/unsupported |
+| `plugin-install-*` | Expected supported for default skills-only plugin after cleanup-first README/CLI command sequence and qualified installed-plugin inspection such as `azure-functions-skills:functions-copilot` pass | Expected supported/partial only after README `claude --add-dir` or `--plugin-dir` flow and inspection pass; default payload is skills-only | Expected supported/partial only after README Codex marketplace flow and inspection pass; default payload is skills-only |
+| `workspace-activation-*` | Expected supported for thin routing, `--yes`, include-file, and opt-in MCP/hooks | Expected supported for thin routing, `--yes`, include-file, and opt-in MCP; hooks unsupported unless Claude adds a supported surface | Expected supported for thin routing, `--yes`, include-file, opt-in MCP, and cross-platform Node hooks |
 | `docs-command-consistency` | Shared static scenario | Shared static scenario | Shared static scenario |
 | `basic-help-prompt` | Expected supported | Expected supported | Expected supported |
 | `azure-skills-dependency` | Expected supported | Not applicable unless Claude dependency flow exists | Expected supported where plugin flow supports it |

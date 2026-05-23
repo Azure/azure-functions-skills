@@ -24,6 +24,7 @@ Before running scenarios, inspect the current repository and record:
 - Agent definitions from `templates/agents/` and generated target-specific agent files.
 - Target-specific agent guidance semantics: GitHub Copilot custom agent definitions, Claude Code `CLAUDE.md` guidance, and Codex `AGENTS.md` guidance are not interchangeable and must be reported separately.
 - Plugin payload manifests and directories from `.github/plugins/azure-functions-skills/` or the built plugin output.
+- Default plugin payload expectations: skills and host plugin manifests only. MCP, hooks, and agents are expected only in `--plugin-profile full` builds or explicit workspace activation scenarios.
 - Azure Skills dependency expectations from README, setup guidance, and generated skills text.
 
 The report should include the inventory counts and paths used for each run. If a template is added or removed, the E2E expectations should change automatically because they come from this inventory.
@@ -152,6 +153,8 @@ Plugin scenarios validate the installation flow, not reuse of a plugin that happ
 
 Plugin scenario inspection commands must run from that scenario's workspace under `reports/e2e/<run-id>/workspaces/<scenario-id>/`. If plugin registration requires a repository plugin payload path, pass the payload path explicitly instead of changing cwd to the repository root.
 
+Default plugin install scenarios must not fail only because MCP, hooks, or custom agent definitions are absent from the plugin payload. Those surfaces are intentionally opt-in after F15. Validate them through `workspace-activation-*` scenarios or an explicit full-profile payload build.
+
 If cleanup would mutate user-level state and approval is unavailable, mark the cleanup check `blocked`. If a CLI does not expose uninstall/select/list commands outside an interactive UI, record the command/help output and classify the plugin scenario as `blocked` unless the user completes the interaction. Do not uninstall unrelated plugins. Do not uninstall the dependent `azure-skills` plugin unless the selected dependency scenario explicitly requires a missing-dependency state and the user approves it.
 
 Start plugin scenarios with cleanup after pre-state discovery. The cleanup command sequence is stable enough to document directly per host. Treat "not installed" or "not registered" as a clean pre-state for the target phase and continue. Treat existing installation as normal pre-state, not as a failure.
@@ -185,6 +188,55 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
 - If a TUI opens despite these options, capture the help output showing the missing noninteractive path and classify the scenario instead of waiting indefinitely.
 
 ## Initial scenarios
+
+### `plugin-install-dry-run`
+
+- Agent: `all`
+- Install mode: `plugin`
+- Priority: P0
+- Purpose: verify CLI-mediated plugin planning is non-destructive and matches documented host commands.
+- Command contract:
+  1. Run `azure-functions-skills plugin install --agent ghcp --agent claude --agent codex --dir <scenario-workspace> --dry-run`.
+  2. Record planned GHCP, Claude, and Codex host commands.
+  3. Verify no workspace files are created.
+- Required checks:
+  - Output includes GHCP `copilot plugin marketplace add` and `copilot plugin install` commands.
+  - Output includes Claude plugin-from-source clone/validate or local-source validate commands.
+  - Output includes Codex marketplace/add commands.
+  - Scenario workspace remains free of generated `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, and plugin settings files.
+
+### `workspace-activation-safety`
+
+- Agent: `claude-code`, `codex`
+- Install mode: `workspace`
+- Priority: P0
+- Purpose: verify existing important instruction files are protected and explicit approval works.
+- Command contract:
+  1. Create isolated workspaces with existing `CLAUDE.md` and `AGENTS.md` files that do not contain an Azure Functions managed block.
+  2. Run `azure-functions-skills workspace apply --agent claude --mode plugin-reference --dir <workspace>` and record the refusal.
+  3. Run the same command with `--yes` and record the managed block append.
+  4. Run `workspace apply --merge-strategy include-file --yes` for Codex and record the include target.
+- Required checks:
+  - Existing files are not modified without `--yes`.
+  - `--yes` preserves existing content and appends exactly one managed block.
+  - Repeated apply does not duplicate the managed block.
+  - `include-file` writes both the include line and `.azure-functions-skills/AGENTS.azure-functions.md` or `.azure-functions-skills/CLAUDE.azure-functions.md`.
+
+### `workspace-activation-opt-in-surfaces`
+
+- Agent: `github-copilot`, `claude-code`, `codex`
+- Install mode: `workspace`
+- Priority: P1
+- Purpose: verify MCP/hooks are opt-in workspace surfaces, not default plugin payload surfaces.
+- Command contract:
+  1. Run `workspace apply --mode plugin-reference --dry-run` and confirm MCP/hooks are not planned by default.
+  2. Run `workspace apply --mode plugin-reference --include-mcp --include-hooks --yes` in an isolated workspace.
+  3. Inspect generated target-specific MCP and hook files.
+- Required checks:
+  - GHCP opt-in writes `.vscode/mcp.json` and `.github/hooks/welcome-setup.json`.
+  - Claude opt-in writes/merges `.claude/settings.json` MCP entries; Claude hooks remain unsupported unless current Claude exposes a supported hook surface.
+  - Codex opt-in writes `.codex/config.toml` and `.codex/hooks.json`.
+  - Codex hook command uses a cross-platform Node command, not a bash-only hook.
 
 ### `setup-workspace-ghcp`
 
@@ -288,8 +340,7 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
   - The post-install Copilot command runs with the installed-plugin agent, normally `--agent azure-functions-skills:functions-copilot`, and an inspection prompt.
   - `functions-copilot` agent is discoverable through the installed plugin. A qualified plugin agent name is expected and should not be reported as a docs or product failure.
   - Every skill from the dynamic inventory is discoverable from the plugin payload or by the agent.
-  - MCP configuration is discoverable and usable when supported.
-  - Hooks are discoverable or documented as unsupported.
+  - Default plugin payload is skills-only; MCP, hooks, and agent definitions are documented as opt-in or unsupported unless workspace activation/full-profile evidence is collected.
   - Azure Skills dependency is installed or clear install guidance is shown.
   - A real GitHub Copilot CLI prompt asks the agent to report visible/usable agents, skills, MCP, hooks, prompts, and Azure Skills dependency surfaces.
 
@@ -311,7 +362,7 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
   - The documented `--add-dir` command is attempted and recorded, or the report explicitly records that current Claude Code uses `--plugin-dir` as the noninteractive session-scoped equivalent and flags the README divergence in `docs-command-consistency`.
   - The post-registration Claude command runs with an inspection prompt, or the scenario is `blocked`/`unsupported` with evidence.
   - Every skill from the dynamic inventory is discoverable if the mode is supported.
-  - MCP settings are discoverable or merged into local settings.
+  - Default plugin payload is skills-only; MCP settings are only required when testing workspace activation with `--include-mcp`.
   - Unsupported plugin capabilities are clearly reported as `unsupported`, not `pass`.
   - A real Claude Code prompt asks the agent to report visible/usable agents, skills, MCP, hooks, prompts, and Azure Skills dependency surfaces.
 
@@ -349,8 +400,7 @@ Every agent run should report the following surfaces, with direct file evidence 
   - Post-install or post-registration state is recorded.
   - The post-install Codex command runs with an inspection prompt, or the scenario is `blocked`/`unsupported` with evidence.
   - Every skill from the dynamic inventory is discoverable from the plugin payload or by the agent.
-  - MCP configuration is discoverable.
-  - Hook behavior is verified or marked unsupported.
+  - Default plugin payload is skills-only; MCP and hook behavior are verified in workspace activation opt-in scenarios or marked not in default payload.
   - A real Codex prompt asks the agent to report visible/usable agents, skills, MCP, hooks, prompts, and Azure Skills dependency surfaces.
 
 ### `docs-command-consistency`
@@ -361,6 +411,8 @@ Every agent run should report the following surfaces, with direct file evidence 
 - Purpose: verify README commands match actual CLI and supported agents.
 - Required checks:
   - README plugin commands match current intended plugin flow.
+  - README documents default skills-only plugin payload and opt-in workspace MCP/hooks.
+  - README documents `workspace apply`, `workspace update`, `--yes`, and `include-file` behavior for existing `CLAUDE.md`/`AGENTS.md`.
   - README `setup` and `chat` examples use supported agent IDs and options.
   - README skill list matches template skill directories.
   - README development commands match `package.json` scripts or known release process.

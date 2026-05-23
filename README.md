@@ -9,7 +9,16 @@ Azure Functions Skills provides guided setup, create, deploy, diagnostics, and r
 
 ## Recommended: install as a plugin
 
-Use the plugin when your agent supports plugin installation. This keeps the Azure Functions agent, skills, hooks, and MCP configuration available without copying files into every workspace.
+Use the plugin when your agent supports plugin installation. The default plugin payload is **skills-only** so global installs do not add MCP, hooks, or extra agent surfaces to every session. Add workspace activation when a repo needs project-local routing, MCP, or hooks.
+
+The CLI can plan and run the host-specific install flow:
+
+```bash
+npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dry-run
+npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dir ./my-app
+```
+
+Use `--source local` when testing the plugin payload from this checkout, and `--no-workspace` when you only want host plugin registration.
 
 GitHub Copilot CLI:
 
@@ -37,6 +46,26 @@ For VS Code plugin-from-source flows, point the installer at:
 ```text
 Azure/azure-functions-skills:.github/plugins/azure-functions-skills
 ```
+
+### Workspace activation
+
+Plugin install can also prepare repo-local routing files. For Claude and Codex, these are important user-owned files, so existing `CLAUDE.md` or `AGENTS.md` files are not modified unless you approve it.
+
+```bash
+# Preview changes without writing files.
+npx @agent-loom/azure-functions-skills workspace apply --agent claude --mode plugin-reference --dry-run
+
+# CI/non-interactive approval to append an Azure Functions managed block.
+npx @agent-loom/azure-functions-skills workspace apply --agent claude --mode plugin-reference --yes
+
+# Keep CLAUDE.md or AGENTS.md small by adding an include line and writing the routing block elsewhere.
+npx @agent-loom/azure-functions-skills workspace apply --agent codex --mode plugin-reference --merge-strategy include-file --yes
+
+# Add workspace MCP/hooks only when explicitly needed.
+npx @agent-loom/azure-functions-skills workspace apply --agent codex --mode plugin-reference --include-mcp --include-hooks --yes
+```
+
+`workspace update` refreshes an existing Azure Functions managed block without replacing the rest of the file.
 
 After installing, ask your agent:
 
@@ -76,7 +105,8 @@ See [docs/usage-scenarios.md](docs/usage-scenarios.md) for customer-friendly sce
 | --- | --- | --- |
 | Plugin | You want the normal, reusable experience | Registers the Azure Functions plugin payload from this repository with your agent. |
 | `chat` | You want to launch a CLI agent with Azure Functions context immediately | Detects the local project, prepares a startup prompt, checks prerequisites, and starts the selected CLI agent. |
-| `setup` | You need workspace-local files or your agent does not support plugins | Copies agent instructions, skills, hooks, and MCP config into the target workspace. |
+| `workspace apply` | You installed the plugin and need repo-local routing or opt-in MCP/hooks | Writes thin routing blocks and optional workspace files without copying skill bodies. |
+| `setup` | You need a full workspace-local fallback or your agent does not support plugins | Copies agent instructions, skills, hooks, and MCP config into the target workspace. |
 
 ## CLI commands
 
@@ -85,6 +115,8 @@ Run without global install:
 ```bash
 npx @agent-loom/azure-functions-skills chat
 npx @agent-loom/azure-functions-skills setup
+npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dry-run
+npx @agent-loom/azure-functions-skills workspace apply --agent claude --mode plugin-reference --dry-run
 ```
 
 Or install globally:
@@ -104,6 +136,8 @@ npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app -- exec
 npx @agent-loom/azure-functions-skills setup --agent ghcp --dir ./my-app
 npx @agent-loom/azure-functions-skills setup --check-prerequisites
 npx @agent-loom/azure-functions-skills setup --skip-prerequisites
+npx @agent-loom/azure-functions-skills workspace apply --agent codex --dir ./my-app --mode plugin-reference --yes
+npx @agent-loom/azure-functions-skills workspace update --agent claude --dir ./my-app --mode plugin-reference --yes
 ```
 
 `chat` launches the selected agent CLI and forwards extra arguments to that CLI. Use `--` to make the boundary explicit. Unrecognized `chat` options are also forwarded for compatibility with agent-specific flags. `setup` does not launch an agent; it installs workspace files and ignores unrelated agent CLI flags.
@@ -137,7 +171,27 @@ npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app --skip-
 
 The `functions-copilot` agent routes user requests to the right skill and suggests the next step after each workflow.
 
-## What `setup` writes
+## What `setup` and `workspace apply` write
+
+`workspace apply --mode plugin-reference` writes thin activation files only. It does not copy skill bodies:
+
+```text
+.github/copilot-instructions.md              # GHCP routing
+CLAUDE.md                                    # Claude routing
+AGENTS.md                                    # Codex routing
+.github/copilot/settings.json                # GHCP plugin reference
+.claude/settings.json                        # Claude plugin reference / optional MCP
+.agents/plugins/marketplace.json             # Codex plugin reference
+```
+
+Optional flags add more surfaces:
+
+```text
+--include-mcp    .vscode/mcp.json, .claude/settings.json, .codex/config.toml
+--include-hooks  .github/hooks/welcome-setup.json, .codex/hooks.json
+```
+
+`setup` remains the full workspace-local fallback.
 
 For GitHub Copilot workspaces, `setup` writes:
 

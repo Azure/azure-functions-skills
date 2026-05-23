@@ -44,6 +44,8 @@ function printHelp() {
     --update           Replace existing Azure Functions managed blocks
     --dry-run          Print planned changes without writing files
     --yes              Approve modifying existing instruction files without prompting
+    --include-mcp      Add workspace MCP configuration files
+    --include-hooks    Add supported workspace hook files
 
   Options (plugin install/update):
     --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
@@ -253,6 +255,8 @@ if (command === 'setup') {
   let dryRun = false;
   let update = action === 'update';
   let yes = false;
+  let includeMcp = false;
+  let includeHooks = false;
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
@@ -262,6 +266,8 @@ if (command === 'setup') {
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--update') update = true;
     else if (args[i] === '--yes') yes = true;
+    else if (args[i] === '--include-mcp') includeMcp = true;
+    else if (args[i] === '--include-hooks') includeHooks = true;
   }
 
   let result;
@@ -273,6 +279,8 @@ if (command === 'setup') {
       update,
       dryRun,
       yes,
+      includeMcp,
+      includeHooks,
     });
   } catch (err) {
     console.error(err.message);
