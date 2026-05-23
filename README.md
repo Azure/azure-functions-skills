@@ -11,14 +11,14 @@ Azure Functions Skills provides guided setup, create, deploy, diagnostics, and r
 
 Use the plugin when your agent supports plugin installation. The default plugin payload is **skills-only** so global installs do not add MCP, hooks, or extra agent surfaces to every session. Add workspace activation when a repo needs project-local routing, MCP, or hooks.
 
-The CLI can plan and run the host-specific install flow:
+Most users should run the one-time `install` command. It performs the host plugin install and workspace activation together:
 
 ```bash
-npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dry-run
-npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dir ./my-app
+npx @agent-loom/azure-functions-skills install --agent ghcp --dir ./my-app --dry-run
+npx @agent-loom/azure-functions-skills install --agent ghcp --dir ./my-app
 ```
 
-Use `--source local` when testing the plugin payload from this checkout, and `--no-workspace` when you only want host plugin registration.
+`install` adds workspace-local MCP/hooks by default because those files live in the target repo rather than in the global plugin payload. Use `--no-mcp` or `--no-hooks` for a smaller activation. Use `--source local` when testing the plugin payload from this checkout.
 
 GitHub Copilot CLI:
 
@@ -49,7 +49,7 @@ Azure/azure-functions-skills:.github/plugins/azure-functions-skills
 
 ### Workspace activation
 
-Plugin install can also prepare repo-local routing files. For Claude and Codex, these are important user-owned files, so existing `CLAUDE.md` or `AGENTS.md` files are not modified unless you approve it.
+`install` calls workspace activation internally. Advanced users can still run `workspace apply` directly. For Claude and Codex, these are important user-owned files, so existing `CLAUDE.md` or `AGENTS.md` files are not modified unless you approve it.
 
 ```bash
 # Preview changes without writing files.
@@ -103,10 +103,11 @@ See [docs/usage-scenarios.md](docs/usage-scenarios.md) for customer-friendly sce
 
 | Option | Use when | What it does |
 | --- | --- | --- |
-| Plugin | You want the normal, reusable experience | Registers the Azure Functions plugin payload from this repository with your agent. |
-| `chat` | You want to launch a CLI agent with Azure Functions context immediately | Detects the local project, prepares a startup prompt, checks prerequisites, and starts the selected CLI agent. |
+| `install` | You are setting up Azure Functions Skills for a repo | Runs plugin install and workspace activation together. |
+| `chat` | You want to launch a CLI agent with Azure Functions context | Starts the selected CLI agent with the Azure Functions startup prompt. It does not install files. |
 | `workspace apply` | You installed the plugin and need repo-local routing or opt-in MCP/hooks | Writes thin routing blocks and optional workspace files without copying skill bodies. |
-| `setup` | You need a full workspace-local fallback or your agent does not support plugins | Copies agent instructions, skills, hooks, and MCP config into the target workspace. |
+| `plugin install` | You need advanced control over host plugin installation only | Runs the host plugin install flow without being the recommended first-run command. |
+| `install --local` | Your agent does not support plugins or you need full workspace-local fallback | Copies agent instructions, skills, hooks, and MCP config into the target workspace. |
 
 ## CLI commands
 
@@ -114,8 +115,7 @@ Run without global install:
 
 ```bash
 npx @agent-loom/azure-functions-skills chat
-npx @agent-loom/azure-functions-skills setup
-npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dry-run
+npx @agent-loom/azure-functions-skills install --agent ghcp --dry-run
 npx @agent-loom/azure-functions-skills workspace apply --agent claude --mode plugin-reference --dry-run
 ```
 
@@ -124,7 +124,7 @@ Or install globally:
 ```bash
 npm install -g @agent-loom/azure-functions-skills
 azure-functions-skills chat
-azure-functions-skills setup
+azure-functions-skills install
 ```
 
 Useful options:
@@ -133,14 +133,13 @@ Useful options:
 npx @agent-loom/azure-functions-skills chat --agent github-copilot --dir ./my-app
 npx @agent-loom/azure-functions-skills chat --prompt "Create an HTTP trigger function"
 npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app -- exec --sandbox read-only --json
-npx @agent-loom/azure-functions-skills setup --agent ghcp --dir ./my-app
-npx @agent-loom/azure-functions-skills setup --check-prerequisites
-npx @agent-loom/azure-functions-skills setup --skip-prerequisites
+npx @agent-loom/azure-functions-skills install --agent ghcp --dir ./my-app
+npx @agent-loom/azure-functions-skills install --local --agent ghcp --dir ./my-app --skip-prerequisites
 npx @agent-loom/azure-functions-skills workspace apply --agent codex --dir ./my-app --mode plugin-reference --yes
 npx @agent-loom/azure-functions-skills workspace update --agent claude --dir ./my-app --mode plugin-reference --yes
 ```
 
-`chat` launches the selected agent CLI and forwards extra arguments to that CLI. Use `--` to make the boundary explicit. Unrecognized `chat` options are also forwarded for compatibility with agent-specific flags. `setup` does not launch an agent; it installs workspace files and ignores unrelated agent CLI flags.
+`chat` launches the selected agent CLI and forwards extra arguments to that CLI. Use `--` to make the boundary explicit. Unrecognized `chat` options are also forwarded for compatibility with agent-specific flags. `install` does not launch an agent; it prepares the plugin and workspace once.
 
 Headless examples:
 
@@ -172,6 +171,10 @@ npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app --skip-
 The `functions-copilot` agent routes user requests to the right skill and suggests the next step after each workflow.
 
 ## What `setup` and `workspace apply` write
+
+`install` runs host plugin installation and then applies workspace activation. By default it writes thin routing, plugin references, MCP, and supported hooks. Use `--no-mcp` or `--no-hooks` to keep the workspace activation smaller.
+
+`install --local` is the compatibility path for the previous full `setup` behavior.
 
 `workspace apply --mode plugin-reference` writes thin activation files only. It does not copy skill bodies:
 

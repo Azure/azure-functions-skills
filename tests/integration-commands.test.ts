@@ -266,6 +266,65 @@ describe('CLI command integration', () => {
     expect(codexHooks).not.toContain('bash -c');
   });
 
+  it('install --dry-run plans plugin install plus workspace activation with MCP and hooks', () => {
+    const projectDir = makeTempDir('af-skills-e2e-install-dry-run-');
+
+    const output = runCliOutput([
+      'install',
+      '--agent', 'ghcp',
+      '--dir', projectDir,
+      '--dry-run',
+    ]);
+
+    expect(output).toContain('Planned install');
+    expect(output).toContain('Plugin:');
+    expect(output).toContain('copilot plugin marketplace add Azure/azure-functions-skills');
+    expect(output).toContain('Workspace:');
+    expect(output).toContain('.github/copilot-instructions.md');
+    expect(output).toContain('.vscode/mcp.json');
+    expect(output).toContain('.github/hooks/welcome-setup.json');
+    expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
+  });
+
+  it('install --local performs the full workspace setup compatibility flow', () => {
+    const projectDir = makeTempDir('af-skills-e2e-install-local-');
+    const expectedSkillIds = templateSkillIds();
+    const expectedAgentFiles = templateAgentFiles();
+
+    runCli(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--skip-prerequisites']);
+
+    assertWorkspaceLayout(projectDir, 'ghcp', expectedSkillIds, expectedAgentFiles);
+  });
+
+  it('install passes host CLI arguments through for a single agent dry-run', () => {
+    const projectDir = makeTempDir('af-skills-e2e-install-passthrough-');
+
+    const output = runCliOutput([
+      'install',
+      '--agent', 'ghcp',
+      '--dir', projectDir,
+      '--dry-run',
+      '--',
+      '--verbose',
+    ]);
+
+    expect(output).toContain('copilot plugin install azure-functions-skills@azure-functions-skills --verbose');
+  });
+
+  it('install rejects passthrough arguments with multiple agents', () => {
+    const projectDir = makeTempDir('af-skills-e2e-install-passthrough-multi-');
+
+    expect(() => runCliOutput([
+      'install',
+      '--agent', 'ghcp',
+      '--agent', 'codex',
+      '--dir', projectDir,
+      '--dry-run',
+      '--',
+      '--verbose',
+    ])).toThrow(/Cannot use passthrough arguments with multiple agents/);
+  });
+
   it('plugin install --dry-run prints plugin and workspace activation plans without writing files', () => {
     const projectDir = makeTempDir('af-skills-e2e-plugin-install-dry-run-');
 
@@ -330,10 +389,8 @@ describe('CLI command integration', () => {
     expect(existsSync(join(projectDir, '.agents', 'plugins', 'marketplace.json'))).toBe(false);
   });
 
-  it('chat auto-installs each target workspace layout before launching the selected agent', () => {
+  it('chat launches the selected agent without installing workspace files', () => {
     const fakeBinDir = createFakeAgentCliDirectory();
-    const expectedSkillIds = templateSkillIds();
-    const expectedAgentFiles = templateAgentFiles();
     const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
     const pathext = process.platform === 'win32'
       ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
@@ -350,7 +407,9 @@ describe('CLI command integration', () => {
         },
       });
 
-      assertWorkspaceLayout(projectDir, setupTarget, expectedSkillIds, expectedAgentFiles);
+      if (setupTarget === 'ghcp') expect(existsSync(join(projectDir, '.github', 'skills'))).toBe(false);
+      if (setupTarget === 'claude') expect(existsSync(join(projectDir, '.claude', 'skills'))).toBe(false);
+      if (setupTarget === 'codex') expect(existsSync(join(projectDir, '.agents', 'skills'))).toBe(false);
     }
   });
 

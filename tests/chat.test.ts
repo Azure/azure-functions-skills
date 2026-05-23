@@ -223,10 +223,10 @@ describe('detectCliAgents', () => {
   });
 });
 
-// ─── Auto-setup tests ───
+// ─── Launcher-only chat tests ───
 
-describe('chat auto-setup', () => {
-  it('auto-installs ghcp skills when not present', async () => {
+describe('chat launcher-only behavior', () => {
+  it('does not auto-install ghcp skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-ghcp-');
 
     try {
@@ -236,12 +236,11 @@ describe('chat auto-setup', () => {
       // Expected: copilot binary not found — that's fine
     }
 
-    // Skills should now be installed
-    expect(existsSync(join(testDir, '.github', 'copilot-instructions.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, '.github', 'copilot-instructions.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
-  it('auto-installs claude skills when not present', async () => {
+  it('does not auto-install claude skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-claude-');
 
     try {
@@ -252,11 +251,11 @@ describe('chat auto-setup', () => {
       // Expected: claude binary not found
     }
 
-    expect(existsSync(join(testDir, 'CLAUDE.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, 'CLAUDE.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
-  it('auto-installs codex skills when not present', async () => {
+  it('does not auto-install codex skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-codex-');
 
     try {
@@ -266,8 +265,8 @@ describe('chat auto-setup', () => {
       // Expected: codex binary not found
     }
 
-    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
   it('skips setup when skills are already present', async () => {
@@ -293,7 +292,7 @@ describe('chat auto-setup', () => {
     expect(contentAfter).toBe(contentBefore);
   }, 15000);
 
-  it('checks Azure Skills prerequisites before launching GitHub Copilot', async () => {
+  it('does not install Azure Skills prerequisites before launching GitHub Copilot', async () => {
     const testDir = makeTestDir('af-skills-chat-prereq-');
     const calls: string[] = [];
 
@@ -312,10 +311,6 @@ describe('chat auto-setup', () => {
       // Expected if the launcher is unavailable.
     }
 
-    expect(calls).toEqual([
-      'copilot plugin list',
-      'copilot plugin marketplace add microsoft/azure-skills',
-      'copilot plugin install azure@azure-skills',
-    ]);
+    expect(calls).toEqual([]);
   }, 15000);
 });

@@ -21,6 +21,8 @@ function printHelp() {
   @agent-loom/azure-functions-skills — AI assistant plugins for Azure Functions
 
   Commands:
+    install  Install plugin and workspace activation in one step
+    update   Update plugin and workspace activation in one step
     setup    Detect coding agents and install skill files into your project
     plugin install   Register Azure Functions Skills as a native plugin
     plugin update    Refresh plugin registration and workspace activation
@@ -35,6 +37,18 @@ function printHelp() {
     --as-plugin        Register as a native platform plugin (instead of copying files)
     --check-prerequisites  Check external prerequisites without installing them
     --skip-prerequisites   Skip external prerequisite checks
+
+  Options (install/update):
+    --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
+    --dir <path>       Target directory (default: current directory)
+    --local            Full workspace-local setup, equivalent to setup
+    --dry-run          Print planned install without writing files
+    --yes              Approve modifying existing instruction files without prompting
+    --source <name>    marketplace, github, or local (default: marketplace)
+    --scope <name>     workspace or user (default: workspace)
+    --no-mcp           Do not add workspace MCP files
+    --no-hooks         Do not add workspace hook files
+    -- <args...>       Pass remaining arguments to the host plugin install command for a single agent
 
   Options (workspace apply/update):
     --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
@@ -74,6 +88,7 @@ function printHelp() {
 
   Examples:
     npx @agent-loom/azure-functions-skills setup
+    npx @agent-loom/azure-functions-skills install --agent ghcp --dry-run
     npx @agent-loom/azure-functions-skills setup --as-plugin
     npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dry-run
     npx @agent-loom/azure-functions-skills workspace apply --agent codex --mode plugin-reference --dry-run
@@ -87,7 +102,90 @@ if (!command || command === '--help' || command === '-h') {
   process.exit(0);
 }
 
-if (command === 'setup') {
+if (command === 'install' || command === 'update') {
+  const separatorIndex = args.indexOf('--', 1);
+  const commandArgs = separatorIndex === -1 ? args.slice(1) : args.slice(1, separatorIndex);
+  const passthroughArgs = separatorIndex === -1 ? [] : args.slice(separatorIndex + 1);
+  const agents = [];
+  let dir = process.cwd();
+  let local = false;
+  let dryRun = false;
+  let yes = false;
+  let includeMcp = true;
+  let includeHooks = true;
+  let source = 'marketplace';
+  let scope = 'workspace';
+  let prerequisites = 'auto';
+
+  for (let i = 0; i < commandArgs.length; i++) {
+    if (commandArgs[i] === '--agent' && commandArgs[i + 1]) agents.push(commandArgs[++i]);
+    else if (commandArgs[i] === '--dir' && commandArgs[i + 1]) dir = commandArgs[++i];
+    else if (commandArgs[i] === '--local') local = true;
+    else if (commandArgs[i] === '--dry-run') dryRun = true;
+    else if (commandArgs[i] === '--yes') yes = true;
+    else if (commandArgs[i] === '--no-mcp') includeMcp = false;
+    else if (commandArgs[i] === '--no-hooks') includeHooks = false;
+    else if (commandArgs[i] === '--source' && commandArgs[i + 1]) source = commandArgs[++i];
+    else if (commandArgs[i] === '--scope' && commandArgs[i + 1]) scope = commandArgs[++i];
+    else if (commandArgs[i] === '--check-prerequisites') prerequisites = 'check-only';
+    else if (commandArgs[i] === '--skip-prerequisites') prerequisites = 'skip';
+  }
+
+  const detectedAgents = agents.length > 0 ? agents : await detectAgents();
+  if (passthroughArgs.length > 0 && detectedAgents.length !== 1) {
+    console.error('Cannot use passthrough arguments with multiple agents. Run one agent at a time.');
+    process.exit(1);
+  }
+
+  if (local) {
+    if (dryRun) {
+      console.log(`Planned local install:`);
+      for (const agent of detectedAgents) console.log(`  - ${agent}: workspace setup files`);
+    } else {
+      const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
+      console.log(result.welcomeMessage);
+    }
+  } else {
+    const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
+    const { applyWorkspace } = await import('../lib/setup/workspace.js');
+    const action = command;
+    const pluginResult = await runPluginOperation({
+      action,
+      agents: detectedAgents,
+      projectDir: dir,
+      dryRun,
+      source,
+      scope,
+      workspace: false,
+      yes,
+      passthroughArgs,
+    });
+    const workspaceResult = await applyWorkspace(dir, {
+      agents: detectedAgents,
+      mode: 'plugin-reference',
+      update: action === 'update',
+      dryRun,
+      yes,
+      includeMcp,
+      includeHooks,
+    });
+
+    if (dryRun) {
+      console.log(`Planned ${action}:`);
+      console.log('  Plugin:');
+      for (const step of pluginResult.steps) {
+        console.log(`    - ${step.target}: ${step.description}`);
+        for (const pluginCommand of step.commands || []) console.log(`        $ ${pluginCommand}`);
+      }
+      console.log('  Workspace:');
+      for (const file of workspaceResult.plannedFiles) console.log(`    - ${file}`);
+    } else {
+      console.log(`${action === 'install' ? 'Install' : 'Update'} complete.`);
+      console.log(`  Agents configured: ${detectedAgents.join(', ')}`);
+      console.log(`  Files written: ${workspaceResult.filesWritten}`);
+    }
+  }
+} else if (command === 'setup') {
   const agents = [];
   let dir = process.cwd();
   let asPlugin = false;

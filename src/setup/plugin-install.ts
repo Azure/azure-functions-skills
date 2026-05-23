@@ -46,6 +46,7 @@ export interface PluginOperationOptions {
   runner?: CommandRunner;
   platform?: NodeJS.Platform;
   yes?: boolean;
+  passthroughArgs?: string[];
 }
 
 export interface PluginOperationStep {
@@ -354,21 +355,29 @@ function unique(values: string[]): string[] {
 }
 
 function officialPluginCommands(target: BuildTargetName, options: PluginOperationOptions): PluginCommand[] {
+  const withPassthrough = (commands: PluginCommand[]): PluginCommand[] => appendPassthrough(commands, options.passthroughArgs || []);
   if (target === 'ghcp') {
-    return [
+    return withPassthrough([
       { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
       { command: 'copilot', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills'] },
-    ];
+    ]);
   }
 
   if (target === 'claude') {
-    return claudePluginCommands(options);
+    return withPassthrough(claudePluginCommands(options));
   }
 
-  return [
+  return withPassthrough([
     { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
     { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
-  ];
+  ]);
+}
+
+function appendPassthrough(commands: PluginCommand[], passthroughArgs: string[]): PluginCommand[] {
+  if (passthroughArgs.length === 0 || commands.length === 0) return commands;
+  return commands.map((pluginCommand, index) => index === commands.length - 1
+    ? { ...pluginCommand, args: [...pluginCommand.args, ...passthroughArgs] }
+    : pluginCommand);
 }
 
 function claudePluginCommands(options: PluginOperationOptions): PluginCommand[] {

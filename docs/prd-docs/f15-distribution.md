@@ -57,9 +57,30 @@ node lib/build/build.js --plugin-profile full
 
 Full profile includes MCP, hooks, and agent definitions for validation or advanced distribution scenarios.
 
-### 2. Workspace Activation
+### 2. One-Step Install And Workspace Activation
 
-Workspace activation adds project-local routing and optional surfaces after plugin install:
+The recommended first-run command combines host plugin install and workspace activation:
+
+```bash
+azure-functions-skills install --agent ghcp --dir ./app
+azure-functions-skills install --agent claude --dir ./app --yes
+azure-functions-skills install --agent codex --dir ./app --no-hooks
+```
+
+Default `install` behavior:
+
+- Installs/registers the host plugin.
+- Applies thin workspace routing in `plugin-reference` mode.
+- Adds workspace MCP and supported hooks by default.
+- Protects existing `CLAUDE.md` / `AGENTS.md`; CI can use `--yes`.
+- Supports `--local` for the previous full workspace-local setup behavior.
+- Supports single-agent passthrough after `--` for fast-moving host CLI options.
+
+`chat` is intentionally a launcher only. It does not install plugin or workspace files; users run `install` once, then `chat` for Azure Functions context.
+
+### 3. Advanced Workspace Activation
+
+Advanced users can run workspace activation directly:
 
 ```bash
 azure-functions-skills workspace apply --agent claude --mode plugin-reference --dry-run
@@ -74,7 +95,7 @@ Important instruction files are protected:
 - Existing Azure Functions managed blocks are idempotent and can be refreshed with `workspace update`.
 - `include-file` keeps important instruction files small by writing routing content under `.azure-functions-skills/`.
 
-### 3. Repo Templates
+### 4. Repo Templates
 
 Project-level instructions that developers copy into their repo:
 
@@ -95,7 +116,7 @@ Repo template content includes:
 - Language-specific guidance based on detected runtime
 - Links to relevant skills
 
-### 4. azd Templates (Future)
+### 5. azd Templates (Future)
 
 Integration with Azure Developer CLI templates:
 

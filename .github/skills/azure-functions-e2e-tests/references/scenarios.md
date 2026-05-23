@@ -189,21 +189,47 @@ Use noninteractive CLI modes whenever they can preserve the scenario contract. K
 
 ## Initial scenarios
 
-### `plugin-install-dry-run`
+### `install-dry-run`
 
 - Agent: `all`
 - Install mode: `plugin`
 - Priority: P0
-- Purpose: verify CLI-mediated plugin planning is non-destructive and matches documented host commands.
+- Purpose: verify CLI-mediated first-run planning is non-destructive and includes both host plugin commands and workspace activation.
 - Command contract:
-  1. Run `azure-functions-skills plugin install --agent ghcp --agent claude --agent codex --dir <scenario-workspace> --dry-run`.
+  1. Run `azure-functions-skills install --agent ghcp --agent claude --agent codex --dir <scenario-workspace> --dry-run`.
   2. Record planned GHCP, Claude, and Codex host commands.
-  3. Verify no workspace files are created.
+  3. Record planned workspace activation files, including default MCP/hooks.
+  4. Verify no workspace files are created.
 - Required checks:
   - Output includes GHCP `copilot plugin marketplace add` and `copilot plugin install` commands.
   - Output includes Claude plugin-from-source clone/validate or local-source validate commands.
   - Output includes Codex marketplace/add commands.
+  - Output includes workspace routing files and default MCP/hooks files.
   - Scenario workspace remains free of generated `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, and plugin settings files.
+
+### `install-local`
+
+- Agent: `github-copilot`, `claude-code`, `codex`
+- Install mode: `setup`
+- Priority: P1
+- Purpose: verify `install --local` remains the full workspace-local setup compatibility path.
+- Command contract:
+  1. Run `azure-functions-skills install --local --agent <target> --dir <scenario-workspace> --skip-prerequisites`.
+  2. Verify the same full workspace files expected from legacy `setup`.
+- Required checks:
+  - Full skill body directories are present for the target.
+  - Workspace MCP/hooks files match the full setup expectations.
+  - No host plugin install command is attempted.
+
+### `install-passthrough`
+
+- Agent: `github-copilot`, `claude-code`, `codex`
+- Install mode: `plugin`
+- Priority: P1
+- Purpose: verify `install -- <args>` can pass host CLI options for a single agent and rejects ambiguous multi-agent passthrough.
+- Required checks:
+  - Single-agent dry-run shows passthrough args on the final host plugin command.
+  - Multi-agent dry-run with passthrough fails with clear guidance to run one agent at a time.
 
 ### `workspace-activation-safety`
 
@@ -410,7 +436,8 @@ Every agent run should report the following surfaces, with direct file evidence 
 - Priority: P0
 - Purpose: verify README commands match actual CLI and supported agents.
 - Required checks:
-  - README plugin commands match current intended plugin flow.
+  - README primary first-run command is `azure-functions-skills install`, with low-level `plugin install` and `workspace apply` documented as advanced flows.
+  - README explains `chat` does not install or write workspace files.
   - README documents default skills-only plugin payload and opt-in workspace MCP/hooks.
   - README documents `workspace apply`, `workspace update`, `--yes`, and `include-file` behavior for existing `CLAUDE.md`/`AGENTS.md`.
   - README `setup` and `chat` examples use supported agent IDs and options.

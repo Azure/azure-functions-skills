@@ -66,7 +66,7 @@ Key caveats that affect classification:
 - If cwd drift nests one scenario under another, discard that evidence as harness-invalid and rerun; do not report a product failure.
 - GitHub Copilot chat and GitHub Copilot installed-plugin inspection use different discovery paths and agent id contracts. `setup --agent ghcp` is a setup target id; `chat --agent github-copilot` is the chat launcher id; `copilot --agent azure-functions-skills:functions-copilot` is the installed-plugin inspection id. Validate `chat-welcome-ghcp` through the normal `chat --agent github-copilot` launcher with headless Copilot passthrough or a workspace artifact; validate `plugin-install-ghcp` after cleanup/install with the qualified installed-plugin agent.
 - Subcommand help, Claude plugin validation, Codex plugin activation, and `azd` hook coverage have known CLI caveats. Use the detailed rules in [scenarios.md](references/scenarios.md) and report-schema checks rather than repeating them here.
-- F15 install/routing flows intentionally separate global plugin install from workspace activation. The default plugin payload is skills-only; MCP, hooks, and repo-local agent guidance must be validated through explicit workspace activation or full-profile scenarios, not assumed from default plugin install.
+- F15 install/routing flows intentionally separate global plugin payload from workspace activation. The default plugin payload is skills-only, while the user-facing `install` command performs plugin install plus workspace activation in one step. MCP/hooks are expected from `install` workspace activation by default, not from the global plugin payload alone.
 
 ## Execution policy
 
@@ -89,8 +89,8 @@ When the user asks to run or validate E2E tests:
    - If the CLI is missing, run and record the version/discovery command that proves it is missing, then mark all scenarios for that agent `blocked` rather than omitting them.
    - If plugin cleanup would mutate real user-level state, ask for approval before uninstalling/removing the target plugin or marketplace. Never silently delete config files. Prefer official CLI uninstall/remove commands over manual filesystem edits. If approval is unavailable, use a documented isolated config/profile location when the CLI supports one; otherwise mark the plugin cleanup check `blocked`.
    - Install or register `azure-functions-skills` using the documented flow for that mode.
-   - For CLI-mediated plugin flows, run `azure-functions-skills plugin install --dry-run` before destructive/global install attempts and record the planned host commands.
-   - For workspace activation flows, cover `workspace apply --dry-run`, existing `CLAUDE.md`/`AGENTS.md` refusal, `--yes`, `include-file`, and opt-in `--include-mcp`/`--include-hooks` behavior.
+   - For CLI-mediated first-run flows, run `azure-functions-skills install --dry-run` before destructive/global install attempts and record both planned host plugin commands and planned workspace activation files.
+   - For install/workspace activation flows, cover `install --yes`, `install --local`, passthrough after `--`, `workspace apply --dry-run`, existing `CLAUDE.md`/`AGENTS.md` refusal, `--yes`, `include-file`, and explicit `--include-mcp`/`--include-hooks` behavior.
    - Verify whether the dependent `azure-skills` surfaces are present or whether clear install guidance is shown.
    - Launch the actual coding-agent CLI with an inspection prompt. The prompt must ask it to report visible/usable `agents`, `skills`, `prompts`, `mcp`, `hooks`, plugin surfaces, and Azure Skills dependency surfaces. Treat missing agent-response evidence as `blocked` or `fail` according to the cause.
    - For `chat`, use the `azure-functions-skills chat` command itself as the launcher under test and follow the agent-specific proof method in [scenarios.md](references/scenarios.md). Direct agent commands are diagnostics only unless the scenario reference explicitly allows them.
