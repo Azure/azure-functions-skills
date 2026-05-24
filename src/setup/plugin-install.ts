@@ -259,6 +259,7 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
     for (const pluginCommand of officialPluginCommands(target, options)) {
       const commandResult = await runCommand(options, pluginCommand);
       if (commandResult.exitCode !== 0) {
+        if (isIdempotentPluginInstallFailure(pluginCommand, commandResult)) continue;
         throw new Error(`Plugin ${options.action} failed for ${target}: ${commandResult.stderr || commandResult.stdout}`);
       }
     }
@@ -271,6 +272,7 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
       mergeStrategy: 'managed-block',
       update: options.action === 'update',
       yes: options.yes,
+      includeAgent: true,
     });
     result.filesWritten += workspaceResult.filesWritten;
   }
@@ -381,34 +383,26 @@ function appendPassthrough(commands: PluginCommand[], passthroughArgs: string[])
 }
 
 function claudePluginCommands(options: PluginOperationOptions): PluginCommand[] {
-  const pluginPath = claudePluginPayloadPath(options);
-  if (options.source === 'local') {
-    return [{ command: 'claude', args: ['plugin', 'validate', pluginPath] }];
+  const marketplaceSource = options.source === 'local' ? PACKAGE_ROOT : 'Azure/azure-functions-skills';
+  const scope = claudeScope(options.scope);
+  const addMarketplace = { command: 'claude', args: ['plugin', 'marketplace', 'add', marketplaceSource, '--scope', scope] };
+
+  if (options.action === 'update') {
+    return [
+      addMarketplace,
+      { command: 'claude', args: ['plugin', 'marketplace', 'update', 'azure-functions-skills'] },
+      { command: 'claude', args: ['plugin', 'update', 'azure-functions-skills@azure-functions-skills', '--scope', scope] },
+    ];
   }
 
-  const cloneDir = claudeRepositoryCloneDir(options.projectDir);
-  const syncCommand = options.action === 'update'
-    ? { command: 'git', args: ['-C', cloneDir, 'pull', '--ff-only'] }
-    : { command: 'git', args: ['clone', 'https://github.com/Azure/azure-functions-skills.git', cloneDir] };
-
   return [
-    syncCommand,
-    { command: 'claude', args: ['plugin', 'validate', pluginPath] },
+    addMarketplace,
+    { command: 'claude', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills', '--scope', scope] },
   ];
 }
 
-function claudePluginPayloadPath(options: PluginOperationOptions): string {
-  if (options.source === 'local') return localPluginPayloadPath();
-  return join(claudeRepositoryCloneDir(options.projectDir), '.github', 'plugins', 'azure-functions-skills');
-}
-
-function claudeRepositoryCloneDir(projectDir: string): string {
-  return join(projectDir, '.azure-functions-skills', 'source', 'azure-functions-skills');
-}
-
-function localPluginPayloadPath(): string {
-  const repoPluginPath = join(PACKAGE_ROOT, '.github', 'plugins', 'azure-functions-skills');
-  return existsSync(repoPluginPath) ? repoPluginPath : getPluginDir('claude');
+function claudeScope(scope: PluginOperationScope | undefined): string {
+  return scope === 'user' ? 'user' : 'local';
 }
 
 function formatCommand(pluginCommand: PluginCommand): string {
@@ -418,6 +412,31 @@ function formatCommand(pluginCommand: PluginCommand): string {
 async function runCommand(options: PluginOperationOptions, pluginCommand: PluginCommand) {
   const runner = options.runner || defaultRunner;
   return runner(pluginCommand.command, pluginCommand.args, { cwd: options.projectDir });
+}
+
+function isIdempotentPluginInstallFailure(
+  pluginCommand: PluginCommand,
+  commandResult: { stdout?: string; stderr?: string },
+): boolean {
+  if (!isAzureFunctionsPluginCommand(pluginCommand)) return false;
+  const output = `${commandResult.stderr || ''}\n${commandResult.stdout || ''}`.toLowerCase();
+  return output.includes('already registered')
+    || output.includes('already installed')
+    || output.includes('already exists');
+}
+
+function isAzureFunctionsPluginCommand(pluginCommand: PluginCommand): boolean {
+  const commandText = formatCommand(pluginCommand).toLowerCase();
+  if (!commandText.includes('azure-functions-skills')) return false;
+  if (pluginCommand.command === 'copilot') {
+    return commandText.startsWith('copilot plugin marketplace add')
+      || commandText.startsWith('copilot plugin install');
+  }
+  if (pluginCommand.command === 'codex') {
+    return commandText.startsWith('codex plugin marketplace add')
+      || commandText.startsWith('codex plugin add');
+  }
+  return false;
 }
 
 async function defaultRunner(command: string, args: string[]) {

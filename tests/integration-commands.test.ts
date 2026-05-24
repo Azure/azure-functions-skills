@@ -281,9 +281,39 @@ describe('CLI command integration', () => {
     expect(output).toContain('copilot plugin marketplace add Azure/azure-functions-skills');
     expect(output).toContain('Workspace:');
     expect(output).toContain('.github/copilot-instructions.md');
+    expect(output).toContain('.github/agents/functions-copilot.agent.md');
     expect(output).toContain('.vscode/mcp.json');
     expect(output).toContain('.github/hooks/welcome-setup.json');
     expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
+  });
+
+  it('prints focused help for top-level help and command help forms', () => {
+    const installHelp = runCliOutput(['help', 'install']);
+    const installFlagHelp = runCliOutput(['install', '--help']);
+    const chatHelp = runCliOutput(['help', 'chat']);
+    const updateHelp = runCliOutput(['update', '--help']);
+
+    expect(installHelp).toContain('Usage: azure-functions-skills install');
+    expect(installHelp).toContain('--all');
+    expect(installHelp).toContain('--agent <name>');
+    expect(installFlagHelp).toBe(installHelp);
+    expect(chatHelp).toContain('Usage: azure-functions-skills chat');
+    expect(chatHelp).toContain('uses .azure-functions-skills state');
+    expect(updateHelp).toContain('Usage: azure-functions-skills update');
+    expect(updateHelp).toContain('uses existing state by default');
+  });
+
+  it('prints focused help for nested plugin and workspace commands', () => {
+    const pluginHelp = runCliOutput(['plugin', 'install', '--help']);
+    const workspaceHelp = runCliOutput(['workspace', 'apply', '--help']);
+    const stateHelp = runCliOutput(['state', 'setup-complete', '--help']);
+
+    expect(pluginHelp).toContain('Usage: azure-functions-skills plugin install');
+    expect(pluginHelp).toContain('--no-workspace');
+    expect(workspaceHelp).toContain('Usage: azure-functions-skills workspace apply');
+    expect(workspaceHelp).toContain('--include-agent');
+    expect(stateHelp).toContain('Usage: azure-functions-skills state setup-complete');
+    expect(stateHelp).toContain('--agent <name>');
   });
 
   it('install --local performs the full workspace setup compatibility flow', () => {
@@ -325,6 +355,75 @@ describe('CLI command integration', () => {
     ])).toThrow(/Cannot use passthrough arguments with multiple agents/);
   });
 
+  it('install without --agent or --all fails clearly in noninteractive mode', () => {
+    const projectDir = makeTempDir('af-skills-e2e-install-no-agent-');
+
+    expect(() => runCliOutput([
+      'install',
+      '--dir', projectDir,
+      '--dry-run',
+    ])).toThrow(/Choose an agent with --agent <name> or use --all/);
+  });
+
+  it('install --all writes state, state-only gitignore entry, and next-step summary', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-install-all-state-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+
+    const output = runCliOutput([
+      'install',
+      '--all',
+      '--dir', projectDir,
+      '--yes',
+    ], {
+      env: {
+        PATH: pathValue,
+        Path: pathValue,
+        ...(pathext ? { PATHEXT: pathext } : {}),
+      },
+    });
+
+    const state = JSON.parse(readFileSync(join(projectDir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      agents: Record<string, { installed: boolean }>;
+      chat: { defaultAgent: string | null };
+    };
+    const gitignoreLines = readFileSync(join(projectDir, '.gitignore'), 'utf-8').split(/\r?\n/).map(line => line.trim());
+    expect(output).toContain('Azure Functions Skills installed');
+    expect(output).toContain('Installed agents: ghcp, claude, codex');
+    expect(output).toContain('Next: azure-functions-skills chat --dir');
+    expect(state.agents.ghcp.installed).toBe(true);
+    expect(state.agents.claude.installed).toBe(true);
+    expect(state.agents.codex.installed).toBe(true);
+    expect(state.chat.defaultAgent).toBe(null);
+    expect(gitignoreLines).toContain('.azure-functions-skills/state.local.json');
+    expect(gitignoreLines).not.toContain('.azure-functions-skills/');
+  });
+
+  it('update without --agent uses installed agents from state', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-update-state-agent-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes'], { env });
+    const output = runCliOutput(['update', '--dir', projectDir, '--dry-run'], { env });
+
+    expect(output).toContain('Planned update');
+    expect(output).toContain('- ghcp:');
+    expect(output).not.toContain('- claude:');
+    expect(output).not.toContain('- codex:');
+  });
+
   it('plugin install --dry-run prints plugin and workspace activation plans without writing files', () => {
     const projectDir = makeTempDir('af-skills-e2e-plugin-install-dry-run-');
 
@@ -349,7 +448,7 @@ describe('CLI command integration', () => {
     expect(existsSync(join(projectDir, '.github', 'copilot', 'settings.json'))).toBe(false);
   });
 
-  it('plugin install --dry-run shows Claude plugin-from-source payload loading', () => {
+  it('plugin install --dry-run shows Claude marketplace install commands', () => {
     const projectDir = makeTempDir('af-skills-e2e-plugin-install-claude-dry-run-');
 
     const output = runCliOutput([
@@ -361,10 +460,8 @@ describe('CLI command integration', () => {
     ]);
 
     expect(output).toContain('Planned plugin install');
-    expect(output).toContain('git clone https://github.com/Azure/azure-functions-skills.git');
-    expect(output).toContain('.github');
-    expect(output).toContain('plugins');
-    expect(output).toContain('claude plugin validate');
+    expect(output).toContain('claude plugin marketplace add Azure/azure-functions-skills --scope local');
+    expect(output).toContain('claude plugin install azure-functions-skills@azure-functions-skills --scope local');
     expect(output).toContain('workspace activation');
     expect(existsSync(join(projectDir, 'CLAUDE.md'))).toBe(false);
   });
@@ -493,5 +590,57 @@ describe('CLI command integration', () => {
     });
 
     expect(readFileSync(argsFile, 'utf-8').trim()).toBe('--help hello');
+  });
+
+  it('chat uses state to select the installed agent and prompts setup only until setup-complete', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-state-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes'], { env });
+  writeFileSync(argsFile, '');
+    runCli(['chat', '--dir', projectDir, '--prompt', 'hello', '--skip-prerequisites'], { env });
+
+    const firstArgs = readFileSync(argsFile, 'utf-8');
+    expect(firstArgs).toContain('--agent functions-copilot');
+    expect(firstArgs).toContain('First run azure-functions-setup');
+
+    const completeOutput = runCliOutput(['state', 'setup-complete', '--dir', projectDir, '--agent', 'github-copilot']);
+    expect(completeOutput).toContain('Setup skill marked complete');
+    writeFileSync(argsFile, '');
+
+    runCli(['chat', '--dir', projectDir, '--prompt', 'hello', '--skip-prerequisites'], { env });
+    const secondArgs = readFileSync(argsFile, 'utf-8');
+    expect(secondArgs).toContain('--agent functions-copilot');
+    expect(secondArgs).not.toContain('First run azure-functions-setup');
+  });
+
+  it('chat without --agent fails in noninteractive mode when state is ambiguous', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-ambiguous-state-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--all', '--dir', projectDir, '--yes'], { env });
+
+    expect(() => runCliOutput(['chat', '--dir', projectDir, '--skip-prerequisites'], { env }))
+      .toThrow(/Multiple agents are installed/);
   });
 });

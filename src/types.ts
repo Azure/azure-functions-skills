@@ -6,6 +6,7 @@ export type CliAgentName = BuildTargetName;
 export type LauncherId = 'github-copilot' | 'claude-code' | 'codex';
 export type WorkspaceMode = 'minimal' | 'copy' | 'plugin-reference';
 export type MergeStrategy = 'managed-block' | 'include-file' | 'fail-if-exists' | 'append';
+export type PluginInstallMode = 'plugin' | 'local';
 
 export interface Skill {
   id: string;
@@ -100,6 +101,8 @@ export interface ChatOptions {
   passthroughArgs?: string[];
   prerequisites?: PrerequisiteMode;
   prerequisiteRunner?: CommandRunner;
+  setupSkillPending?: boolean;
+  setupCompleteCommand?: string;
 }
 
 export interface ChatResult {

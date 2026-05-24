@@ -24,6 +24,11 @@ type ResolveLauncherOptions = {
   env?: NodeJS.ProcessEnv;
 };
 
+type StartupPromptOptions = {
+  setupSkillPending?: boolean;
+  setupCompleteCommand?: string;
+};
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = join(__dirname, '..', '..', 'templates', 'prompts');
 
@@ -34,7 +39,7 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
     command: 'copilot',
     buildArgs: (ctx) => {
       const passthroughArgs = ctx.passthroughArgs || [];
-      const args = ['--agent', 'functions-copilot', ...passthroughArgs];
+      const args = ['--experimental', '--agent', 'functions-copilot', ...passthroughArgs];
       if (ctx.startupPrompt && !hasCopilotPromptArg(passthroughArgs)) args.push('-i', ctx.startupPrompt);
       return args;
     },
@@ -67,6 +72,8 @@ function hasCopilotPromptArg(args: string[]): boolean {
 function insertClaudePrompt(args: string[], startupPrompt: string): void {
   const printIndex = args.findIndex(arg => arg === '-p' || arg === '--print');
   if (printIndex >= 0) {
+    const nextArg = args[printIndex + 1];
+    if (nextArg && !nextArg.startsWith('-')) return;
     args.splice(printIndex + 1, 0, startupPrompt);
     return;
   }
@@ -116,7 +123,7 @@ function detectProject(dir: string): { language: string; hasHostJson: true } | n
  * @param {string} dir - Project directory to analyze
  * @returns {Promise<string>}
  */
-export async function buildStartupPrompt(dir: string): Promise<string> {
+export async function buildStartupPrompt(dir: string, options: StartupPromptOptions = {}): Promise<string> {
   const templatePath = join(PROMPTS_DIR, 'startup.md');
   let template = await readFile(templatePath, 'utf8');
 
@@ -149,6 +156,10 @@ export async function buildStartupPrompt(dir: string): Promise<string> {
   template = template.replaceAll('{{skillList}}', skillList);
   template = template.replaceAll('{{suggestedActions}}', suggestedActions);
 
+  if (options.setupSkillPending) {
+    return `${setupInstruction(options.setupCompleteCommand)}\n\n${template}`;
+  }
+
   return template;
 }
 
@@ -172,7 +183,10 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
     throw new Error(`Unknown agent: ${agentId}. Available: ${Object.keys(LAUNCHERS).join(', ')}`);
   }
 
-  const startupPrompt = options.prompt || await buildStartupPrompt(dir);
+  const basePrompt = options.prompt || await buildStartupPrompt(dir);
+  const startupPrompt = options.setupSkillPending
+    ? `${setupInstruction(options.setupCompleteCommand)} ${basePrompt}`
+    : basePrompt;
   const args = launcher.buildArgs({ startupPrompt, passthroughArgs: options.passthroughArgs });
   const resolvedLauncher = resolveLauncherCommand(launcher.command);
 
@@ -195,6 +209,15 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
       resolve({ childProcess: child, agent: agentId, prompt: startupPrompt });
     });
   });
+}
+
+function setupInstruction(setupCompleteCommand: string | undefined): string {
+  const completeCommand = setupCompleteCommand || 'azure-functions-skills state setup-complete --dir .';
+  return [
+    'First run azure-functions-setup before other Azure Functions Skills workflows in this workspace.',
+    `After azure-functions-setup completes, run: ${completeCommand}.`,
+    'If that command is unavailable, update .azure-functions-skills/state.local.json directly: set setupSkill to { "status": "completed", "completedAt": the current ISO-8601 time, "completedBy": the active agent }, preserve the rest of the file, and update workspace.updatedAt.',
+  ].join(' ');
 }
 
 async function pickAgent(): Promise<LauncherId> {

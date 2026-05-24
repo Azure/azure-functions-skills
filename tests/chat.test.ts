@@ -52,6 +52,18 @@ describe('buildStartupPrompt', () => {
     expect(prompt).toContain('azure-functions-deploy');
     expect(prompt).toContain('Azure Skills plugin');
   });
+
+  it('includes direct state-file fallback when setup completion command is unavailable', async () => {
+    const prompt = await buildStartupPrompt(DIST_DIR, {
+      setupSkillPending: true,
+      setupCompleteCommand: 'azure-functions-skills state setup-complete --dir "Q:/workspace" --agent github-copilot',
+    });
+
+    expect(prompt).toContain('azure-functions-skills state setup-complete --dir');
+    expect(prompt).toContain('If that command is unavailable');
+    expect(prompt).toContain('.azure-functions-skills/state.local.json');
+    expect(prompt).toContain('"status": "completed"');
+  });
 });
 
 // ─── Launcher config tests ───
@@ -63,8 +75,9 @@ describe('LAUNCHERS', () => {
     expect(LAUNCHERS['codex']).toBeTruthy();
   });
 
-  it('ghcp launcher uses --agent and copilot -i flag', () => {
+  it('ghcp launcher enables workspace agents and uses copilot -i flag', () => {
     const args = LAUNCHERS['github-copilot'].buildArgs({ startupPrompt: 'hello' });
+    expect(args).toContain('--experimental');
     expect(args).toContain('--agent');
     expect(args).toContain('functions-copilot');
     expect(args).toContain('-i');
@@ -77,7 +90,7 @@ describe('LAUNCHERS', () => {
       passthroughArgs: ['-p', 'headless', '--yolo', '--output-format', 'json'],
     });
 
-    expect(args).toEqual(['--agent', 'functions-copilot', '-p', 'headless', '--yolo', '--output-format', 'json']);
+    expect(args).toEqual(['--experimental', '--agent', 'functions-copilot', '-p', 'headless', '--yolo', '--output-format', 'json']);
   });
 
   it('claude launcher passes prompt as first arg', () => {
@@ -92,6 +105,15 @@ describe('LAUNCHERS', () => {
     });
 
     expect(args).toEqual(['-p', 'hello', '--permission-mode', 'bypassPermissions']);
+  });
+
+  it('claude launcher preserves an explicit print prompt from passthrough args', () => {
+    const args = LAUNCHERS['claude-code'].buildArgs({
+      startupPrompt: 'startup',
+      passthroughArgs: ['-p', 'headless prompt', '--output-format', 'json'],
+    });
+
+    expect(args).toEqual(['-p', 'headless prompt', '--output-format', 'json']);
   });
 
   it('codex launcher passes prompt as first arg', () => {

@@ -18,7 +18,17 @@ npx @agent-loom/azure-functions-skills install --agent ghcp --dir ./my-app --dry
 npx @agent-loom/azure-functions-skills install --agent ghcp --dir ./my-app
 ```
 
+When `--agent` is omitted, interactive terminals ask which agent to install. In CI or other non-interactive shells, pass `--agent ghcp`, `--agent claude`, `--agent codex`, or `--all` explicitly.
+
 `install` adds workspace-local MCP/hooks by default because those files live in the target repo rather than in the global plugin payload. Use `--no-mcp` or `--no-hooks` for a smaller activation. Use `--source local` when testing the plugin payload from this checkout.
+
+`install` writes local state to `.azure-functions-skills/state.local.json` so future `chat` and `update` commands can use the same agent selection. The state file intentionally stores no secrets. With `--yes`, the CLI also adds only this state file to `.gitignore`:
+
+```gitignore
+.azure-functions-skills/state.local.json
+```
+
+It does not ignore the whole `.azure-functions-skills/` directory, because include-file routing docs under that directory may be useful to commit.
 
 GitHub Copilot CLI:
 
@@ -73,22 +83,22 @@ After installing, ask your agent:
 @functions-copilot set up Azure Functions
 ```
 
-With GitHub Copilot CLI, select the Functions agent explicitly:
+With GitHub Copilot CLI, launch through the wrapper so the workspace agent and Azure Functions startup context are selected consistently:
 
 ```bash
-copilot --agent functions-copilot
+npx @agent-loom/azure-functions-skills chat --dir ./my-app
 ```
 
 For a one-shot prompt:
 
 ```bash
-copilot --agent functions-copilot -p "Explain what Azure Functions Skills can do and which workflow I should start with."
+npx @agent-loom/azure-functions-skills chat --dir ./my-app -- -p "Explain what Azure Functions Skills can do and which workflow I should start with."
 ```
 
 If you intentionally want the session to run without permission prompts, add `--yolo`:
 
 ```bash
-copilot --agent functions-copilot --yolo
+npx @agent-loom/azure-functions-skills chat --dir ./my-app -- --yolo
 ```
 
 For a guided overview first, ask:
@@ -104,7 +114,7 @@ See [docs/usage-scenarios.md](docs/usage-scenarios.md) for customer-friendly sce
 | Option | Use when | What it does |
 | --- | --- | --- |
 | `install` | You are setting up Azure Functions Skills for a repo | Runs plugin install and workspace activation together. |
-| `chat` | You want to launch a CLI agent with Azure Functions context | Starts the selected CLI agent with the Azure Functions startup prompt. It does not install files. |
+| `chat` | You want to launch a CLI agent with Azure Functions context | Starts the state-selected or explicitly selected CLI agent with the Azure Functions startup prompt. It does not install files. |
 | `workspace apply` | You installed the plugin and need repo-local routing or opt-in MCP/hooks | Writes thin routing blocks and optional workspace files without copying skill bodies. |
 | `plugin install` | You need advanced control over host plugin installation only | Runs the host plugin install flow without being the recommended first-run command. |
 | `install --local` | Your agent does not support plugins or you need full workspace-local fallback | Copies agent instructions, skills, hooks, and MCP config into the target workspace. |
@@ -124,7 +134,7 @@ Or install globally:
 ```bash
 npm install -g @agent-loom/azure-functions-skills
 azure-functions-skills chat
-azure-functions-skills install
+azure-functions-skills install --agent ghcp
 ```
 
 Useful options:
@@ -134,12 +144,14 @@ npx @agent-loom/azure-functions-skills chat --agent github-copilot --dir ./my-ap
 npx @agent-loom/azure-functions-skills chat --prompt "Create an HTTP trigger function"
 npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app -- exec --sandbox read-only --json
 npx @agent-loom/azure-functions-skills install --agent ghcp --dir ./my-app
+npx @agent-loom/azure-functions-skills install --all --dir ./my-app --yes
 npx @agent-loom/azure-functions-skills install --local --agent ghcp --dir ./my-app --skip-prerequisites
+npx @agent-loom/azure-functions-skills state setup-complete --dir ./my-app --agent github-copilot
 npx @agent-loom/azure-functions-skills workspace apply --agent codex --dir ./my-app --mode plugin-reference --yes
 npx @agent-loom/azure-functions-skills workspace update --agent claude --dir ./my-app --mode plugin-reference --yes
 ```
 
-`chat` launches the selected agent CLI and forwards extra arguments to that CLI. Use `--` to make the boundary explicit. Unrecognized `chat` options are also forwarded for compatibility with agent-specific flags. `install` does not launch an agent; it prepares the plugin and workspace once.
+`chat` launches the state-selected or explicitly selected agent CLI and forwards extra arguments to that CLI. Use `--` to make the boundary explicit. Unrecognized `chat` options are also forwarded for compatibility with agent-specific flags. `install` does not launch an agent; it prepares the plugin, workspace, and local state once. On first chat launch after install, the startup context asks the agent to run `azure-functions-setup`; after it completes, mark that with `state setup-complete` so later chats skip the setup prompt.
 
 Headless examples:
 

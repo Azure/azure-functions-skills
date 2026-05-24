@@ -91,6 +91,7 @@ function activationFiles(agent: CliAgentName, mode: WorkspaceMode, options: Work
   const files: PlannedFile[] = [];
   if (agent === 'ghcp') {
     files.push({ path: '.github/copilot-instructions.md', content: routingBlock(agent), merge: true });
+    if (options.includeAgent) files.push({ path: '.github/agents/functions-copilot.agent.md', content: ghcpAgentDefinition() });
     if (mode === 'plugin-reference') files.push({ path: '.github/copilot/settings.json', content: JSON.stringify(ghcpPluginSettings(), null, 2) });
     if (options.includeMcp) files.push({ path: '.vscode/mcp.json', content: JSON.stringify(ghcpMcpSettings(), null, 2) });
     if (options.includeHooks) files.push({ path: '.github/hooks/welcome-setup.json', content: JSON.stringify(crossPlatformHooks(), null, 2) });
@@ -192,6 +193,10 @@ function includeInstructionPath(filePath: string): string {
 function routingBlock(agent: CliAgentName): string {
   const template = readFileSync(join(TEMPLATES_DIR, 'routing', `${agent}.md`), 'utf-8');
   return template.replace('{{skills}}', skillRoutingList()).trimEnd();
+}
+
+function ghcpAgentDefinition(): string {
+  return readFileSync(join(TEMPLATES_DIR, 'agents', 'functions-copilot.agent.md'), 'utf-8').trimEnd();
 }
 
 function skillRoutingList(): string {
