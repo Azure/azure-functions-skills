@@ -131,6 +131,32 @@ Options:
   --dir <path>       Target directory (default: current directory)
   --agent <name>     Agent that completed setup: github-copilot, claude-code, codex
 `,
+  doctor: `Usage: azure-functions-skills doctor [options]
+
+Analyze workspace code and configuration for common Azure Functions issues.
+Runs built-in checks by default; add --deep for AI-powered analysis.
+
+Exit codes:
+  0  All checks passed
+  1  Problems found at or above --severity threshold
+  2  Doctor command itself failed (not a code/config problem)
+
+Options:
+  --dir <path>        Target workspace (default: cwd)
+  --deep              Enable AI agent analysis (Tier 2)
+  --no-deep           Skip AI analysis, run built-in checks only
+  --agent <name>      Agent for AI analysis: github-copilot, claude-code, codex
+  --timeout <seconds> Timeout for AI analysis (default: 300)
+  --format <type>     Output format: text, json, markdown (default: text)
+  --output <path>     Report file path (default: .azure-functions-skills/doctor-report.json)
+  --checks <names>    Comma-separated check names to run
+  --severity <level>  Minimum severity to fail: critical, high, medium, low (default: high)
+
+Examples:
+  azure-functions-skills doctor                      # Built-in checks
+  azure-functions-skills doctor --deep               # AI analysis included
+  azure-functions-skills doctor --no-deep --format json  # CI mode
+`,
 };
 
 function printHelp() {
@@ -138,6 +164,7 @@ function printHelp() {
   @agent-loom/azure-functions-skills — AI assistant plugins for Azure Functions
 
   Commands:
+    doctor   Analyze project code and configuration for common issues
     install  Install plugin and workspace activation in one step
     update   Update plugin and workspace activation in one step
     setup    Detect coding agents and install skill files into your project
@@ -224,6 +251,13 @@ function printCommandHelp(topic) {
     process.exit(1);
   }
   console.log(text);
+}
+
+/** Extract the value following a flag from args, e.g. getFlag('--dir') → '/path'. */
+function getFlag(flag) {
+  const idx = args.indexOf(flag);
+  if (idx === -1 || idx + 1 >= args.length) return undefined;
+  return args[idx + 1];
 }
 
 async function resolveInstallTargets({ action, agents, all, dir, readState, getInstalledTargets }) {
@@ -795,6 +829,46 @@ if (command === 'install' || command === 'update') {
     [join(import.meta.dirname, '..', 'lib', 'build', 'build.js'), ...args.slice(1)],
     { stdio: 'inherit' },
   );
+} else if (command === 'doctor') {
+  const { runDoctor, formatReport } = await import('../lib/doctor/index.js');
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { dirname } = await import('node:path');
+
+  const dir = getFlag('--dir') || process.cwd();
+  const deep = args.includes('--deep');
+  const noDeep = args.includes('--no-deep');
+  const agent = getFlag('--agent');
+  const timeout = parseInt(getFlag('--timeout') || '300', 10);
+  const format = getFlag('--format') || 'text';
+  const output = getFlag('--output') || join(dir, '.azure-functions-skills', 'doctor-report.json');
+  const checksArg = getFlag('--checks');
+  const checks = checksArg ? checksArg.split(',').map(s => s.trim()) : undefined;
+  const severity = getFlag('--severity') || 'high';
+
+  try {
+    const { report, exitCode } = await runDoctor({
+      dir,
+      deep: deep && !noDeep,
+      agent,
+      timeout,
+      format,
+      output,
+      checks,
+      severity,
+    });
+
+    console.log(formatReport(report, format));
+
+    // Write report file
+    const reportDir = dirname(output);
+    mkdirSync(reportDir, { recursive: true });
+    writeFileSync(output, JSON.stringify(report, null, 2));
+
+    process.exit(exitCode);
+  } catch (err) {
+    console.error(`Doctor failed: ${err.message}`);
+    process.exit(2);
+  }
 } else {
   console.error(`Unknown command: ${command}`);
   process.exit(1);
