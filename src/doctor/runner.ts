@@ -13,6 +13,7 @@ import type {
 import { ALL_CHECKS } from './checks.js';
 import { loadProjectContext } from './context.js';
 import { resolveStacks } from './stacks.js';
+import { buildDoctorPrompt, runAiAnalysis, mergeReports } from './ai-analysis.js';
 import { join } from 'node:path';
 
 const SEVERITY_ORDER: CheckSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
@@ -72,7 +73,7 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
   const results = await executeChecks(checksToRun, ctx);
 
   const summary = buildSummary(results, options.severity);
-  const report: DoctorReport = {
+  let report: DoctorReport = {
     version: 1,
     timestamp: new Date().toISOString(),
     workspace: options.dir,
@@ -84,7 +85,26 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
     summary,
   };
 
-  const exitCode = summary.status === 'fail' ? 1 : 0;
+  // Tier 2: AI analysis (when --deep is enabled)
+  if (options.deep && options.agent) {
+    const reportPath = join(
+      options.dir,
+      '.azure-functions-skills',
+      'doctor-ai-findings.json',
+    );
+    const prompt = buildDoctorPrompt(results, reportPath);
+    const timeoutMs = options.timeout * 1000;
+    const aiResult = await runAiAnalysis(
+      options.agent,
+      prompt,
+      reportPath,
+      options.dir,
+      timeoutMs,
+    );
+    report = mergeReports(report, aiResult.findings, options.agent, aiResult.durationMs);
+  }
+
+  const exitCode = report.summary.status === 'fail' ? 1 : 0;
   return { report, exitCode };
 }
 
