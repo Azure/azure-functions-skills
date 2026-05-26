@@ -7,6 +7,7 @@ export { runDoctor } from './runner.js';
 export type { RunResult } from './runner.js';
 export { formatReport } from './formatters.js';
 export { resolveStacks, parseStacksResponse, checkVersionStatus, getLanguageVersions } from './stacks.js';
+export { buildDoctorPrompt, buildAgentCommand, readAiReport, mergeReports, runAiAnalysis } from './ai-analysis.js';
 export type {
   CheckSeverity,
   CheckStatus,
