@@ -12,6 +12,8 @@ import type {
 } from './types.js';
 import { ALL_CHECKS } from './checks.js';
 import { loadProjectContext } from './context.js';
+import { resolveStacks } from './stacks.js';
+import { join } from 'node:path';
 
 const SEVERITY_ORDER: CheckSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
@@ -61,6 +63,11 @@ export interface RunResult {
 
 export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
   const ctx = await loadProjectContext(options.dir);
+
+  // Resolve stacks from API / cache / fallback
+  const cacheDir = join(options.dir, '.azure-functions-skills');
+  ctx.stacks = await resolveStacks({ cacheDir });
+
   const checksToRun = filterChecks(ALL_CHECKS, ctx, options.checks);
   const results = await executeChecks(checksToRun, ctx);
 

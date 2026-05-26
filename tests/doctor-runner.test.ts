@@ -49,7 +49,7 @@ describe('runDoctor', () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({
       name: 'test-func',
       main: 'index.js',
-      engines: { node: '>=20' },
+      engines: { node: '>=22' },
     }));
     writeFileSync(join(dir, 'index.js'), 'module.exports = {};');
     writeFileSync(join(dir, 'local.settings.json'), JSON.stringify({

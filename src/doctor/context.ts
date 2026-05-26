@@ -105,5 +105,6 @@ export async function loadProjectContext(dir: string): Promise<ProjectContext> {
     localSettings,
     packageJson,
     functions,
+    stacks: [],  // Resolved later by runner
   };
 }

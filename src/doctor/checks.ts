@@ -9,6 +9,7 @@ import {
   SUPPORTED_NODE_VERSIONS,
   DEPRECATED_SETTINGS,
 } from './rules.js';
+import { checkVersionStatus, getLanguageVersions } from './stacks.js';
 
 // ── Helper ──
 
@@ -22,6 +23,34 @@ function result(
     severity: check.defaultSeverity,
     ...overrides,
   };
+}
+
+function buildVersionResult(
+  check: DoctorCheck,
+  vStatus: import('./stacks.js').VersionStatus,
+  version: string,
+): DoctorCheckResult {
+  switch (vStatus.status) {
+    case 'supported':
+      return result(check, { status: 'pass', title: `Version ${version} supported`, message: vStatus.message });
+    case 'eol-soon':
+      return result(check, {
+        status: 'warn', severity: 'medium',
+        title: `Version ${version} nearing end of life`, message: vStatus.message,
+        recommendation: `Upgrade before ${vStatus.endOfLifeDate?.split('T')[0]}`,
+      });
+    case 'eol':
+    case 'deprecated':
+      return result(check, {
+        status: 'fail',
+        title: `Version ${version} ${vStatus.status === 'eol' ? 'end of life' : 'deprecated'}`,
+        message: vStatus.message, recommendation: 'Upgrade to a supported version',
+      });
+    case 'preview':
+      return result(check, { status: 'pass', severity: 'info', title: `Version ${version} is preview`, message: vStatus.message });
+    default:
+      return result(check, { status: 'fail', title: `Version ${version} unsupported`, message: vStatus.message });
+  }
 }
 
 // ── Check 1: project-exists ──
@@ -163,70 +192,152 @@ export const nodeVersionCheck: DoctorCheck = {
       })];
     }
 
-    // Extract major version from common patterns like ">=18.0.0", "^20.0.0", "18", "20.x"
     const majorMatch = nodeRange.match(/(\d+)/);
-    if (majorMatch) {
-      const major = parseInt(majorMatch[1], 10);
-      if (SUPPORTED_NODE_VERSIONS.includes(major)) {
-        return [result(nodeVersionCheck, {
-          status: 'pass',
-          title: 'Node.js version supported',
-          message: `Node.js ${major}.x is in the support range`,
-        })];
-      }
+    if (!majorMatch) {
       return [result(nodeVersionCheck, {
-        status: 'fail',
-        title: 'Node.js version unsupported',
-        message: `Node.js ${major}.x is not in the Azure Functions support range`,
-        file: 'package.json',
-        recommendation: `Use Node.js ${SUPPORTED_NODE_VERSIONS.join(' or ')}.x`,
+        status: 'pass',
+        title: 'Node.js version not determined',
+        message: `Could not parse engines.node value: ${nodeRange}`,
       })];
     }
 
+    const major = majorMatch[1];
+
+    // Use stacks API data when available, fallback to hardcoded
+    if (ctx.stacks.length > 0) {
+      const vStatus = checkVersionStatus(ctx.stacks, 'node', major);
+      switch (vStatus.status) {
+        case 'supported':
+          return [result(nodeVersionCheck, {
+            status: 'pass',
+            title: 'Node.js version supported',
+            message: vStatus.message,
+          })];
+        case 'eol-soon':
+          return [result(nodeVersionCheck, {
+            status: 'warn',
+            severity: 'medium',
+            title: 'Node.js version nearing end of life',
+            message: vStatus.message,
+            file: 'package.json',
+            recommendation: `Upgrade to a newer LTS version before ${vStatus.endOfLifeDate?.split('T')[0]}`,
+          })];
+        case 'eol':
+        case 'deprecated':
+          return [result(nodeVersionCheck, {
+            status: 'fail',
+            title: `Node.js ${major} ${vStatus.status === 'eol' ? 'end of life' : 'deprecated'}`,
+            message: vStatus.message,
+            file: 'package.json',
+            recommendation: `Upgrade to a supported Node.js version`,
+          })];
+        case 'preview':
+          return [result(nodeVersionCheck, {
+            status: 'pass',
+            severity: 'info',
+            title: 'Node.js version is in preview',
+            message: vStatus.message,
+          })];
+        case 'unknown':
+        default:
+          return [result(nodeVersionCheck, {
+            status: 'fail',
+            title: 'Node.js version unsupported',
+            message: vStatus.message,
+            file: 'package.json',
+            recommendation: `Use a supported Node.js version`,
+          })];
+      }
+    }
+
+    // Fallback to hardcoded
+    const majorNum = parseInt(major, 10);
+    if (SUPPORTED_NODE_VERSIONS.includes(majorNum)) {
+      return [result(nodeVersionCheck, {
+        status: 'pass',
+        title: 'Node.js version supported',
+        message: `Node.js ${major}.x is in the support range`,
+      })];
+    }
     return [result(nodeVersionCheck, {
-      status: 'pass',
-      title: 'Node.js version not determined',
-      message: `Could not parse engines.node value: ${nodeRange}`,
+      status: 'fail',
+      title: 'Node.js version unsupported',
+      message: `Node.js ${major}.x is not in the Azure Functions support range`,
+      file: 'package.json',
+      recommendation: `Use Node.js ${SUPPORTED_NODE_VERSIONS.join(' or ')}.x`,
     })];
   },
 };
 
-// ── Check 5–6: python-version and dotnet-version are placeholders for v1 ──
-// Language version checks require runtime detection beyond file markers.
-// Kept as skip-returning stubs to register the check IDs.
+// ── Check 5: python-version ──
 
 export const pythonVersionCheck: DoctorCheck = {
   id: 'python-version',
   category: 'configuration',
   defaultSeverity: 'high',
   appliesTo: (ctx) => ctx.language === 'python',
-  run: async () => [
-    {
-      id: 'python-version',
-      category: 'configuration',
-      severity: 'high' as const,
-      status: 'skip' as const,
+  run: async (ctx) => {
+    // Detect python version from local.settings.json PYTHON_VERSION or
+    // from .python-version file, or FUNCTIONS_WORKER_RUNTIME_VERSION
+    const values = ((ctx.localSettings as Record<string, unknown>)?.Values ?? {}) as Record<string, unknown>;
+    const pythonVersion = (values.PYTHON_VERSION as string) ?? null;
+
+    if (!pythonVersion && ctx.stacks.length === 0) {
+      return [result(pythonVersionCheck, {
+        status: 'skip',
+        title: 'Python version check',
+        message: 'Python version not specified and stacks API not available',
+      })];
+    }
+
+    if (!pythonVersion) {
+      // List supported versions from stacks API
+      const supported = getLanguageVersions(ctx.stacks, 'python')
+        .filter(v => !v.isDeprecated && !v.isPreview);
+      return [result(pythonVersionCheck, {
+        status: 'pass',
+        title: 'Python version not specified',
+        message: `Supported versions: ${supported.map(v => v.version).join(', ')}`,
+      })];
+    }
+
+    if (ctx.stacks.length > 0) {
+      const vStatus = checkVersionStatus(ctx.stacks, 'python', pythonVersion);
+      return [buildVersionResult(pythonVersionCheck, vStatus, pythonVersion)];
+    }
+
+    return [result(pythonVersionCheck, {
+      status: 'skip',
       title: 'Python version check',
-      message: 'Python version detection not yet implemented',
-    },
-  ],
+      message: 'Stacks API not available for version validation',
+    })];
+  },
 };
+
+// ── Check 6: dotnet-version ──
 
 export const dotnetVersionCheck: DoctorCheck = {
   id: 'dotnet-version',
   category: 'configuration',
   defaultSeverity: 'high',
   appliesTo: (ctx) => ctx.language === 'dotnet',
-  run: async () => [
-    {
-      id: 'dotnet-version',
-      category: 'configuration',
-      severity: 'high' as const,
-      status: 'skip' as const,
-      title: '.NET version check',
-      message: '.NET version detection not yet implemented',
-    },
-  ],
+  run: async (ctx) => {
+    if (ctx.stacks.length === 0) {
+      return [result(dotnetVersionCheck, {
+        status: 'skip',
+        title: '.NET version check',
+        message: 'Stacks API not available for version validation',
+      })];
+    }
+
+    const supported = getLanguageVersions(ctx.stacks, 'dotnet')
+      .filter(v => !v.isDeprecated && !v.isPreview);
+    return [result(dotnetVersionCheck, {
+      status: 'pass',
+      title: '.NET versions available',
+      message: `Supported: ${supported.map(v => v.version).join(', ')}`,
+    })];
+  },
 };
 
 // ── Check 7: local-settings ──

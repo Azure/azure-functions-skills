@@ -52,6 +52,7 @@ describe('Doctor types', () => {
       localSettings: { IsEncrypted: false, Values: {} },
       packageJson: { name: 'my-func', version: '1.0.0' },
       functions: [],
+      stacks: [],
     };
     expect(ctx.language).toBe('node');
     expect(ctx.hostJson).not.toBeNull();
@@ -91,6 +92,7 @@ describe('Doctor types', () => {
       localSettings: null,
       packageJson: null,
       functions: [],
+      stacks: [],
     };
 
     expect(check.appliesTo(ctx)).toBe(true);
