@@ -24,6 +24,29 @@ function acceptingRunner(): TestRunner {
   return runner;
 }
 
+function idempotentPluginRunner(): TestRunner {
+  const calls: Array<{ command: string; args: string[] }> = [];
+  const runner = (async (command, args) => {
+    calls.push({ command, args });
+    if (checkedToolName(command, args)) return { exitCode: 0, stdout: command, stderr: '' };
+    if (command === 'copilot' && args.join(' ') === 'plugin marketplace add Azure/azure-functions-skills') {
+      return { exitCode: 1, stdout: '', stderr: "Marketplace 'azure-functions-skills' already registered" };
+    }
+    if (command === 'copilot' && args.join(' ') === 'plugin install azure-functions-skills@azure-functions-skills') {
+      return { exitCode: 1, stdout: '', stderr: 'Plugin azure-functions-skills is already installed' };
+    }
+    if (command === 'codex' && args.join(' ') === 'plugin marketplace add Azure/azure-functions-skills') {
+      return { exitCode: 1, stdout: '', stderr: 'marketplace azure-functions-skills already exists' };
+    }
+    if (command === 'codex' && args.join(' ') === 'plugin add azure-functions-skills@azure-functions-skills') {
+      return { exitCode: 1, stdout: '', stderr: 'plugin azure-functions-skills already installed' };
+    }
+    return { exitCode: 0, stdout: 'ok\n', stderr: '' };
+  }) as TestRunner;
+  runner.calls = calls;
+  return runner;
+}
+
 function missingToolsRunner(missingTools: string[]): TestRunner {
   const calls: Array<{ command: string; args: string[] }> = [];
   const runner = (async (command, args) => {
@@ -130,7 +153,7 @@ describe('planPluginOperation', () => {
     expect(plan.steps.map(step => step.description).join('\n')).toContain('0.12.1');
   });
 
-  it('plans official plugin install commands for GHCP and Codex plus Claude plugin-from-source validation', () => {
+  it('plans official plugin install commands for GHCP, Claude, and Codex', () => {
     const plan = planPluginOperation({
       action: 'install',
       agents: ['ghcp', 'claude', 'codex'],
@@ -148,8 +171,8 @@ describe('planPluginOperation', () => {
         'copilot plugin install azure-functions-skills@azure-functions-skills',
       ]],
       ['claude', [
-        'git clone https://github.com/Azure/azure-functions-skills.git /workspace/project/.azure-functions-skills/source/azure-functions-skills',
-        'claude plugin validate /workspace/project/.azure-functions-skills/source/azure-functions-skills/.github/plugins/azure-functions-skills',
+        'claude plugin marketplace add Azure/azure-functions-skills --scope local',
+        'claude plugin install azure-functions-skills@azure-functions-skills --scope local',
       ]],
       ['codex', [
         'codex plugin marketplace add Azure/azure-functions-skills',
@@ -176,13 +199,43 @@ describe('planPluginOperation', () => {
       expect(installCalls).toEqual([
         { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'copilot', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills'] },
-        { command: 'git', args: ['clone', 'https://github.com/Azure/azure-functions-skills.git', join(dir, '.azure-functions-skills', 'source', 'azure-functions-skills')] },
-        { command: 'claude', args: ['plugin', 'validate', join(dir, '.azure-functions-skills', 'source', 'azure-functions-skills', '.github', 'plugins', 'azure-functions-skills')] },
+        { command: 'claude', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills', '--scope', 'local'] },
+        { command: 'claude', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills', '--scope', 'local'] },
         { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
       ]);
       expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+      expect(existsSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
       expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+      expect(result.filesWritten).toBeGreaterThan(0);
+    } finally {
+      removeDir(dir);
+    }
+  });
+
+  it('treats already-registered host plugin responses as idempotent install success', async () => {
+    const dir = createTempDir('af-skills-plugin-idempotent-install-');
+    const runner = idempotentPluginRunner();
+    try {
+      const result = await runPluginOperation({
+        action: 'install',
+        agents: ['ghcp', 'codex'],
+        projectDir: dir,
+        dryRun: false,
+        workspace: true,
+        runner,
+      });
+
+      const installCalls = runner.calls.filter(call => !checkedToolName(call.command, call.args));
+      expect(installCalls).toEqual([
+        { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
+        { command: 'copilot', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills'] },
+        { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
+        { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
+      ]);
+      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+      expect(existsSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
       expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
       expect(result.filesWritten).toBeGreaterThan(0);
     } finally {
@@ -192,7 +245,7 @@ describe('planPluginOperation', () => {
 
   it('reports missing Claude prerequisites with install guidance before running install commands', async () => {
     const dir = createTempDir('af-skills-plugin-missing-claude-');
-    const runner = missingToolsRunner(['git', 'claude']);
+    const runner = missingToolsRunner(['claude']);
     try {
       await expect(runPluginOperation({
         action: 'install',
@@ -201,7 +254,7 @@ describe('planPluginOperation', () => {
         dryRun: false,
         workspace: true,
         runner,
-      })).rejects.toThrow(/Cannot install Azure Functions Skills plugin for Claude Code[\s\S]*git[\s\S]*claude[\s\S]*https:\/\/git-scm\.com\/downloads[\s\S]*https:\/\/claude\.ai\/download/);
+      })).rejects.toThrow(/Cannot install Azure Functions Skills plugin for Claude Code[\s\S]*claude[\s\S]*https:\/\/claude\.ai\/download/);
 
       expect(runner.calls.some(call => call.command === 'git' && call.args[0] === 'clone')).toBe(false);
       expect(runner.calls.some(call => call.command === 'claude' && call.args[0] === 'plugin')).toBe(false);
@@ -245,18 +298,17 @@ describe('planPluginOperation', () => {
         runner,
       });
 
-      expect(runner.calls.slice(0, 2)).toEqual([
-        { command: 'sh', args: ['-c', 'command -v git'] },
+      expect(runner.calls.slice(0, 1)).toEqual([
         { command: 'sh', args: ['-c', 'command -v claude'] },
       ]);
       const installCalls = runner.calls.filter(call => !checkedToolName(call.command, call.args));
-      expect(installCalls.map(call => call.command)).toEqual(['git', 'claude']);
+      expect(installCalls.map(call => call.command)).toEqual(['claude', 'claude']);
     } finally {
       removeDir(dir);
     }
   });
 
-  it('uses the current repository plugin payload for Claude when source is local', () => {
+  it('uses the current repository marketplace for Claude when source is local', () => {
     const plan = planPluginOperation({
       action: 'install',
       agents: ['claude'],
@@ -267,10 +319,9 @@ describe('planPluginOperation', () => {
     });
 
     const command = plan.steps[0].commands?.[0] || '';
-    expect(command).toContain('claude plugin validate');
-    expect(command).toContain('.github');
-    expect(command).toContain('plugins');
-    expect(command).toContain('azure-functions-skills');
+    expect(command.replaceAll('\\', '/')).toContain('claude plugin marketplace add');
+    expect(command.replaceAll('\\', '/')).toContain('/azure-functions-skills --scope local');
+    expect(plan.steps[0].commands?.[1]).toBe('claude plugin install azure-functions-skills@azure-functions-skills --scope local');
   });
 
   it('plans plugin update without workspace activation when disabled', () => {

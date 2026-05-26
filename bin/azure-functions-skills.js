@@ -15,26 +15,159 @@ import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 const command = args[0];
+const TARGETS = ['ghcp', 'claude', 'codex'];
+const LAUNCHER_IDS = ['github-copilot', 'claude-code', 'codex'];
+
+const HELP_TEXT = {
+  install: `Usage: azure-functions-skills install [options]
+
+Install Azure Functions Skills plugin support and workspace activation.
+
+Options:
+  --agent <name>     Agent: ghcp, claude, codex (repeatable)
+  --all              Install all supported agents explicitly
+  --dir <path>       Target directory (default: current directory)
+  --local            Full workspace-local setup, equivalent to setup
+  --dry-run          Print planned install without writing files
+  --yes              Approve safe file updates such as managed blocks and state .gitignore entry
+  --source <name>    marketplace, github, or local (default: marketplace)
+  --scope <name>     workspace or user (default: workspace)
+  --no-mcp           Do not add workspace MCP files
+  --no-hooks         Do not add workspace hook files
+  -- <args...>       Pass remaining arguments to the host plugin install command for a single agent
+`,
+  update: `Usage: azure-functions-skills update [options]
+
+Update Azure Functions Skills; uses existing state by default.
+
+Options:
+  --agent <name>     Agent: ghcp, claude, codex (repeatable)
+  --all              Update all supported agents explicitly
+  --dir <path>       Target directory (default: current directory)
+  --local            Full workspace-local setup, equivalent to setup
+  --dry-run          Print planned update without writing files
+  --yes              Approve safe file updates such as managed blocks and state .gitignore entry
+  --source <name>    marketplace, github, or local (default: marketplace)
+  --scope <name>     workspace or user (default: workspace)
+  --no-mcp           Do not add workspace MCP files
+  --no-hooks         Do not add workspace hook files
+`,
+  chat: `Usage: azure-functions-skills chat [options] [-- <agent args...>]
+
+Launch a CLI coding agent with Azure Functions context. When --agent is omitted,
+chat uses .azure-functions-skills state to select the previously installed agent.
+
+Options:
+  --agent <name>     Agent: github-copilot, claude-code, codex
+  --prompt <text>    Custom prompt (overrides startup template)
+  --dir <path>       Working directory (default: current directory)
+  --check-prerequisites  Check external prerequisites without installing them
+  --skip-prerequisites   Skip external prerequisite checks
+  -- <args...>       Pass remaining arguments through to the selected agent CLI
+`,
+  'plugin install': `Usage: azure-functions-skills plugin install [options]
+
+Register Azure Functions Skills with the selected host plugin system.
+
+Options:
+  --agent <name>     Agent: ghcp, claude, codex (repeatable)
+  --dir <path>       Target directory (default: current directory)
+  --scope <name>     workspace or user (default: workspace)
+  --source <name>    marketplace, github, or local (default: marketplace)
+  --workspace        Apply workspace plugin-reference activation (default)
+  --no-workspace     Skip workspace activation
+  --dry-run          Print planned changes without writing files
+  --yes              Approve workspace activation changes to existing instruction files
+`,
+  'plugin update': `Usage: azure-functions-skills plugin update [options]
+
+Update Azure Functions Skills host plugin registration.
+
+Options:
+  --agent <name>     Agent: ghcp, claude, codex (repeatable)
+  --dir <path>       Target directory (default: current directory)
+  --scope <name>     workspace or user (default: workspace)
+  --source <name>    marketplace, github, or local (default: marketplace)
+  --workspace        Apply workspace plugin-reference activation (default)
+  --no-workspace     Skip workspace activation
+  --dry-run          Print planned changes without writing files
+  --yes              Approve workspace activation changes to existing instruction files
+`,
+  'workspace apply': `Usage: azure-functions-skills workspace apply [options]
+
+Apply Azure Functions routing and optional activation files to a workspace.
+
+Options:
+  --agent <name>     Agent: ghcp, claude, codex (repeatable)
+  --dir <path>       Target directory (default: current directory)
+  --mode <name>      minimal, copy, plugin-reference (default: copy)
+  --merge-strategy <name> managed-block, include-file, fail-if-exists, append
+  --dry-run          Print planned changes without writing files
+  --yes              Approve modifying existing instruction files without prompting
+  --include-agent    Add the GHCP functions-copilot workspace agent definition
+  --include-mcp      Add workspace MCP configuration files
+  --include-hooks    Add supported workspace hook files
+`,
+  'workspace update': `Usage: azure-functions-skills workspace update [options]
+
+Update existing Azure Functions managed workspace routing blocks.
+
+Options:
+  --agent <name>     Agent: ghcp, claude, codex (repeatable)
+  --dir <path>       Target directory (default: current directory)
+  --mode <name>      minimal, copy, plugin-reference (default: copy)
+  --merge-strategy <name> managed-block, include-file, fail-if-exists, append
+  --dry-run          Print planned changes without writing files
+  --yes              Approve modifying existing instruction files without prompting
+  --include-agent    Add the GHCP functions-copilot workspace agent definition
+  --include-mcp      Add workspace MCP configuration files
+  --include-hooks    Add supported workspace hook files
+`,
+  'state setup-complete': `Usage: azure-functions-skills state setup-complete [options]
+
+Mark the first-run azure-functions-setup skill as completed in local workspace state.
+
+Options:
+  --dir <path>       Target directory (default: current directory)
+  --agent <name>     Agent that completed setup: github-copilot, claude-code, codex
+`,
+};
 
 function printHelp() {
   console.log(`
   @agent-loom/azure-functions-skills — AI assistant plugins for Azure Functions
 
   Commands:
+    install  Install plugin and workspace activation in one step
+    update   Update plugin and workspace activation in one step
     setup    Detect coding agents and install skill files into your project
     plugin install   Register Azure Functions Skills as a native plugin
     plugin update    Refresh plugin registration and workspace activation
     workspace apply   Apply Azure Functions routing/activation files to a workspace
     workspace update  Update existing Azure Functions managed workspace routing blocks
     chat     Launch a CLI coding agent with Azure Functions Welcome prompt
+    state setup-complete  Mark first-run setup skill complete in local state
     build    Build plugin artifacts for all targets (ghcp, claude, codex)
 
   Options (setup):
     --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
+    --all              Install/update all supported agents explicitly
     --dir <path>       Target directory (default: current directory)
     --as-plugin        Register as a native platform plugin (instead of copying files)
     --check-prerequisites  Check external prerequisites without installing them
     --skip-prerequisites   Skip external prerequisite checks
+
+  Options (install/update):
+    --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
+    --dir <path>       Target directory (default: current directory)
+    --local            Full workspace-local setup, equivalent to setup
+    --dry-run          Print planned install without writing files
+    --yes              Approve modifying existing instruction files without prompting
+    --source <name>    marketplace, github, or local (default: marketplace)
+    --scope <name>     workspace or user (default: workspace)
+    --no-mcp           Do not add workspace MCP files
+    --no-hooks         Do not add workspace hook files
+    -- <args...>       Pass remaining arguments to the host plugin install command for a single agent
 
   Options (workspace apply/update):
     --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
@@ -44,6 +177,9 @@ function printHelp() {
     --update           Replace existing Azure Functions managed blocks
     --dry-run          Print planned changes without writing files
     --yes              Approve modifying existing instruction files without prompting
+    --include-agent    Add the GHCP functions-copilot workspace agent definition
+    --include-mcp      Add workspace MCP configuration files
+    --include-hooks    Add supported workspace hook files
 
   Options (plugin install/update):
     --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
@@ -57,7 +193,7 @@ function printHelp() {
     --yes              Approve workspace activation changes to existing instruction files
 
   Options (chat):
-    --agent <name>     Agent: github-copilot, claude-code, codex (auto-detected if omitted)
+    --agent <name>     Agent: github-copilot, claude-code, codex (state-selected if omitted)
     --prompt <text>    Custom prompt (overrides startup template)
     --dir <path>       Working directory (default: current directory)
     --as-plugin        Ensure plugin is registered before launching agent
@@ -72,6 +208,7 @@ function printHelp() {
 
   Examples:
     npx @agent-loom/azure-functions-skills setup
+    npx @agent-loom/azure-functions-skills install --agent ghcp --dry-run
     npx @agent-loom/azure-functions-skills setup --as-plugin
     npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dry-run
     npx @agent-loom/azure-functions-skills workspace apply --agent codex --mode plugin-reference --dry-run
@@ -80,12 +217,256 @@ function printHelp() {
   `);
 }
 
+function printCommandHelp(topic) {
+  const text = HELP_TEXT[topic];
+  if (!text) {
+    console.error(`Unknown help topic: ${topic}`);
+    process.exit(1);
+  }
+  console.log(text);
+}
+
+async function resolveInstallTargets({ action, agents, all, dir, readState, getInstalledTargets }) {
+  if (agents.length > 0 && all) {
+    console.error('Use either --agent <name> or --all, not both.');
+    process.exit(1);
+  }
+
+  if (agents.length > 0) return validateTargets(agents);
+  if (all) return TARGETS;
+
+  if (action === 'update') {
+    const state = readState(dir);
+    const installedTargets = state ? getInstalledTargets(state) : [];
+    if (installedTargets.length > 0) return installedTargets;
+  }
+
+  if (isInteractive()) return askTargetSelection(action);
+
+  const verb = action === 'install' ? 'install' : 'update';
+  console.error(`Choose an agent with --agent <name> or use --all to ${verb} every supported agent.`);
+  if (action === 'update') console.error('If this workspace was installed before, make sure .azure-functions-skills/state.local.json exists.');
+  process.exit(1);
+}
+
+function validateTargets(values) {
+  const invalid = values.filter(value => !TARGETS.includes(value));
+  if (invalid.length > 0) {
+    console.error(`Unknown agent: ${invalid.join(', ')}. Available: ${TARGETS.join(', ')}`);
+    process.exit(1);
+  }
+  return [...new Set(values)];
+}
+
+async function askTargetSelection(action) {
+  const { createInterface } = await import('node:readline/promises');
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    console.log(`Select agents to ${action}:`);
+    TARGETS.forEach((target, index) => console.log(`  ${index + 1}. ${target}`));
+    console.log(`  ${TARGETS.length + 1}. all`);
+    const answer = (await readline.question('Enter number(s), comma-separated: ')).trim();
+    if (answer === String(TARGETS.length + 1) || answer.toLowerCase() === 'all') return TARGETS;
+    const selected = answer
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)
+      .map(value => TARGETS[Number(value) - 1] || value);
+    return validateTargets(selected);
+  } finally {
+    readline.close();
+  }
+}
+
+async function askLauncherSelection(reason) {
+  const { createInterface } = await import('node:readline/promises');
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    if (reason) console.log(reason);
+    console.log('Select chat agent:');
+    LAUNCHER_IDS.forEach((launcher, index) => console.log(`  ${index + 1}. ${launcher}`));
+    const answer = (await readline.question('Enter number: ')).trim();
+    const selected = LAUNCHER_IDS[Number(answer) - 1] || answer;
+    if (!LAUNCHER_IDS.includes(selected)) {
+      console.error(`Unknown chat agent: ${selected}. Available: ${LAUNCHER_IDS.join(', ')}`);
+      process.exit(1);
+    }
+    return selected;
+  } finally {
+    readline.close();
+  }
+}
+
+async function updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry }) {
+  let result = ensureStateIgnored(dir, { yes, interactive: false });
+  if (result.status === 'needs-approval' && isInteractive()) {
+    const approved = await askYesNo(`Add ${stateIgnoreEntry} to .gitignore so local state is not committed?`);
+    if (approved) result = ensureStateIgnored(dir, { yes: true, interactive: false });
+  }
+  return result;
+}
+
+async function askYesNo(question) {
+  const { createInterface } = await import('node:readline/promises');
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await readline.question(`${question} [y/N] `)).trim().toLowerCase();
+    return answer === 'y' || answer === 'yes';
+  } finally {
+    readline.close();
+  }
+}
+
+function isInteractive() {
+  return process.stdin.isTTY === true && process.stdout.isTTY === true;
+}
+
+function printInstallSummary({ action, agents, dir, filesWritten, state, gitignoreResult }) {
+  const noun = action === 'install' ? 'installed' : 'updated';
+  const label = action === 'install' ? 'Installed' : 'Updated';
+  console.log(`Azure Functions Skills ${noun}.`);
+  console.log(`  ${label} agents: ${agents.join(', ')}`);
+  console.log(`  Workspace files written: ${filesWritten}`);
+  console.log('  State: .azure-functions-skills/state.local.json');
+  if (state.chat.defaultAgent) console.log(`  Default chat agent: ${state.chat.defaultAgent}`);
+  else console.log('  Default chat agent: not set; chat will ask when multiple agents are installed');
+  if (gitignoreResult.status === 'updated') console.log(`  Git ignore: added ${gitignoreResult.entry}`);
+  else if (gitignoreResult.status === 'already-ignored') console.log(`  Git ignore: ${gitignoreResult.entry} already configured`);
+  else console.log(`  Git ignore: add ${gitignoreResult.entry} to keep local state out of Git`);
+  console.log(`  Next: azure-functions-skills chat --dir "${dir}"`);
+}
+
 if (!command || command === '--help' || command === '-h') {
   printHelp();
   process.exit(0);
 }
 
-if (command === 'setup') {
+if (command === 'help') {
+  const topic = args.slice(1).join(' ');
+  if (!topic) printHelp();
+  else printCommandHelp(topic);
+  process.exit(0);
+}
+
+if (command === 'install' || command === 'update') {
+  const separatorIndex = args.indexOf('--', 1);
+  const commandArgs = separatorIndex === -1 ? args.slice(1) : args.slice(1, separatorIndex);
+  if (commandArgs.includes('--help') || commandArgs.includes('-h')) {
+    printCommandHelp(command);
+    process.exit(0);
+  }
+  const passthroughArgs = separatorIndex === -1 ? [] : args.slice(separatorIndex + 1);
+  const agents = [];
+  let dir = process.cwd();
+  let local = false;
+  let all = false;
+  let dryRun = false;
+  let yes = false;
+  let includeMcp = true;
+  let includeHooks = true;
+  let source = 'marketplace';
+  let scope = 'workspace';
+  let prerequisites = 'auto';
+
+  for (let i = 0; i < commandArgs.length; i++) {
+    if (commandArgs[i] === '--agent' && commandArgs[i + 1]) agents.push(commandArgs[++i]);
+    else if (commandArgs[i] === '--all') all = true;
+    else if (commandArgs[i] === '--dir' && commandArgs[i + 1]) dir = commandArgs[++i];
+    else if (commandArgs[i] === '--local') local = true;
+    else if (commandArgs[i] === '--dry-run') dryRun = true;
+    else if (commandArgs[i] === '--yes') yes = true;
+    else if (commandArgs[i] === '--no-mcp') includeMcp = false;
+    else if (commandArgs[i] === '--no-hooks') includeHooks = false;
+    else if (commandArgs[i] === '--source' && commandArgs[i + 1]) source = commandArgs[++i];
+    else if (commandArgs[i] === '--scope' && commandArgs[i + 1]) scope = commandArgs[++i];
+    else if (commandArgs[i] === '--check-prerequisites') prerequisites = 'check-only';
+    else if (commandArgs[i] === '--skip-prerequisites') prerequisites = 'skip';
+  }
+
+  const { readState, getInstalledTargets, recordInstallState, ensureStateIgnored, STATE_IGNORE_ENTRY } = await import('../lib/setup/state.js');
+  const detectedAgents = await resolveInstallTargets({
+    action: command,
+    agents,
+    all,
+    dir,
+    readState,
+    getInstalledTargets,
+  });
+  if (passthroughArgs.length > 0 && detectedAgents.length !== 1) {
+    console.error('Cannot use passthrough arguments with multiple agents. Run one agent at a time.');
+    process.exit(1);
+  }
+
+  if (local) {
+    if (dryRun) {
+      console.log(`Planned local install:`);
+      for (const agent of detectedAgents) console.log(`  - ${agent}: workspace setup files`);
+    } else {
+      const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
+      const state = recordInstallState(dir, {
+        action: command,
+        agents: detectedAgents,
+        mode: 'local',
+        source: 'local',
+        scope,
+        includeMcp: true,
+        includeHooks: true,
+        includeAgent: detectedAgents.includes('ghcp'),
+      });
+      const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
+      printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.filesWritten, state, gitignoreResult });
+    }
+  } else {
+    const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
+    const { applyWorkspace } = await import('../lib/setup/workspace.js');
+    const action = command;
+    const pluginResult = await runPluginOperation({
+      action,
+      agents: detectedAgents,
+      projectDir: dir,
+      dryRun,
+      source,
+      scope,
+      workspace: false,
+      yes,
+      passthroughArgs,
+    });
+    const workspaceResult = await applyWorkspace(dir, {
+      agents: detectedAgents,
+      mode: 'plugin-reference',
+      update: action === 'update',
+      dryRun,
+      yes,
+      includeMcp,
+      includeHooks,
+      includeAgent: true,
+    });
+
+    if (dryRun) {
+      console.log(`Planned ${action}:`);
+      console.log('  Plugin:');
+      for (const step of pluginResult.steps) {
+        console.log(`    - ${step.target}: ${step.description}`);
+        for (const pluginCommand of step.commands || []) console.log(`        $ ${pluginCommand}`);
+      }
+      console.log('  Workspace:');
+      for (const file of workspaceResult.plannedFiles) console.log(`    - ${file}`);
+    } else {
+      const state = recordInstallState(dir, {
+        action,
+        agents: detectedAgents,
+        mode: 'plugin',
+        source,
+        scope,
+        includeMcp,
+        includeHooks,
+        includeAgent: true,
+      });
+      const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
+      printInstallSummary({ action, agents: detectedAgents, dir, filesWritten: workspaceResult.filesWritten, state, gitignoreResult });
+    }
+  }
+} else if (command === 'setup') {
   const agents = [];
   let dir = process.cwd();
   let asPlugin = false;
@@ -159,8 +540,34 @@ if (command === 'setup') {
     const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
     console.log(result.welcomeMessage);
   }
+} else if (command === 'state') {
+  const action = args[1];
+  if (action === 'setup-complete' && (args.includes('--help') || args.includes('-h'))) {
+    printCommandHelp('state setup-complete');
+    process.exit(0);
+  }
+  if (action !== 'setup-complete') {
+    console.error(`Unknown state command: ${action || ''}`.trim());
+    console.error('Usage: azure-functions-skills state setup-complete [options]');
+    process.exit(1);
+  }
+
+  const { markSetupComplete } = await import('../lib/setup/state.js');
+  let dir = process.cwd();
+  let agent = null;
+  for (let i = 2; i < args.length; i++) {
+    if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
+    else if (args[i] === '--agent' && args[i + 1]) agent = args[++i];
+  }
+  if (agent && !LAUNCHER_IDS.includes(agent)) {
+    console.error(`Unknown chat agent: ${agent}. Available: ${LAUNCHER_IDS.join(', ')}`);
+    process.exit(1);
+  }
+  markSetupComplete(dir, agent);
+  console.log('Setup skill marked complete.');
+  console.log('  State: .azure-functions-skills/state.local.json');
 } else if (command === 'chat') {
-  const { chat, detectCliAgents } = await import('../lib/chat/index.js');
+  const { chat } = await import('../lib/chat/index.js');
 
   const separatorIndex = args.indexOf('--', 1);
   const commandArgs = separatorIndex === -1 ? args.slice(1) : args.slice(1, separatorIndex);
@@ -216,18 +623,26 @@ if (command === 'setup') {
     }
   }
 
+  const { readState, resolveStateLauncher, markSetupPrompted } = await import('../lib/setup/state.js');
+  const state = readState(dir);
+
   if (!agent) {
-    console.log('🔍 Detecting CLI coding agents...');
-    const agents = await detectCliAgents();
-    if (agents.length === 0) {
-      console.error('❌ No CLI coding agent found. Install one of:');
-      console.error('  • GitHub Copilot CLI: gh extension install github/gh-copilot');
-      console.error('  • Claude Code: https://claude.ai/download');
-      console.error('  • Codex: npm install -g @openai/codex');
+    const resolution = resolveStateLauncher(state);
+    if (resolution.kind === 'resolved') {
+      agent = resolution.agent;
+      console.log(`Using chat agent from .azure-functions-skills state: ${agent}`);
+    } else if (resolution.kind === 'ambiguous') {
+      if (isInteractive()) agent = await askLauncherSelection(`Multiple agents are installed: ${resolution.agents.join(', ')}`);
+      else {
+        console.error(`Multiple agents are installed: ${resolution.agents.join(', ')}. Choose one with --agent <name>.`);
+        process.exit(1);
+      }
+    } else if (isInteractive()) {
+      agent = await askLauncherSelection('No .azure-functions-skills state was found for chat agent selection.');
+    } else {
+      console.error('No .azure-functions-skills state was found. Run install first or choose an agent with --agent <name>.');
       process.exit(1);
     }
-    agent = agents[0].id;
-    console.log(`  Using: ${agent}`);
   }
 
   console.log(`\n🚀 Launching ${agent} with Azure Functions context...\n`);
@@ -236,9 +651,19 @@ if (command === 'setup') {
   if (prompt) options.prompt = prompt;
   if (passthroughArgs.length > 0) options.passthroughArgs = passthroughArgs;
   options.prerequisites = prerequisites;
+  const setupSkillPending = state && state.setupSkill.status !== 'completed';
+  if (setupSkillPending) {
+    markSetupPrompted(dir, agent);
+    options.setupSkillPending = true;
+    options.setupCompleteCommand = `azure-functions-skills state setup-complete --dir "${dir}" --agent ${agent}`;
+  }
   await chat(options);
 } else if (command === 'workspace') {
   const action = args[1];
+  if ((action === 'apply' || action === 'update') && (args.includes('--help') || args.includes('-h'))) {
+    printCommandHelp(`workspace ${action}`);
+    process.exit(0);
+  }
   if (action !== 'apply' && action !== 'update') {
     console.error(`Unknown workspace command: ${action || ''}`.trim());
     console.error('Usage: azure-functions-skills workspace apply|update [options]');
@@ -253,6 +678,9 @@ if (command === 'setup') {
   let dryRun = false;
   let update = action === 'update';
   let yes = false;
+  let includeMcp = false;
+  let includeHooks = false;
+  let includeAgent = false;
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
@@ -262,6 +690,9 @@ if (command === 'setup') {
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--update') update = true;
     else if (args[i] === '--yes') yes = true;
+    else if (args[i] === '--include-mcp') includeMcp = true;
+    else if (args[i] === '--include-hooks') includeHooks = true;
+    else if (args[i] === '--include-agent') includeAgent = true;
   }
 
   let result;
@@ -273,6 +704,9 @@ if (command === 'setup') {
       update,
       dryRun,
       yes,
+      includeMcp,
+      includeHooks,
+      includeAgent,
     });
   } catch (err) {
     console.error(err.message);
@@ -290,6 +724,10 @@ if (command === 'setup') {
   }
 } else if (command === 'plugin') {
   const action = args[1];
+  if ((action === 'install' || action === 'update') && (args.includes('--help') || args.includes('-h'))) {
+    printCommandHelp(`plugin ${action}`);
+    process.exit(0);
+  }
   if (action !== 'install' && action !== 'update') {
     console.error(`Unknown plugin command: ${action || ''}`.trim());
     console.error('Usage: azure-functions-skills plugin install|update [options]');

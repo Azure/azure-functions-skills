@@ -71,6 +71,15 @@ describe('loadSkills', () => {
     expect(setupSkill?.content).toContain('/plugin install azure@claude-plugins-official');
     expect(setupSkill?.content).toContain('codex plugin marketplace add microsoft/azure-skills');
   });
+
+  it('azure-functions-setup marks local setup state complete after checks finish', () => {
+    const setupSkill = skills.find(skill => skill.id === 'azure-functions-setup');
+    expect(setupSkill?.content).toContain('azure-functions-skills state setup-complete --dir');
+    expect(setupSkill?.content).toContain('After the environment check completes');
+    expect(setupSkill?.content).toContain('If the command is unavailable');
+    expect(setupSkill?.content).toContain('.azure-functions-skills/state.local.json');
+    expect(setupSkill?.content).toContain('"status": "completed"');
+  });
 });
 
 describe('loadMcpServers', () => {

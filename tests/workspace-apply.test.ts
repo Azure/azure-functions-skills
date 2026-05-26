@@ -132,6 +132,23 @@ describe('applyWorkspace', () => {
     expect(result.filesWritten).toBeGreaterThan(0);
   });
 
+  it('can include the GHCP workspace agent definition without copying skill bodies', async () => {
+    const dir = makeTempDir();
+
+    const result = await applyWorkspace(dir, {
+      agents: ['ghcp'],
+      mode: 'plugin-reference',
+      mergeStrategy: 'managed-block',
+      includeAgent: true,
+    });
+
+    const agentPath = join(dir, '.github', 'agents', 'functions-copilot.agent.md');
+    expect(existsSync(agentPath)).toBe(true);
+    expect(readFileSync(agentPath, 'utf-8')).toContain('name: functions-copilot');
+    expect(existsSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
+    expect(result.plannedFiles).toContain('.github/agents/functions-copilot.agent.md');
+  });
+
   it('dry-run reports planned changes without writing files', async () => {
     const dir = makeTempDir();
 

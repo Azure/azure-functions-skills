@@ -119,6 +119,7 @@ Each scenario run should emit one JSON object.
 
 `surface` must be one of `plugin`, `skills`, `prompts`, `mcp`, `hooks`, `agents`, `agent-launch`, `agent-inspection`, `setup-files`, or `general`.
 Use `support: "unsupported"` for surfaces that the package or agent cannot support today. For example, Claude Code native plugin support must not be reported as passing unless the test actually launches Claude with the plugin loaded and proves the plugin surfaces are visible.
+For default plugin payload scenarios, do not require `mcp`, `hooks`, or `agents` checks to pass unless the scenario explicitly opted into workspace activation or full-profile payload generation. Record those surfaces as `not-in-default-payload`, `unsupported`, or validate them in a separate opt-in scenario.
 Checks should cite dynamic inventory paths instead of assuming a fixed template list. If a template changes, the next run should discover the new inventory and update expectations automatically.
 
 ## Inspection artifact record
@@ -157,7 +158,7 @@ Plugin scenarios must also prove fresh-install semantics. A plugin scenario cann
 - Post-state discovery output after install/register.
 - Real-agent inspection output proving usable plugin surfaces.
 
-Do not count setup-mode files, repository payload files, or a previously installed plugin as plugin scenario success unless the documented plugin lifecycle above completed in the current run.
+Do not count dry-run output, setup-mode files, repository payload files, local-source validation, or a previously installed plugin as plugin scenario success unless the documented plugin lifecycle above completed in the current run. If an existing plugin was reused because cleanup was skipped, the scenario is not a pass: classify it as `blocked` when approval/isolation was unavailable, or `fail`/`harness-invalid` when the runner incorrectly reused state despite the scenario contract.
 
 ## Issue record
 
@@ -205,6 +206,7 @@ The cross-check must include a default-scope coverage check:
 - Verify that no required scenario is absent from both `scenarioResults` and `omittedScenarioIds`.
 - Verify that every omitted scenario has an explicit user narrowing reason; otherwise add a `blocked`, `unsupported`, or `fail` scenario record before publishing.
 - Verify that every plugin scenario has `pluginLifecycle` pre-state, cleanup/isolation, install/register, post-state, and inspection evidence. If any phase is missing, the plugin scenario cannot be `pass` or `warning`.
+- Verify that no `plugin-install-*` scenario is marked `pass` based only on `install --dry-run`, `install --local`, `--source local`, existing plugin state, or setup-mode file evidence.
 - Verify that command logs for setup/chat/agent-inspection scenarios use isolated scenario workspaces as cwd or document why a different cwd was safe.
 - Verify that final command evidence does not rely on `--dir .` unless the same command log proves cwd is the isolated scenario workspace. Prefer `--dir <scenario-workspace>` in reports.
 - Verify `git status --short` does not show generated root-level `.agents`, `.claude`, `.codex`, `.github/agents`, `.github/hooks`, `.github/skills/<non-e2e>`, `AGENTS.md`, or `CLAUDE.md` artifacts. If any appear and are confirmed untracked generated output, remove them before publishing.
