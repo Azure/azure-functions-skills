@@ -2,6 +2,8 @@
  * Doctor command types — project diagnostics for Azure Functions.
  */
 
+import type { LanguageStackInfo } from './stacks-types.js';
+
 // ── Check result severity and status ──
 
 export type CheckSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
@@ -42,6 +44,7 @@ export interface ProjectContext {
   localSettings: Record<string, unknown> | null;
   packageJson: Record<string, unknown> | null;
   functions: FunctionInfo[];
+  stacks: LanguageStackInfo[];
 }
 
 // ── Individual check definition ──
