@@ -166,7 +166,7 @@ describe('node-version check', () => {
     const dir = makeTmp('chk-node-ok-');
     scaffoldProject(dir, {
       hostJson: { version: '2.0' },
-      packageJson: { name: 'test', engines: { node: '>=20.0.0' } },
+      packageJson: { name: 'test', engines: { node: '>=22.0.0' } },
     });
     const ctx = await loadProjectContext(dir);
     const results = await nodeVersionCheck.run(ctx);
@@ -177,7 +177,7 @@ describe('node-version check', () => {
     const dir = makeTmp('chk-node-bad-');
     scaffoldProject(dir, {
       hostJson: { version: '2.0' },
-      packageJson: { name: 'test', engines: { node: '>=16.0.0' } },
+      packageJson: { name: 'test', engines: { node: '>=14.0.0' } },
     });
     const ctx = await loadProjectContext(dir);
     const results = await nodeVersionCheck.run(ctx);
