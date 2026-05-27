@@ -157,10 +157,14 @@ export function buildAgentCommand(
  * This warning informs the user before the agent is spawned.
  */
 export function buildDeepWarning(agent: string): string {
+  // Plain ASCII only: this output is piped through stderr and renders on
+  // PowerShell / cmd.exe / Linux terminals with varying default encodings.
+  // Emojis cause mojibake on Windows where stderr uses the system codepage.
   return [
-    '⚠️  WARNING: Deep analysis runs the AI agent with elevated permissions.',
-    `   Agent "${agent}" has access to file write and shell execution.`,
-    '   Do NOT use --deep on untrusted workspaces. Project content can prompt-inject the agent.',
+    '[WARNING] Deep analysis runs the AI agent with elevated permissions.',
+    `          Agent "${agent}" has access to file write and shell execution.`,
+    '          Do NOT use --deep on untrusted workspaces.',
+    '          Project content can prompt-inject the agent.',
   ].join('\n');
 }
 

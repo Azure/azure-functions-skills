@@ -242,7 +242,7 @@ async function ensureSkillsInstalled(dir: string, agentLauncher: string, install
       });
     } catch (err) {
       // Fall back to local install if plugin CLI is unavailable
-      console.error(`⚠️  Plugin install failed (${(err as Error).message}), falling back to local install.`);
+      console.error(`[WARN] Plugin install failed (${(err as Error).message}), falling back to local install.`);
       effectiveMode = 'local';
       const { applySetup } = await import('../setup/index.js');
       await applySetup(dir, { agents: [target], prerequisites: 'skip' });

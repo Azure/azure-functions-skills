@@ -102,6 +102,12 @@ describe('buildDeepWarning', () => {
     expect(buildDeepWarning('claude-code')).toContain('claude-code');
     expect(buildDeepWarning('codex')).toContain('codex');
   });
+
+  it('contains only ASCII (no emojis that would mojibake on Windows PowerShell stderr)', () => {
+    const warning = buildDeepWarning('github-copilot');
+    // eslint-disable-next-line no-control-regex
+    expect(warning).toMatch(/^[\x09\x0a\x20-\x7e]+$/);
+  });
 });
 
 // ── readAiReport ──
