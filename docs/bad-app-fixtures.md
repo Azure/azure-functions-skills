@@ -60,7 +60,9 @@ node-deep-client-reuse                      1 fail           1    3      2      
 
 ### 3. Generate HTML validation report
 
-After a deep run, compare AI findings against expected results and produce an HTML report:
+After a deep run, compare AI findings against expected results and produce an HTML report.
+
+**Option A — bundled Node.js script (deterministic, recommended):**
 
 ```bash
 node <repo>/scripts/doctor-validation-report.mjs --fixtures-dir Q:\temp\doctor-deep-test
@@ -73,6 +75,8 @@ Writes `ai-validation-report.html` to the fixtures directory with:
 - Drill-down: AI title, severity badge, file:line, full message
 
 Typical recall on 16 fixtures with GitHub Copilot CLI: **~95%**.
+
+> The deterministic Node.js script above is the only supported way to generate the validation report. A previous "ask a coding agent to write the report" option was withdrawn: pointing a general-purpose agent at adversarial fixture content is itself a prompt-injection surface.
 
 ### 4. Cleanup
 

@@ -121,6 +121,17 @@ cd Q:\temp\doctor-deep-test
 
 This validates that doctor catches the expected findings on every fixture.
 
+> **Security note:** Run `doctor --deep` only on workspaces you trust. Never run it on a pull request workspace from a contributor — pull request code is untrusted by definition and can prompt-inject the LLM agent (which has file write and shell execution permissions). Doctor refuses to start in `pull_request` event contexts. See [docs/doctor-guide.md → Security model](docs/doctor-guide.md#security-model).
+
+## Security policy for skill and CI changes
+
+Because skills are loaded by an LLM agent that may run with elevated permissions, modifications to certain files require extra care:
+
+- **`templates/skills/**`**: Markdown that the agent reads as instructions. A malicious or careless skill can instruct the agent to fetch and execute arbitrary content. Every PR that touches a `SKILL.md` or `references/*.md` requires explicit reviewer attention to the content of the change.
+- **`.github/workflows/**`**: CI workflows have access to repo secrets. Adding a `secrets.NPM_TOKEN` or similar credential is a footgun — this repo does not publish to npm (the mirror pipeline does). Run `node scripts/audit-npm-token.mjs` locally to scan for such references.
+- **`package.json` lifecycle scripts**: Only `prepack` is allowed. Adding `postinstall`, `preinstall`, `postpack`, `prepublish`, or `prepublishOnly` is forbidden — these run on every user `npm install` and are a textbook supply chain attack surface. CI rejects them automatically.
+- **`.github/plugins/**`**: Auto-generated from `templates/`. Never hand-edit. `npm run verify:plugin-payload` enforces this in CI.
+
 ## Submitting a pull request
 
 1. **Fork & branch**: branch from `main` with a descriptive name.

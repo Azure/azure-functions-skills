@@ -3,6 +3,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { DoctorCheck, DoctorCheckResult } from './types.js';
 import {
   RECOMMENDED_EXTENSION_BUNDLE,
@@ -582,6 +583,372 @@ function readJsonFile(filePath: string): Record<string, unknown> | null {
 
 // ── All Tier 1 checks ──
 
+// ── Check 14: lifecycle-scripts (supply-chain) ──
+
+const FORBIDDEN_LIFECYCLE_SCRIPTS = ['preinstall', 'postinstall', 'postpack', 'prepublish', 'prepublishOnly'];
+
+export const lifecycleScriptsCheck: DoctorCheck = {
+  id: 'lifecycle-scripts',
+  category: 'security',
+  defaultSeverity: 'high',
+  appliesTo: (ctx) => ctx.language === 'node' && ctx.packageJson !== null,
+  run: async (ctx) => {
+    const scripts = (ctx.packageJson?.scripts ?? {}) as Record<string, unknown>;
+    const present = FORBIDDEN_LIFECYCLE_SCRIPTS.filter(name => typeof scripts[name] === 'string');
+    if (present.length === 0) {
+      return [result(lifecycleScriptsCheck, {
+        status: 'pass',
+        title: 'No risky lifecycle scripts',
+        message: 'package.json does not define preinstall/postinstall/postpack/prepublish/prepublishOnly',
+      })];
+    }
+    return [result(lifecycleScriptsCheck, {
+      status: 'fail',
+      title: 'Risky npm lifecycle script defined',
+      message: `package.json defines: ${present.join(', ')}. These run on every npm install and are a common supply-chain attack surface.`,
+      file: 'package.json',
+      recommendation: 'Remove these scripts, or convert to a manually-invoked npm run target. Functions runtime does not require any install-time scripts.',
+    })];
+  },
+};
+
+// ── Check 15: unpinned-prod-deps (supply-chain) ──
+
+function looksFloating(versionSpec: string): boolean {
+  if (!versionSpec) return false;
+  const s = versionSpec.trim();
+  if (s === '*' || s === 'latest' || s === 'next') return true;
+  if (/^[\^~]/.test(s)) return true;
+  if (/^>=?/.test(s)) return true;
+  return false;
+}
+
+export const unpinnedProdDepsCheck: DoctorCheck = {
+  id: 'unpinned-prod-deps',
+  category: 'security',
+  defaultSeverity: 'medium',
+  appliesTo: (ctx) => ctx.language === 'node' && ctx.packageJson !== null,
+  run: async (ctx) => {
+    const deps = (ctx.packageJson?.dependencies ?? {}) as Record<string, string>;
+    const unpinned = Object.entries(deps).filter(([, spec]) => looksFloating(spec));
+    if (unpinned.length === 0) {
+      return [result(unpinnedProdDepsCheck, {
+        status: 'pass',
+        title: 'Production dependencies are pinned',
+        message: 'All production dependency versions are exact',
+      })];
+    }
+    const names = unpinned.map(([name, spec]) => `${name}@${spec}`).slice(0, 5).join(', ');
+    const more = unpinned.length > 5 ? `, +${unpinned.length - 5} more` : '';
+    return [result(unpinnedProdDepsCheck, {
+      status: 'warn',
+      title: 'Production dependencies use floating version ranges',
+      message: `${unpinned.length} production dependencies allow newer versions to be installed automatically: ${names}${more}. This expands the supply-chain attack window.`,
+      file: 'package.json',
+      recommendation: 'Pin direct production dependencies to exact versions and rely on package-lock.json + npm ci for reproducibility. Use Dependabot or manual review for upgrades.',
+    })];
+  },
+};
+
+// ── Check 16: missing-lockfile (supply-chain) ──
+
+export const missingLockfileCheck: DoctorCheck = {
+  id: 'missing-lockfile',
+  category: 'security',
+  defaultSeverity: 'medium',
+  appliesTo: (ctx) => ctx.language === 'node' && ctx.packageJson !== null,
+  run: async (ctx) => {
+    const hasNpmLock = existsSync(join(ctx.dir, 'package-lock.json'));
+    const hasShrinkwrap = existsSync(join(ctx.dir, 'npm-shrinkwrap.json'));
+    const hasYarnLock = existsSync(join(ctx.dir, 'yarn.lock'));
+    const hasPnpmLock = existsSync(join(ctx.dir, 'pnpm-lock.yaml'));
+    if (hasNpmLock || hasShrinkwrap || hasYarnLock || hasPnpmLock) {
+      return [result(missingLockfileCheck, {
+        status: 'pass',
+        title: 'Lockfile present',
+        message: 'A package manager lockfile (npm/yarn/pnpm/shrinkwrap) is committed',
+      })];
+    }
+    return [result(missingLockfileCheck, {
+      status: 'warn',
+      title: 'No lockfile present',
+      message: 'No package-lock.json, yarn.lock, pnpm-lock.yaml, or npm-shrinkwrap.json found. Without a lockfile, each install can resolve to different transitive dependency versions.',
+      recommendation: 'Commit a lockfile (run `npm install` and commit the resulting package-lock.json). Use `npm ci` in CI for reproducible builds.',
+    })];
+  },
+};
+
+// ── Check 17: tracked-secret-files (supply-chain) ──
+
+const SECRET_FILE_NAMES = ['.env', '.env.local', '.env.production', '.env.development', '.env.staging'];
+
+export const trackedSecretFilesCheck: DoctorCheck = {
+  id: 'tracked-secret-files',
+  category: 'security',
+  defaultSeverity: 'high',
+  appliesTo: (ctx) => existsSync(join(ctx.dir, '.gitignore')) || existsSync(join(ctx.dir, '.git')),
+  run: async (ctx) => {
+    const found: string[] = [];
+    for (const name of SECRET_FILE_NAMES) {
+      if (existsSync(join(ctx.dir, name))) found.push(name);
+    }
+    if (found.length === 0) {
+      return [result(trackedSecretFilesCheck, {
+        status: 'pass',
+        title: 'No environment files in workspace',
+        message: 'No .env-style files were found',
+      })];
+    }
+
+    // Highest-risk case: file is tracked by git (committed) even if it now
+    // appears in .gitignore. Consult the git index, not just .gitignore text.
+    const tracked = gitListTrackedFromCandidates(ctx.dir, found);
+    if (tracked.length > 0) {
+      return [result(trackedSecretFilesCheck, {
+        status: 'fail',
+        title: 'Environment files are tracked by git',
+        message: `${tracked.join(', ')} ${tracked.length === 1 ? 'is' : 'are'} committed to the git index. Adding to .gitignore later does not remove the secrets from history. The files are tracked even if .gitignore covers them now.`,
+        recommendation: 'Run `git rm --cached <file>` to stop tracking, then `git commit`. Rotate any secrets that may have been pushed to a shared remote. Use `git filter-repo` or BFG to scrub history if required.',
+      })];
+    }
+
+    const ignored = readGitignoreLines(ctx.dir);
+    const unignored = found.filter(name => !isIgnored(name, ignored));
+    if (unignored.length === 0) {
+      return [result(trackedSecretFilesCheck, {
+        status: 'pass',
+        title: 'Environment files are gitignored',
+        message: `${found.length} .env-style file(s) found and all are listed in .gitignore`,
+      })];
+    }
+    return [result(trackedSecretFilesCheck, {
+      status: 'fail',
+      title: 'Environment files are not gitignored',
+      message: `Found ${unignored.join(', ')} but they are not covered by .gitignore. These files often contain secrets.`,
+      recommendation: 'Add the file(s) to .gitignore and rotate any secrets that may have been committed. Verify with `git ls-files` that the files are not tracked.',
+    })];
+  },
+};
+
+/**
+ * Return the subset of candidate filenames that are tracked in the git index.
+ * Returns empty array when there is no git repository or git is unavailable.
+ */
+function gitListTrackedFromCandidates(dir: string, candidates: string[]): string[] {
+  if (!existsSync(join(dir, '.git'))) return [];
+  const tracked: string[] = [];
+  for (const name of candidates) {
+    const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', name], {
+      cwd: dir,
+      stdio: ['ignore', 'pipe', 'ignore'],
+      shell: process.platform === 'win32',
+      encoding: 'utf-8',
+    });
+    if (r.status === 0 && (r.stdout?.trim().length ?? 0) > 0) {
+      tracked.push(name);
+    }
+  }
+  return tracked;
+}
+
+function readGitignoreLines(dir: string): string[] {
+  const path = join(dir, '.gitignore');
+  if (!existsSync(path)) return [];
+  try {
+    return readFileSync(path, 'utf-8')
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('#'));
+  } catch {
+    return [];
+  }
+}
+
+function isIgnored(filename: string, patterns: string[]): boolean {
+  return patterns.some(p => {
+    if (p === filename) return true;
+    if (p === `/${filename}`) return true;
+    if (p === '.env*' && filename.startsWith('.env')) return true;
+    if (p === '*.env' && filename.endsWith('.env')) return true;
+    return false;
+  });
+}
+
+// ── Check 18: install-script-deps (supply-chain) ──
+// Detect direct prod deps that historically run install scripts (heuristic list).
+// This is informational — not all listed packages are malicious, but they
+// expand the install-time execution surface.
+
+const PROD_DEP_INSTALL_SCRIPT_ALLOWLIST = new Set([
+  // Common legitimate native modules that need install scripts; expand as needed.
+  'sharp', 'bcrypt', 'sqlite3', 'better-sqlite3', 'node-sass', 'sass',
+  'esbuild', 'puppeteer', 'playwright', '@parcel/watcher',
+]);
+
+export const installScriptDepsCheck: DoctorCheck = {
+  id: 'install-script-deps',
+  category: 'security',
+  defaultSeverity: 'info',
+  appliesTo: (ctx) => ctx.language === 'node' && ctx.packageJson !== null,
+  run: async (ctx) => {
+    const deps = (ctx.packageJson?.dependencies ?? {}) as Record<string, string>;
+    const nodeModules = join(ctx.dir, 'node_modules');
+    if (!existsSync(nodeModules)) {
+      return [result(installScriptDepsCheck, {
+        status: 'skip',
+        title: 'Install-script audit skipped',
+        message: 'node_modules not present; run `npm install` first to audit install scripts',
+      })];
+    }
+    const offenders: string[] = [];
+    for (const name of Object.keys(deps)) {
+      if (PROD_DEP_INSTALL_SCRIPT_ALLOWLIST.has(name)) continue;
+      const depPkgPath = join(nodeModules, name, 'package.json');
+      if (!existsSync(depPkgPath)) continue;
+      try {
+        const depPkg = JSON.parse(readFileSync(depPkgPath, 'utf-8'));
+        const scripts = (depPkg.scripts ?? {}) as Record<string, unknown>;
+        if (typeof scripts.preinstall === 'string'
+          || typeof scripts.postinstall === 'string'
+          || typeof scripts.install === 'string') {
+          offenders.push(name);
+        }
+      } catch {
+        // ignore unreadable dep
+      }
+    }
+    if (offenders.length === 0) {
+      return [result(installScriptDepsCheck, {
+        status: 'pass',
+        title: 'No production deps with install scripts',
+        message: 'No direct production dependency runs preinstall/install/postinstall scripts (allowlisted natives excluded)',
+      })];
+    }
+    const list = offenders.slice(0, 5).join(', ') + (offenders.length > 5 ? `, +${offenders.length - 5} more` : '');
+    return [result(installScriptDepsCheck, {
+      status: 'warn',
+      title: 'Production deps run install scripts',
+      message: `${offenders.length} direct production dependencies run install-time scripts: ${list}. Each one runs on every install and is a potential supply-chain surface.`,
+      recommendation: 'Audit each dependency. Pin versions, use `npm ci --ignore-scripts` in CI where feasible, and watch for unexpected post-install activity.',
+    })];
+  },
+};
+
+// ── Check 19: python-unpinned-requirements (supply-chain) ──
+
+export const pythonUnpinnedRequirementsCheck: DoctorCheck = {
+  id: 'python-unpinned-requirements',
+  category: 'security',
+  defaultSeverity: 'medium',
+  appliesTo: (ctx) => ctx.language === 'python' && existsSync(join(ctx.dir, 'requirements.txt')),
+  run: async (ctx) => {
+    if (ctx.language !== 'python' || !existsSync(join(ctx.dir, 'requirements.txt'))) {
+      return [result(pythonUnpinnedRequirementsCheck, {
+        status: 'skip',
+        title: 'Python unpinned-requirements audit skipped',
+        message: 'Not a Python Functions project or requirements.txt not found',
+      })];
+    }
+    const text = readFileSync(join(ctx.dir, 'requirements.txt'), 'utf-8');
+    const unpinned: string[] = [];
+    let total = 0;
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = stripPyComment(rawLine).trim();
+      if (line.length === 0) continue;
+      if (line.startsWith('-')) continue; // pip flags like -r, -c, --index-url
+      total++;
+      const name = line.split(/[<>=!~;[\s]/)[0];
+      if (!isPinnedRequirement(line)) {
+        unpinned.push(name);
+      }
+    }
+    if (total === 0 || unpinned.length === 0) {
+      return [result(pythonUnpinnedRequirementsCheck, {
+        status: 'pass',
+        title: 'Python requirements are pinned',
+        message: 'Every requirement in requirements.txt is pinned with ==',
+      })];
+    }
+    const list = unpinned.slice(0, 5).join(', ') + (unpinned.length > 5 ? `, +${unpinned.length - 5} more` : '');
+    return [result(pythonUnpinnedRequirementsCheck, {
+      status: 'warn',
+      title: 'Python requirements are not pinned',
+      message: `${unpinned.length} packages in requirements.txt are not pinned to an exact version: ${list}. Each install can resolve to a newer release that could include a compromised package (durabletask-style supply-chain attacks).`,
+      file: 'requirements.txt',
+      recommendation: 'Pin every direct dependency with ==, e.g. `azure-functions==1.18.0`. Use `pip-compile` (pip-tools) or `uv pip compile` to generate a fully resolved, hash-locked file.',
+    })];
+  },
+};
+
+// ── Check 20: python-missing-lockfile (supply-chain) ──
+
+export const pythonMissingLockfileCheck: DoctorCheck = {
+  id: 'python-missing-lockfile',
+  category: 'security',
+  defaultSeverity: 'medium',
+  appliesTo: (ctx) => ctx.language === 'python' && existsSync(join(ctx.dir, 'requirements.txt')),
+  run: async (ctx) => {
+    if (ctx.language !== 'python' || !existsSync(join(ctx.dir, 'requirements.txt'))) {
+      return [result(pythonMissingLockfileCheck, {
+        status: 'skip',
+        title: 'Python lockfile audit skipped',
+        message: 'Not a Python Functions project or requirements.txt not found',
+      })];
+    }
+    const lockCandidates = ['requirements.lock', 'requirements.txt.lock', 'poetry.lock', 'Pipfile.lock', 'uv.lock', 'pdm.lock'];
+    const hasLock = lockCandidates.some(n => existsSync(join(ctx.dir, n)));
+    if (hasLock) {
+      return [result(pythonMissingLockfileCheck, {
+        status: 'pass',
+        title: 'Python lockfile present',
+        message: 'A Python dependency lockfile is committed',
+      })];
+    }
+    // Hash-pinned requirements.txt is effectively a lock
+    const text = readFileSync(join(ctx.dir, 'requirements.txt'), 'utf-8');
+    const hasAnyRequirement = text.split(/\r?\n/).some(l => {
+      const s = stripPyComment(l).trim();
+      return s.length > 0 && !s.startsWith('-');
+    });
+    const allHashed = hasAnyRequirement && text.split(/\r?\n/).every(l => {
+      const s = stripPyComment(l).trim();
+      if (s.length === 0 || s.startsWith('-')) return true;
+      return s.includes('--hash=');
+    });
+    if (allHashed) {
+      return [result(pythonMissingLockfileCheck, {
+        status: 'pass',
+        title: 'requirements.txt is hash-locked',
+        message: 'Every entry in requirements.txt uses --hash, providing reproducible installs',
+      })];
+    }
+    return [result(pythonMissingLockfileCheck, {
+      status: 'warn',
+      title: 'No Python lockfile present',
+      message: 'No poetry.lock, Pipfile.lock, uv.lock, requirements.lock, or hash-pinned requirements.txt was found. Without a lockfile, transient indexes can resolve to compromised package versions on the next install (durabletask-style risk).',
+      recommendation: 'Generate and commit a lockfile. Examples: `pip-compile --generate-hashes -o requirements.txt requirements.in`, `poetry lock`, `uv lock`. Install in CI with `pip install --require-hashes -r requirements.txt` or the lock-aware command for your tool.',
+    })];
+  },
+};
+
+function stripPyComment(line: string): string {
+  const i = line.indexOf('#');
+  return i >= 0 ? line.slice(0, i) : line;
+}
+
+function isPinnedRequirement(line: string): boolean {
+  // Strip extras/markers/hashes for the comparator check
+  const head = line.split(';')[0].split(' --hash=')[0];
+  // Must contain an == that is not part of !=
+  // Simple heuristic: an `==` exists in the version specifier
+  const m = head.match(/[<>=!~]=?/g);
+  if (!m) return false;
+  // If only `==` operators are present, it is pinned
+  return m.every(op => op === '==');
+}
+
+// ── All Tier 1 checks ──
+
 export const ALL_CHECKS: DoctorCheck[] = [
   projectExistsCheck,
   runtimeVersionCheck,
@@ -596,4 +963,12 @@ export const ALL_CHECKS: DoctorCheck[] = [
   functionBindingsCheck,
   entryPointCheck,
   typescriptBuildCheck,
+  // Supply-chain security checks
+  lifecycleScriptsCheck,
+  unpinnedProdDepsCheck,
+  missingLockfileCheck,
+  trackedSecretFilesCheck,
+  installScriptDepsCheck,
+  pythonUnpinnedRequirementsCheck,
+  pythonMissingLockfileCheck,
 ];

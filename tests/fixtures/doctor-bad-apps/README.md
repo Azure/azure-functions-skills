@@ -74,8 +74,34 @@ Use `expected-results.md` for expected findings. Tier 1 findings are strict; Tie
 | `powershell-deep-install-module` | PowerShell | — | PS-002, PS-003, CQ-002 — Heavy profile, Install-Module in handler, $env/$global persistence |
 | `powershell-deep-managed-deps` | PowerShell | Deprecated AzureWebJobsDashboard | PS-001, CQ-002, CQ-007 — managedDependency without requirements.psd1, $global cache anti-pattern |
 
+### Supply-chain fixtures (Tier 1 + Tier 2)
+
+| Fixture | Language | Tier 1 issues | Tier 2 (deep) issues |
+|---------|----------|---------------|----------------------|
+| `node-supply-chain-postinstall` | Node.js | `lifecycle-scripts:fail`, `missing-lockfile:warn` | SC-101 module-load spawn, SC-103 silent except |
+| `node-supply-chain-unpinned-deps` | Node.js | `unpinned-prod-deps:warn`, `missing-lockfile:warn` | — |
+| `node-supply-chain-tracked-env` | Node.js | `tracked-secret-files:fail`, `missing-lockfile:warn` | SC-109 hardcoded secrets in source |
+| `node-supply-chain-dropper-pattern` | Node.js | `missing-lockfile:warn` | SC-101+102+103+104+108 (durabletask Node.js port) |
+| `node-supply-chain-credential-collector` | Node.js | `missing-lockfile:warn` | SC-105 credential harvest, SC-106 .bashrc persistence |
+| `python-supply-chain-c2-import` | Python | — | SC-101+102+103+104+108 (durabletask Python port) |
+
 ## Check ID reference
 
 - **CF/RT/AS/DP/SC/PF** — Source-only checks (see `references/source-only-checks.md`)
 - **CQ/EH** — AI semantic checks (see `references/ai-semantic-checks.md`)
 - **CS/JS/PY/JV/PS** — Language-specific checks (see `references/language-checks.md`)
+- **SC-101 .. SC-110** — Supply-chain semantic checks (see `references/supply-chain-checks.md`)
+
+## Generate an HTML validation report
+
+After running `run-all.ps1 -Deep`, you can produce an HTML report that scores how many expected Tier 2 findings the AI agent caught.
+
+```powershell
+node <repo-root>/scripts/doctor-validation-report.mjs --fixtures-dir .
+Start-Process .\ai-validation-report.html
+```
+
+The script uses a curated keyword map for each fixture and reports overall recall (%), per-fixture matched / missed / extra findings, and AI durations. Self-contained HTML, no external dependencies.
+
+> **Why not delegate this to an LLM agent?** An earlier version of this README contained a "let a coding agent produce the report" prompt. That pattern was withdrawn because every fixture under this directory is intentionally adversarial test content (some files are designed to look like real prompt-injection / supply-chain payloads). Pointing a general-purpose agent at the fixtures directory and asking it to *read* and *interpret* their JSON output is itself a prompt-injection surface. Use the deterministic Node.js script above instead.
+

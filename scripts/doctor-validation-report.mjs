@@ -194,6 +194,46 @@ const EXPECTED = {
     { id: 'CQ-007', desc: 'No error handling around Invoke-RestMethod',
       keywords: [['invoke-restmethod', 'invoke restmethod'], ['try', 'catch', 'error', 'exception', 'handling']] },
   ],
+  'node-supply-chain-postinstall': [
+    { id: 'SC-101', desc: 'Module-load side effect (detached spawn at require)',
+      keywords: [['spawn', 'detached', 'unref', 'module load', 'import time', 'at load'], ['side effect', 'module', 'load', 'import', 'startup']] },
+    { id: 'SC-103', desc: 'Silent error suppression around the spawn',
+      keywords: [['empty catch', 'silent', 'swallow', 'try', 'catch'], ['error', 'suppress', 'silent', 'empty']] },
+  ],
+  'node-supply-chain-tracked-env': [
+    { id: 'SC-109', desc: 'Hardcoded production secrets in source',
+      keywords: [['hardcod', 'secret', 'password', 'key', 'token'], ['db_password', 'aws_access', 'production', 'source', 'literal']] },
+  ],
+  'node-supply-chain-dropper-pattern': [
+    { id: 'SC-101', desc: 'IIFE runs at module load',
+      keywords: [['iife', 'self-executing', 'immediately', 'module load', 'import time'], ['side effect', 'load', 'startup']] },
+    { id: 'SC-102', desc: 'Fetch then execute downloaded file',
+      keywords: [['fetch', 'download', 'https.get', 'urlretrieve', 'retrieve'], ['execute', 'spawn', 'subprocess', 'run']] },
+    { id: 'SC-104', desc: 'Raw IP host (C2 indicator)',
+      keywords: [['raw ip', 'ip address', '192.0.2', '192.', 'numeric host'], ['c2', 'command and control', 'host', 'url']] },
+    { id: 'SC-108', desc: 'Anti-analysis gates (Linux only, CPU >2, skip Russian)',
+      keywords: [['linux', 'platform', 'cpu count', 'cpus', 'locale', 'lang'], ['sandbox', 'gate', 'evasion', 'skip', 'anti-analysis']] },
+  ],
+  'node-supply-chain-credential-collector': [
+    { id: 'SC-105', desc: 'Systematic credential harvest from filesystem and env',
+      keywords: [['.aws/credentials', '.ssh', '.kube', '.npmrc', 'aws', 'credentials'], ['harvest', 'collect', 'enumerate', 'read', 'walk']] },
+    { id: 'SC-105 (env)', desc: 'Env variable regex harvest (TOKEN|SECRET|KEY|PASSWORD)',
+      keywords: [['env', 'environment', 'process.env'], ['token', 'secret', 'key', 'password', 'regex', 'match', 'filter']] },
+    { id: 'SC-106', desc: 'Persistence via .bashrc append',
+      keywords: [['.bashrc', 'bashrc', 'profile', 'shell init'], ['persistence', 'append', 'install', 'autostart']] },
+  ],
+  'python-supply-chain-c2-import': [
+    { id: 'SC-101', desc: 'Top-level import-time code runs at module load',
+      keywords: [['top-level', 'module load', 'import time', 'at import'], ['side effect', 'runs at import', 'before handler']] },
+    { id: 'SC-102', desc: 'urlretrieve + Popen pattern',
+      keywords: [['urlretrieve', 'urllib', 'download', 'request'], ['popen', 'subprocess', 'execute', 'spawn', 'run']] },
+    { id: 'SC-103', desc: 'Bare except: pass silences everything',
+      keywords: [['bare except', 'except:', 'except pass', 'silent', 'swallow'], ['except', 'pass', 'error', 'suppress']] },
+    { id: 'SC-104', desc: 'Hardcoded C2-shaped host',
+      keywords: [['check.example', 'rcd-host', 'hardcod', 'host'], ['c2', 'command and control', 'url', 'domain']] },
+    { id: 'SC-108', desc: 'Linux-only + Russian-locale skip + low-CPU exit',
+      keywords: [['linux', 'platform.system', 'locale', 'lang'], ['russian', 'ru', 'cpu', 'count', 'gate', 'sandbox', 'evasion']] },
+  ],
 };
 
 function loadFixtureResult(fixtureDir) {

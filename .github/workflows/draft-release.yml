@@ -1,0 +1,47 @@
+name: Draft Release
+
+# Triggered when a maintainer pushes a v* tag. Creates a draft GitHub Release
+# at that tag with auto-generated notes for review. Does NOT publish to npm —
+# the downstream Microsoft mirror pipeline handles that separately.
+#
+# Permissions are limited to `contents: write` (needed by `gh release create`).
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  draft-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create or update draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # If a release already exists for this tag, do not overwrite it.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub Release for $TAG already exists; skipping."
+            exit 0
+          fi
+
+          # Create a draft release. --generate-notes builds the changelog from
+          # merged PRs since the previous release.
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --draft \
+            --generate-notes \
+            --notes "Draft release created by draft-release.yml. Review and publish manually.
+
+          npm publishing is handled by the downstream Microsoft mirror pipeline, not this workflow."

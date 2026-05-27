@@ -103,6 +103,20 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
           },
         },
       };
+    } else if (isContributorPrContext()) {
+      // Refuse --deep on contributor PR contexts: pull-request workspaces
+      // contain untrusted code that can prompt-inject the agent.
+      report = {
+        ...report,
+        tiers: {
+          ...report.tiers,
+          ai: {
+            ran: false,
+            checks: [],
+            error: 'AI analysis refused: --deep must not run on contributor pull request workspaces. Pull request code is untrusted and can prompt-inject the agent. Run --deep only in post-merge or release jobs where the workspace is trusted. See docs/doctor-guide.md → Security model.',
+          },
+        },
+      };
     } else {
       const resolvedAgent = await resolveDeepAgent(options.dir, options.agent);
       if (!resolvedAgent) {
@@ -228,7 +242,7 @@ async function ensureSkillsInstalled(dir: string, agentLauncher: string, install
       });
     } catch (err) {
       // Fall back to local install if plugin CLI is unavailable
-      console.error(`⚠️  Plugin install failed (${(err as Error).message}), falling back to local install.`);
+      console.error(buildPluginFallbackWarning((err as Error).message));
       effectiveMode = 'local';
       const { applySetup } = await import('../setup/index.js');
       await applySetup(dir, { agents: [target], prerequisites: 'skip' });
@@ -281,4 +295,39 @@ async function resolveDeepAgent(dir: string, explicit?: string): Promise<string 
   const installed = getInstalledTargets(state);
   if (installed.length === 0) return undefined;
   return targetToLauncher(installed[0]);
+}
+
+/**
+ * Detect whether doctor is being invoked on a contributor pull request context.
+ *
+ * --deep spawns an LLM agent with file-write and shell-execution permissions.
+ * Running it on workspace files from an untrusted PR is equivalent to giving
+ * that PR shell access to the runner: prompt injection in the PR's source
+ * code can hijack the agent into exfiltrating secrets, modifying files, or
+ * running arbitrary commands. We therefore refuse --deep when a PR-like
+ * context is detected.
+ *
+ * Heuristics across GitHub Actions, Azure DevOps, and GitLab CI:
+ *   - GitHub Actions: GITHUB_EVENT_NAME=pull_request or pull_request_target
+ *   - Azure DevOps: BUILD_REASON=PullRequest
+ *   - GitLab CI: CI_PIPELINE_SOURCE=merge_request_event
+ *
+ * Override: AZURE_FUNCTIONS_DOCTOR_TRUST_PR=1 explicitly opts in (for
+ * mirror or trusted-environment workflows that need to scan PRs).
+ */
+export function isContributorPrContext(): boolean {
+  if (process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR === '1') return false;
+  const githubEvent = process.env.GITHUB_EVENT_NAME;
+  if (githubEvent === 'pull_request' || githubEvent === 'pull_request_target') return true;
+  if (process.env.BUILD_REASON === 'PullRequest') return true;
+  if (process.env.CI_PIPELINE_SOURCE === 'merge_request_event') return true;
+  return false;
+}
+
+/**
+ * Build the warning shown when plugin install fails and we fall back to local install.
+ * Must remain pure ASCII so it does not mojibake on Windows PowerShell stderr (cp932/cp1252).
+ */
+export function buildPluginFallbackWarning(errMessage: string): string {
+  return `[WARN] Plugin install failed (${errMessage}), falling back to local install.`;
 }

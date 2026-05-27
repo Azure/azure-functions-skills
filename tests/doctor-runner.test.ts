@@ -8,6 +8,7 @@ import type { DoctorOptions } from '../src/doctor/types.js';
 
 const TEMP_DIRS: string[] = [];
 let previousStacksOffline: string | undefined;
+let previousTrustPr: string | undefined;
 function makeTmp(prefix: string): string {
   const dir = createTempDir(prefix);
   TEMP_DIRS.push(dir);
@@ -16,12 +17,24 @@ function makeTmp(prefix: string): string {
 beforeAll(() => {
   previousStacksOffline = process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE;
   process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE = '1';
+  // CI runs these tests on pull_request events, where the runner's
+  // contributor-PR guard would refuse --deep before the assertions are
+  // reached. Most tests in this file exercise codepaths beyond that guard;
+  // opt the whole file into "trusted" mode by default. Tests that
+  // specifically exercise the PR guard override this flag explicitly.
+  previousTrustPr = process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR;
+  process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR = '1';
 });
 afterAll(() => {
   if (previousStacksOffline === undefined) {
     delete process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE;
   } else {
     process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE = previousStacksOffline;
+  }
+  if (previousTrustPr === undefined) {
+    delete process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR;
+  } else {
+    process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR = previousTrustPr;
   }
   for (const d of TEMP_DIRS) removeDir(d);
 });
@@ -87,6 +100,51 @@ describe('runDoctor', () => {
     expect(report.tiers.builtin.ran).toBe(true);
     expect(report.tiers.ai.ran).toBe(false);
     expect(report.tiers.ai.error).toMatch(/--accept-deep-risk|untrusted|elevated/i);
+  });
+
+  it('refuses --deep when GITHUB_EVENT_NAME=pull_request (contributor PR context)', async () => {
+    const dir = makeTmp('runner-deep-pr-ctx-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const savedEvent = process.env.GITHUB_EVENT_NAME;
+    const savedTrust = process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR;
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    delete process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR;
+    try {
+      const { report } = await runDoctor(defaultOpts(dir, {
+        deep: true,
+        agent: 'github-copilot',
+        acceptDeepRisk: true,
+      }));
+      expect(report.tiers.ai.ran).toBe(false);
+      expect(report.tiers.ai.error).toMatch(/pull request|contributor|untrusted/i);
+    } finally {
+      if (savedEvent === undefined) delete process.env.GITHUB_EVENT_NAME;
+      else process.env.GITHUB_EVENT_NAME = savedEvent;
+      if (savedTrust !== undefined) process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR = savedTrust;
+    }
+  });
+
+  it('allows --deep on pull_request context when AZURE_FUNCTIONS_DOCTOR_TRUST_PR=1 (opt-in for trusted pipelines)', async () => {
+    const dir = makeTmp('runner-deep-pr-trust-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const savedEvent = process.env.GITHUB_EVENT_NAME;
+    const savedTrust = process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR;
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR = '1';
+    try {
+      // Without an agent installed in state, ai will be skipped for that reason — but
+      // crucially NOT for the PR-context reason. Confirm the error is not about PR.
+      const { report } = await runDoctor(defaultOpts(dir, {
+        deep: true,
+        acceptDeepRisk: true,
+      }));
+      expect(report.tiers.ai.error ?? '').not.toMatch(/pull request|contributor/i);
+    } finally {
+      if (savedEvent === undefined) delete process.env.GITHUB_EVENT_NAME;
+      else process.env.GITHUB_EVENT_NAME = savedEvent;
+      if (savedTrust === undefined) delete process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR;
+      else process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR = savedTrust;
+    }
   });
 
   it('returns exit 0 for a healthy project', async () => {

@@ -1,0 +1,8 @@
+{
+  "name": "node-supply-chain-credential-collector",
+  "version": "1.0.0",
+  "main": "src/functions/harvest.js",
+  "dependencies": {
+    "@azure/functions": "4.5.1"
+  }
+}
