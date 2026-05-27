@@ -132,34 +132,37 @@ $startTime = Get-Date
 foreach ($d in $dirs) {
     Write-Host ""
     Write-Host "=== $($d.Name) ===" -ForegroundColor Yellow
-    $doctorArgs = @('doctor', '--dir', $d.FullName, '--format', $Format)
+    $outFile = Join-Path $d.FullName "doctor-result.json"
+    $doctorArgs = @('doctor', '--dir', $d.FullName, '--format', $Format, '--output', $outFile)
     if (-not $Deep) { $doctorArgs += '--no-deep' }
     else {
+        # Doctor refuses Tier 2 without --accept-deep-risk so the user explicitly
+        # acknowledges the agent runs with elevated permissions on this workspace.
         $doctorArgs += '--deep'
+        $doctorArgs += '--accept-deep-risk'
         $doctorArgs += '--agent'
         $doctorArgs += $Agent
         $doctorArgs += '--timeout'
         $doctorArgs += $Timeout
     }
-    $outFile = Join-Path $d.FullName "doctor-result.json"
     $fixtureStart = Get-Date
-    & node $CLI_PATH @doctorArgs 2>&1 | Tee-Object -Variable runOutput | Out-Host
+    & node $CLI_PATH @doctorArgs 2>&1 | Out-Host
     $fixtureDuration = (Get-Date) - $fixtureStart
-    if ($Format -eq 'json') {
-        $runOutput -join "`n" | Out-File -FilePath $outFile -Encoding utf8
-        Write-Host "  -> saved to $outFile" -ForegroundColor DarkGray
-    }
     $exitCode = $LASTEXITCODE
     $color = if ($exitCode -eq 0) { 'Green' } else { 'Red' }
     Write-Host ("  -> exit code: {0} (duration: {1:N1}s)" -f $exitCode, $fixtureDuration.TotalSeconds) -ForegroundColor $color
 
-    # Parse summary from JSON if available
+    # Parse summary from the --output file (always JSON when $Format -eq 'json')
     $summary = $null
+    $aiCount = '-'
     if ($Format -eq 'json' -and (Test-Path $outFile)) {
         try {
             $json = Get-Content $outFile -Raw | ConvertFrom-Json
             $summary = $json.summary
-        } catch { }
+            if ($json.tiers.ai) { $aiCount = @($json.tiers.ai.checks).Count }
+        } catch {
+            Write-Host "  -> WARN: failed to parse $outFile : $($_.Exception.Message)" -ForegroundColor Yellow
+        }
     }
 
     $results += [PSCustomObject]@{
@@ -169,7 +172,7 @@ foreach ($d in $dirs) {
         Critical  = if ($summary) { $summary.critical } else { '-' }
         High      = if ($summary) { $summary.high } else { '-' }
         Medium    = if ($summary) { $summary.medium } else { '-' }
-        AiChecks  = if ($json -and $json.tiers.ai) { @($json.tiers.ai.checks).Count } else { '-' }
+        AiChecks  = $aiCount
         Duration  = [Math]::Round($fixtureDuration.TotalSeconds, 1)
     }
 }

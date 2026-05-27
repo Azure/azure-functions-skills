@@ -63,11 +63,10 @@ node-deep-client-reuse                      1 fail           1    3      2      
 After a deep run, compare AI findings against expected results and produce an HTML report:
 
 ```bash
-cd Q:\temp\doctor-deep-test
-node generate-report.mjs
+node <repo>/scripts/doctor-validation-report.mjs --fixtures-dir Q:\temp\doctor-deep-test
 ```
 
-Opens / writes `ai-validation-report.html` with:
+Writes `ai-validation-report.html` to the fixtures directory with:
 
 - Overall recall metric (% of expected findings matched)
 - Per-fixture: matched / missed / extra findings
