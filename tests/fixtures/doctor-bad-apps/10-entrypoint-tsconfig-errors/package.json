@@ -1,0 +1,7 @@
+{
+  "name": "doctor-bad-entrypoint-tsconfig-errors",
+  "main": "dist/missing.js",
+  "engines": {
+    "node": ">=22"
+  }
+}

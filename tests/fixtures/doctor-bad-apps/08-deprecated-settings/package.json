@@ -1,0 +1,7 @@
+{
+  "name": "doctor-bad-deprecated-settings",
+  "main": "index.js",
+  "engines": {
+    "node": ">=22"
+  }
+}

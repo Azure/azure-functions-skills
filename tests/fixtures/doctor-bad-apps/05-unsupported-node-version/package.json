@@ -1,0 +1,7 @@
+{
+  "name": "doctor-bad-unsupported-node-version",
+  "main": "index.js",
+  "engines": {
+    "node": "18.x"
+  }
+}

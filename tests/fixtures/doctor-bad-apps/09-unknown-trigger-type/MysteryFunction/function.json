@@ -1,0 +1,9 @@
+{
+  "bindings": [
+    {
+      "name": "input",
+      "type": "mystery",
+      "direction": "in"
+    }
+  ]
+}

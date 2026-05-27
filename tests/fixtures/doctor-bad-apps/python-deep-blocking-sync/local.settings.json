@@ -1,0 +1,7 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "STORAGE_CONNECTION": "DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=placeholder=="
+  }
+}
