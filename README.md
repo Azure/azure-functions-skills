@@ -77,35 +77,47 @@ The `functions-copilot` agent routes user requests to the right skill and sugges
 
 ## Doctor — pre-deployment validation
 
-Catch configuration mistakes, deprecated settings, and (with `--deep`) semantic code issues *before* you deploy.
+Catch configuration mistakes, deprecated settings, **and semantic code issues** (missing error handling, blocking I/O, hardcoded secrets, durable-orchestrator non-determinism) *before* you deploy. The LLM semantic analysis is the value — `doctor` ships it as both a local CLI command and a GitHub Actions step.
 
-### Local — visual HTML report
+### Local — LLM analysis + visual HTML report
 
 ```bash
-npx @azure/functions-skills doctor --dir . --format html --output doctor-report.html
+npx @azure/functions-skills doctor --dir . \
+  --deep --accept-deep-risk \
+  --agent github-copilot \
+  --format html --output doctor-report.html
 ```
+
+`--accept-deep-risk` acknowledges that the agent runs with elevated permissions (file write, shell execution) — only use on trusted workspaces. Skip the LLM with `--no-deep` for fast deterministic checks only.
 
 Open `doctor-report.html` in a browser:
 
 ![Doctor HTML report](docs/images/doctor-report.png)
 
-### GitHub Actions — pre-deploy gate
+### GitHub Actions — pre-deploy gate with deep analysis
 
 ```yaml
+- uses: actions/checkout@v4
 - uses: actions/setup-node@v4
   with:
     node-version: '22'
-- name: Validate Azure Functions project
+- name: Install GitHub Copilot CLI
+  run: npm install -g @github/copilot
+- name: Run Azure Functions doctor
+  env:
+    GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
   run: |
     npx @azure/functions-skills doctor \
-      --no-deep \
-      --format markdown \
-      --output doctor.md \
+      --deep --accept-deep-risk \
+      --agent github-copilot \
+      --format markdown --output doctor.md \
       --severity high
 - name: Publish summary
   if: always()
   run: cat doctor.md >> $GITHUB_STEP_SUMMARY
 ```
+
+Exit code is `1` if any finding is at or above `--severity` (default `high`), gating the deploy step.
 
 > **Doctor walkthrough?** See [docs/doctor-guide.md](docs/doctor-guide.md) for Tier 1 vs Tier 2 details, output formats, deep mode security, and bad-app fixtures.
 
