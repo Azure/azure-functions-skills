@@ -1,6 +1,6 @@
 {
   "name": "azure-functions-skills",
-  "version": "0.12.1",
+  "version": "0.0.2-preview",
   "description": "Azure Functions skills for setup, create, and deploy workflows",
   "skills": "./skills/"
 }
