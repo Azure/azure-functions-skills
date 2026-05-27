@@ -582,6 +582,225 @@ function readJsonFile(filePath: string): Record<string, unknown> | null {
 
 // ── All Tier 1 checks ──
 
+// ── Check 14: lifecycle-scripts (supply-chain) ──
+
+const FORBIDDEN_LIFECYCLE_SCRIPTS = ['preinstall', 'postinstall', 'postpack', 'prepublish', 'prepublishOnly'];
+
+export const lifecycleScriptsCheck: DoctorCheck = {
+  id: 'lifecycle-scripts',
+  category: 'security',
+  defaultSeverity: 'high',
+  appliesTo: (ctx) => ctx.language === 'node' && ctx.packageJson !== null,
+  run: async (ctx) => {
+    const scripts = (ctx.packageJson?.scripts ?? {}) as Record<string, unknown>;
+    const present = FORBIDDEN_LIFECYCLE_SCRIPTS.filter(name => typeof scripts[name] === 'string');
+    if (present.length === 0) {
+      return [result(lifecycleScriptsCheck, {
+        status: 'pass',
+        title: 'No risky lifecycle scripts',
+        message: 'package.json does not define preinstall/postinstall/postpack/prepublish/prepublishOnly',
+      })];
+    }
+    return [result(lifecycleScriptsCheck, {
+      status: 'fail',
+      title: 'Risky npm lifecycle script defined',
+      message: `package.json defines: ${present.join(', ')}. These run on every npm install and are a common supply-chain attack surface.`,
+      file: 'package.json',
+      recommendation: 'Remove these scripts, or convert to a manually-invoked npm run target. Functions runtime does not require any install-time scripts.',
+    })];
+  },
+};
+
+// ── Check 15: unpinned-prod-deps (supply-chain) ──
+
+function looksFloating(versionSpec: string): boolean {
+  if (!versionSpec) return false;
+  const s = versionSpec.trim();
+  if (s === '*' || s === 'latest' || s === 'next') return true;
+  if (/^[\^~]/.test(s)) return true;
+  if (/^>=?/.test(s)) return true;
+  return false;
+}
+
+export const unpinnedProdDepsCheck: DoctorCheck = {
+  id: 'unpinned-prod-deps',
+  category: 'security',
+  defaultSeverity: 'medium',
+  appliesTo: (ctx) => ctx.language === 'node' && ctx.packageJson !== null,
+  run: async (ctx) => {
+    const deps = (ctx.packageJson?.dependencies ?? {}) as Record<string, string>;
+    const unpinned = Object.entries(deps).filter(([, spec]) => looksFloating(spec));
+    if (unpinned.length === 0) {
+      return [result(unpinnedProdDepsCheck, {
+        status: 'pass',
+        title: 'Production dependencies are pinned',
+        message: 'All production dependency versions are exact',
+      })];
+    }
+    const names = unpinned.map(([name, spec]) => `${name}@${spec}`).slice(0, 5).join(', ');
+    const more = unpinned.length > 5 ? `, +${unpinned.length - 5} more` : '';
+    return [result(unpinnedProdDepsCheck, {
+      status: 'warn',
+      title: 'Production dependencies use floating version ranges',
+      message: `${unpinned.length} production dependencies allow newer versions to be installed automatically: ${names}${more}. This expands the supply-chain attack window.`,
+      file: 'package.json',
+      recommendation: 'Pin direct production dependencies to exact versions and rely on package-lock.json + npm ci for reproducibility. Use Dependabot or manual review for upgrades.',
+    })];
+  },
+};
+
+// ── Check 16: missing-lockfile (supply-chain) ──
+
+export const missingLockfileCheck: DoctorCheck = {
+  id: 'missing-lockfile',
+  category: 'security',
+  defaultSeverity: 'medium',
+  appliesTo: (ctx) => ctx.language === 'node' && ctx.packageJson !== null,
+  run: async (ctx) => {
+    const hasNpmLock = existsSync(join(ctx.dir, 'package-lock.json'));
+    const hasShrinkwrap = existsSync(join(ctx.dir, 'npm-shrinkwrap.json'));
+    const hasYarnLock = existsSync(join(ctx.dir, 'yarn.lock'));
+    const hasPnpmLock = existsSync(join(ctx.dir, 'pnpm-lock.yaml'));
+    if (hasNpmLock || hasShrinkwrap || hasYarnLock || hasPnpmLock) {
+      return [result(missingLockfileCheck, {
+        status: 'pass',
+        title: 'Lockfile present',
+        message: 'A package manager lockfile (npm/yarn/pnpm/shrinkwrap) is committed',
+      })];
+    }
+    return [result(missingLockfileCheck, {
+      status: 'warn',
+      title: 'No lockfile present',
+      message: 'No package-lock.json, yarn.lock, pnpm-lock.yaml, or npm-shrinkwrap.json found. Without a lockfile, each install can resolve to different transitive dependency versions.',
+      recommendation: 'Commit a lockfile (run `npm install` and commit the resulting package-lock.json). Use `npm ci` in CI for reproducible builds.',
+    })];
+  },
+};
+
+// ── Check 17: tracked-secret-files (supply-chain) ──
+
+const SECRET_FILE_NAMES = ['.env', '.env.local', '.env.production', '.env.development', '.env.staging'];
+
+export const trackedSecretFilesCheck: DoctorCheck = {
+  id: 'tracked-secret-files',
+  category: 'security',
+  defaultSeverity: 'high',
+  appliesTo: (ctx) => existsSync(join(ctx.dir, '.gitignore')) || existsSync(join(ctx.dir, '.git')),
+  run: async (ctx) => {
+    const found: string[] = [];
+    for (const name of SECRET_FILE_NAMES) {
+      if (existsSync(join(ctx.dir, name))) found.push(name);
+    }
+    if (found.length === 0) {
+      return [result(trackedSecretFilesCheck, {
+        status: 'pass',
+        title: 'No environment files in workspace',
+        message: 'No .env-style files were found',
+      })];
+    }
+    const ignored = readGitignoreLines(ctx.dir);
+    const unignored = found.filter(name => !isIgnored(name, ignored));
+    if (unignored.length === 0) {
+      return [result(trackedSecretFilesCheck, {
+        status: 'pass',
+        title: 'Environment files are gitignored',
+        message: `${found.length} .env-style file(s) found and all are listed in .gitignore`,
+      })];
+    }
+    return [result(trackedSecretFilesCheck, {
+      status: 'fail',
+      title: 'Environment files are not gitignored',
+      message: `Found ${unignored.join(', ')} but they are not covered by .gitignore. These files often contain secrets.`,
+      recommendation: 'Add the file(s) to .gitignore and rotate any secrets that may have been committed. Verify with `git ls-files` that the files are not tracked.',
+    })];
+  },
+};
+
+function readGitignoreLines(dir: string): string[] {
+  const path = join(dir, '.gitignore');
+  if (!existsSync(path)) return [];
+  try {
+    return readFileSync(path, 'utf-8')
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('#'));
+  } catch {
+    return [];
+  }
+}
+
+function isIgnored(filename: string, patterns: string[]): boolean {
+  return patterns.some(p => {
+    if (p === filename) return true;
+    if (p === `/${filename}`) return true;
+    if (p === '.env*' && filename.startsWith('.env')) return true;
+    if (p === '*.env' && filename.endsWith('.env')) return true;
+    return false;
+  });
+}
+
+// ── Check 18: install-script-deps (supply-chain) ──
+// Detect direct prod deps that historically run install scripts (heuristic list).
+// This is informational — not all listed packages are malicious, but they
+// expand the install-time execution surface.
+
+const PROD_DEP_INSTALL_SCRIPT_ALLOWLIST = new Set([
+  // Common legitimate native modules that need install scripts; expand as needed.
+  'sharp', 'bcrypt', 'sqlite3', 'better-sqlite3', 'node-sass', 'sass',
+  'esbuild', 'puppeteer', 'playwright', '@parcel/watcher',
+]);
+
+export const installScriptDepsCheck: DoctorCheck = {
+  id: 'install-script-deps',
+  category: 'security',
+  defaultSeverity: 'info',
+  appliesTo: (ctx) => ctx.language === 'node' && ctx.packageJson !== null,
+  run: async (ctx) => {
+    const deps = (ctx.packageJson?.dependencies ?? {}) as Record<string, string>;
+    const nodeModules = join(ctx.dir, 'node_modules');
+    if (!existsSync(nodeModules)) {
+      return [result(installScriptDepsCheck, {
+        status: 'skip',
+        title: 'Install-script audit skipped',
+        message: 'node_modules not present; run `npm install` first to audit install scripts',
+      })];
+    }
+    const offenders: string[] = [];
+    for (const name of Object.keys(deps)) {
+      if (PROD_DEP_INSTALL_SCRIPT_ALLOWLIST.has(name)) continue;
+      const depPkgPath = join(nodeModules, name, 'package.json');
+      if (!existsSync(depPkgPath)) continue;
+      try {
+        const depPkg = JSON.parse(readFileSync(depPkgPath, 'utf-8'));
+        const scripts = (depPkg.scripts ?? {}) as Record<string, unknown>;
+        if (typeof scripts.preinstall === 'string'
+          || typeof scripts.postinstall === 'string'
+          || typeof scripts.install === 'string') {
+          offenders.push(name);
+        }
+      } catch {
+        // ignore unreadable dep
+      }
+    }
+    if (offenders.length === 0) {
+      return [result(installScriptDepsCheck, {
+        status: 'pass',
+        title: 'No production deps with install scripts',
+        message: 'No direct production dependency runs preinstall/install/postinstall scripts (allowlisted natives excluded)',
+      })];
+    }
+    const list = offenders.slice(0, 5).join(', ') + (offenders.length > 5 ? `, +${offenders.length - 5} more` : '');
+    return [result(installScriptDepsCheck, {
+      status: 'warn',
+      title: 'Production deps run install scripts',
+      message: `${offenders.length} direct production dependencies run install-time scripts: ${list}. Each one runs on every install and is a potential supply-chain surface.`,
+      recommendation: 'Audit each dependency. Pin versions, use `npm ci --ignore-scripts` in CI where feasible, and watch for unexpected post-install activity.',
+    })];
+  },
+};
+
+// ── All Tier 1 checks ──
+
 export const ALL_CHECKS: DoctorCheck[] = [
   projectExistsCheck,
   runtimeVersionCheck,
@@ -596,4 +815,10 @@ export const ALL_CHECKS: DoctorCheck[] = [
   functionBindingsCheck,
   entryPointCheck,
   typescriptBuildCheck,
+  // Supply-chain security checks
+  lifecycleScriptsCheck,
+  unpinnedProdDepsCheck,
+  missingLockfileCheck,
+  trackedSecretFilesCheck,
+  installScriptDepsCheck,
 ];

