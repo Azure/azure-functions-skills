@@ -1,0 +1,17 @@
+{
+  "name": "node-supply-chain-postinstall",
+  "version": "1.0.0",
+  "main": "src/functions/hello.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "func start",
+    "preinstall": "node ./scripts/init.js",
+    "postinstall": "node ./scripts/setup-hook.js"
+  },
+  "dependencies": {
+    "@azure/functions": "4.5.1"
+  }
+}

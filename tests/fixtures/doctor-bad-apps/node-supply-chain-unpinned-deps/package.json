@@ -1,0 +1,19 @@
+{
+  "name": "node-supply-chain-unpinned-deps",
+  "version": "1.0.0",
+  "main": "src/functions/hello.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.1",
+    "@azure/cosmos": "^4.0.0",
+    "axios": "^1.6.0",
+    "lodash": "*",
+    "moment": "latest"
+  }
+}

@@ -155,6 +155,45 @@ These findings require `--deep` and are produced by LLM semantic analysis. Becau
 - ⚠️ CQ-002: `$global:UserCache` hash table used as cross-invocation cache — per-worker only
 - ⚠️ CQ-007: No error handling around `Invoke-RestMethod` call
 
+### Supply-chain deep fixtures (Tier 1 + Tier 2)
+
+These fixtures exercise the supply-chain checks added with the doctor-as-defender feature.
+
+**`node-supply-chain-postinstall`** — Tier 1: `lifecycle-scripts:fail` (high — package.json defines `preinstall` and `postinstall`). Tier 2 advisory:
+- 🚫 SC-101: src/functions/hello.js spawns a detached child process at module load (import-time side effect)
+- ⚠️ SC-103: bare try/catch swallows errors around the spawn
+
+**`node-supply-chain-unpinned-deps`** — Tier 1:
+- `unpinned-prod-deps:warn` (medium — 5 prod deps use `^`/`*`/`latest`)
+- `missing-lockfile:warn` (medium — no package-lock.json)
+
+No Tier 2 advisory expected (deterministic only).
+
+**`node-supply-chain-tracked-env`** — Tier 1:
+- `tracked-secret-files:fail` (high — `.env` is present and `.gitignore` does not cover it)
+
+Tier 2 advisory:
+- 🚫 SC-109: `src/functions/lookup.js` contains hardcoded production-looking secrets in variable declarations (`DB_PASSWORD`, `AWS_ACCESS_KEY_ID`, an AWS-key-shaped string)
+
+**`node-supply-chain-dropper-pattern`** — Tier 2 only (no Tier 1 findings expected). Mirrors the durabletask Node.js port:
+- 🚫 SC-101: code runs at module-load via IIFE
+- 🚫 SC-102: fetch-then-execute (https.get + spawn child to run downloaded file)
+- ⚠️ SC-103: empty catch swallows all errors
+- 🚫 SC-104: hardcoded raw IP host in URL (`192.0.2.42`)
+- 🚫 SC-108: anti-analysis gates (Linux only, CPU > 2, skip Russian LANG)
+
+**`node-supply-chain-credential-collector`** — Tier 2 only:
+- 🚫 SC-105: systematic credential harvesting from cloud / SSH / git / npm / docker / shell-history paths plus regex over env vars matching `TOKEN|SECRET|KEY|PASSWORD`
+- 🚫 SC-106: persistence installation via append to `~/.bashrc`
+- ⚠️ SC-103: silent empty catch around filesystem reads and persistence write
+
+**`python-supply-chain-c2-import`** — Tier 2 only (Python). Mirrors the durabletask dropper:
+- 🚫 SC-101: top-level code in `function_app.py` runs at import (before any handler is called)
+- 🚫 SC-102: urlretrieve + subprocess.Popen with `start_new_session=True`
+- ⚠️ SC-103: bare `except: pass` suppresses everything
+- 🚫 SC-104: hardcoded C2-shaped host (`check.example-rcd-host.com`)
+- 🚫 SC-108: Linux gate, low-CPU exit, Russian-locale exit
+
 ## Severity legend
 
 - 🚫 = Expected `fail` (Tier 2 confidence: high)
@@ -168,3 +207,4 @@ These findings require `--deep` and are produced by LLM semantic analysis. Becau
 - `09-unknown-trigger-type` is a high-severity warning → exits 1 with default severity.
 - Clean fixtures should produce 0 findings at both Tier 1 and Tier 2 (false positives indicate LLM hallucination).
 - Tier 2 expected findings are advisory — LLM may use different wording, produce additional valid findings, or miss some. Use category + keyword matching rather than exact ID comparison for automated Tier 2 validation.
+- The supply-chain fixtures use non-routable example.com / 192.0.2.x placeholders. They do not contain actual malicious payloads — only the structural patterns doctor's checks should detect.

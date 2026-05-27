@@ -74,6 +74,17 @@ Use `expected-results.md` for expected findings. Tier 1 findings are strict; Tie
 | `powershell-deep-install-module` | PowerShell | — | PS-002, PS-003, CQ-002 — Heavy profile, Install-Module in handler, $env/$global persistence |
 | `powershell-deep-managed-deps` | PowerShell | Deprecated AzureWebJobsDashboard | PS-001, CQ-002, CQ-007 — managedDependency without requirements.psd1, $global cache anti-pattern |
 
+### Supply-chain fixtures (Tier 1 + Tier 2)
+
+| Fixture | Language | Tier 1 issues | Tier 2 (deep) issues |
+|---------|----------|---------------|----------------------|
+| `node-supply-chain-postinstall` | Node.js | `lifecycle-scripts:fail`, `missing-lockfile:warn` | SC-101 module-load spawn, SC-103 silent except |
+| `node-supply-chain-unpinned-deps` | Node.js | `unpinned-prod-deps:warn`, `missing-lockfile:warn` | — |
+| `node-supply-chain-tracked-env` | Node.js | `tracked-secret-files:fail`, `missing-lockfile:warn` | SC-109 hardcoded secrets in source |
+| `node-supply-chain-dropper-pattern` | Node.js | `missing-lockfile:warn` | SC-101+102+103+104+108 (durabletask Node.js port) |
+| `node-supply-chain-credential-collector` | Node.js | `missing-lockfile:warn` | SC-105 credential harvest, SC-106 .bashrc persistence |
+| `python-supply-chain-c2-import` | Python | — | SC-101+102+103+104+108 (durabletask Python port) |
+
 ## Check ID reference
 
 - **CF/RT/AS/DP/SC/PF** — Source-only checks (see `references/source-only-checks.md`)

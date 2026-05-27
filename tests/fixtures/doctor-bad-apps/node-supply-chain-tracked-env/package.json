@@ -1,0 +1,11 @@
+{
+  "name": "node-supply-chain-tracked-env",
+  "version": "1.0.0",
+  "main": "src/functions/lookup.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@azure/functions": "4.5.1"
+  }
+}
