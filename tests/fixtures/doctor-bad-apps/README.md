@@ -15,7 +15,11 @@ node bin/azure-functions-skills.js doctor --dir tests\fixtures\doctor-bad-apps\<
 
 ```powershell
 $env:AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE = "1"
-node bin/azure-functions-skills.js doctor --dir tests\fixtures\doctor-bad-apps\<fixture-name> --deep --format json
+node bin/azure-functions-skills.js doctor `
+  --dir tests\fixtures\doctor-bad-apps\<fixture-name> `
+  --deep --accept-deep-risk `
+  --agent github-copilot `
+  --format json --output <fixture-name>-result.json
 ```
 
 > **CI cost note:** Each Tier 2 fixture spawns an LLM agent for semantic analysis. Consider using `SKIP_DEEP_TESTS=1` for CI runs that should only validate Tier 1 checks.
