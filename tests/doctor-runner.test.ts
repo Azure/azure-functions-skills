@@ -8,6 +8,7 @@ import type { DoctorOptions } from '../src/doctor/types.js';
 
 const TEMP_DIRS: string[] = [];
 let previousStacksOffline: string | undefined;
+let previousTrustPr: string | undefined;
 function makeTmp(prefix: string): string {
   const dir = createTempDir(prefix);
   TEMP_DIRS.push(dir);
@@ -16,12 +17,24 @@ function makeTmp(prefix: string): string {
 beforeAll(() => {
   previousStacksOffline = process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE;
   process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE = '1';
+  // CI runs these tests on pull_request events, where the runner's
+  // contributor-PR guard would refuse --deep before the assertions are
+  // reached. Most tests in this file exercise codepaths beyond that guard;
+  // opt the whole file into "trusted" mode by default. Tests that
+  // specifically exercise the PR guard override this flag explicitly.
+  previousTrustPr = process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR;
+  process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR = '1';
 });
 afterAll(() => {
   if (previousStacksOffline === undefined) {
     delete process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE;
   } else {
     process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE = previousStacksOffline;
+  }
+  if (previousTrustPr === undefined) {
+    delete process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR;
+  } else {
+    process.env.AZURE_FUNCTIONS_DOCTOR_TRUST_PR = previousTrustPr;
   }
   for (const d of TEMP_DIRS) removeDir(d);
 });
