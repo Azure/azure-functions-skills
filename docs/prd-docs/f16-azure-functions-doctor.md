@@ -1,171 +1,121 @@
 # F16: azure-functions-doctor — Project Diagnostics
 
-**Status:** 📋 Proposed  
-**Draft Spec Section:** N/A (discovered from func-emulate F18 + fnx-diagnostics)  
+**Status:** ✅ Implemented
+**User guide:** [docs/doctor-guide.md](../doctor-guide.md)
+**CLI reference:** [docs/cli-reference.md#doctor](../cli-reference.md#doctor)
 **Depends on:** F1 (Skill Graph Metadata), F3 (azure-functions-setup)
 
 ## Problem
 
-`azure-functions-setup` (F3) handles initial environment checks (verifying the presence of Azure CLI, Core Tools, and runtimes), but **diagnosing `func start` failures during development** is an entirely different responsibility.
+Configuration mistakes, deprecated app settings, blocking I/O patterns, hardcoded secrets, and non-deterministic durable orchestrators routinely make it into Azure Functions deployments and cause production incidents. There was no single command developers could run *before* deploying to catch these.
 
-`func start` failures have many possible causes:
+`azure-functions-setup` verifies the developer's local environment (Azure CLI, Core Tools, runtimes). `azure-functions-doctor` is a different responsibility: it validates the *project* — its `host.json`, `local.settings.json`, runtime version, extension bundle, code patterns, and configuration coherence — and produces actionable findings.
 
-- Syntax errors or invalid version specification in `host.json`
-- Missing `local.settings.json` or invalid JSON
-- Port 7071 already in use
-- Runtime version mismatch (e.g., trying to use v2 model with Python 3.8)
-- Extension Bundle download failure
-- Azurite/storage emulator not running (when using Blob/Queue triggers)
-- Missing worker runtime configuration (`FUNCTIONS_WORKER_RUNTIME` not set)
-- `.NET` in-process project misdetection
+## Goals
 
-Developers have no choice but to investigate these one by one manually, and beginners spend the most time identifying root causes.
+- One CLI command runs all checks and exits non-zero on failure (so it can gate CI).
+- Two tiers: deterministic built-ins (always on) + opt-in AI semantic analysis (off by default).
+- Output formats for both humans (text/html) and machines (json/markdown).
+- Safe by default: deep mode requires explicit acknowledgement of elevated agent permissions.
+- Auto-installs skill files if missing, so first-time users don't need a separate setup step.
+- Works on Windows, Linux, macOS.
 
-## Feature
+## Architecture
 
-`azure-functions-doctor` is a diagnostic skill that checks Azure Functions project health across 8 structured categories and returns actionable fix suggestions for each issue.
-
-Difference from `azure-functions-setup`:
-
-| Aspect | azure-functions-setup (F3) | azure-functions-doctor (F16) |
-|--------|-------------|----------------|
-| **Timing** | Before development begins (initial setup) | When issues occur (during development) |
-| **Target** | Verify presence of global tools | Project-specific config and state |
-| **Output** | "Environment Ready / Not Ready" | "8 categories × Pass/Warn/Fail + fix instructions" |
-| **Repetition** | Run once is sufficient | Run whenever issues arise |
-
-## Diagnostic Checks
-
-| # | Category | Pass | Warn | Fail |
-|---|---------|------|------|------|
-| 1 | `host.json` | Exists with `version: "2.0"` | Invalid version | Missing or JSON parse error |
-| 2 | `local.settings.json` | Exists with valid JSON | Missing (partially functional) | JSON parse error |
-| 3 | Worker runtime | `FUNCTIONS_WORKER_RUNTIME` is set | — | Not set or invalid value |
-| 4 | Runtime version | Installed and within Functions support range | Version nearing EOL | Not installed or unsupported |
-| 5 | Extension Bundle | Configured in `host.json` and downloaded | Outdated version range | Download failed or invalid range |
-| 6 | Port availability | 7071 is available | — | Port in use |
-| 7 | Azurite / Storage | Running (only when Storage triggers are used) | Installed but not running | Not installed despite Storage triggers present |
-| 8 | Security | Secret values only in `local.settings.json` | — | Secret values detected in source code or config files |
-
-## Output Format
-
-```
-Azure Functions Project Diagnostics
-
-  ✅ host.json           version 2.0, valid
-  ✅ local.settings.json valid JSON, 5 settings
-  ✅ Worker runtime      python (from local.settings.json)
-  ⚠️  Runtime version     Python 3.9 — EOL October 2025, upgrade to 3.11+
-  ✅ Extension bundle     [4.*, 5.0.0) — cached
-  ✅ Port 7071           available
-  ⚠️  Azurite             installed but not running (blob_trigger detected)
-  ✅ Security             no secrets in tracked files
-
-Issues Found:
-  ⚠️  Runtime version: Python 3.9 reaches EOL October 2025.
-     Fix: Install Python 3.11+ and update FUNCTIONS_WORKER_RUNTIME_VERSION.
-     Docs: https://learn.microsoft.com/azure/azure-functions/functions-reference-python
-
-  ⚠️  Azurite: blob_trigger detected but Azurite is not running.
-     Fix: Run 'azurite --silent' or 'npx azurite --silent' in another terminal.
-     Docs: https://learn.microsoft.com/azure/storage/common/storage-use-azurite
-
-Summary: 0 errors, 2 warnings, 6 passed
-
-Next Steps:
-  → Fix warnings and run 'func start'
+```text
+runDoctor(options)
+  │
+  ├─ Tier 1 (always)
+  │    Load context (host.json, local.settings.json, package.json, function files)
+  │    Resolve stacks (Azure Stack API or offline fallback)
+  │    Execute deterministic checks (project-exists, runtime-version, extension-bundle, …)
+  │    Build summary with severity threshold
+  │
+  └─ Tier 2 (if --deep --accept-deep-risk and agent resolvable)
+       Auto-install skill files if state shows them missing
+       Build prompt from Tier 1 results
+       Spawn agent in headless mode (Copilot CLI / Claude Code / Codex)
+       Read agent's JSON findings file
+       Merge into report; respect severity threshold (fail-closed on unknown severity)
 ```
 
-## Diagnostic Workflow (for AI agents)
+Source: [src/doctor/](../../src/doctor/) — `runner.ts`, `checks.ts`, `context.ts`, `stacks.ts`, `ai-analysis.ts`, `formatters.ts`.
 
-```
-Step 1: Run azure-functions-doctor checks
-  → Collect all 8 category results
+## Tier 1 checks (built-in)
 
-Step 2: If func start fails, reproduce with verbose output
-  → func start --verbose 2>&1
+| ID | Severity | Description |
+| --- | --- | --- |
+| `project-exists` | critical | `host.json` exists at the workspace root |
+| `runtime-version` | critical | `host.json` schema version is supported (v4 runtime) |
+| `extension-bundle` | high | Extension bundle version range is current (Microsoft.Azure.Functions.ExtensionBundle / ExtensionBundle.Preview) |
+| `node-version` / `python-version` / `dotnet-version` | high | Language version is supported and not EOL |
+| `local-settings` | medium | `local.settings.json` present and `FUNCTIONS_WORKER_RUNTIME` is set |
+| `deprecated-settings` | medium | No deprecated app settings (e.g. `AzureWebJobsDashboard`) |
+| `connection-strings` | high | Non-HTTP triggers reference defined storage connections |
+| `function-bindings` | high/medium | Trigger types are recognized in v4 programming model |
+| `entry-point` | critical | TypeScript/JavaScript entry exists and matches `main` in package.json |
+| `typescript-build` | critical | TypeScript compiles without errors (when applicable) |
 
-Step 3: Parse error output for known patterns
-  → "WorkerConfig for runtime: X not found" → Runtime config issue
-  → "0 functions loaded" → Worker indexing not enabled (Python v2)
-  → "Port X in use" → Port conflict
-  → "No job functions found" → Function detection failure
+## Tier 2 (AI semantic analysis)
 
-Step 4: Read project config files for root cause
-  → host.json, local.settings.json, package.json/requirements.txt/*.csproj
+The agent receives Tier 1 results as context and looks for:
 
-Step 5: Provide fix with exact command and docs link
-```
+- **Code quality** — exception-handling gaps, resource disposal issues, async/await anti-patterns, hardcoded secrets, deprecated API usage
+- **Configuration coherence** — `host.json` settings conflicting with bindings, app settings referenced in code but missing, connection-name mismatches, scaling config issues
+- **Azure Functions-specific patterns** — durable orchestrator determinism, Service Bus `autoComplete` conflicts, missing `FUNCTIONS_WORKER_RUNTIME`, output binding error gaps, idempotency issues, blocking I/O in async handlers
 
-## Common Error Patterns
+Each finding includes id, category, severity, status, title, message, optional file/line/recommendation.
 
-| Error Message | Cause | Fix |
-|--------------|-------|-----|
-| `No job functions found` | Worker indexing not enabled | Set `FUNCTIONS_WORKER_RUNTIME`; for Python v2, set `AzureWebJobsFeatureFlags=EnableWorkerIndexing` |
-| `WorkerConfig for runtime: X not found` | Runtime not detected or Core Tools corrupted | Reinstall Core Tools |
-| `Port 7071 is in use` | Another process is using the port | `func start --port 7080` or kill the previous process |
-| `Extension bundle download failed` | Network issue or CDN outage | `func start --offline` (if cached) or check network |
-| `Value cannot be null: AzureWebJobsStorage` | Storage connection string not set | Add `"AzureWebJobsStorage": "UseDevelopmentStorage=true"` to `local.settings.json` |
-| `The listener for function 'X' was unable to start` | Binding connection error | Verify connection strings; confirm Azurite/emulator is running |
+## Output formats
 
-## Skill Metadata
+| Format | Use case |
+| --- | --- |
+| `text` (default) | Local terminal, CI logs (also written to stdout regardless of `--format`) |
+| `json` | CI artifacts, custom tooling |
+| `markdown` | PR comments, GitHub Actions job summary |
+| `html` | Local viewing, hosted artifacts |
 
-```yaml
-id: azure-functions-doctor
-title: Azure Functions Project Diagnostics
-intent:
-  - diagnose_issue
-  - func_start_failed
-  - troubleshoot
-  - debug_project
-completion_signals:
-  - diagnostics_passed
-  - issue_identified_and_fixed
-suggestions:
-  on_success:
-    - target: azure-functions-deploy
-      reason: "Project is healthy. Ready to deploy."
-      priority: 80
-    - target: azure-functions-observability
-      reason: "Set up monitoring for production readiness."
-      priority: 60
-  on_failure:
-    - target: azure-functions-setup
-      reason: "Diagnostic failures may require environment reconfiguration."
-      priority: 80
-    - target: azure-functions-help
-      reason: "Get guided assistance for unresolved issues."
-      priority: 60
-entry_conditions:
-  - func_start_failed
-  - error_occurred
-  - project_not_working
-```
+## Exit codes
 
-## Relationship to azure-functions-setup
+| Code | Meaning |
+| --- | --- |
+| 0 | All checks passed at or below severity threshold |
+| 1 | Problems found at or above `--severity` (default `high`) |
+| 2 | Doctor command itself failed (not a project issue) |
 
-```
-azure-functions-setup (F3)                    azure-functions-doctor (F16)
-─────────────                    ───────────────
-"Do I have the tools?"           "Is my project healthy?"
+## Security model
 
-  Azure CLI installed?             host.json valid?
-  Core Tools installed?            local.settings.json valid?
-  Python/Node/.NET?                Runtime compatible?
-                                   Ports available?
-                                   Azurite running?
-                                   Secrets safe?
+Tier 2 spawns an agent with elevated permissions (file write, shell execution) so the agent can read and analyze workspace files freely. Workspace content can prompt-inject the agent. To make the risk explicit:
 
-Entry condition:                 Entry condition:
-  user_is_new                      func_start_failed
-  tooling_unknown                  error_occurred
-```
+- `--deep` alone refuses to start the agent
+- User must add `--accept-deep-risk` to acknowledge the risk
+- A warning is printed to stderr immediately before agent spawn
+- Workspace files (`.azure-functions-skills/state.local.json`, `doctor-ai-agent.log`) are written but only the state file is auto-added to `.gitignore`
 
-## Cross-Target Implementation
+## CI integration
+
+GitHub Actions example, full snippet: [docs/doctor-guide.md → GitHub Actions](../doctor-guide.md#github-actions-integration).
+
+## Testing
+
+A fixture library at [tests/fixtures/doctor-bad-apps/](../../tests/fixtures/doctor-bad-apps/) covers every check at every tier. See [docs/bad-app-fixtures.md](../bad-app-fixtures.md) for the manual E2E workflow.
+
+## Cross-target implementation
 
 | Target | Surfacing |
-|--------|-----------|
-| GHCP | Skill runs checks via terminal commands, reports structured results |
-| Claude Code | Skill with file reads and terminal execution for each check |
-| Codex | Agent instruction with diagnostic workflow |
-| Repo Template | Troubleshooting guide in `copilot-instructions.md` |
+| --- | --- |
+| GitHub Copilot CLI | `copilot -p` invocation with `--allow-all-tools` |
+| Claude Code | `claude -p` with `--dangerously-skip-permissions` and `--max-turns 20` |
+| Codex | `codex --approval-mode full-auto -q` |
+| Repository template | Skill instructions copied into `.github/skills/azure-functions-doctor/` |
+
+## References to external knowledge
+
+The skill references under [templates/skills/azure-functions-doctor/references/](../../templates/skills/azure-functions-doctor/references/) provide tagged checklists the agent can load on demand:
+
+- `source-only-checks.md` — code patterns
+- `language-checks.md` — per-language pitfalls
+- `iac-azure-resource-checks.md` — managed identity, network, scaling
+- `ai-semantic-checks.md` — durable determinism, output bindings, idempotency
+
+These are sourced from [docs/doctor-checks-best-practices-reference.md](../doctor-checks-best-practices-reference.md).

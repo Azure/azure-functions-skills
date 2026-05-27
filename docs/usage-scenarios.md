@@ -2,45 +2,37 @@
 
 Use these scenario scripts to try the Azure Functions Skills plugin without relying on private subscriptions, prepared test apps, or customer-specific data.
 
-The examples focus on GitHub Copilot CLI. Claude Code and Codex can use the same prompts after installing the plugin or running `setup` for their target.
+The examples focus on GitHub Copilot CLI. Claude Code and Codex can use the same prompts after installing the plugin with `install --agent claude` or `--agent codex`.
 
 ## Prerequisites
 
-Install the Azure Functions Skills plugin or run workspace setup first. Confirm these tools are available for the scenarios you want to run:
+The only hard prerequisite is **Node.js 18+**. Everything else is checked (and installed where supported) by the `azure-functions-setup` skill the first time you run `chat`.
 
-```bash
-node --version
-npm --version
-copilot --help
-func --version
-az --version
-```
-
-For Azure deployment or diagnostics scenarios, sign in to Azure and choose a subscription:
+For scenarios that touch a real Azure subscription, sign in first:
 
 ```bash
 az login
 az account show
 ```
 
-## Start the Functions agent
-
-For GitHub Copilot CLI, select the `functions-copilot` agent explicitly:
+## Install the plugin once
 
 ```bash
-copilot --agent functions-copilot
+npx @azure/functions-skills install --agent ghcp --dir ./my-app
+```
+
+For Claude Code use `--agent claude`, for Codex use `--agent codex`. See [cli-reference.md](cli-reference.md#install) for the full option list.
+
+## Start the Functions agent
+
+```bash
+npx @azure/functions-skills chat --dir ./my-app
 ```
 
 For a one-shot prompt:
 
 ```bash
-copilot --agent functions-copilot -p "Explain what Azure Functions Skills can do and which workflow I should start with."
-```
-
-Optional: add `--yolo` only when you are comfortable granting all permissions for the session:
-
-```bash
-copilot --agent functions-copilot --yolo
+npx @azure/functions-skills chat --dir ./my-app -- -p "Explain what Azure Functions Skills can do and which workflow I should start with."
 ```
 
 Expected result:
@@ -82,16 +74,16 @@ Expected result:
 
 ## Scenario 3: Add skills to an existing Functions project
 
-Start in an existing Azure Functions project, then run setup if workspace-local files are desired:
+Start in an existing Azure Functions project, then install:
 
 ```bash
-npx @agent-loom/azure-functions-skills@latest setup --agent ghcp --check-prerequisites
+npx @azure/functions-skills install --agent ghcp --check-prerequisites
 ```
 
 Then start the agent:
 
 ```bash
-copilot --agent functions-copilot
+npx @azure/functions-skills chat --dir .
 ```
 
 Prompt:
@@ -102,7 +94,7 @@ Inspect this existing Azure Functions project and tell me which Azure Functions 
 
 Expected result:
 
-- Setup adds agent instructions, skills, hooks, and MCP configuration without modifying app source code.
+- Install adds the plugin and workspace activation files without modifying app source code.
 - The assistant detects that the directory already contains a Functions project.
 - It suggests relevant next actions such as adding a function, deploying, reviewing best practices, or running diagnostics.
 
@@ -181,3 +173,34 @@ Expected result:
 - It previews the feedback before creating anything.
 - It asks whether to create an issue or pull request.
 - It does not create external GitHub artifacts without explicit approval.
+
+## Scenario 8: Pre-deployment validation with doctor
+
+Run from a Functions project to validate configuration and code before deployment:
+
+```bash
+# Quick built-in checks (Tier 1)
+npx @azure/functions-skills doctor --dir .
+
+# Visual HTML report
+npx @azure/functions-skills doctor --dir . --format html --output doctor-report.html
+
+# Deep semantic analysis (Tier 2 — opt-in, agent runs with elevated permissions)
+npx @azure/functions-skills doctor --dir . \
+  --deep --accept-deep-risk \
+  --agent github-copilot \
+  --format html --output doctor-deep.html
+```
+
+Expected result:
+
+- Tier 1 finishes in under a second with deterministic findings: missing `host.json`, deprecated settings, unsupported runtime versions, etc.
+- Tier 2 (with `--deep --accept-deep-risk`) takes ~60–120s and adds semantic findings: missing exception handling, hardcoded secrets, blocking I/O, durable non-determinism, etc.
+- Exit code `1` if any finding is at or above the `--severity` threshold (default `high`).
+- See [doctor-guide.md](doctor-guide.md) for output formats and GitHub Actions integration.
+
+## Related
+
+- [CLI reference](cli-reference.md)
+- [Doctor guide](doctor-guide.md)
+- [Skills vs Azure Skills](skills-vs-azure-skills.md)
