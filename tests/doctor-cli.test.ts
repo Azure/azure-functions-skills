@@ -14,16 +14,25 @@ afterAll(() => { for (const d of TEMP_DIRS) removeDir(d); });
 
 const CLI = join(import.meta.dirname, '..', 'bin', 'azure-functions-skills.js');
 
-function runDoctor(args: string[]): { stdout: string; exitCode: number } {
+function runDoctor(args: string[]): { stdout: string; stderr: string; exitCode: number } {
   try {
     const stdout = execFileSync(process.execPath, [CLI, 'doctor', ...args], {
       encoding: 'utf-8',
       timeout: 30_000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE: '1',
+      },
     });
-    return { stdout, exitCode: 0 };
+    return { stdout, stderr: '', exitCode: 0 };
   } catch (err: unknown) {
-    const e = err as { stdout?: string; status?: number };
-    return { stdout: e.stdout ?? '', exitCode: e.status ?? 2 };
+    const e = err as { stdout?: Buffer | string; stderr?: Buffer | string; status?: number };
+    return {
+      stdout: e.stdout ? e.stdout.toString() : '',
+      stderr: e.stderr ? e.stderr.toString() : '',
+      exitCode: e.status ?? 2,
+    };
   }
 }
 
@@ -56,13 +65,16 @@ describe('doctor CLI', () => {
     expect(stdout).toContain('passed');
   });
 
-  it('json format returns valid JSON', () => {
+  it('json format writes valid JSON to output file', () => {
     const dir = makeTmp('cli-doc-json-');
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'test' }));
+    const reportPath = join(dir, 'report.json');
 
-    const { stdout } = runDoctor(['--dir', dir, '--no-deep', '--format', 'json']);
-    const report = JSON.parse(stdout);
+    runDoctor(['--dir', dir, '--no-deep', '--format', 'json', '--output', reportPath]);
+
+    expect(existsSync(reportPath)).toBe(true);
+    const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
     expect(report.version).toBe(1);
     expect(report.tiers.builtin.ran).toBe(true);
   });
@@ -71,9 +83,11 @@ describe('doctor CLI', () => {
     const dir = makeTmp('cli-doc-filter-');
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'test' }));
+    const reportPath = join(dir, 'report.json');
 
-    const { stdout } = runDoctor(['--dir', dir, '--no-deep', '--format', 'json', '--checks', 'project-exists']);
-    const report = JSON.parse(stdout);
+    runDoctor(['--dir', dir, '--no-deep', '--format', 'json', '--output', reportPath, '--checks', 'project-exists']);
+
+    const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
     expect(report.tiers.builtin.checks).toHaveLength(1);
     expect(report.tiers.builtin.checks[0].id).toBe('project-exists');
   });
@@ -88,17 +102,44 @@ describe('doctor CLI', () => {
     expect(exitCode).toBe(0);
   });
 
-  it('writes report file', () => {
+  it('writes report file in requested format', () => {
     const dir = makeTmp('cli-doc-report-');
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'test' }));
     const reportPath = join(dir, '.doctor-test', 'report.json');
 
-    runDoctor(['--dir', dir, '--no-deep', '--output', reportPath]);
+    runDoctor(['--dir', dir, '--no-deep', '--format', 'json', '--output', reportPath]);
 
     expect(existsSync(reportPath)).toBe(true);
     const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
     expect(report.version).toBe(1);
+  });
+
+  it('writes HTML report when --format html is specified', () => {
+    const dir = makeTmp('cli-doc-html-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'test' }));
+    const reportPath = join(dir, 'report.html');
+
+    runDoctor(['--dir', dir, '--no-deep', '--format', 'html', '--output', reportPath]);
+
+    expect(existsSync(reportPath)).toBe(true);
+    const html = readFileSync(reportPath, 'utf-8');
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('Azure Functions Doctor');
+  });
+
+  it('prints text summary to stdout regardless of --format', () => {
+    const dir = makeTmp('cli-doc-stdout-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'test' }));
+    const reportPath = join(dir, 'report.json');
+
+    const { stdout } = runDoctor(['--dir', dir, '--no-deep', '--format', 'json', '--output', reportPath]);
+
+    // stdout always contains human-readable text, even when --format json
+    expect(stdout).toContain('Azure Functions Doctor');
+    expect(stdout).toContain('Summary:');
   });
 
   it('help doctor prints usage', () => {

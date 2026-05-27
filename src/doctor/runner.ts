@@ -10,6 +10,7 @@ import type {
   ProjectContext,
   ReportSummary,
 } from './types.js';
+import type { BuildTargetName } from '../types.js';
 import { ALL_CHECKS } from './checks.js';
 import { loadProjectContext } from './context.js';
 import { resolveStacks } from './stacks.js';
@@ -67,7 +68,10 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
 
   // Resolve stacks from API / cache / fallback
   const cacheDir = join(options.dir, '.azure-functions-skills');
-  ctx.stacks = await resolveStacks({ cacheDir });
+  ctx.stacks = await resolveStacks({
+    cacheDir,
+    offline: process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE === '1',
+  });
 
   const checksToRun = filterChecks(ALL_CHECKS, ctx, options.checks);
   const results = await executeChecks(checksToRun, ctx);
@@ -86,22 +90,67 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
   };
 
   // Tier 2: AI analysis (when --deep is enabled)
-  if (options.deep && options.agent) {
-    const reportPath = join(
-      options.dir,
-      '.azure-functions-skills',
-      'doctor-ai-findings.json',
-    );
-    const prompt = buildDoctorPrompt(results, reportPath);
-    const timeoutMs = options.timeout * 1000;
-    const aiResult = await runAiAnalysis(
-      options.agent,
-      prompt,
-      reportPath,
-      options.dir,
-      timeoutMs,
-    );
-    report = mergeReports(report, aiResult.findings, options.agent, aiResult.durationMs);
+  if (options.deep) {
+    if (!options.acceptDeepRisk) {
+      report = {
+        ...report,
+        tiers: {
+          ...report.tiers,
+          ai: {
+            ran: false,
+            checks: [],
+            error: 'AI analysis skipped: --deep runs the agent with elevated permissions (file write, shell execution). Re-run with --accept-deep-risk only on trusted workspaces.',
+          },
+        },
+      };
+    } else {
+      const resolvedAgent = await resolveDeepAgent(options.dir, options.agent);
+      if (!resolvedAgent) {
+        report = {
+          ...report,
+          tiers: {
+            ...report.tiers,
+            ai: {
+              ran: false,
+              checks: [],
+              error: 'AI analysis skipped: no agent specified and none installed in workspace state. Pass --agent github-copilot|claude-code|codex.',
+            },
+          },
+        };
+      } else if (ctx.hostJson === null) {
+        report = {
+          ...report,
+          tiers: {
+            ...report.tiers,
+            ai: {
+              ran: false,
+              checks: [],
+              agent: resolvedAgent,
+              error: 'AI analysis skipped because host.json is missing. Run doctor from an Azure Functions project directory or pass --dir.',
+            },
+          },
+        };
+      } else {
+        // Ensure skill files are installed so the agent has context
+        await ensureSkillsInstalled(options.dir, resolvedAgent, options.installMode);
+
+        const reportPath = join(
+          options.dir,
+          '.azure-functions-skills',
+          'doctor-ai-findings.json',
+        );
+        const prompt = buildDoctorPrompt(results, reportPath);
+        const timeoutMs = options.timeout * 1000;
+        const aiResult = await runAiAnalysis(
+          resolvedAgent,
+          prompt,
+          reportPath,
+          options.dir,
+          timeoutMs,
+        );
+        report = mergeReports(report, aiResult.findings, resolvedAgent, aiResult.durationMs, aiResult.error, options.severity);
+      }
+    }
   }
 
   const exitCode = report.summary.status === 'fail' ? 1 : 0;
@@ -131,4 +180,105 @@ async function executeChecks(
     results.push(...checkResults);
   }
   return results;
+}
+
+/**
+ * Ensure skill/agent workspace files are installed before deep analysis.
+ * Checks install state; if no agent is installed, runs the install flow.
+ *
+ * Default: local workspace install (applySetup) — safe for CI and ephemeral environments.
+ * With installMode 'plugin': plugin registration + workspace activation.
+ */
+async function ensureSkillsInstalled(dir: string, agentLauncher: string, installMode: 'local' | 'plugin' = 'local'): Promise<void> {
+  const { readState, getInstalledTargets, recordInstallState } = await import('../setup/state.js');
+
+  const target = launcherToTarget(agentLauncher);
+
+  const state = readState(dir);
+  if (state) {
+    const installed = getInstalledTargets(state);
+    // Check that this specific target is installed, not just any target
+    if (installed.includes(target)) return;
+  }
+
+  let effectiveMode: 'local' | 'plugin' = installMode;
+  const includeAgent = target === 'ghcp';
+
+  if (installMode === 'plugin') {
+    // Plugin registration + workspace activation (developer machine)
+    try {
+      const { runPluginOperation } = await import('../setup/plugin-install.js');
+      const { applyWorkspace } = await import('../setup/workspace.js');
+
+      await runPluginOperation({
+        action: 'install',
+        agents: [target],
+        projectDir: dir,
+        workspace: false,
+        yes: true,
+      });
+
+      await applyWorkspace(dir, {
+        agents: [target],
+        mode: 'plugin-reference',
+        yes: true,
+        includeMcp: true,
+        includeHooks: true,
+        includeAgent,
+      });
+    } catch (err) {
+      // Fall back to local install if plugin CLI is unavailable
+      console.error(`⚠️  Plugin install failed (${(err as Error).message}), falling back to local install.`);
+      effectiveMode = 'local';
+      const { applySetup } = await import('../setup/index.js');
+      await applySetup(dir, { agents: [target], prerequisites: 'skip' });
+    }
+  } else {
+    // Local workspace install (default — CI-safe)
+    const { applySetup } = await import('../setup/index.js');
+    await applySetup(dir, { agents: [target], prerequisites: 'skip' });
+  }
+
+  // Record state with the actual install mode used
+  recordInstallState(dir, {
+    action: 'install',
+    agents: [target],
+    mode: effectiveMode,
+    source: 'doctor-auto',
+    scope: 'workspace',
+    includeMcp: effectiveMode === 'plugin',
+    includeHooks: effectiveMode === 'plugin',
+    includeAgent,
+  });
+}
+
+function launcherToTarget(agent: string): BuildTargetName {
+  switch (agent) {
+    case 'github-copilot': return 'ghcp';
+    case 'claude-code': return 'claude';
+    case 'codex': return 'codex';
+    default: throw new Error(`Unknown agent launcher: ${agent}. Expected: github-copilot, claude-code, or codex`);
+  }
+}
+
+function targetToLauncher(target: BuildTargetName): string {
+  switch (target) {
+    case 'ghcp': return 'github-copilot';
+    case 'claude': return 'claude-code';
+    case 'codex': return 'codex';
+  }
+}
+
+/**
+ * Resolve which launcher to use for deep analysis.
+ * Priority: explicit --agent > first installed agent recorded in state > undefined.
+ */
+async function resolveDeepAgent(dir: string, explicit?: string): Promise<string | undefined> {
+  if (explicit) return explicit;
+  const { readState, getInstalledTargets } = await import('../setup/state.js');
+  const state = readState(dir);
+  if (!state) return undefined;
+  const installed = getInstalledTargets(state);
+  if (installed.length === 0) return undefined;
+  return targetToLauncher(installed[0]);
 }

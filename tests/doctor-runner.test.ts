@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTempDir, removeDir } from './helpers/fs.js';
@@ -7,12 +7,24 @@ import { formatReport } from '../src/doctor/formatters.js';
 import type { DoctorOptions } from '../src/doctor/types.js';
 
 const TEMP_DIRS: string[] = [];
+let previousStacksOffline: string | undefined;
 function makeTmp(prefix: string): string {
   const dir = createTempDir(prefix);
   TEMP_DIRS.push(dir);
   return dir;
 }
-afterAll(() => { for (const d of TEMP_DIRS) removeDir(d); });
+beforeAll(() => {
+  previousStacksOffline = process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE;
+  process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE = '1';
+});
+afterAll(() => {
+  if (previousStacksOffline === undefined) {
+    delete process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE;
+  } else {
+    process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE = previousStacksOffline;
+  }
+  for (const d of TEMP_DIRS) removeDir(d);
+});
 
 function defaultOpts(dir: string, overrides?: Partial<DoctorOptions>): DoctorOptions {
   return {
@@ -35,6 +47,46 @@ describe('runDoctor', () => {
     expect(exitCode).toBe(1);
     expect(report.summary.status).toBe('fail');
     expect(report.summary.critical).toBeGreaterThanOrEqual(1);
+  });
+
+  it('skips AI analysis when deep is requested outside a Functions project', async () => {
+    const dir = makeTmp('runner-empty-deep-');
+    const { report, exitCode } = await runDoctor(defaultOpts(dir, {
+      deep: true,
+      agent: 'github-copilot',
+      acceptDeepRisk: true,
+    }));
+
+    expect(exitCode).toBe(1);
+    expect(report.tiers.ai.ran).toBe(false);
+    expect(report.tiers.ai.agent).toBe('github-copilot');
+    expect(report.tiers.ai.error).toContain('host.json is missing');
+  });
+
+  it('errors when --deep is requested without --agent and no state', async () => {
+    const dir = makeTmp('runner-deep-no-agent-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const { report } = await runDoctor(defaultOpts(dir, { deep: true, acceptDeepRisk: true }));
+
+    // Tier 1 should still run; Tier 2 should be skipped with explanation
+    expect(report.tiers.builtin.ran).toBe(true);
+    expect(report.tiers.ai.ran).toBe(false);
+    expect(report.tiers.ai.agent).toBeUndefined();
+    expect(report.tiers.ai.error).toMatch(/agent/i);
+  });
+
+  it('refuses to run --deep without acceptDeepRisk acknowledgement', async () => {
+    const dir = makeTmp('runner-deep-no-accept-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const { report } = await runDoctor(defaultOpts(dir, {
+      deep: true,
+      agent: 'github-copilot',
+      acceptDeepRisk: false,
+    }));
+
+    expect(report.tiers.builtin.ran).toBe(true);
+    expect(report.tiers.ai.ran).toBe(false);
+    expect(report.tiers.ai.error).toMatch(/--accept-deep-risk|untrusted|elevated/i);
   });
 
   it('returns exit 0 for a healthy project', async () => {
@@ -128,5 +180,97 @@ describe('formatReport', () => {
     const md = formatReport(report, 'markdown');
     expect(md).toContain('# Azure Functions Doctor Report');
     expect(md).toContain('| Status | Check | Message |');
+  });
+
+  it('html format has valid structure and embedded styles', async () => {
+    const dir = makeTmp('fmt-html-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'test' }));
+    const { report } = await runDoctor(defaultOpts(dir));
+    const html = formatReport(report, 'html');
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('<title>Azure Functions Doctor Report</title>');
+    expect(html).toContain('<style>');
+    expect(html).toContain('Azure Functions Doctor');
+    expect(html).toContain('Built-in Checks');
+    // Status badge present
+    expect(html).toMatch(/class="overall-status status-(pass|fail)"/);
+    // Summary cards present
+    expect(html).toContain('Critical');
+    expect(html).toContain('High');
+    expect(html).toContain('Passed');
+  });
+
+  it('html format escapes user-provided content', async () => {
+    const dir = makeTmp('fmt-html-esc-');
+    // Use a path-like name that would be reflected back into the report
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const { report } = await runDoctor(defaultOpts(dir));
+    // Inject a hostile value into a check message to verify escaping
+    report.tiers.builtin.checks.push({
+      id: 'evil-check',
+      category: 'configuration',
+      severity: 'low',
+      status: 'warn',
+      title: 'evil <script>alert(1)</script>',
+      message: '"quotes" & <tags>',
+    });
+    const html = formatReport(report, 'html');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('&quot;quotes&quot;');
+  });
+
+  it('html format defends against malicious status/severity/category/line values', async () => {
+    const dir = makeTmp('fmt-html-enum-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const { report } = await runDoctor(defaultOpts(dir));
+    // Inject malicious enum-like values that would break CSS class attributes
+    // (cast through unknown to bypass strict types — simulates AI returning bad JSON)
+    report.tiers.builtin.checks.push({
+      id: 'evil-enum',
+      category: 'evil"><script>x</script>',
+      severity: 'evil"><script>y</script>' as unknown as 'low',
+      status: 'fail', // valid so check renders
+      title: 'Evil',
+      message: 'M',
+      file: 'evil"><script>f</script>',
+      line: '1"><script>l</script>' as unknown as number,
+    });
+    const html = formatReport(report, 'html');
+    // No raw <script> tags anywhere (case-insensitive)
+    expect(html.toLowerCase()).not.toMatch(/<script[\s>]/);
+    // CSS class attributes must not be broken out of
+    expect(html).not.toContain('sev-evil');
+    expect(html).not.toContain('check-cat">evil"');
+  });
+
+  it('html format defends against malicious values in AI tier findings', async () => {
+    const dir = makeTmp('fmt-html-ai-enum-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const { report } = await runDoctor(defaultOpts(dir));
+    // AI tier renders findings without the builtin status filter — bigger attack surface
+    report.tiers.ai = {
+      ran: true,
+      agent: 'github-copilot',
+      durationMs: 1000,
+      checks: [{
+        id: 'ai-evil',
+        category: 'evil"><script>a</script>',
+        severity: 'evil"><script>b</script>' as unknown as 'critical',
+        status: 'evil"><script>c</script>' as unknown as 'fail',
+        title: 'AI Evil',
+        message: 'M',
+        file: 'evil"><script>d</script>',
+        line: '99"><script>e</script>' as unknown as number,
+      }],
+    };
+    const html = formatReport(report, 'html');
+    // No raw <script> tags anywhere
+    expect(html.toLowerCase()).not.toMatch(/<script[\s>]/);
+    // CSS class attributes must not be broken out of
+    expect(html).not.toContain('status-evil');
+    expect(html).not.toContain('sev-evil');
+    expect(html).not.toContain('check-evil');
   });
 });

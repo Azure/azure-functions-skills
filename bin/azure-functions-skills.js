@@ -4,10 +4,10 @@
  * Azure Functions Skills CLI
  *
  * Usage:
- *   npx @agent-loom/azure-functions-skills setup              # Install skill files
- *   npx @agent-loom/azure-functions-skills chat               # Launch agent with Welcome prompt
- *   npx @agent-loom/azure-functions-skills chat --agent codex  # Specific agent
- *   npx @agent-loom/azure-functions-skills build               # Build plugin artifacts
+ *   npx @azure/functions-skills setup              # Install skill files
+ *   npx @azure/functions-skills chat               # Launch agent with Welcome prompt
+ *   npx @azure/functions-skills chat --agent codex  # Specific agent
+ *   npx @azure/functions-skills build               # Build plugin artifacts
  */
 
 import { detectAgents, applySetup } from '../lib/setup/index.js';
@@ -143,25 +143,29 @@ Exit codes:
 
 Options:
   --dir <path>        Target workspace (default: cwd)
-  --deep              Enable AI agent analysis (Tier 2)
+  --deep              Enable AI agent analysis (Tier 2). Requires --accept-deep-risk.
   --no-deep           Skip AI analysis, run built-in checks only
+  --accept-deep-risk  Acknowledge that --deep runs the agent with elevated permissions
+                      (file write, shell execution). Required on trusted workspaces only.
   --agent <name>      Agent for AI analysis: github-copilot, claude-code, codex
+  --install-mode <m>  How to auto-install skills: local (default, CI-safe), plugin
   --timeout <seconds> Timeout for AI analysis (default: 300)
-  --format <type>     Output format: text, json, markdown (default: text)
+  --format <type>     Output format: text, json, markdown, html (default: text)
   --output <path>     Report file path (default: .azure-functions-skills/doctor-report.json)
   --checks <names>    Comma-separated check names to run
   --severity <level>  Minimum severity to fail: critical, high, medium, low (default: high)
 
 Examples:
   azure-functions-skills doctor                      # Built-in checks
-  azure-functions-skills doctor --deep               # AI analysis included
+  azure-functions-skills doctor --deep --accept-deep-risk               # AI analysis included
   azure-functions-skills doctor --no-deep --format json  # CI mode
+  azure-functions-skills doctor --deep --accept-deep-risk --install-mode plugin  # Plugin install on dev machine
 `,
 };
 
 function printHelp() {
   console.log(`
-  @agent-loom/azure-functions-skills — AI assistant plugins for Azure Functions
+  @azure/functions-skills — AI assistant plugins for Azure Functions
 
   Commands:
     doctor   Analyze project code and configuration for common issues
@@ -234,13 +238,13 @@ function printHelp() {
     --dist-dir <path>  Output directory (default: dist)
 
   Examples:
-    npx @agent-loom/azure-functions-skills setup
-    npx @agent-loom/azure-functions-skills install --agent ghcp --dry-run
-    npx @agent-loom/azure-functions-skills setup --as-plugin
-    npx @agent-loom/azure-functions-skills plugin install --agent ghcp --dry-run
-    npx @agent-loom/azure-functions-skills workspace apply --agent codex --mode plugin-reference --dry-run
-    npx @agent-loom/azure-functions-skills chat
-    npx @agent-loom/azure-functions-skills chat --as-plugin --agent claude-code
+    npx @azure/functions-skills setup
+    npx @azure/functions-skills install --agent ghcp --dry-run
+    npx @azure/functions-skills setup --as-plugin
+    npx @azure/functions-skills plugin install --agent ghcp --dry-run
+    npx @azure/functions-skills workspace apply --agent codex --mode plugin-reference --dry-run
+    npx @azure/functions-skills chat
+    npx @azure/functions-skills chat --as-plugin --agent claude-code
   `);
 }
 
@@ -837,6 +841,7 @@ if (command === 'install' || command === 'update') {
   const dir = getFlag('--dir') || process.cwd();
   const deep = args.includes('--deep');
   const noDeep = args.includes('--no-deep');
+  const acceptDeepRisk = args.includes('--accept-deep-risk');
   const agent = getFlag('--agent');
   const timeout = parseInt(getFlag('--timeout') || '300', 10);
   const format = getFlag('--format') || 'text';
@@ -844,25 +849,28 @@ if (command === 'install' || command === 'update') {
   const checksArg = getFlag('--checks');
   const checks = checksArg ? checksArg.split(',').map(s => s.trim()) : undefined;
   const severity = getFlag('--severity') || 'high';
+  const installMode = getFlag('--install-mode') || 'local';
 
   try {
     const { report, exitCode } = await runDoctor({
       dir,
       deep: deep && !noDeep,
+      acceptDeepRisk,
       agent,
       timeout,
       format,
       output,
       checks,
       severity,
+      installMode,
     });
 
-    console.log(formatReport(report, format));
+    console.log(formatReport(report, 'text'));
 
-    // Write report file
+    // Write report file in the requested format
     const reportDir = dirname(output);
     mkdirSync(reportDir, { recursive: true });
-    writeFileSync(output, JSON.stringify(report, null, 2));
+    writeFileSync(output, formatReport(report, format));
 
     process.exit(exitCode);
   } catch (err) {

@@ -130,6 +130,13 @@ const MOCK_PYTHON_STACK = {
 };
 
 const MOCK_API_RESPONSE = [MOCK_NODE_STACK, MOCK_PYTHON_STACK];
+const MOCK_ARM_RESPONSE = {
+  value: MOCK_API_RESPONSE.map(stack => ({
+    name: stack.value,
+    type: 'Microsoft.Web/functionAppStacks',
+    properties: stack,
+  })),
+};
 
 // ── parseStacksResponse ──
 
@@ -163,6 +170,13 @@ describe('parseStacksResponse', () => {
   it('handles empty response', () => {
     const stacks = parseStacksResponse([]);
     expect(stacks).toEqual([]);
+  });
+
+  it('extracts versions from ARM functionAppStacks response', () => {
+    const stacks = parseStacksResponse(MOCK_ARM_RESPONSE);
+    const node = stacks.find(s => s.language === 'node');
+    expect(node).toBeDefined();
+    expect(node!.versions.some(v => v.version === '22')).toBe(true);
   });
 });
 
@@ -219,26 +233,24 @@ describe('checkVersionStatus', () => {
 // ── resolveStacks (cache behavior) ──
 
 describe('resolveStacks', () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let sourceSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    fetchSpy = vi.fn();
+    sourceSpy = vi.fn();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('fetches from API and writes cache', async () => {
+  it('fetches from source and writes cache', async () => {
     const dir = makeTmp('stacks-fetch-');
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: async () => MOCK_API_RESPONSE,
-    });
+    sourceSpy.mockResolvedValueOnce(MOCK_ARM_RESPONSE);
 
-    const stacks = await resolveStacks({ cacheDir: dir }, fetchSpy);
+    const stacks = await resolveStacks({ cacheDir: dir }, sourceSpy);
     expect(stacks.length).toBeGreaterThan(0);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(sourceSpy).toHaveBeenCalledTimes(1);
+    expect(sourceSpy).toHaveBeenCalledWith({ apiVersion: '2025-05-01', timeoutMs: 15000 });
 
     // Cache file should be written
     const cachePath = join(dir, 'stacks-cache.json');
@@ -257,9 +269,9 @@ describe('resolveStacks', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'stacks-cache.json'), JSON.stringify(cache));
 
-    const stacks = await resolveStacks({ cacheDir: dir }, fetchSpy);
+    const stacks = await resolveStacks({ cacheDir: dir }, sourceSpy);
     expect(stacks.length).toBeGreaterThan(0);
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(sourceSpy).not.toHaveBeenCalled();
   });
 
   it('refetches when cache is expired', async () => {
@@ -272,21 +284,18 @@ describe('resolveStacks', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'stacks-cache.json'), JSON.stringify(cache));
 
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: async () => MOCK_API_RESPONSE,
-    });
+    sourceSpy.mockResolvedValueOnce(MOCK_ARM_RESPONSE);
 
-    const stacks = await resolveStacks({ cacheDir: dir }, fetchSpy);
+    const stacks = await resolveStacks({ cacheDir: dir }, sourceSpy);
     expect(stacks.length).toBeGreaterThan(0);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(sourceSpy).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to hardcoded rules when offline', async () => {
     const dir = makeTmp('stacks-offline-');
-    const stacks = await resolveStacks({ cacheDir: dir, offline: true }, fetchSpy);
+    const stacks = await resolveStacks({ cacheDir: dir, offline: true }, sourceSpy);
     expect(stacks.length).toBeGreaterThan(0);
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(sourceSpy).not.toHaveBeenCalled();
     // Should have node from fallback
     const node = stacks.find(s => s.language === 'node');
     expect(node).toBeDefined();
@@ -294,9 +303,9 @@ describe('resolveStacks', () => {
 
   it('falls back to hardcoded rules when fetch fails', async () => {
     const dir = makeTmp('stacks-fail-');
-    fetchSpy.mockRejectedValueOnce(new Error('Network error'));
+    sourceSpy.mockRejectedValueOnce(new Error('Azure CLI error'));
 
-    const stacks = await resolveStacks({ cacheDir: dir }, fetchSpy);
+    const stacks = await resolveStacks({ cacheDir: dir }, sourceSpy);
     expect(stacks.length).toBeGreaterThan(0);
     // Should still have language entries from fallback
     const node = stacks.find(s => s.language === 'node');
@@ -313,9 +322,9 @@ describe('resolveStacks', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'stacks-cache.json'), JSON.stringify(staleCache));
 
-    fetchSpy.mockRejectedValueOnce(new Error('Network error'));
+    sourceSpy.mockRejectedValueOnce(new Error('Azure CLI error'));
 
-    const stacks = await resolveStacks({ cacheDir: dir }, fetchSpy);
+    const stacks = await resolveStacks({ cacheDir: dir }, sourceSpy);
     expect(stacks.length).toBeGreaterThan(0);
     // Should prefer stale cache over hardcoded
     const node = stacks.find(s => s.language === 'node');

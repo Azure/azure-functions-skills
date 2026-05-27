@@ -5,6 +5,7 @@ import { createTempDir, removeDir } from './helpers/fs.js';
 import {
   buildDoctorPrompt,
   buildAgentCommand,
+  buildDeepWarning,
   readAiReport,
   mergeReports,
 } from '../src/doctor/ai-analysis.js';
@@ -58,9 +59,12 @@ describe('buildDoctorPrompt', () => {
 describe('buildAgentCommand', () => {
   it('builds github-copilot headless command', () => {
     const cmd = buildAgentCommand('github-copilot', 'analyze this', '/tmp/report.json');
-    expect(cmd.command).toBe('copilot');
+    // On Windows, command may be process.execPath when .cmd wrapper is resolved
+    const validCommands = ['copilot', process.execPath];
+    expect(validCommands).toContain(cmd.command);
     expect(cmd.args).toContain('-p');
     expect(cmd.args.some(a => a.includes('analyze this'))).toBe(true);
+    expect(cmd.args).toContain('--allow-all-tools');
   });
 
   it('builds claude-code headless command', () => {
@@ -72,13 +76,31 @@ describe('buildAgentCommand', () => {
 
   it('builds codex headless command', () => {
     const cmd = buildAgentCommand('codex', 'analyze this', '/tmp/report.json');
-    expect(cmd.command).toBe('codex');
+    const validCommands = ['codex', process.execPath];
+    expect(validCommands).toContain(cmd.command);
     expect(cmd.args).toContain('--approval-mode');
   });
 
   it('throws for unknown agent', () => {
     expect(() => buildAgentCommand('unknown-agent', 'test', '/tmp/r.json'))
       .toThrow('Unknown agent');
+  });
+});
+
+// ── buildDeepWarning ──
+
+describe('buildDeepWarning', () => {
+  it('mentions elevated permissions and the agent name', () => {
+    const warning = buildDeepWarning('github-copilot');
+    expect(warning.toLowerCase()).toContain('warning');
+    expect(warning).toContain('github-copilot');
+    // Should mention file/shell access risk
+    expect(warning.toLowerCase()).toMatch(/file|shell|untrusted|workspace/);
+  });
+
+  it('different agents are reflected in the warning', () => {
+    expect(buildDeepWarning('claude-code')).toContain('claude-code');
+    expect(buildDeepWarning('codex')).toContain('codex');
   });
 });
 
@@ -211,5 +233,43 @@ describe('mergeReports', () => {
     expect(merged.summary.critical).toBe(1);
     expect(merged.summary.medium).toBe(1);
     expect(merged.summary.pass).toBe(1);
+  });
+
+  it('honors severity threshold when computing status (critical threshold ignores high AI findings)', () => {
+    const report = makeBaseReport();
+    const aiFindings: DoctorCheckResult[] = [
+      { id: 'f-high', category: 'code', severity: 'high', status: 'fail', title: 'High', message: 'M' },
+    ];
+    const merged = mergeReports(report, aiFindings, 'github-copilot', 1000, undefined, 'critical');
+    expect(merged.summary.high).toBe(1);
+    expect(merged.summary.status).toBe('pass');
+  });
+
+  it('honors severity threshold (high threshold fails on AI high finding)', () => {
+    const report = makeBaseReport();
+    const aiFindings: DoctorCheckResult[] = [
+      { id: 'f-high', category: 'code', severity: 'high', status: 'fail', title: 'High', message: 'M' },
+    ];
+    const merged = mergeReports(report, aiFindings, 'github-copilot', 1000, undefined, 'high');
+    expect(merged.summary.status).toBe('fail');
+  });
+
+  it('honors severity threshold (low threshold fails on AI medium warn)', () => {
+    const report = makeBaseReport();
+    const aiFindings: DoctorCheckResult[] = [
+      { id: 'f-med', category: 'code', severity: 'medium', status: 'warn', title: 'Med', message: 'M' },
+    ];
+    const merged = mergeReports(report, aiFindings, 'github-copilot', 1000, undefined, 'low');
+    expect(merged.summary.status).toBe('fail');
+  });
+
+  it('treats unknown severity as fail-closed (matches Tier 1 semantics)', () => {
+    const report = makeBaseReport();
+    // AI returned an unrecognized severity — should NOT silently pass
+    const aiFindings: DoctorCheckResult[] = [
+      { id: 'f-bad', category: 'code', severity: 'foo' as unknown as 'high', status: 'fail', title: 'Bad', message: 'M' },
+    ];
+    const merged = mergeReports(report, aiFindings, 'github-copilot', 1000, undefined, 'high');
+    expect(merged.summary.status).toBe('fail');
   });
 });
