@@ -96,8 +96,6 @@ Use `expected-results.md` for expected findings. Tier 1 findings are strict; Tie
 
 After running `run-all.ps1 -Deep`, you can produce an HTML report that scores how many expected Tier 2 findings the AI agent caught.
 
-### Option 1 — bundled Node.js script (recommended)
-
 ```powershell
 node <repo-root>/scripts/doctor-validation-report.mjs --fixtures-dir .
 Start-Process .\ai-validation-report.html
@@ -105,59 +103,5 @@ Start-Process .\ai-validation-report.html
 
 The script uses a curated keyword map for each fixture and reports overall recall (%), per-fixture matched / missed / extra findings, and AI durations. Self-contained HTML, no external dependencies.
 
-### Option 2 — let a coding agent produce the report
+> **Why not delegate this to an LLM agent?** An earlier version of this README contained a "let a coding agent produce the report" prompt. That pattern was withdrawn because every fixture under this directory is intentionally adversarial test content (some files are designed to look like real prompt-injection / supply-chain payloads). Pointing a general-purpose agent at the fixtures directory and asking it to *read* and *interpret* their JSON output is itself a prompt-injection surface. Use the deterministic Node.js script above instead.
 
-If you would rather hand the validation to a coding agent (Copilot CLI, Claude Code, Codex), paste the prompt below into the agent **from this directory** (the one containing `<fixture>/doctor-result.json`, `expected-results.md`, and this README). The agent reads each report, compares findings to the advisory `expected-results.md` assertions, and writes `ai-validation-report.html`.
-
-````text
-You are validating a doctor command test run for @azure/functions-skills.
-
-The current working directory contains:
-- One subdirectory per fixture (each is a doctor bad-app fixture).
-- A `doctor-result.json` in each subdirectory, produced by
-  `azure-functions-skills doctor --deep`.
-- `expected-results.md` documents the Tier 2 findings each fixture is
-  expected to produce, as advisory keyword-tagged assertions (LLM output is
-  non-deterministic so wording varies — match by concept, not exact ID).
-
-Task:
-
-1. List the fixture subdirectories.
-2. For each fixture:
-   a. Load `doctor-result.json` and read `tiers.ai.checks` (the AI findings).
-   b. Look up the expected Tier 2 findings for that fixture in
-      `expected-results.md`. Each expected entry has an ID such as SC-101
-      or CQ-007 and a short description.
-   c. Use semantic matching: an AI finding satisfies an expected one if its
-      `title`, `message`, `file`, or `recommendation` collectively cover the
-      expected concept. Do not require the expected ID string to appear
-      verbatim — match the concept (e.g. "module-load side effect" matches
-      titles like "Code executes at import time" or "Top-level network call").
-   d. Each expected entry: MATCHED or MISSED.
-   e. Each AI finding that satisfies no expected entry: EXTRA. Many extras
-      are still valid supply-chain concerns, not hallucinations.
-3. Compute overall metrics: total expected, matched, missed, extras, recall (%).
-
-Output: write a single self-contained file `ai-validation-report.html` in
-the current directory with:
-
-- Hero metrics at top: fixture count, expected total, matched, recall %, extras.
-- A per-fixture summary table with columns: name, language (from each
-  report's `language` field), Tier 1 issue count (status `fail`+`warn` in
-  `tiers.builtin.checks`), Tier 2 finding count, recall (matched/total),
-  AI duration in seconds (from `tiers.ai.durationMs`).
-- A detailed section per fixture:
-  - Each MATCHED expected entry, shown beside the AI title and severity
-    that matched it.
-  - Each MISSED expected entry, clearly flagged.
-  - Each EXTRA AI finding, shown separately under an "Extras" heading.
-- Inline `<style>` only — no external CSS or JS. The report must render
-  offline. Color code: green for matched, red for missed, blue for extras.
-- Escape every value that originates from the AI report (XSS safety).
-  Validate `status` and `severity` against an allowlist before
-  interpolating into CSS class names.
-
-Do not modify any other files. Do not make network calls.
-````
-
-After the agent writes `ai-validation-report.html`, open it in a browser to review.

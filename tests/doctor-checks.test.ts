@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { createTempDir, removeDir } from './helpers/fs.js';
 import { loadProjectContext } from '../src/doctor/context.js';
 import {
@@ -19,6 +20,8 @@ import {
   missingLockfileCheck,
   trackedSecretFilesCheck,
   installScriptDepsCheck,
+  pythonUnpinnedRequirementsCheck,
+  pythonMissingLockfileCheck,
   ALL_CHECKS,
 } from '../src/doctor/checks.js';
 
@@ -370,8 +373,8 @@ describe('typescript-build check', () => {
 // ── ALL_CHECKS ──
 
 describe('ALL_CHECKS registry', () => {
-  it('contains 18 checks', () => {
-    expect(ALL_CHECKS).toHaveLength(18);
+  it('contains 20 checks', () => {
+    expect(ALL_CHECKS).toHaveLength(20);
   });
 
   it('has unique IDs', () => {
@@ -525,7 +528,57 @@ describe('tracked-secret-files check', () => {
     const results = await trackedSecretFilesCheck.run(ctx);
     expect(results[0].status).toBe('pass');
   });
+
+  it('fails when .env is actually tracked by git, even if .gitignore now covers it', async () => {
+    // The highest-risk case: secret was committed to git, then later added
+    // to .gitignore. Reading .gitignore alone misses it. The check must
+    // consult the git index.
+    const dir = makeTmp('chk-secret-tracked-');
+    scaffoldProject(dir, { hostJson: { version: '2.0' } });
+    writeFileSync(join(dir, '.env'), 'SECRET=topsecret\n');
+
+    // Init a git repo and commit the .env file BEFORE writing .gitignore
+    initGit(dir);
+    addAndCommit(dir, '.env');
+
+    // Now add .gitignore that would cover .env going forward
+    writeFileSync(join(dir, '.gitignore'), 'node_modules/\n.env*\n');
+
+    const ctx = await loadProjectContext(dir);
+    const results = await trackedSecretFilesCheck.run(ctx);
+    expect(results[0].status).toBe('fail');
+    expect(results[0].message.toLowerCase()).toMatch(/tracked|committed|git/);
+  });
+
+  it('passes when .env is gitignored AND not tracked by git', async () => {
+    const dir = makeTmp('chk-secret-clean-');
+    scaffoldProject(dir, { hostJson: { version: '2.0' } });
+
+    // git init first, gitignore in place, then write .env (untracked)
+    writeFileSync(join(dir, '.gitignore'), 'node_modules/\n.env*\n');
+    initGit(dir);
+    addAndCommit(dir, '.gitignore');
+
+    writeFileSync(join(dir, '.env'), 'SECRET=topsecret\n');
+
+    const ctx = await loadProjectContext(dir);
+    const results = await trackedSecretFilesCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
 });
+
+function initGit(dir: string) {
+  // Allow tests to skip if git is not on PATH
+  const r = spawnSync('git', ['init', '-q'], { cwd: dir, shell: process.platform === 'win32' });
+  if (r.status !== 0) throw new Error('git init failed (is git on PATH?)');
+  spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir, shell: process.platform === 'win32' });
+  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir, shell: process.platform === 'win32' });
+}
+
+function addAndCommit(dir: string, file: string) {
+  spawnSync('git', ['add', file], { cwd: dir, shell: process.platform === 'win32' });
+  spawnSync('git', ['commit', '-q', '-m', `add ${file}`], { cwd: dir, shell: process.platform === 'win32' });
+}
 
 // ── Supply-chain: install-script-deps ──
 
@@ -575,6 +628,83 @@ describe('install-script-deps check', () => {
     }));
     const ctx = await loadProjectContext(dir);
     const results = await installScriptDepsCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+});
+
+// ── Supply-chain (Python): unpinned-requirements ──
+
+describe('python-unpinned-requirements check', () => {
+  it('skips when not a python project', async () => {
+    const dir = makeTmp('chk-pyunpin-skip-');
+    scaffoldProject(dir, { hostJson: { version: '2.0' }, packageJson: { name: 'n' } });
+    const ctx = await loadProjectContext(dir);
+    const results = await pythonUnpinnedRequirementsCheck.run(ctx);
+    expect(results[0].status).toBe('skip');
+  });
+
+  it('passes when requirements.txt pins every package', async () => {
+    const dir = makeTmp('chk-pyunpin-ok-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'requirements.txt'), 'azure-functions==1.18.0\nrequests==2.31.0\n');
+    const ctx = await loadProjectContext(dir);
+    const results = await pythonUnpinnedRequirementsCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('warns when requirements.txt has unpinned packages', async () => {
+    const dir = makeTmp('chk-pyunpin-bad-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(
+      join(dir, 'requirements.txt'),
+      'azure-functions\nrequests>=2.0\nflask~=2.3\n# comment\n'
+    );
+    const ctx = await loadProjectContext(dir);
+    const results = await pythonUnpinnedRequirementsCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+    expect(results[0].message).toContain('azure-functions');
+  });
+});
+
+// ── Supply-chain (Python): missing-lockfile ──
+
+describe('python-missing-lockfile check', () => {
+  it('skips when not a python project', async () => {
+    const dir = makeTmp('chk-pylock-skip-');
+    scaffoldProject(dir, { hostJson: { version: '2.0' }, packageJson: { name: 'n' } });
+    const ctx = await loadProjectContext(dir);
+    const results = await pythonMissingLockfileCheck.run(ctx);
+    expect(results[0].status).toBe('skip');
+  });
+
+  it('warns when no python lockfile is present', async () => {
+    const dir = makeTmp('chk-pylock-warn-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'requirements.txt'), 'azure-functions==1.18.0\n');
+    const ctx = await loadProjectContext(dir);
+    const results = await pythonMissingLockfileCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+  });
+
+  it('passes when requirements.txt uses --hash for every dep', async () => {
+    const dir = makeTmp('chk-pylock-hash-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(
+      join(dir, 'requirements.txt'),
+      'azure-functions==1.18.0 --hash=sha256:abc\nrequests==2.31.0 --hash=sha256:def\n'
+    );
+    const ctx = await loadProjectContext(dir);
+    const results = await pythonMissingLockfileCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('passes when poetry.lock is present', async () => {
+    const dir = makeTmp('chk-pylock-poetry-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'requirements.txt'), 'azure-functions==1.18.0\n');
+    writeFileSync(join(dir, 'poetry.lock'), '# poetry lock\n');
+    const ctx = await loadProjectContext(dir);
+    const results = await pythonMissingLockfileCheck.run(ctx);
     expect(results[0].status).toBe('pass');
   });
 });

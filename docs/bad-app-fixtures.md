@@ -76,9 +76,7 @@ Writes `ai-validation-report.html` to the fixtures directory with:
 
 Typical recall on 16 fixtures with GitHub Copilot CLI: **~95%**.
 
-**Option B — ask a coding agent to write the report:**
-
-The fixtures README (which is copied alongside the fixtures by the setup script) contains a ready-to-paste prompt under the "Generate an HTML validation report → Option 2" section. Paste it into Copilot CLI / Claude Code / Codex from the test working directory and the agent produces `ai-validation-report.html` itself by reading each `doctor-result.json` and `expected-results.md`. Useful when you want the agent to also annotate findings or add a narrative section.
+> The deterministic Node.js script above is the only supported way to generate the validation report. A previous "ask a coding agent to write the report" option was withdrawn: pointing a general-purpose agent at adversarial fixture content is itself a prompt-injection surface.
 
 ### 4. Cleanup
 

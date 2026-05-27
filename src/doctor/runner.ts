@@ -242,7 +242,7 @@ async function ensureSkillsInstalled(dir: string, agentLauncher: string, install
       });
     } catch (err) {
       // Fall back to local install if plugin CLI is unavailable
-      console.error(`[WARN] Plugin install failed (${(err as Error).message}), falling back to local install.`);
+      console.error(buildPluginFallbackWarning((err as Error).message));
       effectiveMode = 'local';
       const { applySetup } = await import('../setup/index.js');
       await applySetup(dir, { agents: [target], prerequisites: 'skip' });
@@ -324,3 +324,10 @@ export function isContributorPrContext(): boolean {
   return false;
 }
 
+/**
+ * Build the warning shown when plugin install fails and we fall back to local install.
+ * Must remain pure ASCII so it does not mojibake on Windows PowerShell stderr (cp932/cp1252).
+ */
+export function buildPluginFallbackWarning(errMessage: string): string {
+  return `[WARN] Plugin install failed (${errMessage}), falling back to local install.`;
+}

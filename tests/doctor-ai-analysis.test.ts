@@ -9,6 +9,7 @@ import {
   readAiReport,
   mergeReports,
 } from '../src/doctor/ai-analysis.js';
+import { buildPluginFallbackWarning } from '../src/doctor/runner.js';
 import type { DoctorCheckResult, DoctorReport } from '../src/doctor/types.js';
 
 const TEMP_DIRS: string[] = [];
@@ -51,6 +52,22 @@ describe('buildDoctorPrompt', () => {
     expect(prompt).toContain('Exception handling');
     expect(prompt).toContain('Async/await');
     expect(prompt).toContain('JSON array');
+  });
+
+  it('instructs the agent to load the supply-chain reference when dependency manifests exist', () => {
+    const prompt = buildDoctorPrompt([], '/tmp/r.json');
+    // The Tier 2 supply-chain reference is the central mitigation for
+    // durabletask-class attacks. The prompt must explicitly route the agent
+    // to it, not rely on implicit skill auto-activation.
+    expect(prompt).toContain('supply-chain-checks.md');
+    expect(prompt.toLowerCase()).toMatch(/supply chain|supply-chain/);
+    // Reference the specific check IDs the agent should apply
+    expect(prompt).toMatch(/SC-101|SC-102|SC-110/);
+  });
+
+  it('warns the agent to treat workspace content as untrusted input', () => {
+    const prompt = buildDoctorPrompt([], '/tmp/r.json');
+    expect(prompt.toLowerCase()).toMatch(/untrusted|prompt inject|do not follow instructions/);
   });
 });
 
@@ -107,6 +124,14 @@ describe('buildDeepWarning', () => {
     const warning = buildDeepWarning('github-copilot');
     // eslint-disable-next-line no-control-regex
     expect(warning).toMatch(/^[\x09\x0a\x20-\x7e]+$/);
+  });
+
+  it('plugin fallback warning is pure ASCII', () => {
+    const warning = buildPluginFallbackWarning('ENOENT: missing /etc/foo');
+    // eslint-disable-next-line no-control-regex
+    expect(warning).toMatch(/^[\x09\x0a\x20-\x7e]+$/);
+    expect(warning).toContain('[WARN]');
+    expect(warning).toContain('ENOENT');
   });
 });
 
