@@ -57,6 +57,20 @@ const PATTERNS = [
     regex: /https?:\/\/(?:\d{1,3}\.){3}\d{1,3}\b/,
     reason: 'URL with raw IP address — anomalous, often used in malware C2',
   },
+  {
+    // Anti-malware engines (Windows Defender, etc.) ship signatures for the
+    // exact IOCs from real supply-chain attacks. Documentation that quotes
+    // those IOCs verbatim gets the published package quarantined. Always
+    // use a placeholder like <ATTACKER-HOST>/<PAYLOAD> in skill content.
+    name: 'durabletask-ioc-domain',
+    regex: /\bcheck\.git-service\.com\b/i,
+    reason: 'Verbatim durabletask C2 domain triggers anti-malware (Trojan:JS/ShaiWorm). Replace with <ATTACKER-HOST>.',
+  },
+  {
+    name: 'durabletask-ioc-payload',
+    regex: /\b(?:rope|managed)\.pyz\b/,
+    reason: 'Verbatim durabletask payload filename triggers anti-malware (Trojan:JS/ShaiWorm). Replace with <PAYLOAD>.',
+  },
 ];
 
 const ALLOW_COMMENT = /<!--\s*skill-lint:\s*allow\s+(.+?)\s*-->/i;
