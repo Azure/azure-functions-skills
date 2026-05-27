@@ -147,8 +147,8 @@ describe('Doctor types', () => {
     expect(statuses).toHaveLength(4);
   });
 
-  it('OutputFormat covers text, json, markdown', () => {
-    const formats: OutputFormat[] = ['text', 'json', 'markdown'];
-    expect(formats).toHaveLength(3);
+  it('OutputFormat covers text, json, markdown, html', () => {
+    const formats: OutputFormat[] = ['text', 'json', 'markdown', 'html'];
+    expect(formats).toHaveLength(4);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Stack version info resolved from the Azure Functions Stacks API.
+ * Stack version info resolved from Azure Resource Manager functionAppStacks metadata.
  */
 
 export interface StackVersionInfo {
@@ -28,10 +28,13 @@ export interface StacksResolverOptions {
   cacheDir: string;
   ttlHours?: number;
   offline?: boolean;
+  apiVersion?: string;
+  commandTimeoutMs?: number;
 }
 
-export const STACKS_API_URL =
-  'https://functions-next.azure.com/stacks/functionAppStacks/?api-version=2023-01-01';
+export const STACKS_API_VERSION = '2025-05-01';
+export const STACKS_RESOURCE_PATH = '/providers/Microsoft.Web/functionAppStacks';
 
 export const STACKS_CACHE_FILE = 'stacks-cache.json';
 export const DEFAULT_TTL_HOURS = 24;
+export const DEFAULT_STACKS_COMMAND_TIMEOUT_MS = 15_000;

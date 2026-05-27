@@ -4,12 +4,12 @@
  * Builds the doctor prompt, launches an agent in headless mode,
  * reads the resulting report file, and merges findings into the report.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
-import type { DoctorCheckResult, DoctorReport } from './types.js';
+import { spawn, execSync } from 'node:child_process';
+import type { CheckSeverity, DoctorCheckResult, DoctorReport } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -68,37 +68,100 @@ export interface AgentCommand {
   args: string[];
 }
 
+/**
+ * Resolve a CLI command name to its executable details.
+ * On Windows, npm-installed CLIs use `.cmd` wrappers that delegate to Node.js.
+ * Spawning `.cmd` files with `shell: true` breaks multiline prompt args because
+ * cmd.exe splits them on whitespace/newlines.  By extracting the underlying
+ * Node.js entry point we can use `spawn(process.execPath, [entry, ...args])`
+ * with `shell: false`, which passes args through CreateProcess and preserves
+ * them verbatim.
+ */
+function resolveCliCommand(name: string): { command: string; argsPrefix: string[] } {
+  if (process.platform !== 'win32') {
+    return { command: name, argsPrefix: [] };
+  }
+
+  try {
+    const cmdPath = execSync(`where ${name}.cmd`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .split(/\r?\n/)[0]?.trim();
+    if (cmdPath) {
+      const content = readFileSync(cmdPath, 'utf-8');
+      // npm .cmd wrappers contain a line like:
+      //   "%_prog%" "%dp0%\node_modules\...\entry.js" %*
+      const match = content.match(/"?%_prog%"?\s+"?%dp0%\\([^"]+\.js)"?/i)
+        || content.match(/"?%_prog%"?\s+"?%~dp0\\?([^"]+\.js)"?/i);
+      if (match) {
+        const cmdDir = dirname(cmdPath);
+        const entry = resolve(cmdDir, match[1]);
+        if (existsSync(entry)) {
+          return { command: process.execPath, argsPrefix: [entry] };
+        }
+      }
+    }
+  } catch {
+    // Fall through to direct executable execution.
+  }
+
+  return { command: name, argsPrefix: [] };
+}
+
 export function buildAgentCommand(
   agent: string,
   prompt: string,
   _reportPath: string,
 ): AgentCommand {
   switch (agent) {
-    case 'github-copilot':
-      return {
-        command: 'copilot',
-        args: ['-p', prompt, '--allow-tool=write', '--allow-tool=shell(cat)', '--allow-tool=shell(node)'],
-      };
+    case 'github-copilot': {
+      const resolved = resolveCliCommand('copilot');
+      const baseArgs = ['-p', prompt, '--allow-all-tools'];
+      return { command: resolved.command, args: [...resolved.argsPrefix, ...baseArgs] };
+    }
 
-    case 'claude-code':
+    case 'claude-code': {
+      const resolved = resolveCliCommand('claude');
       return {
-        command: 'claude',
+        command: resolved.command,
         args: [
+          ...resolved.argsPrefix,
           '-p', prompt,
           '--dangerously-skip-permissions',
           '--max-turns', '20',
         ],
       };
+    }
 
-    case 'codex':
-      return {
-        command: 'codex',
-        args: ['--approval-mode', 'full-auto', '-q', prompt],
-      };
+    case 'codex': {
+      const resolved = resolveCliCommand('codex');
+      const baseArgs = ['--approval-mode', 'full-auto', '-q', prompt];
+      return { command: resolved.command, args: [...resolved.argsPrefix, ...baseArgs] };
+    }
 
     default:
       throw new Error(`Unknown agent: ${agent}`);
   }
+}
+
+// ── Untrusted-deep warning ──
+
+/**
+ * Build the warning text shown before invoking an agent in deep mode.
+ *
+ * The agent runs with elevated permissions (file write, shell access, all-tools).
+ * Users running doctor on an untrusted workspace can be subjected to prompt
+ * injection that modifies files or executes commands beyond the validation scope.
+ * This warning informs the user before the agent is spawned.
+ */
+export function buildDeepWarning(agent: string): string {
+  return [
+    '⚠️  WARNING: Deep analysis runs the AI agent with elevated permissions.',
+    `   Agent "${agent}" has access to file write and shell execution.`,
+    '   Do NOT use --deep on untrusted workspaces. Project content can prompt-inject the agent.',
+  ].join('\n');
 }
 
 // ── Agent executor ──
@@ -107,6 +170,13 @@ export interface AiAnalysisResult {
   findings: DoctorCheckResult[];
   durationMs: number;
   error?: string;
+  agentOutput?: string;
+}
+
+interface SpawnResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
 }
 
 export async function runAiAnalysis(
@@ -119,8 +189,13 @@ export async function runAiAnalysis(
   const startTime = Date.now();
   const cmd = buildAgentCommand(agent, prompt, reportPath);
 
+  // Inform the user before spawning the agent — the agent has elevated permissions
+  // and project content can prompt-inject it on untrusted workspaces.
+  console.warn(buildDeepWarning(agent));
+
+  let spawnResult: SpawnResult;
   try {
-    await spawnAgent(cmd, dir, timeoutMs);
+    spawnResult = await spawnAgent(cmd, dir, timeoutMs);
   } catch (err) {
     return {
       findings: [],
@@ -129,20 +204,57 @@ export async function runAiAnalysis(
     };
   }
 
+  // Log agent output for diagnostics
+  const agentLog = join(dir, '.azure-functions-skills', 'doctor-ai-agent.log');
+  try {
+    mkdirSync(dirname(agentLog), { recursive: true });
+    writeFileSync(agentLog, [
+      `--- Agent: ${agent} ---`,
+      `--- Command: ${cmd.command} ${cmd.args.join(' ').slice(0, 200)}... ---`,
+      `--- Exit code: ${spawnResult.exitCode} ---`,
+      `--- Duration: ${Date.now() - startTime}ms ---`,
+      '',
+      '=== STDOUT ===',
+      spawnResult.stdout,
+      '',
+      '=== STDERR ===',
+      spawnResult.stderr,
+    ].join('\n'));
+  } catch {
+    // Best-effort log writing
+  }
+
+  if (spawnResult.exitCode !== 0) {
+    const errorDetail = spawnResult.stderr || spawnResult.stdout || `exit code ${spawnResult.exitCode}`;
+    return {
+      findings: [],
+      durationMs: Date.now() - startTime,
+      error: `Agent exited with code ${spawnResult.exitCode}: ${errorDetail.slice(0, 500)}`,
+      agentOutput: spawnResult.stdout,
+    };
+  }
+
   const findings = await readAiReport(reportPath);
   return {
     findings,
     durationMs: Date.now() - startTime,
+    agentOutput: spawnResult.stdout,
   };
 }
 
-function spawnAgent(cmd: AgentCommand, dir: string, timeoutMs: number): Promise<void> {
+function spawnAgent(cmd: AgentCommand, dir: string, timeoutMs: number): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd.command, cmd.args, {
       cwd: dir,
       stdio: 'pipe',
-      shell: process.platform === 'win32',
+      shell: false,
     });
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+
+    child.stdout?.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
+    child.stderr?.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
@@ -151,8 +263,11 @@ function spawnAgent(cmd: AgentCommand, dir: string, timeoutMs: number): Promise<
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve();
-      else reject(new Error(`Agent exited with code ${code}`));
+      resolve({
+        exitCode: code ?? 1,
+        stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
+        stderr: Buffer.concat(stderrChunks).toString('utf-8'),
+      });
     });
 
     child.on('error', (err) => {
@@ -192,15 +307,34 @@ export async function readAiReport(reportPath: string): Promise<DoctorCheckResul
 
 // ── Report merger ──
 
+const SEVERITY_ORDER: CheckSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
+
+/**
+ * Rank a severity value for threshold comparison.
+ *
+ * Lower rank = more severe. Returns `-1` for unknown severities so they
+ * are treated as MORE severe than `critical` (fail-closed), matching
+ * Tier 1's `severityRank` behavior in `runner.ts`. This protects against
+ * agents returning invalid severity strings — a misbehaving AI cannot
+ * silently downgrade a finding by emitting unknown severity values.
+ */
+function severityRank(s: CheckSeverity): number {
+  return SEVERITY_ORDER.indexOf(s);
+}
+
 export function mergeReports(
   report: DoctorReport,
   aiFindings: DoctorCheckResult[],
   agent: string,
   durationMs: number,
+  error?: string,
+  severityThreshold: CheckSeverity = 'high',
 ): DoctorReport {
   const allChecks = [...report.tiers.builtin.checks, ...aiFindings];
+  const thresholdRank = severityRank(severityThreshold);
 
   let critical = 0, high = 0, medium = 0, low = 0, pass = 0;
+  let hasFailing = false;
   for (const c of allChecks) {
     if (c.status === 'pass' || c.status === 'skip') {
       pass++;
@@ -212,9 +346,10 @@ export function mergeReports(
       case 'medium': medium++; break;
       case 'low': low++; break;
     }
+    if ((c.status === 'fail' || c.status === 'warn') && severityRank(c.severity) <= thresholdRank) {
+      hasFailing = true;
+    }
   }
-
-  const hasFailing = critical > 0 || high > 0;
 
   return {
     ...report,
@@ -225,6 +360,7 @@ export function mergeReports(
         checks: aiFindings,
         agent,
         durationMs,
+        ...(error ? { error } : {}),
       },
     },
     summary: {

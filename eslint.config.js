@@ -20,6 +20,7 @@ export default [
       'node_modules/**',
       'coverage/**',
       'reports/e2e/**',
+      'tests/fixtures/doctor-bad-apps/**',
     ],
   },
   js.configs.recommended,

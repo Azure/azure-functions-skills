@@ -67,6 +67,7 @@ export interface TierResult {
 export interface AiTierResult extends TierResult {
   agent?: string;
   durationMs?: number;
+  error?: string;
 }
 
 export interface ReportSummary {
@@ -93,7 +94,7 @@ export interface DoctorReport {
 
 // ── CLI options ──
 
-export type OutputFormat = 'text' | 'json' | 'markdown';
+export type OutputFormat = 'text' | 'json' | 'markdown' | 'html';
 
 export interface DoctorOptions {
   dir: string;
@@ -104,4 +105,11 @@ export interface DoctorOptions {
   output: string;
   checks?: string[];
   severity: CheckSeverity;
+  /** How to auto-install skills when not yet installed. Default: 'local' (CI-safe). */
+  installMode?: 'local' | 'plugin';
+  /**
+   * Acknowledge that --deep runs the agent with elevated permissions (write/shell)
+   * and that the workspace is trusted. Required to enable Tier 2 analysis.
+   */
+  acceptDeepRisk?: boolean;
 }

@@ -9,7 +9,7 @@ import { createInterface } from 'node:readline/promises';
 const DEFAULT_REPO = 'Azure/azure-functions-skills';
 
 function printHelp() {
-  console.log(`Local release helper for @agent-loom/azure-functions-skills
+  console.log(`Local release helper for @azure/functions-skills
 
 Usage:
   npm run release:local -- <version> [options]
@@ -25,7 +25,7 @@ What it does:
   3. Bumps package.json/package-lock.json when needed, commits, and pushes main.
   4. Runs npm ci, npm run check, and npm pack --dry-run.
   5. Creates a local annotated tag.
-  6. Publishes @agent-loom/azure-functions-skills to npm.
+  6. Publishes @azure/functions-skills to npm.
   7. Pushes the tag.
   8. Best-effort: creates a GitHub Release with plugin bundle zip.
 
@@ -230,8 +230,8 @@ AI assistant plugins for Azure Functions — one-command setup for GitHub Copilo
 ### Install with npm
 
 \`\`\`bash
-npx @agent-loom/azure-functions-skills@${version} setup
-npx @agent-loom/azure-functions-skills@${version} chat
+npx @azure/functions-skills@${version} setup
+npx @azure/functions-skills@${version} chat
 \`\`\`
 
 ### Plugin bundles

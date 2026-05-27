@@ -2,7 +2,7 @@
  * Chat module — launch CLI coding agents with Azure Functions startup prompt.
  *
  * CLI usage: azure-functions-skills chat [--agent <name>] [--prompt <text>] [--dir <path>]
- * Library:   import { chat, buildStartupPrompt, LAUNCHERS } from '@agent-loom/azure-functions-skills/chat'
+ * Library:   import { chat, buildStartupPrompt, LAUNCHERS } from '@azure/functions-skills/chat'
  */
 
 import { existsSync } from 'node:fs';

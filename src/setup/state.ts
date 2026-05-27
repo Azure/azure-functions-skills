@@ -290,10 +290,10 @@ function packageInfo(): AzureFunctionsSkillsState['package'] {
   try {
     const packageJson = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf-8')) as { name?: string; version?: string };
     return {
-      name: packageJson.name || '@agent-loom/azure-functions-skills',
+      name: packageJson.name || '@azure/functions-skills',
       version: packageJson.version || '0.0.0',
     };
   } catch {
-    return { name: '@agent-loom/azure-functions-skills', version: '0.0.0' };
+    return { name: '@azure/functions-skills', version: '0.0.0' };
   }
 }

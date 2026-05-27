@@ -1,10 +1,11 @@
 /**
- * Dynamic version resolver using the Azure Functions Stacks API.
+ * Dynamic version resolver using Azure Resource Manager functionAppStacks metadata.
  *
- * Priority: fresh cache → API fetch → stale cache → hardcoded fallback.
+ * Priority: fresh cache → Azure CLI ARM query → stale cache → hardcoded fallback.
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 import type {
   LanguageStackInfo,
   StackVersionInfo,
@@ -12,9 +13,11 @@ import type {
   StacksResolverOptions,
 } from './stacks-types.js';
 import {
-  STACKS_API_URL,
+  STACKS_API_VERSION,
+  STACKS_RESOURCE_PATH,
   STACKS_CACHE_FILE,
   DEFAULT_TTL_HOURS,
+  DEFAULT_STACKS_COMMAND_TIMEOUT_MS,
 } from './stacks-types.js';
 import {
   SUPPORTED_NODE_VERSIONS,
@@ -58,6 +61,15 @@ interface RawStack {
   majorVersions: RawMajorVersion[];
 }
 
+interface ArmFunctionAppStack {
+  name?: string;
+  properties?: RawStack;
+}
+
+interface ArmFunctionAppStacksResponse {
+  value?: ArmFunctionAppStack[];
+}
+
 // ── Version status for check results ──
 
 export type VersionStatusKind = 'supported' | 'eol-soon' | 'eol' | 'deprecated' | 'preview' | 'unknown';
@@ -91,10 +103,49 @@ function pickRuntimeSettings(settings: RawStackSettings): RawRuntimeSettings | n
   return settings.linuxRuntimeSettings ?? settings.windowsRuntimeSettings ?? null;
 }
 
-export function parseStacksResponse(raw: RawStack[]): LanguageStackInfo[] {
+function normalizeStacksResponse(raw: unknown): RawStack[] {
+  if (Array.isArray(raw)) {
+    return raw as RawStack[];
+  }
+
+  const response = raw as ArmFunctionAppStacksResponse;
+  if (Array.isArray(response?.value)) {
+    return response.value
+      .map(item => item.properties)
+      .filter((stack): stack is RawStack => !!stack);
+  }
+
+  return [];
+}
+
+function getRuntimeVersion(settings: RawRuntimeSettings | null): string | null {
+  return settings?.runtimeVersion ?? null;
+}
+
+function extractVersion(language: string, major: RawMajorVersion, minor: RawMinorVersion, runtimeVersion: string | null): string {
+  if (language === 'python' || language === 'powershell') {
+    return minor.value?.match(/^(\d+(?:\.\d+)?)/)?.[1] ?? major.value;
+  }
+
+  if (language === 'dotnet') {
+    const runtimeMatch = runtimeVersion?.match(/(\d+(?:\.\d+)?)/);
+    if (runtimeMatch) {
+      const value = runtimeMatch[1];
+      return value.includes('.') ? value : `${value}.0`;
+    }
+
+    const majorMatch = major.value.match(/(\d+)/);
+    return majorMatch ? `${majorMatch[1]}.0` : major.value;
+  }
+
+  return major.value;
+}
+
+export function parseStacksResponse(raw: unknown): LanguageStackInfo[] {
+  const rawStacks = normalizeStacksResponse(raw);
   const result: LanguageStackInfo[] = [];
 
-  for (const stack of raw) {
+  for (const stack of rawStacks) {
     const language = LANGUAGE_MAP[stack.value] ?? stack.value;
     const versions: StackVersionInfo[] = [];
 
@@ -107,15 +158,7 @@ export function parseStacksResponse(raw: RawStack[]): LanguageStackInfo[] {
         if (!rt) continue;
         if (rt.isHidden) continue;
 
-        let version: string;
-        if (language === 'python') {
-          version = minor.value?.match(/^(\d+\.\d+)/)?.[1] ?? major.value;
-        } else if (language === 'dotnet') {
-          const match = major.value.match(/(\d+)/);
-          version = match ? `${match[1]}.0` : major.value;
-        } else {
-          version = major.value;
-        }
+        const version = extractVersion(language, major, minor, getRuntimeVersion(rt));
 
         // Avoid duplicate versions (e.g. dotnet8 in-process + isolated)
         if (versions.some(v => v.version === version)) continue;
@@ -304,13 +347,89 @@ function buildFallbackStacks(): LanguageStackInfo[] {
 
 // ── Main resolver ──
 
-type FetchFn = (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
+export type StacksSourceFn = (options: { apiVersion: string; timeoutMs: number }) => Promise<unknown>;
+
+function runAzureCli(args: string[], timeoutMs: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('az', args, {
+      shell: process.platform === 'win32',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Azure CLI timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.stderr.on('data', chunk => { stderr += chunk; });
+
+    child.on('error', err => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    child.on('close', code => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve(stdout);
+        return;
+      }
+
+      const detail = stderr.trim() || stdout.trim() || `exit code ${code}`;
+      reject(new Error(detail));
+    });
+  });
+}
+
+function joinManagementUrl(managementUrl: string, apiVersion: string): string {
+  const base = managementUrl.replace(/\/+$/, '');
+  return `${base}${STACKS_RESOURCE_PATH}?api-version=${encodeURIComponent(apiVersion)}`;
+}
+
+export async function fetchStacksWithAzureCli(options: { apiVersion: string; timeoutMs: number }): Promise<unknown> {
+  const managementUrl = (await runAzureCli([
+    'cloud',
+    'show',
+    '--query',
+    'endpoints.resourceManager',
+    '-o',
+    'tsv',
+  ], options.timeoutMs)).trim();
+
+  if (!managementUrl) {
+    throw new Error('Azure CLI did not return a resource manager endpoint');
+  }
+
+  const raw = await runAzureCli([
+    'rest',
+    '--method',
+    'get',
+    '--url',
+    joinManagementUrl(managementUrl, options.apiVersion),
+    '--only-show-errors',
+    '-o',
+    'json',
+  ], options.timeoutMs);
+
+  return JSON.parse(raw) as unknown;
+}
 
 export async function resolveStacks(
   options: StacksResolverOptions,
-  fetchFn?: FetchFn,
+  sourceFn?: StacksSourceFn,
 ): Promise<LanguageStackInfo[]> {
-  const { cacheDir, ttlHours = DEFAULT_TTL_HOURS, offline = false } = options;
+  const {
+    cacheDir,
+    ttlHours = DEFAULT_TTL_HOURS,
+    offline = false,
+    apiVersion = STACKS_API_VERSION,
+    commandTimeoutMs = DEFAULT_STACKS_COMMAND_TIMEOUT_MS,
+  } = options;
 
   // 1. Check cache
   const cache = readCache(cacheDir);
@@ -323,18 +442,17 @@ export async function resolveStacks(
     return cache?.stacks ?? buildFallbackStacks();
   }
 
-  // 3. Fetch from API
-  const doFetch = fetchFn ?? globalThis.fetch;
+  // 3. Fetch from Azure Resource Manager through Azure CLI
+  const loadStacks = sourceFn ?? fetchStacksWithAzureCli;
   try {
-    const response = await doFetch(STACKS_API_URL);
-    if (response.ok) {
-      const raw = (await response.json()) as RawStack[];
-      const stacks = parseStacksResponse(raw);
+    const raw = await loadStacks({ apiVersion, timeoutMs: commandTimeoutMs });
+    const stacks = parseStacksResponse(raw);
+    if (stacks.length > 0) {
       writeCache(cacheDir, stacks, ttlHours);
       return stacks;
     }
   } catch {
-    // Fetch failed — fall through to fallback
+    // Azure CLI / ARM fetch failed — fall through to stale cache or fallback
   }
 
   // 4. Prefer stale cache over hardcoded

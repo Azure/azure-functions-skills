@@ -13,6 +13,8 @@ Analyze the local Azure Functions workspace for code and configuration issues th
 
 You are running as part of `azure-functions-doctor`. Analyze the workspace at the current directory for Azure Functions code and configuration issues that require semantic understanding.
 
+Before detailed analysis, read `references/routing.md` and then load only the checklist reference files that match the project language, detected triggers/bindings, and requested execution scope. Do not load every checklist by default.
+
 ## Context from built-in checks
 
 The CLI has already run Tier 1 deterministic checks. Their results are provided below for context — do not repeat checks that have already passed or been reported.
@@ -24,24 +26,16 @@ The CLI has already run Tier 1 deterministic checks. Their results are provided 
 Focus on issues that require understanding code semantics, not just syntax or file structure:
 
 ### Code quality
-- Exception handling gaps in function handlers
-- Resource disposal issues (HttpClient, database connections not disposed)
-- Async/await anti-patterns (fire-and-forget, missing await)
-- Hardcoded secrets or connection strings in source code
-- Deprecated API usage in Azure Functions SDK
+- Load `references/ai-semantic-checks.md` for semantic code-quality checks.
+- Load `references/language-checks.md` for language-specific patterns.
 
 ### Configuration coherence
-- host.json settings that conflict with function bindings
-- App settings referenced in code but missing from local.settings.json
-- Scaling configuration issues (e.g. maxConcurrentRequests=1 in production)
-- Timer trigger schedules that conflict with function execution time
-- Duplicate or conflicting binding configurations
+- Load `references/source-only-checks.md` when interpreting deterministic check output.
+- Load `references/iac-azure-resource-checks.md` only when IaC files or Azure resource context are present.
 
 ### Azure Functions-specific patterns
-- Durable Functions orchestrator determinism violations
-- Service Bus/Event Hub trigger with autoComplete=true but manual completion in code
-- Connection setting name typos between bindings and local.settings.json
-- Missing FUNCTIONS_WORKER_RUNTIME or incorrect value for the project language
+- Use the routed checklist files to evaluate Durable, Service Bus, Event Hubs, storage, HTTP, timer, and language-specific risks.
+- Prefer findings with concrete evidence from a file path and line number.
 
 ## Output
 
