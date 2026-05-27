@@ -8,8 +8,8 @@ The goal is to prevent the most common incident classes from reaching production
 
 | Tier | Engine | Speed | Trust model | What it catches |
 | --- | --- | --- | --- | --- |
-| **Tier 1** (built-in) | Deterministic Node.js checks | < 1s | No external execution | Missing `host.json`, deprecated app settings, unsupported runtime versions, missing `FUNCTIONS_WORKER_RUNTIME`, extension bundle drift, function entry point errors, TypeScript build mismatches |
-| **Tier 2** (`--deep`) | Headless LLM agent (Copilot / Claude / Codex) | ~60–120s | Agent runs with elevated permissions (write, shell) | Async/await anti-patterns, missing exception handling, hardcoded secrets, output-binding error gaps, durable non-determinism, service bus autoComplete conflicts, idempotency gaps |
+| **Tier 1** (built-in) | Deterministic Node.js checks | < 1s | No external execution | Missing `host.json`, deprecated app settings, unsupported runtime versions, missing `FUNCTIONS_WORKER_RUNTIME`, extension bundle drift, function entry point errors, TypeScript build mismatches, **supply-chain risks (lifecycle scripts, unpinned prod deps, missing lockfile, tracked `.env` files, install-script deps)** |
+| **Tier 2** (`--deep`) | Headless LLM agent (Copilot / Claude / Codex) | ~60–120s | Agent runs with elevated permissions (write, shell) | Async/await anti-patterns, missing exception handling, hardcoded secrets, output-binding error gaps, durable non-determinism, service bus autoComplete conflicts, idempotency gaps, **semantic supply-chain attack patterns (import-time side effects, fetch-then-eval, anti-analysis, credential exfiltration)** |
 
 Tier 1 always runs. Tier 2 is opt-in.
 
@@ -64,7 +64,9 @@ Files are written to `--output` (default `.azure-functions-skills/doctor-report.
 
 ## GitHub Actions integration
 
-A minimal pre-deployment validation workflow:
+### Pre-merge (PR) checks — Tier 1 only
+
+For pull request validation, run **Tier 1 only** (`--no-deep`). Tier 2 must never run on PR code (see [Security model](#security-model) below).
 
 ```yaml
 name: Pre-deploy validation
@@ -80,7 +82,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Run Azure Functions doctor
+      - name: Run Azure Functions doctor (Tier 1 only)
         run: |
           npx @azure/functions-skills doctor \
             --no-deep \
@@ -100,9 +102,28 @@ jobs:
           path: doctor.md
 ```
 
-For Tier 2 in CI (requires the chosen agent CLI to be installed and authenticated):
+If you try to use `--deep` from this workflow, doctor refuses to start because it detects the `pull_request` event context.
+
+### Post-merge — Tier 2 (full semantic analysis)
+
+Tier 2 belongs in a separate workflow triggered by `push` to `main` (post-merge) — never `pull_request`. The agent only sees code that has already been reviewed and merged.
 
 ```yaml
+name: Post-merge deep analysis
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deep-doctor:
+    runs-on: ubuntu-latest
+    environment: trusted-deep-analysis  # gate with GitHub Environment protections
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Install GitHub Copilot CLI
         run: npm install -g @github/copilot
 
@@ -123,6 +144,28 @@ For Tier 2 in CI (requires the chosen agent CLI to be installed and authenticate
           path: doctor.html
 ```
 
+Using a GitHub Environment (`environment: trusted-deep-analysis` above) lets you require manual approval before the deep run starts, scope the secret to that environment only, and limit branch eligibility.
+
+## Security model
+
+`doctor --deep` spawns an LLM agent with **file write** and **shell execution** permissions on the workspace. That means workspace content can prompt-inject the agent into doing anything the runner permits — exfiltrate secrets, modify files, install backdoors. Treat it like giving the workspace shell access.
+
+### Rules
+
+1. **Never run `--deep` on contributor pull requests.** Pull request code is untrusted by definition. Doctor refuses to run when it detects `GITHUB_EVENT_NAME=pull_request`/`pull_request_target`, Azure DevOps `BUILD_REASON=PullRequest`, or GitLab CI `CI_PIPELINE_SOURCE=merge_request_event`.
+2. **Use environment isolation.** Run `--deep` only in a GitHub Environment (or equivalent) gated by manual approval and scoped secrets.
+3. **Acknowledge the risk.** `--accept-deep-risk` is required to start Tier 2. There is no global default; every invocation must consent explicitly.
+4. **Limit network egress.** Use [Harden-Runner](https://github.com/step-security/harden-runner) or equivalent egress filtering on runners that execute `--deep`.
+5. **Do not store long-lived agent credentials in CI.** Prefer short-lived OIDC tokens.
+
+### Escape hatch (trusted pipelines only)
+
+The mirror/release pipeline may legitimately need to scan PR-derived branches. Set `AZURE_FUNCTIONS_DOCTOR_TRUST_PR=1` in that pipeline's environment to opt out of the PR-context refusal. **Never set this in a workflow that runs on PR events from contributors.**
+
+### Why the refusal is at the runner, not just docs
+
+Documentation is easy to overlook. The runtime refusal at the doctor level catches the bad pattern even when a workflow author copy-pastes the wrong example.
+
 ## Skill references
 
 When `--deep` runs, the agent has access to focused checklists tagged by language and category:
@@ -131,6 +174,7 @@ When `--deep` runs, the agent has access to focused checklists tagged by languag
 - `references/language-checks.md` — Python sync I/O, .NET in-process, Java old plugin versions, etc.
 - `references/iac-azure-resource-checks.md` — managed identity, network, scaling configs
 - `references/ai-semantic-checks.md` — Durable orchestrator determinism, output-binding gaps, idempotency
+- `references/supply-chain-checks.md` — supply chain attack patterns (lifecycle scripts, fetch-then-eval, credential exfiltration)
 
 The agent loads only the checklists relevant to the detected language/triggers.
 

@@ -96,36 +96,53 @@ Open `doctor-report.html` in a browser:
 
 ### GitHub Actions — pre-deploy gate with deep analysis
 
+Trigger on `push: main` (post-merge), not on pull requests — `--deep` refuses to run on pull-request workspaces because PR code is untrusted (it can prompt-inject the agent). See [docs/doctor-guide.md#security-model](docs/doctor-guide.md#security-model).
+
 ```yaml
-- uses: actions/checkout@v4
-- uses: actions/setup-node@v4
-  with:
-    node-version: '22'
-- name: Install GitHub Copilot CLI
-  run: npm install -g @github/copilot
-- name: Run Azure Functions doctor
-  env:
-    GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
-  run: |
-    npx @azure/functions-skills doctor \
-      --deep --accept-deep-risk \
-      --agent github-copilot \
-      --format markdown --output doctor.md \
-      --severity high
-- name: Publish summary
-  if: always()
-  run: cat doctor.md >> $GITHUB_STEP_SUMMARY
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deep-doctor:
+    runs-on: ubuntu-latest
+    environment: trusted-deep-analysis  # GitHub Environment for approval + scoped secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install GitHub Copilot CLI
+        run: npm install -g @github/copilot
+      - name: Run Azure Functions doctor
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
+        run: |
+          npx @azure/functions-skills doctor \
+            --deep --accept-deep-risk \
+            --agent github-copilot \
+            --format markdown --output doctor.md \
+            --severity high
+      - name: Publish summary
+        if: always()
+        run: cat doctor.md >> $GITHUB_STEP_SUMMARY
 ```
 
-Exit code is `1` if any finding is at or above `--severity` (default `high`), gating the deploy step.
+Exit code is `1` if any finding is at or above `--severity` (default `high`), gating downstream deploy steps. For PR validation, use the same command with `--no-deep` (Tier 1 only) on `pull_request` events.
 
 > **Doctor walkthrough?** See [docs/doctor-guide.md](docs/doctor-guide.md) for Tier 1 vs Tier 2 details, output formats, deep mode security, and bad-app fixtures.
+
+Doctor also includes **supply-chain security checks** (lifecycle scripts, unpinned production dependencies, missing lockfile, tracked `.env` files, install-script deps, plus Tier 2 semantic checks for import-time side effects, fetch-then-execute, and credential exfiltration patterns) — informed by recent npm and PyPI compromises. See [SECURITY.md](SECURITY.md) for the threat model.
 
 ## Contributing
 
 We welcome contributions. The canonical source for skills, agents, hooks, and MCP definitions lives under [`templates/`](templates/) — edit there, then `npm run build:plugin-payload` to regenerate the published plugin payload.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
+
+## Security
+
+Report vulnerabilities to [secure@microsoft.com](mailto:secure@microsoft.com). See [SECURITY.md](SECURITY.md) for the threat model and our defense layers.
 
 ## License
 
