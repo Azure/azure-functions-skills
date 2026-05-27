@@ -1,0 +1,10 @@
+{
+  "name": "node-deep-durable-nondeterministic",
+  "version": "1.0.0",
+  "main": "src/functions/orchestrator.js",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "durable-functions": "^3.0.0"
+  }
+}

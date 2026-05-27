@@ -1,0 +1,7 @@
+{
+  "name": "doctor-bad-extension-bundle-outdated",
+  "main": "index.js",
+  "engines": {
+    "node": ">=22"
+  }
+}

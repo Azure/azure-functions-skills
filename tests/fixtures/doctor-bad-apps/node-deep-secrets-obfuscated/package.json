@@ -1,0 +1,7 @@
+{
+  "name": "node-deep-secrets-obfuscated",
+  "version": "1.0.0",
+  "main": "src/functions/upload.js",
+  "engines": { "node": ">=22" },
+  "dependencies": { "@azure/functions": "^4.0.0", "@azure/storage-blob": "^12.0.0" }
+}

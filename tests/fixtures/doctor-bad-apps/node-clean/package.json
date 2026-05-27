@@ -1,0 +1,9 @@
+{
+  "name": "node-clean-func",
+  "version": "1.0.0",
+  "main": "src/functions/hello.js",
+  "scripts": { "build": "tsc", "start": "func start" },
+  "engines": { "node": ">=22" },
+  "dependencies": { "@azure/functions": "^4.0.0" },
+  "devDependencies": { "typescript": "^5.0.0" }
+}
