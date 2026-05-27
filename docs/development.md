@@ -1,5 +1,7 @@
 # Development Workflow
 
+> **Looking to contribute?** Start with [CONTRIBUTING.md](../CONTRIBUTING.md). This page is the deeper reference for internal build/test/release commands.
+
 This repository keeps canonical agent, skill, hook, prompt, and MCP content under `templates/`. Generated plugin payloads and marketplace manifests are committed so users can install the current repository state without rebuilding locally.
 
 ## Prerequisites
@@ -101,7 +103,7 @@ npm run release:local -- 0.12.0 --dry-run
 npm run release:local -- 0.12.0 --yes
 ```
 
-The helper verifies the release state, optionally bumps `package.json` and `package-lock.json`, regenerates plugin payloads, runs `npm ci`, `npm run check`, and `npm pack --dry-run`, creates an annotated tag, publishes `@agent-loom/azure-functions-skills` to npm, pushes the tag, and creates a GitHub Release with the plugin bundle when GitHub CLI authentication is available.
+The helper verifies the release state, optionally bumps `package.json` and `package-lock.json`, regenerates plugin payloads, runs `npm ci`, `npm run check`, and `npm pack --dry-run`, creates an annotated tag, publishes `@azure/functions-skills` to npm, pushes the tag, and creates a GitHub Release with the plugin bundle when GitHub CLI authentication is available.
 
 Useful release options:
 
@@ -114,6 +116,6 @@ npm run release:local -- 0.12.0 --yes --github-account <user>
 Before publishing, confirm that:
 
 - `npm run check` passes.
-- `npm pack --dry-run` contains `bin/`, `lib/`, `src/`, `templates/`, and `README.md`.
+- `npm pack --dry-run` contains `bin/`, `lib/`, `templates/`, and `README.md` (no `src/`, no `.js.map`).
 - The generated plugin payload and marketplace manifests are included in the release commit when templates changed.
-- You are authenticated to npm with publish rights for `@agent-loom/azure-functions-skills`.
+- You are authenticated to npm with publish rights for `@azure/functions-skills`.
