@@ -25,7 +25,7 @@ It is **focused on Azure Functions**. For deployment of *any* Azure resource (Fu
 <summary><strong>GitHub Copilot CLI</strong></summary>
 
 ```bash
-npx @azure/functions-skills install --agent ghcp --dir ./my-app
+npx @azure/functions-skills install --agent ghcp
 ```
 
 </details>
@@ -34,7 +34,7 @@ npx @azure/functions-skills install --agent ghcp --dir ./my-app
 <summary><strong>Claude Code</strong></summary>
 
 ```bash
-npx @azure/functions-skills install --agent claude --dir ./my-app
+npx @azure/functions-skills install --agent claude
 ```
 
 </details>
@@ -43,15 +43,17 @@ npx @azure/functions-skills install --agent claude --dir ./my-app
 <summary><strong>Codex CLI</strong></summary>
 
 ```bash
-npx @azure/functions-skills install --agent codex --dir ./my-app
+npx @azure/functions-skills install --agent codex
 ```
 
 </details>
 
+> Installs at **user scope** (available to every project on this machine). Prefer to scope the skills to the current project only? Add `--local` to install them under the working directory instead.
+
 ### 2. Open the agent
 
 ```bash
-npx @azure/functions-skills chat --dir ./my-app
+npx @azure/functions-skills chat
 ```
 
 The first time, the agent greets you with a welcome message, shows the available skills, and suggests the next workflow based on your project state.
