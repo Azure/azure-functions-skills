@@ -26,8 +26,8 @@ The key differentiator is **Skill Graph** — skills are not a flat catalog but 
 | F12 | [functions-copilot Agent](./f12-functions-copilot-agent.md) | 📋 Proposed | Custom agent that interprets user context and routes to skills |
 | F13 | [post-task-suggester Hook](./f13-post-task-suggester-hook.md) | 📋 Proposed | Post-completion hooks that surface next-step candidates |
 | F14 | [Build System — Cross-Target Generation](./f14-build-system.md) | 📋 Proposed | Build pipeline with agent path manifest for 10+ targets |
-| F15 | [Distribution — Plugin Packaging](./f15-distribution.md) | 📋 Proposed | Package and distribute plugins per target (GHCP, Claude, Codex) |
-| F16 | [azure-functions-doctor — Project Diagnostics](./f16-azure-functions-doctor.md) | � Design Complete | Two-tier (built-in + AI) project code/config analysis with CI exit codes |
+| F15 | [Distribution — Installation and Workspace Routing](./f15-distribution.md) | 📋 Proposed | Versioned plugin install plus workspace activation/routing across GHCP, Claude Code, and Codex |
+| F16 | [azure-functions-doctor — Project Diagnostics](./f16-azure-functions-doctor.md) | ✅ Implemented | Two-tier (built-in + AI) project code/config analysis with CI exit codes |
 | F17 | [azure-functions-migrate — Model Migration](./f17-azure-functions-migrate.md) | 📋 Proposed | Guide migration from legacy programming models (v1→v2, v3→v4, in-process→isolated) |
 | F18 | [azure-functions-audit — Project Audit](./f18-azure-functions-audit.md) | 📋 Proposed | Static analysis for security, SKU compatibility, and best practices |
 | F19 | [MCP Integration](./f19-mcp-integration.md) | 📋 Proposed | Templates MCP server integration for AI-assisted function creation |
