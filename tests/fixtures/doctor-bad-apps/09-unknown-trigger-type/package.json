@@ -1,0 +1,7 @@
+{
+  "name": "doctor-bad-unknown-trigger-type",
+  "main": "MysteryFunction/index.js",
+  "engines": {
+    "node": ">=22"
+  }
+}

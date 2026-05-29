@@ -76,6 +76,32 @@ For each failing check, provide:
 
 ## After Setup
 
+After the environment check completes and you have reported the results, update the local Azure Functions Skills setup state when a state command is available:
+
+1. If the startup context provided an exact `azure-functions-skills state setup-complete ...` command, run that exact command.
+2. Otherwise, when running from a workspace that has `.azure-functions-skills/state.local.json`, run:
+
+  ```bash
+  azure-functions-skills state setup-complete --dir .
+  ```
+
+If the command is unavailable because the CLI is not installed, the npm package has not been updated yet, or the user reached the skill without using the CLI, update `.azure-functions-skills/state.local.json` directly when that file exists:
+
+1. Preserve every existing field except the setup status timestamps.
+2. Set `setupSkill` to include at least:
+
+   ```json
+   {
+     "status": "completed",
+     "completedAt": "<current ISO-8601 time>",
+     "completedBy": "<active agent if known, otherwise null>"
+   }
+   ```
+
+3. Update `workspace.updatedAt` to the same current ISO-8601 time.
+
+Do this only after the setup check has finished and the user has received the checklist results. If neither the command nor direct file update is possible, state that setup state could not be updated and continue with the next-step guidance.
+
 When all checks pass, suggest the next step:
 
 > ✅ Your environment is ready! Next: use **azure-functions-create** to scaffold a new Azure Functions project.

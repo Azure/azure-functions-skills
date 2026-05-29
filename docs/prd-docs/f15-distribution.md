@@ -1,4 +1,4 @@
-# F15: Distribution - Installation and Workspace Routing
+# F15: Distribution — Installation and Workspace Routing
 
 **Status:** Proposed  
 **Draft Spec Section:** 10, 11  

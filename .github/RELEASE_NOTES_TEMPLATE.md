@@ -5,8 +5,8 @@ AI assistant plugins for Azure Functions — one-command setup for GitHub Copilo
 ### Install with npm
 
 ```bash
-npx @agent-loom/azure-functions-skills@${VERSION} setup
-npx @agent-loom/azure-functions-skills@${VERSION} chat
+npx @azure/functions-skills@${VERSION} setup
+npx @azure/functions-skills@${VERSION} chat
 ```
 
 ### Install without npm

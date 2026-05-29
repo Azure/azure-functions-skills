@@ -1,161 +1,153 @@
 # Azure Functions Skills
 
-[![npm](https://img.shields.io/npm/v/@agent-loom/azure-functions-skills)](https://www.npmjs.com/package/@agent-loom/azure-functions-skills)
+[![npm](https://img.shields.io/npm/v/@azure/functions-skills)](https://www.npmjs.com/package/@azure/functions-skills)
 [![E2E report](https://github.com/Azure/azure-functions-skills/actions/workflows/publish-e2e-report.yml/badge.svg)](https://azure.github.io/azure-functions-skills/)
+
+**Azure Functions context for your coding agent.** One command sets up guided workflows (create, deploy, diagnose, review) for GitHub Copilot CLI, Claude Code, and Codex. The `doctor` command catches configuration and code issues *before* you deploy.
 
 Latest E2E status: [HTML report](https://azure.github.io/azure-functions-skills/)
 
-Azure Functions Skills provides guided setup, create, deploy, diagnostics, and review workflows for coding agents such as GitHub Copilot CLI, Claude Code, and Codex.
+## What & why
 
-## Recommended: install as a plugin
+Azure Functions Skills equips your coding agent with Functions-specific knowledge — trigger/binding patterns, language anti-patterns, runtime versions, deployment best practices — so the agent gives accurate guidance instead of generic advice.
 
-Use the plugin when your agent supports plugin installation. This keeps the Azure Functions agent, skills, hooks, and MCP configuration available without copying files into every workspace.
+It is **focused on Azure Functions**. For deployment of *any* Azure resource (Functions or otherwise), it delegates to [Azure Skills](https://github.com/microsoft/azure-skills) via the `azure-functions-deploy` skill. The two packages complement each other — see [docs/skills-vs-azure-skills.md](docs/skills-vs-azure-skills.md) for the role split.
 
-GitHub Copilot CLI:
+## Prerequisites
 
-```bash
-copilot plugin marketplace add Azure/azure-functions-skills
-copilot plugin install azure-functions-skills@azure-functions-skills
-```
+**Node.js 18+** is the only thing you need to install yourself. Everything else (Azure CLI, Core Tools, language runtimes) is checked and guided by the `azure-functions-setup` skill the first time you run `chat`.
 
-Claude Code plugin-from-source:
+## Quick Start
 
-```bash
-git clone https://github.com/Azure/azure-functions-skills.git
-claude --add-dir ./azure-functions-skills/.github/plugins/azure-functions-skills
-```
+### 1. Install the plugin
 
-Codex CLI:
+<details open>
+<summary><strong>GitHub Copilot CLI</strong></summary>
 
 ```bash
-codex plugin marketplace add Azure/azure-functions-skills
-# Then install azure-functions-skills from /plugins.
+npx @azure/functions-skills install --agent ghcp
 ```
 
-For VS Code plugin-from-source flows, point the installer at:
+</details>
 
-```text
-Azure/azure-functions-skills:.github/plugins/azure-functions-skills
-```
-
-After installing, ask your agent:
-
-```text
-@functions-copilot set up Azure Functions
-```
-
-With GitHub Copilot CLI, select the Functions agent explicitly:
+<details>
+<summary><strong>Claude Code</strong></summary>
 
 ```bash
-copilot --agent functions-copilot
+npx @azure/functions-skills install --agent claude
 ```
 
-For a one-shot prompt:
+</details>
+
+<details>
+<summary><strong>Codex CLI</strong></summary>
 
 ```bash
-copilot --agent functions-copilot -p "Explain what Azure Functions Skills can do and which workflow I should start with."
+npx @azure/functions-skills install --agent codex
 ```
 
-If you intentionally want the session to run without permission prompts, add `--yolo`:
+</details>
+
+> Installs at **user scope** (available to every project on this machine). Prefer to scope the skills to the current project only? Add `--local` to install them under the working directory instead.
+
+### 2. Open the agent
 
 ```bash
-copilot --agent functions-copilot --yolo
+npx @azure/functions-skills chat
 ```
 
-For a guided overview first, ask:
+The first time, the agent greets you with a welcome message, shows the available skills, and suggests the next workflow based on your project state.
 
-```text
-@functions-copilot Explain what Azure Functions Skills can do, when to use setup/create/deploy/diagnostics/best-practices/feedback, and which workflow I should start with.
-```
-
-See [docs/usage-scenarios.md](docs/usage-scenarios.md) for customer-friendly scenario walkthroughs and expected results.
-
-## Plugin vs. `chat` vs. `setup`
-
-| Option | Use when | What it does |
-| --- | --- | --- |
-| Plugin | You want the normal, reusable experience | Registers the Azure Functions plugin payload from this repository with your agent. |
-| `chat` | You want to launch a CLI agent with Azure Functions context immediately | Detects the local project, prepares a startup prompt, checks prerequisites, and starts the selected CLI agent. |
-| `setup` | You need workspace-local files or your agent does not support plugins | Copies agent instructions, skills, hooks, and MCP config into the target workspace. |
-
-## CLI commands
-
-Run without global install:
-
-```bash
-npx @agent-loom/azure-functions-skills chat
-npx @agent-loom/azure-functions-skills setup
-```
-
-Or install globally:
-
-```bash
-npm install -g @agent-loom/azure-functions-skills
-azure-functions-skills chat
-azure-functions-skills setup
-```
-
-Useful options:
-
-```bash
-npx @agent-loom/azure-functions-skills chat --agent github-copilot --dir ./my-app
-npx @agent-loom/azure-functions-skills chat --prompt "Create an HTTP trigger function"
-npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app -- exec --sandbox read-only --json
-npx @agent-loom/azure-functions-skills setup --agent ghcp --dir ./my-app
-npx @agent-loom/azure-functions-skills setup --check-prerequisites
-npx @agent-loom/azure-functions-skills setup --skip-prerequisites
-```
-
-`chat` launches the selected agent CLI and forwards extra arguments to that CLI. Use `--` to make the boundary explicit. Unrecognized `chat` options are also forwarded for compatibility with agent-specific flags. `setup` does not launch an agent; it installs workspace files and ignores unrelated agent CLI flags.
-
-Headless examples:
-
-```bash
-# GitHub Copilot CLI: pass a noninteractive prompt and JSON output flags through to copilot.
-npx @agent-loom/azure-functions-skills chat --agent github-copilot --dir ./my-app --skip-prerequisites -- --output-format json -s --allow-all --no-ask-user -p "Inspect visible Azure Functions skills and return JSON."
-
-# Claude Code: chat inserts --prompt content after -p/--print and forwards the rest.
-npx @agent-loom/azure-functions-skills chat --agent claude-code --dir ./my-app --skip-prerequisites --prompt "Inspect visible Azure Functions skills and return JSON." -- -p --output-format json --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
-
-# Codex CLI: pass the exec subcommand and noninteractive output options through to codex.
-npx @agent-loom/azure-functions-skills chat --agent codex --dir ./my-app --skip-prerequisites --prompt "Inspect visible Azure Functions skills." -- exec --sandbox read-only --json --output-last-message e2e-chat-inspection.txt --ephemeral --skip-git-repo-check --cd .
-```
+> **More options?** See [CLI Reference](docs/cli-reference.md) for every command, flag, and headless example.
 
 ## Skills
 
+For contributor guidance on the product boundary between Azure Skills and Azure Functions Skills, see [Azure Skills and Azure Functions Skills Boundary](docs/azure-skills-boundary.md).
+
 | Skill | Purpose |
 | --- | --- |
-| `azure-functions-setup` | Verify local prerequisites such as Azure CLI, Azure Functions Core Tools, runtimes, and Azure Skills deployment dependency. |
-| `azure-functions-create` | Create new Functions projects or add functions by using Azure MCP template discovery first. |
-| `azure-functions-deploy` | Prepare, validate, and deploy through Azure Skills while adding Azure Functions-specific guidance. |
-| `azure-functions-best-practices` | Review an app for Azure Functions configuration, security, reliability, and production-readiness guidance. |
-| `azure-functions-diagnostics` | Investigate deployment, runtime, trigger, binding, language worker, logging, and telemetry issues. |
-| `azure-functions-health-status` | Collect current health, metrics, logs, Resource Health, and Activity Log evidence. |
-| `azure-functions-inventory` | Collect app specification and configuration inventory without diagnosing health. |
-| `azure-functions-common` | Shared language, trigger, binding, extension, routing, and local emulator references for the skill suite. |
-| `azure-functions-feedback` | Turn session findings into previewed issues or pull requests for this repository. |
+| [`azure-functions-setup`](templates/skills/azure-functions-setup/SKILL.md) | Verify local prerequisites (Azure CLI, Core Tools, runtimes, Azure Skills) |
+| [`azure-functions-create`](templates/skills/azure-functions-create/SKILL.md) | Create new Functions projects or add functions via Azure MCP templates |
+| [`azure-functions-deploy`](templates/skills/azure-functions-deploy/SKILL.md) | Prepare, validate, and deploy via Azure Skills with Functions-specific guidance |
+| [`azure-functions-best-practices`](templates/skills/azure-functions-best-practices/SKILL.md) | Production-readiness review (config, security, reliability) |
+| [`azure-functions-diagnostics`](templates/skills/azure-functions-diagnostics/SKILL.md) | Investigate deployment, runtime, trigger, binding, logging issues |
+| [`azure-functions-health-status`](templates/skills/azure-functions-health-status/SKILL.md) | Collect current health, metrics, logs, Resource Health, Activity Log |
+| [`azure-functions-inventory`](templates/skills/azure-functions-inventory/SKILL.md) | Collect app specification and configuration inventory |
+| [`azure-functions-doctor`](templates/skills/azure-functions-doctor/SKILL.md) | Pre-deployment validation (used by the `doctor` CLI command) |
+| [`azure-functions-common`](templates/skills/azure-functions-common/SKILL.md) | Shared language, trigger, binding, extension, routing references |
+| [`azure-functions-feedback`](templates/skills/azure-functions-feedback/SKILL.md) | Turn session findings into previewed issues or pull requests |
 
 The `functions-copilot` agent routes user requests to the right skill and suggests the next step after each workflow.
 
-## What `setup` writes
+## Doctor — pre-deployment validation
 
-For GitHub Copilot workspaces, `setup` writes:
+Catch configuration mistakes, deprecated settings, **and semantic code issues** (missing error handling, blocking I/O, hardcoded secrets, durable-orchestrator non-determinism) *before* you deploy. The LLM semantic analysis is the value — `doctor` ships it as both a local CLI command and a GitHub Actions step.
 
-```text
-.github/copilot-instructions.md
-.github/agents/functions-copilot.agent.md
-.github/skills/<skill-id>/SKILL.md
-.github/hooks/welcome-setup.json
-.vscode/mcp.json
-AGENTS.md
+### Local — LLM analysis + visual HTML report
+
+```bash
+npx @azure/functions-skills doctor --dir . \
+  --deep --accept-deep-risk \
+  --agent github-copilot \
+  --format html --output doctor-report.html
 ```
 
-Claude Code and Codex receive equivalent workspace-local instructions, skills, hooks, and MCP configuration in their native locations.
+`--accept-deep-risk` acknowledges that the agent runs with elevated permissions (file write, shell execution) — only use on trusted workspaces. Skip the LLM with `--no-deep` for fast deterministic checks only.
 
-## Development
+Open `doctor-report.html` in a browser:
 
-See [docs/development.md](docs/development.md) for contributor prerequisites, validation commands, the template-to-plugin workflow, local smoke tests, and the CLI release process.
+![Doctor HTML report](docs/images/doctor-report.png)
+
+### GitHub Actions — pre-deploy gate with deep analysis
+
+Trigger on `push: main` (post-merge), not on pull requests — `--deep` refuses to run on pull-request workspaces because PR code is untrusted (it can prompt-inject the agent). See [docs/doctor-guide.md#security-model](docs/doctor-guide.md#security-model).
+
+```yaml
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deep-doctor:
+    runs-on: ubuntu-latest
+    environment: trusted-deep-analysis  # GitHub Environment for approval + scoped secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install GitHub Copilot CLI
+        run: npm install -g @github/copilot
+      - name: Run Azure Functions doctor
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
+        run: |
+          npx @azure/functions-skills doctor \
+            --deep --accept-deep-risk \
+            --agent github-copilot \
+            --format markdown --output doctor.md \
+            --severity high
+      - name: Publish summary
+        if: always()
+        run: cat doctor.md >> $GITHUB_STEP_SUMMARY
+```
+
+Exit code is `1` if any finding is at or above `--severity` (default `high`), gating downstream deploy steps. For PR validation, use the same command with `--no-deep` (Tier 1 only) on `pull_request` events.
+
+> **Doctor walkthrough?** See [docs/doctor-guide.md](docs/doctor-guide.md) for Tier 1 vs Tier 2 details, output formats, deep mode security, and bad-app fixtures.
+
+Doctor also includes **supply-chain security checks** (lifecycle scripts, unpinned production dependencies, missing lockfile, tracked `.env` files, install-script deps, plus Tier 2 semantic checks for import-time side effects, fetch-then-execute, and credential exfiltration patterns) — informed by recent npm and PyPI compromises. See [SECURITY.md](SECURITY.md) for the threat model.
+
+## Contributing
+
+We welcome contributions. The canonical source for skills, agents, hooks, and MCP definitions lives under [`templates/`](templates/) — edit there, then `npm run build:plugin-payload` to regenerate the published plugin payload.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
+
+## Security
+
+Report vulnerabilities to [secure@microsoft.com](mailto:secure@microsoft.com). See [SECURITY.md](SECURITY.md) for the threat model and our defense layers.
 
 ## License
 
-MIT
+[MIT](LICENSE)

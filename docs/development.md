@@ -1,5 +1,7 @@
 # Development Workflow
 
+> **Looking to contribute?** Start with [CONTRIBUTING.md](../CONTRIBUTING.md). This page is the deeper reference for internal build/test/release commands.
+
 This repository keeps canonical agent, skill, hook, prompt, and MCP content under `templates/`. Generated plugin payloads and marketplace manifests are committed so users can install the current repository state without rebuilding locally.
 
 ## Prerequisites
@@ -94,26 +96,41 @@ node bin/azure-functions-skills.js chat --agent codex --dir ../tmp-functions-app
 
 ## Release CLI Package
 
+> **This repository does NOT publish to npm.** The package `@azure/functions-skills` is published by a downstream Microsoft mirror pipeline that picks up tags pushed here. The local release helper only prepares and tags; it never holds NPM tokens or runs `npm publish`.
+
 Use the local release helper from a clean `main` branch that matches `origin/main`:
 
 ```bash
-npm run release:local -- 0.12.0 --dry-run
-npm run release:local -- 0.12.0 --yes
+npm run release:local -- 0.0.3-preview --dry-run
+npm run release:local -- 0.0.3-preview --yes
 ```
 
-The helper verifies the release state, optionally bumps `package.json` and `package-lock.json`, regenerates plugin payloads, runs `npm ci`, `npm run check`, and `npm pack --dry-run`, creates an annotated tag, publishes `@agent-loom/azure-functions-skills` to npm, pushes the tag, and creates a GitHub Release with the plugin bundle when GitHub CLI authentication is available.
+The helper:
+
+1. Verifies `main` is clean and matches `origin/main`.
+2. Verifies the version is not already published on npm.
+3. Bumps `package.json` and `package-lock.json` when needed, regenerates the plugin payload, commits, and pushes `main`.
+4. Runs `npm ci --ignore-scripts` and `npm run check`.
+5. Runs `npm pack --dry-run` to verify the tarball contents.
+6. Creates an annotated git tag and pushes it.
+
+The tag push triggers two independent downstream processes:
+
+- **`.github/workflows/draft-release.yml`** creates a draft GitHub Release with auto-generated notes for the maintainer to review and publish.
+- **The Microsoft mirror pipeline** publishes `@azure/functions-skills@<version>` to npm.
 
 Useful release options:
 
 ```bash
-npm run release:local -- 0.12.0 --dry-run
-npm run release:local -- 0.12.0 --yes --skip-github-release
-npm run release:local -- 0.12.0 --yes --github-account <user>
+npm run release:local -- 0.0.3-preview --dry-run
+npm run release:local -- 0.0.3-preview --yes --skip-check
+npm run release:local -- 0.0.3-preview --yes --no-push-main
 ```
 
-Before publishing, confirm that:
+Before tagging, confirm that:
 
 - `npm run check` passes.
-- `npm pack --dry-run` contains `bin/`, `lib/`, `src/`, `templates/`, and `README.md`.
+- `npm pack --dry-run` contains `bin/`, `lib/`, `templates/`, and `README.md` (no `src/`, no `.js.map`).
 - The generated plugin payload and marketplace manifests are included in the release commit when templates changed.
-- You are authenticated to npm with publish rights for `@agent-loom/azure-functions-skills`.
+
+This repo does **not** require any npm credentials. If you see references to `NPM_TOKEN` in workflows or scripts, that is a footgun — file an issue.

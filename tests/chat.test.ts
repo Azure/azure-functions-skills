@@ -52,6 +52,18 @@ describe('buildStartupPrompt', () => {
     expect(prompt).toContain('azure-functions-deploy');
     expect(prompt).toContain('Azure Skills plugin');
   });
+
+  it('includes direct state-file fallback when setup completion command is unavailable', async () => {
+    const prompt = await buildStartupPrompt(DIST_DIR, {
+      setupSkillPending: true,
+      setupCompleteCommand: 'azure-functions-skills state setup-complete --dir "Q:/workspace" --agent github-copilot',
+    });
+
+    expect(prompt).toContain('azure-functions-skills state setup-complete --dir');
+    expect(prompt).toContain('If that command is unavailable');
+    expect(prompt).toContain('.azure-functions-skills/state.local.json');
+    expect(prompt).toContain('"status": "completed"');
+  });
 });
 
 // ─── Launcher config tests ───
@@ -63,8 +75,9 @@ describe('LAUNCHERS', () => {
     expect(LAUNCHERS['codex']).toBeTruthy();
   });
 
-  it('ghcp launcher uses --agent and copilot -i flag', () => {
+  it('ghcp launcher enables workspace agents and uses copilot -i flag', () => {
     const args = LAUNCHERS['github-copilot'].buildArgs({ startupPrompt: 'hello' });
+    expect(args).toContain('--experimental');
     expect(args).toContain('--agent');
     expect(args).toContain('functions-copilot');
     expect(args).toContain('-i');
@@ -77,7 +90,7 @@ describe('LAUNCHERS', () => {
       passthroughArgs: ['-p', 'headless', '--yolo', '--output-format', 'json'],
     });
 
-    expect(args).toEqual(['--agent', 'functions-copilot', '-p', 'headless', '--yolo', '--output-format', 'json']);
+    expect(args).toEqual(['--experimental', '--agent', 'functions-copilot', '-p', 'headless', '--yolo', '--output-format', 'json']);
   });
 
   it('claude launcher passes prompt as first arg', () => {
@@ -92,6 +105,15 @@ describe('LAUNCHERS', () => {
     });
 
     expect(args).toEqual(['-p', 'hello', '--permission-mode', 'bypassPermissions']);
+  });
+
+  it('claude launcher preserves an explicit print prompt from passthrough args', () => {
+    const args = LAUNCHERS['claude-code'].buildArgs({
+      startupPrompt: 'startup',
+      passthroughArgs: ['-p', 'headless prompt', '--output-format', 'json'],
+    });
+
+    expect(args).toEqual(['-p', 'headless prompt', '--output-format', 'json']);
   });
 
   it('codex launcher passes prompt as first arg', () => {
@@ -223,10 +245,10 @@ describe('detectCliAgents', () => {
   });
 });
 
-// ─── Auto-setup tests ───
+// ─── Launcher-only chat tests ───
 
-describe('chat auto-setup', () => {
-  it('auto-installs ghcp skills when not present', async () => {
+describe('chat launcher-only behavior', () => {
+  it('does not auto-install ghcp skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-ghcp-');
 
     try {
@@ -236,12 +258,11 @@ describe('chat auto-setup', () => {
       // Expected: copilot binary not found — that's fine
     }
 
-    // Skills should now be installed
-    expect(existsSync(join(testDir, '.github', 'copilot-instructions.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, '.github', 'copilot-instructions.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
-  it('auto-installs claude skills when not present', async () => {
+  it('does not auto-install claude skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-claude-');
 
     try {
@@ -252,11 +273,11 @@ describe('chat auto-setup', () => {
       // Expected: claude binary not found
     }
 
-    expect(existsSync(join(testDir, 'CLAUDE.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, 'CLAUDE.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
-  it('auto-installs codex skills when not present', async () => {
+  it('does not auto-install codex skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-codex-');
 
     try {
@@ -266,8 +287,8 @@ describe('chat auto-setup', () => {
       // Expected: codex binary not found
     }
 
-    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
   it('skips setup when skills are already present', async () => {
@@ -293,7 +314,7 @@ describe('chat auto-setup', () => {
     expect(contentAfter).toBe(contentBefore);
   }, 15000);
 
-  it('checks Azure Skills prerequisites before launching GitHub Copilot', async () => {
+  it('does not install Azure Skills prerequisites before launching GitHub Copilot', async () => {
     const testDir = makeTestDir('af-skills-chat-prereq-');
     const calls: string[] = [];
 
@@ -312,10 +333,6 @@ describe('chat auto-setup', () => {
       // Expected if the launcher is unavailable.
     }
 
-    expect(calls).toEqual([
-      'copilot plugin list',
-      'copilot plugin marketplace add microsoft/azure-skills',
-      'copilot plugin install azure@azure-skills',
-    ]);
+    expect(calls).toEqual([]);
   }, 15000);
 });

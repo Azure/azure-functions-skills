@@ -1,0 +1,48 @@
+parameters:
+    - name: IsPrerelease
+      type: boolean
+      default: true
+
+jobs:
+    - job:
+      templateContext:
+          outputs:
+              - output: pipelineArtifact
+                path: $(Build.ArtifactStagingDirectory)/dropOutput
+                artifact: drop
+                sbomBuildDropPath: '$(Build.ArtifactStagingDirectory)/dropInput'
+                sbomPackageName: 'Azure Functions Skills CLI'
+                sbomBuildComponentPath: '$(Build.SourcesDirectory)/node_modules'
+      steps:
+          - task: NodeTool@0
+            inputs:
+                versionSpec: 22.x
+            displayName: 'Install Node.js'
+          - script: npm ci
+            displayName: 'npm ci'
+          - script: npm audit --production
+            displayName: 'Run vulnerability scan'
+          - script: npm run build
+            displayName: 'npm run build'
+          - task: CopyFiles@2
+            displayName: 'Copy files to staging'
+            inputs:
+                sourceFolder: '$(Build.SourcesDirectory)'
+                contents: |
+                    bin/**
+                    lib/**
+                    src/**
+                    templates/**
+                    LICENSE
+                    package.json
+                    README.md
+                targetFolder: '$(Build.ArtifactStagingDirectory)/dropInput'
+                cleanTargetFolder: true
+          - script: npm prune --production
+            displayName: 'npm prune --production'
+          - script: npm pack
+            displayName: 'npm pack'
+            workingDirectory: '$(Build.ArtifactStagingDirectory)/dropInput'
+          - script: mkdir dropOutput && mv dropInput/*.tgz dropOutput
+            displayName: 'Move package to dropOutput'
+            workingDirectory: '$(Build.ArtifactStagingDirectory)'

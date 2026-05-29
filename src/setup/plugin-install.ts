@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import type { BuildTargetName } from '../types.js';
+import type { CommandRunner } from './prerequisites/types.js';
+import { applyWorkspace } from './workspace.js';
 
 interface PluginInstallResult {
   target: BuildTargetName;
@@ -26,6 +28,49 @@ interface CodexMarketplacePlugin {
 interface CodexMarketplace {
   plugins?: CodexMarketplacePlugin[];
   [key: string]: unknown;
+}
+
+export type PluginOperationAction = 'install' | 'update';
+export type PluginOperationScope = 'workspace' | 'user';
+export type PluginOperationSource = 'marketplace' | 'local' | 'github';
+
+export interface PluginOperationOptions {
+  action: PluginOperationAction;
+  agents: BuildTargetName[];
+  projectDir: string;
+  dryRun?: boolean;
+  scope?: PluginOperationScope;
+  source?: PluginOperationSource;
+  version?: string;
+  workspace?: boolean;
+  runner?: CommandRunner;
+  platform?: NodeJS.Platform;
+  yes?: boolean;
+  passthroughArgs?: string[];
+}
+
+export interface PluginOperationStep {
+  target: BuildTargetName;
+  kind: 'plugin-registration' | 'workspace-activation';
+  description: string;
+  commands?: string[];
+  path?: string;
+}
+
+export interface PluginOperationResult {
+  action: PluginOperationAction;
+  agents: BuildTargetName[];
+  dryRun: boolean;
+  scope: PluginOperationScope;
+  source: PluginOperationSource;
+  version: string;
+  steps: PluginOperationStep[];
+  filesWritten: number;
+}
+
+interface PluginCommand {
+  command: string;
+  args: string[];
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -163,6 +208,289 @@ export function installPlugin(target: BuildTargetName, projectDir: string): Plug
   }
 
   return result;
+}
+
+export function planPluginOperation(options: PluginOperationOptions): PluginOperationResult {
+  const dryRun = options.dryRun === true;
+  const scope = options.scope || 'workspace';
+  const source = options.source || 'marketplace';
+  const version = options.version || packageVersion();
+  const includeWorkspace = options.workspace !== false;
+  const steps: PluginOperationStep[] = [];
+
+  for (const target of options.agents) {
+    const commands = officialPluginCommands(target, options);
+    steps.push({
+      target,
+      kind: 'plugin-registration',
+      path: source === 'local' ? getPluginDir(target) : undefined,
+      description: pluginRegistrationDescription(options.action, target, scope, source, version),
+      commands: commands.map(formatCommand),
+    });
+
+    if (includeWorkspace) {
+      steps.push({
+        target,
+        kind: 'workspace-activation',
+        description: `Apply workspace activation with workspace apply --agent ${target} --mode plugin-reference${options.action === 'update' ? ' --update' : ''}.`,
+      });
+    }
+  }
+
+  return {
+    action: options.action,
+    agents: options.agents,
+    dryRun,
+    scope,
+    source,
+    version,
+    steps,
+    filesWritten: 0,
+  };
+}
+
+export async function runPluginOperation(options: PluginOperationOptions): Promise<PluginOperationResult> {
+  const result = planPluginOperation(options);
+  if (result.dryRun) return result;
+
+  await ensureRequiredTools(options);
+
+  for (const target of result.agents) {
+    for (const pluginCommand of officialPluginCommands(target, options)) {
+      const commandResult = await runCommand(options, pluginCommand);
+      if (commandResult.exitCode !== 0) {
+        if (isIdempotentPluginInstallFailure(pluginCommand, commandResult)) continue;
+        throw new Error(`Plugin ${options.action} failed for ${target}: ${commandResult.stderr || commandResult.stdout}`);
+      }
+    }
+  }
+
+  if (options.workspace !== false) {
+    const workspaceResult = await applyWorkspace(options.projectDir, {
+      agents: result.agents,
+      mode: 'plugin-reference',
+      mergeStrategy: 'managed-block',
+      update: options.action === 'update',
+      yes: options.yes,
+      includeAgent: true,
+    });
+    result.filesWritten += workspaceResult.filesWritten;
+  }
+
+  return result;
+}
+
+async function ensureRequiredTools(options: PluginOperationOptions): Promise<void> {
+  const requiredTools = unique(options.agents.flatMap(target => officialPluginCommands(target, options).map(pluginCommand => pluginCommand.command)));
+  const missingTools: string[] = [];
+
+  for (const tool of requiredTools) {
+    if (!await toolExists(options, tool)) missingTools.push(tool);
+  }
+
+  if (missingTools.length > 0) {
+    throw new Error(missingToolsMessage(options, missingTools));
+  }
+}
+
+async function toolExists(options: PluginOperationOptions, tool: string): Promise<boolean> {
+  const runner = options.runner || defaultRunner;
+  const checkCommand = toolCheckCommand(options, tool);
+  const result = await runner(checkCommand.command, checkCommand.args, { cwd: options.projectDir });
+  return result.exitCode === 0;
+}
+
+function toolCheckCommand(options: PluginOperationOptions, tool: string): PluginCommand {
+  if (runtimePlatform(options) === 'win32') return { command: 'where.exe', args: [tool] };
+  return { command: 'sh', args: ['-c', `command -v ${tool}`] };
+}
+
+function missingToolsMessage(options: PluginOperationOptions, missingTools: string[]): string {
+  return [
+    `Cannot ${options.action} Azure Functions Skills plugin for ${agentLabel(options.agents)}.`,
+    '',
+    'Missing required tools:',
+    ...missingTools.map(tool => `  - ${tool}: ${toolPurpose(tool)}`),
+    '',
+    'Install:',
+    ...missingTools.map(tool => `  - ${toolInstallLabel(tool)}: ${toolInstallUrl(tool)}`),
+    '',
+    'Then retry:',
+    `  azure-functions-skills plugin ${options.action}${options.agents.map(agent => ` --agent ${agent}`).join('')}`,
+  ].join('\n');
+}
+
+function agentLabel(agents: BuildTargetName[]): string {
+  return agents.map(agent => ({
+    ghcp: 'GitHub Copilot CLI',
+    claude: 'Claude Code',
+    codex: 'Codex',
+  })[agent]).join(', ');
+}
+
+function toolPurpose(tool: string): string {
+  if (tool === 'git') return 'required to clone https://github.com/Azure/azure-functions-skills.git for Claude plugin-from-source.';
+  if (tool === 'claude') return 'required to validate and load the Claude plugin payload.';
+  if (tool === 'copilot') return 'required to run GitHub Copilot plugin marketplace and install commands.';
+  if (tool === 'codex') return 'required to run Codex plugin marketplace and install commands.';
+  return 'required to install the plugin.';
+}
+
+function toolInstallLabel(tool: string): string {
+  if (tool === 'git') return 'Git';
+  if (tool === 'claude') return 'Claude Code';
+  if (tool === 'copilot') return 'GitHub Copilot CLI';
+  if (tool === 'codex') return 'Codex CLI';
+  return tool;
+}
+
+function toolInstallUrl(tool: string): string {
+  if (tool === 'git') return 'https://git-scm.com/downloads';
+  if (tool === 'claude') return 'https://claude.ai/download';
+  if (tool === 'copilot') return 'https://docs.github.com/copilot/github-copilot-in-the-cli/using-github-copilot-in-the-cli';
+  if (tool === 'codex') return 'https://developers.openai.com/codex/cli';
+  return 'See the tool documentation.';
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function officialPluginCommands(target: BuildTargetName, options: PluginOperationOptions): PluginCommand[] {
+  const withPassthrough = (commands: PluginCommand[]): PluginCommand[] => appendPassthrough(commands, options.passthroughArgs || []);
+  if (target === 'ghcp') {
+    return withPassthrough([
+      { command: 'copilot', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
+      { command: 'copilot', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills'] },
+    ]);
+  }
+
+  if (target === 'claude') {
+    return withPassthrough(claudePluginCommands(options));
+  }
+
+  return withPassthrough([
+    { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
+    { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
+  ]);
+}
+
+function appendPassthrough(commands: PluginCommand[], passthroughArgs: string[]): PluginCommand[] {
+  if (passthroughArgs.length === 0 || commands.length === 0) return commands;
+  return commands.map((pluginCommand, index) => index === commands.length - 1
+    ? { ...pluginCommand, args: [...pluginCommand.args, ...passthroughArgs] }
+    : pluginCommand);
+}
+
+function claudePluginCommands(options: PluginOperationOptions): PluginCommand[] {
+  const marketplaceSource = options.source === 'local' ? PACKAGE_ROOT : 'Azure/azure-functions-skills';
+  const scope = claudeScope(options.scope);
+  const addMarketplace = { command: 'claude', args: ['plugin', 'marketplace', 'add', marketplaceSource, '--scope', scope] };
+
+  if (options.action === 'update') {
+    return [
+      addMarketplace,
+      { command: 'claude', args: ['plugin', 'marketplace', 'update', 'azure-functions-skills'] },
+      { command: 'claude', args: ['plugin', 'update', 'azure-functions-skills@azure-functions-skills', '--scope', scope] },
+    ];
+  }
+
+  return [
+    addMarketplace,
+    { command: 'claude', args: ['plugin', 'install', 'azure-functions-skills@azure-functions-skills', '--scope', scope] },
+  ];
+}
+
+function claudeScope(scope: PluginOperationScope | undefined): string {
+  return scope === 'user' ? 'user' : 'local';
+}
+
+function formatCommand(pluginCommand: PluginCommand): string {
+  return [pluginCommand.command, ...pluginCommand.args].join(' ');
+}
+
+async function runCommand(options: PluginOperationOptions, pluginCommand: PluginCommand) {
+  const runner = options.runner || defaultRunner;
+  return runner(pluginCommand.command, pluginCommand.args, { cwd: options.projectDir });
+}
+
+function isIdempotentPluginInstallFailure(
+  pluginCommand: PluginCommand,
+  commandResult: { stdout?: string; stderr?: string },
+): boolean {
+  if (!isAzureFunctionsPluginCommand(pluginCommand)) return false;
+  const output = `${commandResult.stderr || ''}\n${commandResult.stdout || ''}`.toLowerCase();
+  return output.includes('already registered')
+    || output.includes('already installed')
+    || output.includes('already exists');
+}
+
+function isAzureFunctionsPluginCommand(pluginCommand: PluginCommand): boolean {
+  const commandText = formatCommand(pluginCommand).toLowerCase();
+  if (!commandText.includes('azure-functions-skills')) return false;
+  if (pluginCommand.command === 'copilot') {
+    return commandText.startsWith('copilot plugin marketplace add')
+      || commandText.startsWith('copilot plugin install');
+  }
+  if (pluginCommand.command === 'codex') {
+    return commandText.startsWith('codex plugin marketplace add')
+      || commandText.startsWith('codex plugin add');
+  }
+  return false;
+}
+
+async function defaultRunner(command: string, args: string[]) {
+  const { execFileSync } = await import('node:child_process');
+  try {
+    const stdout = execFileSync(command, args, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: runtimePlatform() === 'win32',
+    });
+    return { exitCode: 0, stdout, stderr: '' };
+  } catch (error) {
+    const err = error as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
+    return {
+      exitCode: err.status ?? 1,
+      stdout: bufferToString(err.stdout),
+      stderr: bufferToString(err.stderr) || err.message || '',
+    };
+  }
+}
+
+function runtimePlatform(options?: PluginOperationOptions): NodeJS.Platform {
+  return options?.platform || process.platform;
+}
+
+function bufferToString(value: Buffer | string | undefined): string {
+  if (!value) return '';
+  return typeof value === 'string' ? value : value.toString('utf-8');
+}
+
+function pluginRegistrationDescription(
+  action: PluginOperationAction,
+  target: BuildTargetName,
+  scope: PluginOperationScope,
+  source: PluginOperationSource,
+  version: string,
+): string {
+  if (source === 'local') {
+    return `${capitalize(action)} ${target} plugin from local package build at ${scope} scope.`;
+  }
+  return `${capitalize(action)} ${target} plugin from ${source} source version ${version} at ${scope} scope.`;
+}
+
+function capitalize(value: string): string {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
+function packageVersion(): string {
+  try {
+    const packageJson = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf-8')) as { version?: string };
+    return packageJson.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 function mergeJsonFile(filePath: string, newEntries: Record<string, unknown>): Record<string, unknown> {

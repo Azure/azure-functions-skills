@@ -1,6 +1,6 @@
 /**
  * Setup module — detects coding agents and applies Azure Functions skill files.
- * Usable as CLI (`npx @agent-loom/azure-functions-skills setup`) or library (VS Code extension).
+ * Usable as CLI (`npx @azure/functions-skills setup`) or library (VS Code extension).
  */
 
 import { existsSync, mkdirSync, cpSync, readdirSync, rmSync } from 'node:fs';

@@ -1,6 +1,6 @@
 {
-  "name": "@agent-loom/azure-functions-skills",
-  "version": "0.12.1",
+  "name": "@azure/functions-skills",
+  "version": "0.0.3-preview",
   "description": "AI assistant plugins for Azure Functions — one-command setup for GitHub Copilot, Claude Code, and Codex",
   "type": "module",
   "bin": {
@@ -24,7 +24,6 @@
   "files": [
     "bin/",
     "lib/",
-    "src/",
     "templates/",
     "README.md"
   ],
@@ -34,11 +33,13 @@
   "scripts": {
     "build": "npm run compile && node lib/build/build.js",
     "build:plugin-payload": "npm run compile && node lib/build/build.js --plugin-only --repo-plugin-dir .github/plugins/azure-functions-skills --marketplace-root .",
-    "check": "npm run lint && npm run typecheck && npm run validate:skills && npm run verify:plugin-payload && npm test && npm run build",
+    "check": "npm run lint && npm run typecheck && npm run lint:security && npm run validate:skills && npm run verify:plugin-payload && npm test && npm run build",
     "ci": "npm run check",
     "compile": "tsc",
     "lint": "eslint .",
+    "lint:security": "node scripts/lint-package-scripts.mjs && node scripts/lint-skill-content.mjs && node scripts/audit-npm-token.mjs",
     "new:skill": "npm run compile && node lib/build/new-skill.js",
+    "prepack": "npm run compile && node scripts/strip-sourcemaps.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",

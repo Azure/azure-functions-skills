@@ -12,7 +12,7 @@ In VS Code Chat windows, the `SessionStart` hook's `additionalContext` is only i
 
 ## Feature
 
-### npm package: `@agent-loom/azure-functions-skills`
+### npm package: `@azure/functions-skills`
 
 Provides two usage modes:
 
@@ -20,24 +20,24 @@ Provides two usage modes:
 
 ```bash
 # Place skills, agents, MCP, and hooks into a project
-npx @agent-loom/azure-functions-skills setup
+npx @azure/functions-skills setup
 
 # Launch a CLI agent with Welcome message
-npx @agent-loom/azure-functions-skills chat
+npx @azure/functions-skills chat
 
 # Build plugin artifacts
-npx @agent-loom/azure-functions-skills build
+npx @azure/functions-skills build
 ```
 
 #### 2. Library (for use from VS Code Extensions, etc.)
 
 ```javascript
 // Setup API
-import { applySetup, detectAgents } from '@agent-loom/azure-functions-skills';
+import { applySetup, detectAgents } from '@azure/functions-skills';
 const result = await applySetup('/path/to/project', { agents: ['ghcp'] });
 
 // Chat API
-import { chat, buildStartupPrompt, detectCliAgents } from '@agent-loom/azure-functions-skills/chat';
+import { chat, buildStartupPrompt, detectCliAgents } from '@azure/functions-skills/chat';
 const result = await chat({ agent: 'claude-code', dir: '/path/to/project' });
 ```
 
@@ -102,7 +102,7 @@ azure-functions-skills build [--target <name>]
 
 ## Library API
 
-### Setup module (`@agent-loom/azure-functions-skills`)
+### Setup module (`@azure/functions-skills`)
 
 ```typescript
 // Detect installed coding agents
@@ -116,7 +116,7 @@ applySetup(targetDir: string, options?: { agents?: string[] }): Promise<{
 }>
 ```
 
-### Chat module (`@agent-loom/azure-functions-skills/chat`)
+### Chat module (`@azure/functions-skills/chat`)
 
 ```typescript
 // Detect installed CLI coding agents
@@ -151,7 +151,7 @@ All commands are implemented in Node.js ESM. Zero dependencies (Node.js 18+ stan
 
 | Use | Import |
 |-----|--------|
-| CLI | `npx @agent-loom/azure-functions-skills <command>` |
-| Library (setup) | `import { applySetup } from '@agent-loom/azure-functions-skills'` |
-| Library (chat) | `import { chat } from '@agent-loom/azure-functions-skills/chat'` |
+| CLI | `npx @azure/functions-skills <command>` |
+| Library (setup) | `import { applySetup } from '@azure/functions-skills'` |
+| Library (chat) | `import { chat } from '@azure/functions-skills/chat'` |
 | VS Code Extension | Call Library API |

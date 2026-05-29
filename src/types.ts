@@ -4,6 +4,9 @@ import type { CommandRunner, PrerequisiteMode, PrerequisiteResult } from './setu
 export type BuildTargetName = 'ghcp' | 'claude' | 'codex';
 export type CliAgentName = BuildTargetName;
 export type LauncherId = 'github-copilot' | 'claude-code' | 'codex';
+export type WorkspaceMode = 'minimal' | 'copy' | 'plugin-reference';
+export type MergeStrategy = 'managed-block' | 'include-file' | 'fail-if-exists' | 'append';
+export type PluginInstallMode = 'plugin' | 'local';
 
 export interface Skill {
   id: string;
@@ -54,6 +57,26 @@ export interface SetupResult {
   prerequisites?: PrerequisiteResult[];
 }
 
+export interface WorkspaceApplyOptions {
+  agents?: CliAgentName[];
+  mode?: WorkspaceMode;
+  mergeStrategy?: MergeStrategy;
+  update?: boolean;
+  dryRun?: boolean;
+  yes?: boolean;
+  includeMcp?: boolean;
+  includeHooks?: boolean;
+  includeAgent?: boolean;
+}
+
+export interface WorkspaceApplyResult {
+  agents: CliAgentName[];
+  mode: WorkspaceMode;
+  filesWritten: number;
+  plannedFiles: string[];
+  dryRun: boolean;
+}
+
 export interface LauncherContext {
   startupPrompt?: string;
   passthroughArgs?: string[];
@@ -78,6 +101,8 @@ export interface ChatOptions {
   passthroughArgs?: string[];
   prerequisites?: PrerequisiteMode;
   prerequisiteRunner?: CommandRunner;
+  setupSkillPending?: boolean;
+  setupCompleteCommand?: string;
 }
 
 export interface ChatResult {

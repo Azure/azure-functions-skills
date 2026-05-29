@@ -1,0 +1,23 @@
+parameters:
+    tgzPath: ''
+    NpmPublishTag: ''
+    NpmPublishDryRun: false
+
+steps:
+    - task: NodeTool@0
+      displayName: 'Install Node.js'
+      inputs:
+          versionSpec: 22.x
+
+    - script: mv *.tgz package.tgz
+      displayName: 'Rename tgz file'
+      workingDirectory: '${{ parameters.tgzPath }}'
+
+    - task: Npm@1
+      displayName: 'npm publish'
+      inputs:
+          command: custom
+          workingDir: '${{ parameters.tgzPath }}'
+          verbose: true
+          customCommand: 'publish package.tgz --tag ${{ parameters.NpmPublishTag }} --dry-run ${{ lower(parameters.NpmPublishDryRun) }}'
+          customEndpoint: azure-functions-skills-npm
