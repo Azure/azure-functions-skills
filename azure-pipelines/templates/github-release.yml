@@ -1,0 +1,47 @@
+steps:
+    - powershell: |
+        $githubToken = "$(GithubPat)"
+        $newVersion = "$(version)"
+        Write-Host "Debug: Version from pipeline variable is '$newVersion'"
+
+        # Create GitHub credential
+        git config --global user.name "AzureFunctionsSkills"
+        git config --global user.email "azfunc@microsoft.com"
+
+        # Clone Repository
+        git clone https://$githubToken@github.com/Azure/azure-functions-skills
+        Write-Host "Cloned azure-functions-skills into local"
+        Set-Location "azure-functions-skills"
+        git checkout "origin/release/$newVersion"
+
+        # Create release tag X.Y.Z
+        Write-Host "Creating release tag $newVersion"
+        git tag -a "$newVersion" -m "$newVersion"
+
+        # Push tag to remote
+        git push origin $newVersion
+
+      displayName: 'Create and push release tag x.y.z'
+    - powershell: |
+        $githubUser = "$(GithubUser)"
+        $githubToken = "$(GithubPat)"
+        $newVersion = "$(version)"
+
+        # Create GitHub credential
+        $credential = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("${githubUser}:${githubToken}"))
+
+        # Create Release Note
+        Write-Host "Creating release note in GitHub"
+        $body = (@{tag_name="$newVersion";name="Release $newVersion";body="- Fill in Release Note Here";draft=$true} | ConvertTo-Json -Compress)
+        $response = Invoke-WebRequest -Headers @{"Cache-Control"="no-cache";"Content-Type"="application/json";"Authorization"="Basic $credential"} -Method Post -Body "$body" -Uri "https://api.github.com/repos/Azure/azure-functions-skills/releases"
+
+        # Return Value
+        if ($response.StatusCode -ne 201) {
+            Write-Host "Failed to create release note in GitHub"
+            exit -1
+        }
+
+        $draftUrl = $response | ConvertFrom-Json | Select -expand url
+        Write-Host "Release draft created in $draftUrl"
+
+      displayName: 'Create GitHub release draft'
