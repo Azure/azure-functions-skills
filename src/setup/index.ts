@@ -1,6 +1,6 @@
 /**
  * Setup module — detects coding agents and applies Azure Functions skill files.
- * Usable as CLI (`npx @agent-loom/azure-functions-skills setup`) or library (VS Code extension).
+ * Usable as CLI (`npx @azure/functions-skills setup`) or library (VS Code extension).
  */
 
 import { existsSync, mkdirSync, cpSync, readdirSync, rmSync } from 'node:fs';
@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../build/loader.js';
 import { buildTarget } from '../build/build-target.js';
+import { ensurePrerequisites } from './prerequisites/index.js';
 import type { BuildData, CliAgentName, SetupOptions, SetupResult } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -65,6 +66,7 @@ export async function detectAgents(): Promise<CliAgentName[]> {
  */
 export async function applySetup(targetDir: string, options: SetupOptions = {}): Promise<SetupResult> {
   const agents = options.agents || await detectAgents();
+  const prerequisiteMode = options.prerequisites || 'auto';
 
   // Load canonical sources
   const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
@@ -100,7 +102,15 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     }
   }
 
+  const prerequisiteResults = await ensurePrerequisites({
+    targets: agents,
+    projectDir: targetDir,
+    mode: prerequisiteMode,
+    runner: options.prerequisiteRunner,
+  });
+
   const skillLines = skills.map(skill => `    • ${skill.id} — ${skill.title}`);
+  const prerequisiteLines = formatPrerequisiteLines(prerequisiteResults);
   const welcomeMessage = [
     '',
     '⚡ Azure Functions Skills installed!',
@@ -111,6 +121,9 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     '  Skills available:',
     ...skillLines,
     '',
+    '  External prerequisites:',
+    ...prerequisiteLines,
+    '',
     '  Get started: Ask your AI assistant to "set up Azure Functions"',
     '',
   ].join('\n');
@@ -119,7 +132,13 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     agents,
     filesWritten: totalFiles,
     welcomeMessage,
+    prerequisites: prerequisiteResults,
   };
+}
+
+function formatPrerequisiteLines(results: SetupResult['prerequisites']): string[] {
+  if (!results || results.length === 0) return ['    • none'];
+  return results.map(result => `    • ${result.id} (${result.target}) — ${result.status}: ${result.message}`);
 }
 
 function copyWorkspaceFiles(src: string, dest: string, agent: CliAgentName): number {

@@ -50,6 +50,36 @@ describe('loadSkills', () => {
     const ids = skills.map(s => s.id).sort();
     expect(ids).toEqual(expectedSkillIds());
   });
+
+  it('azure-functions-deploy proxies to the Azure Skills deployment workflow', () => {
+    const deploySkill = skills.find(skill => skill.id === 'azure-functions-deploy');
+    expect(deploySkill?.content).toContain('azure-prepare');
+    expect(deploySkill?.content).toContain('azure-validate');
+    expect(deploySkill?.content).toContain('azure-deploy');
+    expect(deploySkill?.content).toContain('.azure/deployment-plan.md');
+    expect(deploySkill?.content).toContain('Validated');
+    expect(deploySkill?.content).toContain('Flex Consumption');
+  });
+
+  it('azure-functions-setup documents Azure Skills plugin as a deployment prerequisite', () => {
+    const setupSkill = skills.find(skill => skill.id === 'azure-functions-setup');
+    expect(setupSkill?.content).toContain('Azure Skills plugin');
+    expect(setupSkill?.content).toContain('azure-prepare');
+    expect(setupSkill?.content).toContain('azure-validate');
+    expect(setupSkill?.content).toContain('azure-deploy');
+    expect(setupSkill?.content).toContain('/plugin install azure@azure-skills');
+    expect(setupSkill?.content).toContain('/plugin install azure@claude-plugins-official');
+    expect(setupSkill?.content).toContain('codex plugin marketplace add microsoft/azure-skills');
+  });
+
+  it('azure-functions-setup marks local setup state complete after checks finish', () => {
+    const setupSkill = skills.find(skill => skill.id === 'azure-functions-setup');
+    expect(setupSkill?.content).toContain('azure-functions-skills state setup-complete --dir');
+    expect(setupSkill?.content).toContain('After the environment check completes');
+    expect(setupSkill?.content).toContain('If the command is unavailable');
+    expect(setupSkill?.content).toContain('.azure-functions-skills/state.local.json');
+    expect(setupSkill?.content).toContain('"status": "completed"');
+  });
 });
 
 describe('loadMcpServers', () => {
@@ -83,6 +113,7 @@ describe('loadAgents', () => {
     expect(agents.copilot).toContain('functions-copilot');
     expect(agents.copilot).toContain('azure-functions-best-practices');
     expect(agents.copilot).toContain('azure-functions-diagnostics');
+    expect(agents.copilot).toContain('proxy to Azure Skills');
   });
 });
 
@@ -184,9 +215,9 @@ describe('buildTarget — ghcp', () => {
     const skillPath = join(DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-create', 'SKILL.md');
     const body = readFileSync(skillPath, 'utf-8');
     // MCP-primary: mentions the Azure MCP tool names
-    expect(body).toContain('functions language list');
-    expect(body).toContain('functions project get');
-    expect(body).toContain('functions list or get template');
+    expect(body).toContain('functions_language_list');
+    expect(body).toContain('functions_project_get');
+    expect(body).toContain('functions_template_get');
     // Best practices tool reference
     expect(body).toContain('get_azure_bestpractices');
     expect(body).toContain('azurefunctions');
@@ -397,7 +428,7 @@ describe('buildPluginPayload', () => {
     resetDistDir();
   });
 
-  it('generates a self-contained plugin payload without workspace layout files', () => {
+  it('generates a skills-only plugin payload by default without workspace layout files', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
@@ -410,9 +441,9 @@ describe('buildPluginPayload', () => {
     expect(existsSync(join(payloadDir, 'plugin.json'))).toBe(true);
     expect(existsSync(join(payloadDir, '.claude-plugin', 'plugin.json'))).toBe(true);
     expect(existsSync(join(payloadDir, '.codex-plugin', 'plugin.json'))).toBe(true);
-    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
-    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
-    expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
+    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(false);
+    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(false);
+    expect(existsSync(join(payloadDir, 'agents'))).toBe(false);
     expect(existsSync(join(payloadDir, '.github'))).toBe(false);
     expect(existsSync(join(payloadDir, '.agents'))).toBe(false);
     expect(existsSync(join(payloadDir, '.codex'))).toBe(false);
@@ -421,13 +452,70 @@ describe('buildPluginPayload', () => {
     expect(manifest.name).toBe('azure-functions-skills');
     expect(manifest.version).toBe('9.8.7');
     expect(manifest.skills).toBe('./skills/');
-    expect(manifest.agents).toBe('./agents/');
-    expect(manifest.hooks).toBe('./hooks.json');
-    expect(manifest.mcpServers).toBe('./.mcp.json');
+    expect(manifest).not.toHaveProperty('agents');
+    expect(manifest).not.toHaveProperty('hooks');
+    expect(manifest).not.toHaveProperty('mcpServers');
 
     for (const s of skills) {
       expect(existsSync(join(payloadDir, 'skills', s.id, 'SKILL.md'))).toBe(true);
     }
+  });
+
+  it('emits skills-only host plugin manifests by default', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir);
+
+    const defaultManifest = JSON.parse(readFileSync(join(payloadDir, 'plugin.json'), 'utf-8'));
+    const claudeManifest = JSON.parse(readFileSync(join(payloadDir, '.claude-plugin', 'plugin.json'), 'utf-8'));
+    const codexManifest = JSON.parse(readFileSync(join(payloadDir, '.codex-plugin', 'plugin.json'), 'utf-8'));
+
+    expect(defaultManifest.interface).toBeTruthy();
+    expect(defaultManifest).not.toHaveProperty('agents');
+    expect(defaultManifest).not.toHaveProperty('hooks');
+    expect(defaultManifest).not.toHaveProperty('mcpServers');
+    expect(claudeManifest).toMatchObject({
+      name: 'azure-functions-skills',
+      version: '9.8.7',
+      description: 'Azure Functions skills for setup, create, and deploy workflows',
+      skills: './skills/',
+    });
+    expect(claudeManifest).not.toHaveProperty('agents');
+    expect(claudeManifest).not.toHaveProperty('hooks');
+    expect(claudeManifest).not.toHaveProperty('mcpServers');
+    expect(claudeManifest).not.toHaveProperty('interface');
+    expect(codexManifest).not.toHaveProperty('agents');
+    expect(codexManifest).not.toHaveProperty('hooks');
+    expect(codexManifest).not.toHaveProperty('mcpServers');
+  });
+
+  it('generates a full plugin payload when explicitly requested', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir, { profile: 'full' });
+
+    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
+
+    const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
+    expect(manifest.skills).toBe('./skills/');
+    expect(manifest.agents).toBe('./agents/');
+    expect(manifest.hooks).toBe('./hooks.json');
+    expect(manifest.mcpServers).toBe('./.mcp.json');
+
+    const claudeManifest = JSON.parse(readFileSync(join(payloadDir, '.claude-plugin', 'plugin.json'), 'utf-8'));
+    expect(claudeManifest.skills).toBe('./skills/');
+    expect(claudeManifest.hooks).toBe('./hooks.json');
+    expect(claudeManifest.mcpServers).toBe('./.mcp.json');
   });
 });
 
@@ -477,7 +565,7 @@ describe('setup module', () => {
   });
 
   it('applySetup copies files to target directory', async () => {
-    await applySetup(DIST_DIR, { agents: ['ghcp'] });
+    await applySetup(DIST_DIR, { agents: ['ghcp'], prerequisites: 'skip' });
 
     // Should have copilot-instructions.md
     expect(existsSync(join(DIST_DIR, '.github', 'copilot-instructions.md'))).toBe(true);
@@ -486,7 +574,7 @@ describe('setup module', () => {
   });
 
   it('applySetup omits duplicate GHCP plugin directories from workspace root', async () => {
-    await applySetup(DIST_DIR, { agents: ['ghcp'] });
+    await applySetup(DIST_DIR, { agents: ['ghcp'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
@@ -499,7 +587,7 @@ describe('setup module', () => {
   });
 
   it('applySetup handles codex target', async () => {
-    await applySetup(DIST_DIR, { agents: ['codex'] });
+    await applySetup(DIST_DIR, { agents: ['codex'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, 'AGENTS.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
@@ -507,7 +595,7 @@ describe('setup module', () => {
   });
 
   it('applySetup omits duplicate Codex plugin skills from workspace root', async () => {
-    await applySetup(DIST_DIR, { agents: ['codex'] });
+    await applySetup(DIST_DIR, { agents: ['codex'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, 'skills'))).toBe(false);
@@ -517,14 +605,26 @@ describe('setup module', () => {
   });
 
   it('applySetup handles claude target', async () => {
-    await applySetup(DIST_DIR, { agents: ['claude'] });
+    await applySetup(DIST_DIR, { agents: ['claude'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.claude', 'settings.json'))).toBe(true);
   });
 
+  it('applySetup omits Claude plugin payload files from workspace setup', async () => {
+    await applySetup(DIST_DIR, { agents: ['claude'], prerequisites: 'skip' });
+
+    expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.claude-plugin'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'plugin.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'agents'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'hooks.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(false);
+  });
+
   it('applySetup handles multiple agents at once', async () => {
-    await applySetup(DIST_DIR, { agents: ['ghcp', 'claude', 'codex'] });
+    await applySetup(DIST_DIR, { agents: ['ghcp', 'claude', 'codex'], prerequisites: 'skip' });
 
     expect(existsSync(join(DIST_DIR, '.github', 'copilot-instructions.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
@@ -532,11 +632,30 @@ describe('setup module', () => {
   });
 
   it('applySetup returns a summary with welcome message', async () => {
-    const result = await applySetup(DIST_DIR, { agents: ['ghcp'] });
+    const result = await applySetup(DIST_DIR, { agents: ['ghcp'], prerequisites: 'skip' });
 
     expect(result.agents).toContain('ghcp');
     expect(result.filesWritten).toBeGreaterThan(0);
     expect(result.welcomeMessage).toContain('Azure Functions');
+  });
+
+  it('applySetup reports Azure Skills prerequisite installation results', async () => {
+    const calls: string[] = [];
+    const result = await applySetup(DIST_DIR, {
+      agents: ['ghcp'],
+      prerequisiteRunner: async (command, args) => {
+        calls.push([command, ...args].join(' '));
+        return { exitCode: 0, stdout: '', stderr: '' };
+      },
+    });
+
+    expect(calls).toEqual([
+      'copilot plugin list',
+      'copilot plugin marketplace add microsoft/azure-skills',
+      'copilot plugin install azure@azure-skills',
+    ]);
+    expect(result.prerequisites?.[0].status).toBe('installed');
+    expect(result.welcomeMessage).toContain('External prerequisites');
   });
 });
 

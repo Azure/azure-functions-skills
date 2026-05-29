@@ -1,0 +1,10 @@
+{
+  "name": "node-deep-client-reuse",
+  "version": "1.0.0",
+  "main": "src/functions/processOrder.js",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "@azure/cosmos": "^4.0.0"
+  }
+}

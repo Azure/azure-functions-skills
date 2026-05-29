@@ -2,7 +2,7 @@
  * Chat module — launch CLI coding agents with Azure Functions startup prompt.
  *
  * CLI usage: azure-functions-skills chat [--agent <name>] [--prompt <text>] [--dir <path>]
- * Library:   import { chat, buildStartupPrompt, LAUNCHERS } from '@agent-loom/azure-functions-skills/chat'
+ * Library:   import { chat, buildStartupPrompt, LAUNCHERS } from '@azure/functions-skills/chat'
  */
 
 import { existsSync } from 'node:fs';
@@ -10,9 +10,24 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync, spawn } from 'node:child_process';
-import { applySetup } from '../setup/index.js';
 import { loadSkills } from '../build/loader.js';
-import type { BuildTargetName, ChatOptions, ChatResult, DetectedCliAgent, Launcher, LauncherId } from '../types.js';
+import type { ChatOptions, ChatResult, DetectedCliAgent, Launcher, LauncherId } from '../types.js';
+
+type ResolvedLauncherCommand = {
+  command: string;
+  argsPrefix: string[];
+  shell: boolean;
+};
+
+type ResolveLauncherOptions = {
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+};
+
+type StartupPromptOptions = {
+  setupSkillPending?: boolean;
+  setupCompleteCommand?: string;
+};
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = join(__dirname, '..', '..', 'templates', 'prompts');
@@ -23,8 +38,9 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
   'github-copilot': {
     command: 'copilot',
     buildArgs: (ctx) => {
-      const args = ['--agent', 'functions-copilot'];
-      if (ctx.startupPrompt) args.push('-i', ctx.startupPrompt);
+      const passthroughArgs = ctx.passthroughArgs || [];
+      const args = ['--experimental', '--agent', 'functions-copilot', ...passthroughArgs];
+      if (ctx.startupPrompt && !hasCopilotPromptArg(passthroughArgs)) args.push('-i', ctx.startupPrompt);
       return args;
     },
     description: 'GitHub Copilot CLI',
@@ -32,8 +48,8 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
   'claude-code': {
     command: 'claude',
     buildArgs: (ctx) => {
-      const args = [];
-      if (ctx.startupPrompt) args.push(ctx.startupPrompt);
+      const args = [...(ctx.passthroughArgs || [])];
+      if (ctx.startupPrompt) insertClaudePrompt(args, ctx.startupPrompt);
       return args;
     },
     description: 'Claude Code',
@@ -41,13 +57,28 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
   'codex': {
     command: 'codex',
     buildArgs: (ctx) => {
-      const args = [];
+      const args = [...(ctx.passthroughArgs || [])];
       if (ctx.startupPrompt) args.push(ctx.startupPrompt);
       return args;
     },
     description: 'Codex CLI',
   },
 };
+
+function hasCopilotPromptArg(args: string[]): boolean {
+  return args.some(arg => arg === '-p' || arg === '--prompt' || arg === '-i' || arg === '--interactive');
+}
+
+function insertClaudePrompt(args: string[], startupPrompt: string): void {
+  const printIndex = args.findIndex(arg => arg === '-p' || arg === '--print');
+  if (printIndex >= 0) {
+    const nextArg = args[printIndex + 1];
+    if (nextArg && !nextArg.startsWith('-')) return;
+    args.splice(printIndex + 1, 0, startupPrompt);
+    return;
+  }
+  args.push(startupPrompt);
+}
 
 // ─── Agent detection ───
 
@@ -92,7 +123,7 @@ function detectProject(dir: string): { language: string; hasHostJson: true } | n
  * @param {string} dir - Project directory to analyze
  * @returns {Promise<string>}
  */
-export async function buildStartupPrompt(dir: string): Promise<string> {
+export async function buildStartupPrompt(dir: string, options: StartupPromptOptions = {}): Promise<string> {
   const templatePath = join(PROMPTS_DIR, 'startup.md');
   let template = await readFile(templatePath, 'utf8');
 
@@ -109,7 +140,8 @@ export async function buildStartupPrompt(dir: string): Promise<string> {
   const suggestedActions = project
     ? [
         '🚀 Suggested next steps:',
-        '   → Run azure-functions-deploy to deploy your app to Azure',
+        '   → Run azure-functions-deploy to deploy your app to Azure through the Azure Skills plugin',
+        '   → Ensure the Azure Skills plugin is installed for prepare/validate/deploy workflows',
         '   → Run azure-functions-create to add another function',
         '   → Ask about best practices for your project',
       ].join('\n')
@@ -123,6 +155,10 @@ export async function buildStartupPrompt(dir: string): Promise<string> {
   template = template.replaceAll('{{projectContext}}', projectContext);
   template = template.replaceAll('{{skillList}}', skillList);
   template = template.replaceAll('{{suggestedActions}}', suggestedActions);
+
+  if (options.setupSkillPending) {
+    return `${setupInstruction(options.setupCompleteCommand)}\n\n${template}`;
+  }
 
   return template;
 }
@@ -147,25 +183,14 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
     throw new Error(`Unknown agent: ${agentId}. Available: ${Object.keys(LAUNCHERS).join(', ')}`);
   }
 
-  // Auto-setup: ensure skills are installed before launching the agent
-  const agentToSetupTarget: Record<LauncherId, BuildTargetName> = {
-    'github-copilot': 'ghcp',
-    'claude-code': 'claude',
-    'codex': 'codex',
-  };
-  const setupTarget = agentToSetupTarget[agentId];
-  if (setupTarget && !isSetupDone(dir, setupTarget)) {
-    const result = await applySetup(dir, { agents: [setupTarget] });
-    if (result.filesWritten > 0) {
-      process.stderr.write(`📦 Installed ${result.filesWritten} skill files for ${setupTarget}\n`);
-    }
-  }
-
-  const startupPrompt = options.prompt || await buildStartupPrompt(dir);
-  const args = launcher.buildArgs({ startupPrompt });
+  const basePrompt = options.prompt || await buildStartupPrompt(dir);
+  const startupPrompt = options.setupSkillPending
+    ? `${setupInstruction(options.setupCompleteCommand)} ${basePrompt}`
+    : basePrompt;
+  const args = launcher.buildArgs({ startupPrompt, passthroughArgs: options.passthroughArgs });
   const resolvedLauncher = resolveLauncherCommand(launcher.command);
 
-  const child = spawn(resolvedLauncher.command, args, {
+  const child = spawn(resolvedLauncher.command, [...resolvedLauncher.argsPrefix, ...args], {
     cwd: dir,
     stdio: 'inherit',
     shell: resolvedLauncher.shell,
@@ -186,6 +211,15 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
   });
 }
 
+function setupInstruction(setupCompleteCommand: string | undefined): string {
+  const completeCommand = setupCompleteCommand || 'azure-functions-skills state setup-complete --dir .';
+  return [
+    'First run azure-functions-setup before other Azure Functions Skills workflows in this workspace.',
+    `After azure-functions-setup completes, run: ${completeCommand}.`,
+    'If that command is unavailable, update .azure-functions-skills/state.local.json directly: set setupSkill to { "status": "completed", "completedAt": the current ISO-8601 time, "completedBy": the active agent }, preserve the rest of the file, and update workspace.updatedAt.',
+  ].join(' ');
+}
+
 async function pickAgent(): Promise<LauncherId> {
   const agents = await detectCliAgents();
   if (agents.length === 0) {
@@ -199,41 +233,57 @@ async function pickAgent(): Promise<LauncherId> {
   return agents[0].id;
 }
 
-function resolveLauncherCommand(command: string): { command: string; shell: boolean } {
-  if (process.platform !== 'win32') {
-    return { command, shell: false };
+export function resolveLauncherCommand(command: string, options: ResolveLauncherOptions = {}): ResolvedLauncherCommand {
+  const platform = options.platform || process.platform;
+  if (platform !== 'win32') {
+    return { command, argsPrefix: [], shell: false };
   }
 
   try {
-    const resolved = execSync(`where ${command}`, { encoding: 'utf-8' })
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .find(Boolean);
-    if (!resolved) return { command, shell: false };
-    return { command: resolved, shell: /\.(cmd|bat)$/i.test(resolved) };
+    const candidates = findWindowsLauncherCandidates(command, options.env || process.env);
+    const resolved = pickWindowsLauncherCandidate(candidates);
+    if (!resolved) return { command, argsPrefix: [], shell: false };
+    if (/\.(cmd|bat)$/i.test(resolved)) {
+      return {
+        command: 'cmd.exe',
+        argsPrefix: ['/d', '/s', '/c', resolved],
+        shell: false,
+      };
+    }
+    if (/\.ps1$/i.test(resolved)) {
+      return {
+        command: 'powershell.exe',
+        argsPrefix: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolved],
+        shell: false,
+      };
+    }
+    return { command: resolved, argsPrefix: [], shell: false };
   } catch {
-    return { command, shell: false };
+    return { command, argsPrefix: [], shell: false };
   }
 }
 
-/**
- * Check if skill files are already present for a given target.
- */
-function isSetupDone(dir: string, target: BuildTargetName): boolean {
-  const skillIds = loadSkills(join(__dirname, '..', '..', 'templates', 'skills')).map(skill => skill.id);
-  const checks: Record<BuildTargetName, string[]> = {
-    ghcp: [
-      join(dir, '.github', 'copilot-instructions.md'),
-      ...skillIds.map(skillId => join(dir, '.github', 'skills', skillId, 'SKILL.md')),
-    ],
-    claude: [
-      join(dir, 'CLAUDE.md'),
-      ...skillIds.map(skillId => join(dir, '.claude', 'skills', skillId, 'SKILL.md')),
-    ],
-    codex: [
-      join(dir, 'AGENTS.md'),
-      ...skillIds.map(skillId => join(dir, '.agents', 'skills', skillId, 'SKILL.md')),
-    ],
-  };
-  return checks[target].every(f => existsSync(f));
+function findWindowsLauncherCandidates(command: string, env: NodeJS.ProcessEnv): string[] {
+  const pathValue = env.Path || env.PATH || '';
+  const pathExtValue = env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD;.PS1';
+  const extensions = pathExtValue
+    .split(';')
+    .map(extension => extension.trim())
+    .filter(Boolean);
+  const commandHasExtension = /\.[^\\/]+$/.test(command);
+  const commandNames = commandHasExtension ? [command] : [...extensions.map(extension => `${command}${extension.toLowerCase()}`), command];
+  const candidates: string[] = [];
+
+  for (const directory of pathValue.split(';').map(entry => entry.trim()).filter(Boolean)) {
+    for (const commandName of commandNames) {
+      const candidate = join(directory, commandName);
+      if (existsSync(candidate)) candidates.push(candidate);
+    }
+  }
+
+  return candidates;
+}
+
+function pickWindowsLauncherCandidate(candidates: string[]): string | undefined {
+  return candidates[0];
 }

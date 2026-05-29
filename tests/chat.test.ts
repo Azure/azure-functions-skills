@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildStartupPrompt, LAUNCHERS, detectCliAgents, chat } from '../src/chat/index.js';
+import { buildStartupPrompt, LAUNCHERS, detectCliAgents, chat, resolveLauncherCommand } from '../src/chat/index.js';
 import { createTempDir, removeDir, resetDir } from './helpers/fs.js';
 
 const TEMP_DIRS: string[] = [];
@@ -50,6 +50,19 @@ describe('buildStartupPrompt', () => {
 
     const prompt = await buildStartupPrompt(dir);
     expect(prompt).toContain('azure-functions-deploy');
+    expect(prompt).toContain('Azure Skills plugin');
+  });
+
+  it('includes direct state-file fallback when setup completion command is unavailable', async () => {
+    const prompt = await buildStartupPrompt(DIST_DIR, {
+      setupSkillPending: true,
+      setupCompleteCommand: 'azure-functions-skills state setup-complete --dir "Q:/workspace" --agent github-copilot',
+    });
+
+    expect(prompt).toContain('azure-functions-skills state setup-complete --dir');
+    expect(prompt).toContain('If that command is unavailable');
+    expect(prompt).toContain('.azure-functions-skills/state.local.json');
+    expect(prompt).toContain('"status": "completed"');
   });
 });
 
@@ -62,12 +75,22 @@ describe('LAUNCHERS', () => {
     expect(LAUNCHERS['codex']).toBeTruthy();
   });
 
-  it('ghcp launcher uses --agent and copilot -i flag', () => {
+  it('ghcp launcher enables workspace agents and uses copilot -i flag', () => {
     const args = LAUNCHERS['github-copilot'].buildArgs({ startupPrompt: 'hello' });
+    expect(args).toContain('--experimental');
     expect(args).toContain('--agent');
     expect(args).toContain('functions-copilot');
     expect(args).toContain('-i');
     expect(args).toContain('hello');
+  });
+
+  it('ghcp launcher forwards CLI args and lets explicit prompt flags replace interactive startup prompt', () => {
+    const args = LAUNCHERS['github-copilot'].buildArgs({
+      startupPrompt: 'startup',
+      passthroughArgs: ['-p', 'headless', '--yolo', '--output-format', 'json'],
+    });
+
+    expect(args).toEqual(['--experimental', '--agent', 'functions-copilot', '-p', 'headless', '--yolo', '--output-format', 'json']);
   });
 
   it('claude launcher passes prompt as first arg', () => {
@@ -75,9 +98,36 @@ describe('LAUNCHERS', () => {
     expect(args).toContain('hello');
   });
 
+  it('claude launcher forwards CLI args before the startup prompt', () => {
+    const args = LAUNCHERS['claude-code'].buildArgs({
+      startupPrompt: 'hello',
+      passthroughArgs: ['-p', '--permission-mode', 'bypassPermissions'],
+    });
+
+    expect(args).toEqual(['-p', 'hello', '--permission-mode', 'bypassPermissions']);
+  });
+
+  it('claude launcher preserves an explicit print prompt from passthrough args', () => {
+    const args = LAUNCHERS['claude-code'].buildArgs({
+      startupPrompt: 'startup',
+      passthroughArgs: ['-p', 'headless prompt', '--output-format', 'json'],
+    });
+
+    expect(args).toEqual(['-p', 'headless prompt', '--output-format', 'json']);
+  });
+
   it('codex launcher passes prompt as first arg', () => {
     const args = LAUNCHERS['codex'].buildArgs({ startupPrompt: 'hello' });
     expect(args).toContain('hello');
+  });
+
+  it('codex launcher forwards subcommands and CLI args before the startup prompt', () => {
+    const args = LAUNCHERS['codex'].buildArgs({
+      startupPrompt: 'hello',
+      passthroughArgs: ['exec', '--sandbox', 'read-only', '--json'],
+    });
+
+    expect(args).toEqual(['exec', '--sandbox', 'read-only', '--json', 'hello']);
   });
 
   it('launchers return empty args when no prompt', () => {
@@ -85,6 +135,96 @@ describe('LAUNCHERS', () => {
       const args = launcher.buildArgs({});
       expect(args).toBeInstanceOf(Array);
     }
+  });
+});
+
+// ─── Launcher resolution tests ───
+
+describe('resolveLauncherCommand', () => {
+  it('leaves non-Windows launchers unchanged', () => {
+    const resolved = resolveLauncherCommand('codex', {
+      platform: 'linux',
+    });
+
+    expect(resolved).toEqual({ command: 'codex', argsPrefix: [], shell: false });
+  });
+
+  it('wraps cmd shims with cmd.exe on Windows to avoid shell quoting', () => {
+    const binDir = resetDir(join(DIST_DIR, 'launcher-cmd-ps1'));
+    writeFileSync(join(binDir, 'codex.ps1'), 'exit 0');
+    writeFileSync(join(binDir, 'codex.cmd'), '@echo off\r\nexit /b 0\r\n');
+    const resolved = resolveLauncherCommand('codex', {
+      platform: 'win32',
+      env: { Path: binDir, PATHEXT: '.CMD;.PS1' },
+    });
+
+    expect(resolved).toEqual({
+      command: 'cmd.exe',
+      argsPrefix: ['/d', '/s', '/c', join(binDir, 'codex.cmd')],
+      shell: false,
+    });
+  });
+
+  it('prefers Windows batch shims over extensionless scripts in the same directory', () => {
+    const batDir = resetDir(join(DIST_DIR, 'launcher-extensionless-bat'));
+    const cmdDir = resetDir(join(DIST_DIR, 'launcher-extensionless-cmd'));
+    writeFileSync(join(batDir, 'copilot'), '#!/bin/sh\nexit 0\n');
+    writeFileSync(join(batDir, 'copilot.bat'), '@echo off\r\nexit /b 0\r\n');
+    writeFileSync(join(cmdDir, 'codex'), '#!/bin/sh\nexit 0\n');
+    writeFileSync(join(cmdDir, 'codex.cmd'), '@echo off\r\nexit /b 0\r\n');
+
+    const bat = resolveLauncherCommand('copilot', {
+      platform: 'win32',
+      env: { Path: batDir, PATHEXT: '.BAT' },
+    });
+    const cmd = resolveLauncherCommand('codex', {
+      platform: 'win32',
+      env: { Path: cmdDir, PATHEXT: '.CMD' },
+    });
+
+    expect(bat).toEqual({
+      command: 'cmd.exe',
+      argsPrefix: ['/d', '/s', '/c', join(batDir, 'copilot.bat')],
+      shell: false,
+    });
+    expect(cmd).toEqual({
+      command: 'cmd.exe',
+      argsPrefix: ['/d', '/s', '/c', join(cmdDir, 'codex.cmd')],
+      shell: false,
+    });
+  });
+
+  it('runs PowerShell shims through powershell.exe when no better shim is available', () => {
+    const binDir = resetDir(join(DIST_DIR, 'launcher-ps1'));
+    writeFileSync(join(binDir, 'copilot.ps1'), 'exit 0');
+    const resolved = resolveLauncherCommand('copilot', {
+      platform: 'win32',
+      env: { Path: binDir, PATHEXT: '.PS1' },
+    });
+
+    expect(resolved).toEqual({
+      command: 'powershell.exe',
+      argsPrefix: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(binDir, 'copilot.ps1')],
+      shell: false,
+    });
+  });
+
+  it('runs exe and extensionless Windows shims directly', () => {
+    const exeDir = resetDir(join(DIST_DIR, 'launcher-exe'));
+    const extensionlessDir = resetDir(join(DIST_DIR, 'launcher-extensionless'));
+    writeFileSync(join(exeDir, 'tool.exe'), 'fake');
+    writeFileSync(join(extensionlessDir, 'tool'), 'fake');
+    const exe = resolveLauncherCommand('tool', {
+      platform: 'win32',
+      env: { Path: exeDir, PATHEXT: '.EXE' },
+    });
+    const extensionless = resolveLauncherCommand('tool', {
+      platform: 'win32',
+      env: { Path: extensionlessDir, PATHEXT: '' },
+    });
+
+    expect(exe).toEqual({ command: join(exeDir, 'tool.exe'), argsPrefix: [], shell: false });
+    expect(extensionless).toEqual({ command: join(extensionlessDir, 'tool'), argsPrefix: [], shell: false });
   });
 });
 
@@ -105,51 +245,50 @@ describe('detectCliAgents', () => {
   });
 });
 
-// ─── Auto-setup tests ───
+// ─── Launcher-only chat tests ───
 
-describe('chat auto-setup', () => {
-  it('auto-installs ghcp skills when not present', async () => {
+describe('chat launcher-only behavior', () => {
+  it('does not auto-install ghcp skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-ghcp-');
 
     try {
-      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test' });
+      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test', prerequisites: 'skip' });
       if (result?.childProcess) result.childProcess.kill();
     } catch {
       // Expected: copilot binary not found — that's fine
     }
 
-    // Skills should now be installed
-    expect(existsSync(join(testDir, '.github', 'copilot-instructions.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, '.github', 'copilot-instructions.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
-  it('auto-installs claude skills when not present', async () => {
+  it('does not auto-install claude skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-claude-');
 
     try {
-      const result = await chat({ agent: 'claude-code', dir: testDir, prompt: 'test' });
+      const result = await chat({ agent: 'claude-code', dir: testDir, prompt: 'test', prerequisites: 'skip' });
       // If claude is installed, kill the spawned process immediately
       if (result?.childProcess) result.childProcess.kill();
     } catch {
       // Expected: claude binary not found
     }
 
-    expect(existsSync(join(testDir, 'CLAUDE.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, 'CLAUDE.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
-  it('auto-installs codex skills when not present', async () => {
+  it('does not auto-install codex skills when not present', async () => {
     const testDir = makeTestDir('af-skills-chat-codex-');
 
     try {
-      const result = await chat({ agent: 'codex', dir: testDir, prompt: 'test' });
+      const result = await chat({ agent: 'codex', dir: testDir, prompt: 'test', prerequisites: 'skip' });
       if (result?.childProcess) result.childProcess.kill();
     } catch {
       // Expected: codex binary not found
     }
 
-    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(true);
-    expect(existsSync(join(testDir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(testDir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
   }, 15000);
 
   it('skips setup when skills are already present', async () => {
@@ -157,14 +296,14 @@ describe('chat auto-setup', () => {
 
     // Pre-install skills
     const { applySetup } = await import('../src/setup/index.js');
-    await applySetup(testDir, { agents: ['ghcp'] });
+    await applySetup(testDir, { agents: ['ghcp'], prerequisites: 'skip' });
 
     // Get content of instructions file
     const instrPath = join(testDir, '.github', 'copilot-instructions.md');
     const contentBefore = readFileSync(instrPath, 'utf-8');
 
     try {
-      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test' });
+      const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test', prerequisites: 'skip' });
       if (result?.childProcess) result.childProcess.kill();
     } catch {
       // Expected
@@ -173,5 +312,27 @@ describe('chat auto-setup', () => {
     // File should not have been re-written (same content)
     const contentAfter = readFileSync(instrPath, 'utf-8');
     expect(contentAfter).toBe(contentBefore);
+  }, 15000);
+
+  it('does not install Azure Skills prerequisites before launching GitHub Copilot', async () => {
+    const testDir = makeTestDir('af-skills-chat-prereq-');
+    const calls: string[] = [];
+
+    try {
+      const result = await chat({
+        agent: 'github-copilot',
+        dir: testDir,
+        prompt: 'test',
+        prerequisiteRunner: async (command, args) => {
+          calls.push([command, ...args].join(' '));
+          return { exitCode: 0, stdout: '', stderr: '' };
+        },
+      });
+      if (result?.childProcess) result.childProcess.kill();
+    } catch {
+      // Expected if the launcher is unavailable.
+    }
+
+    expect(calls).toEqual([]);
   }, 15000);
 });

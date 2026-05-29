@@ -1,0 +1,7 @@
+{
+  "name": "node-deep-servicebus-autocomplete",
+  "version": "1.0.0",
+  "main": "src/functions/processMessage.js",
+  "engines": { "node": ">=22" },
+  "dependencies": { "@azure/functions": "^4.0.0" }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "node-supply-chain-dropper-pattern",
+  "version": "1.0.0",
+  "main": "src/functions/hello.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@azure/functions": "4.5.1"
+  }
+}

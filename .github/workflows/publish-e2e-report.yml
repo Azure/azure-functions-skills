@@ -1,0 +1,54 @@
+name: Publish E2E Report
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-e2e-report.yml'
+      - 'docs/research/bug-bash-feedback-summary-20260519.html'
+      - 'docs/research/bug-bash-feedback-summary-20260519-en.html'
+      - 'reports/e2e/current/report.html'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare site
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f reports/e2e/current/report.html
+          test -f docs/research/bug-bash-feedback-summary-20260519.html
+          test -f docs/research/bug-bash-feedback-summary-20260519-en.html
+          mkdir -p _site
+          mkdir -p _site/bug-bash
+          cp reports/e2e/current/report.html _site/index.html
+          cp reports/e2e/current/report.html _site/report.html
+          cp docs/research/bug-bash-feedback-summary-20260519-en.html _site/bug-bash/index.html
+          cp docs/research/bug-bash-feedback-summary-20260519-en.html _site/bug-bash/en.html
+          cp docs/research/bug-bash-feedback-summary-20260519.html _site/bug-bash/ja.html
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
