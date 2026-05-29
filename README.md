@@ -62,6 +62,8 @@ The first time, the agent greets you with a welcome message, shows the available
 
 ## Skills
 
+For contributor guidance on the product boundary between Azure Skills and Azure Functions Skills, see [Azure Skills and Azure Functions Skills Boundary](docs/azure-skills-boundary.md).
+
 | Skill | Purpose |
 | --- | --- |
 | [`azure-functions-setup`](templates/skills/azure-functions-setup/SKILL.md) | Verify local prerequisites (Azure CLI, Core Tools, runtimes, Azure Skills) |
