@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterAll, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTempDir, removeDir } from './helpers/fs.js';
@@ -7,6 +7,7 @@ import {
   resolveStacks,
   getLanguageVersions,
   checkVersionStatus,
+  type StacksSourceFn,
 } from '../src/doctor/stacks.js';
 import type { StacksCache } from '../src/doctor/stacks-types.js';
 
@@ -233,7 +234,7 @@ describe('checkVersionStatus', () => {
 // ── resolveStacks (cache behavior) ──
 
 describe('resolveStacks', () => {
-  let sourceSpy: ReturnType<typeof vi.fn>;
+  let sourceSpy: Mock<StacksSourceFn>;
 
   beforeEach(() => {
     sourceSpy = vi.fn();
