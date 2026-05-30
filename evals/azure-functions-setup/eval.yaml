@@ -1,0 +1,147 @@
+name: azure-functions-setup-eval
+description: |
+  Evaluation suite for the azure-functions-setup skill.
+
+  Doubles as a CI environment sanity check: when the agent runs the
+  prerequisite-version commands listed in the skill (az, azd, func,
+  node, python3, dotnet), every one of those tools must actually be
+  present on the runner. If any of them is missing the eval will
+  surface it through the `prereq_*_ok` graders below.
+
+  Stimuli are intentionally low-cost (1 routing + 1 quality, runs: 3)
+  so this suite stays cheap enough to run on every PR alongside the
+  other smoke stimuli.
+
+  Notes:
+    - Built-in graders only. Global graders (`completed`,
+      `no_runtime_failure`) are duplicated into each stimulus per
+      evaluate#125. See ../_base/common-graders.yaml.
+
+tags:
+  type: integration
+  skill: azure-functions-setup
+
+config:
+  runs: 3
+  timeout: "5m"
+  executor: copilot-sdk
+  model: claude-sonnet-4.6
+
+scoring:
+  threshold: 0.8
+  weights:
+    skill-invocation: 2.0
+    output-matches: 1.0
+    output-not-matches: 1.5
+    completed: 1.0
+
+stimuli:
+  # ─────────────────────────────────────────────────────────────────
+  # Routing (tier: smoke) — does a "check my environment" prompt
+  # activate the setup skill?
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Routing — check Azure Functions environment"
+    prompt: |
+      Check whether my development environment is ready for Azure Functions —
+      list each required tool and its version, and tell me what is missing.
+    tags:
+      type: integration
+      skill: azure-functions-setup
+      tier: smoke
+      cost: llm
+      area: routing
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-setup
+        - ../../templates/skills/azure-functions-common
+    constraints:
+      max_turns: 12
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-setup
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Response quality (tier: smoke) — environment sanity check
+  # The skill instructs the agent to run version probes for six
+  # prerequisites. Each grader below asserts that the corresponding
+  # tool reported a usable version (not "missing" / "not found" /
+  # "command not found"). On a correctly provisioned CI runner all
+  # six must pass.
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Quality — all six prerequisites present"
+    prompt: |
+      Please verify that my environment is set up for Azure Functions development.
+      Run the prerequisite version checks for Azure CLI, Azure Developer CLI,
+      Azure Functions Core Tools, Node.js, Python, and .NET SDK, and report
+      each result individually.
+    tags:
+      type: integration
+      skill: azure-functions-setup
+      tier: smoke
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-setup
+        - ../../templates/skills/azure-functions-common
+    constraints:
+      max_turns: 15
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-setup
+
+      # Each tool must appear in the agent's report with a ✅-style
+      # OK marker (the skill template uses ✅ / "ready" / "installed").
+      # We accept any positive marker; we only fail when the tool is
+      # explicitly missing (caught by the prereq_no_missing grader
+      # below).
+      - name: prereq_az_mentioned
+        type: output-matches
+        config:
+          pattern: "(?i)Azure CLI"
+      - name: prereq_azd_mentioned
+        type: output-matches
+        config:
+          pattern: "(?i)Azure Developer CLI|\\bazd\\b"
+      - name: prereq_func_mentioned
+        type: output-matches
+        config:
+          pattern: "(?i)Core Tools|\\bfunc\\b"
+      - name: prereq_node_mentioned
+        type: output-matches
+        config:
+          pattern: "(?i)Node\\.?js"
+      - name: prereq_python_mentioned
+        type: output-matches
+        config:
+          pattern: "(?i)Python"
+      - name: prereq_dotnet_mentioned
+        type: output-matches
+        config:
+          pattern: "(?i)\\.NET( SDK)?|dotnet"
+
+      # Hard failure: any of the six prerequisites reported as missing
+      # means the CI environment is broken. This is the grader that
+      # actually validates the runner; the version-prober ran by the
+      # agent will produce "command not found" / "not installed" / "❌"
+      # output that the model paraphrases in its final answer.
+      - name: prereq_no_missing
+        type: output-not-matches
+        config:
+          pattern: "(?i)(command not found|not installed|missing|❌)\\s*(:|—|-)?\\s*(azure cli|az\\b|azure developer cli|azd\\b|core tools|func\\b|node\\.?js|python|\\.net|dotnet)"
+
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"

@@ -69,6 +69,30 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Install Azure Functions Core Tools (func)
+        # Required by the azure-functions-setup skill prerequisite checks
+        # and by any eval that asks the agent to run / verify the host.
+        run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
+
+      - name: Install Azure Developer CLI (azd)
+        # Required by the azure-functions-setup skill prerequisite checks
+        # and by deployment-related evals.
+        run: curl -fsSL https://aka.ms/install-azd.sh | bash
+
+      - name: Verify prerequisites
+        # Fail fast if the installs above did not land — keeps
+        # CI-environment regressions from masquerading as model failures
+        # in the azure-functions-setup eval.
+        run: |
+          set -euo pipefail
+          echo "node:    $(node --version)"
+          echo "npm:     $(npm --version)"
+          echo "az:      $(az --version | head -1)"
+          echo "azd:     $(azd version)"
+          echo "func:    $(func --version)"
+          echo "python3: $(python3 --version)"
+          echo "dotnet:  $(dotnet --version)"
+
       - name: Pre-warm @azure/mcp cache
         # Functions evals attach an Azure MCP server (functions namespace) via
         # stdio. Pulling the package once upfront keeps per-stimulus startup fast

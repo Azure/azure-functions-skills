@@ -74,6 +74,28 @@ Defined in [`.vally.yaml`](../.vally.yaml) at the repo root:
   `scoring.threshold: 0.8` so the metric measures invocation rate.
 - Response-quality stimuli typically use `runs: 1`.
 
+## CI runner prerequisites
+
+The `Skill Evaluation - Vally` workflow installs the following before running
+evals, so any stimulus that triggers a prerequisite check (e.g. the
+`azure-functions-setup` eval) reflects the agent / skill behavior rather than a
+missing runner tool:
+
+| Tool | Provided by |
+| --- | --- |
+| Node.js 22 | `actions/setup-node@v4` |
+| `npm` | Node.js |
+| `az` (Azure CLI) | runner image (pre-installed) |
+| `python3` | runner image (pre-installed) |
+| `dotnet` | runner image (pre-installed) |
+| `func` (Azure Functions Core Tools 4.x) | `npm install -g azure-functions-core-tools@4` step |
+| `azd` (Azure Developer CLI) | `https://aka.ms/install-azd.sh` step |
+
+The workflow runs `Verify prerequisites` immediately after these installs, so a
+broken provisioning step fails the job before the LLM is invoked. The
+`azure-functions-setup` eval then sanity-checks that the agent observes the
+same tools from inside the session.
+
 ## Common graders (copy into each stimulus)
 
 See [`_base/common-graders.yaml`](_base/common-graders.yaml). Highlights:
