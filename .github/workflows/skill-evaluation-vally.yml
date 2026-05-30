@@ -37,6 +37,11 @@ jobs:
   eval:
     name: vally eval
     runs-on: ubuntu-latest
+    # Scope COPILOT_GITHUB_TOKEN to a dedicated GitHub Environment so the
+    # secret is only available from approved branches (and, optionally,
+    # behind required reviewers for cost-sensitive Opus / full runs).
+    # Mirrors the pattern used by skill-evaluation-live-azure-login-smoke.yml.
+    environment: functions-skills-vally-eval
     timeout-minutes: 60
     env:
       # GitHub Copilot SDK authentication used by the `copilot-sdk` executor.
