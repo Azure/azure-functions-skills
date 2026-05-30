@@ -1,0 +1,188 @@
+name: Cleanup Stale Vally Resources
+
+# Safety net: deletes Azure resource groups tagged `vally-eval=true`
+# whose `createdAt` tag is older than the configured age. This runs
+# even if the Skill Evaluation - Vally Live workflow forgets to clean
+# up (e.g. because keep_resources=true was used for debugging or the
+# workflow itself was cancelled mid-cleanup).
+#
+# Scope:
+#   Subscription = vars.AZURE_SUBSCRIPTION_ID on functions-skills-live-e2e.
+#   Tag filter   = vally-eval=true   AND   createdAt < (now - max_age_hours).
+#
+# Required identity:
+#   The federated identity behind vars.AZURE_CLIENT_ID must hold a
+#   role that allows `Microsoft.Resources/subscriptions/resourceGroups/delete`
+#   (Contributor on the subscription is the simplest fit).
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_age_hours:
+        description: Delete resource groups whose createdAt tag is older than this many hours.
+        required: false
+        type: string
+        default: "24"
+      dry_run:
+        description: When true, list candidates but do not delete.
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # Daily at 03:00 UTC. Runs against the reviewer-gated environment,
+    # which means scheduled runs currently sit waiting for approval
+    # until a non-gated identity is provisioned. Approving once a day
+    # is the interim manual step.
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: vally-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: cleanup stale vally resource groups
+    runs-on: ubuntu-latest
+    environment: functions-skills-live-e2e
+    timeout-minutes: 30
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Mask Azure identifiers
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in "$AZURE_CLIENT_ID" "$AZURE_TENANT_ID" "$AZURE_SUBSCRIPTION_ID"; do
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
+
+      - name: Validate Azure configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required configuration: $name" >&2
+              exit 1
+            fi
+          done
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Find stale resource groups
+        id: find
+        shell: bash
+        env:
+          MAX_AGE_HOURS: ${{ inputs.max_age_hours || '24' }}
+        run: |
+          set -euo pipefail
+
+          # Compute cutoff in epoch seconds. Tag values are ISO-8601
+          # strings (we write them at RG creation time).
+          NOW_EPOCH="$(date -u +%s)"
+          CUTOFF_EPOCH="$((NOW_EPOCH - MAX_AGE_HOURS * 3600))"
+          echo "Cutoff: $(date -u -d "@$CUTOFF_EPOCH" +%Y-%m-%dT%H:%M:%SZ) ($CUTOFF_EPOCH)"
+
+          # List every RG tagged vally-eval=true, projecting name + createdAt.
+          mapfile -t CANDIDATES < <(
+            az group list \
+              --tag vally-eval=true \
+              --query "[].{name:name, createdAt:tags.createdAt}" \
+              -o tsv
+          )
+
+          STALE_NAMES=()
+          if [ "${#CANDIDATES[@]}" -eq 0 ]; then
+            echo "No resource groups tagged vally-eval=true found."
+          else
+            for line in "${CANDIDATES[@]}"; do
+              # tsv columns: name<TAB>createdAt
+              NAME="$(echo "$line" | cut -f1)"
+              CREATED_AT="$(echo "$line" | cut -f2)"
+              if [ -z "$CREATED_AT" ] || [ "$CREATED_AT" = "None" ]; then
+                # No createdAt tag → treat as stale immediately (safer
+                # to delete than to let an unknown RG accumulate cost).
+                echo "  STALE (no createdAt): $NAME"
+                STALE_NAMES+=("$NAME")
+                continue
+              fi
+              CREATED_EPOCH="$(date -u -d "$CREATED_AT" +%s 2>/dev/null || echo 0)"
+              if [ "$CREATED_EPOCH" -lt "$CUTOFF_EPOCH" ]; then
+                echo "  STALE ($CREATED_AT): $NAME"
+                STALE_NAMES+=("$NAME")
+              else
+                echo "  fresh ($CREATED_AT): $NAME"
+              fi
+            done
+          fi
+
+          # Join with newlines for the next step.
+          {
+            echo "stale_count=${#STALE_NAMES[@]}"
+            echo 'stale_names<<EOF'
+            printf '%s\n' "${STALE_NAMES[@]}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Delete stale resource groups
+        if: steps.find.outputs.stale_count != '0'
+        shell: bash
+        env:
+          STALE_NAMES: ${{ steps.find.outputs.stale_names }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          DELETED=()
+          SKIPPED=()
+          while IFS= read -r NAME; do
+            [ -z "$NAME" ] && continue
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "[dry-run] would delete: $NAME"
+              SKIPPED+=("$NAME")
+            else
+              echo "Deleting: $NAME"
+              if az group delete --name "$NAME" --yes --no-wait; then
+                DELETED+=("$NAME")
+              else
+                echo "::warning::Failed to issue delete for $NAME"
+              fi
+            fi
+          done <<< "$STALE_NAMES"
+          {
+            echo "## Cleanup summary"
+            echo ""
+            echo "- Mode: $([ "$DRY_RUN" = "true" ] && echo "dry-run" || echo "delete")"
+            echo "- Stale groups: ${{ steps.find.outputs.stale_count }}"
+            echo "- Delete submitted: ${#DELETED[@]}"
+            echo "- Dry-run skipped:  ${#SKIPPED[@]}"
+            if [ "${#DELETED[@]}" -gt 0 ]; then
+              echo ""
+              echo "### Deleted"
+              printf -- '- `%s`\n' "${DELETED[@]}"
+            fi
+            if [ "${#SKIPPED[@]}" -gt 0 ]; then
+              echo ""
+              echo "### Dry-run candidates"
+              printf -- '- `%s`\n' "${SKIPPED[@]}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report nothing-to-do
+        if: steps.find.outputs.stale_count == '0'
+        shell: bash
+        run: |
+          echo "## Cleanup summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "No stale resource groups found." >> "$GITHUB_STEP_SUMMARY"
