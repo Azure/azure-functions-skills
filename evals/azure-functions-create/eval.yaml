@@ -1,0 +1,257 @@
+name: azure-functions-create-eval
+description: |
+  Evaluation suite for the azure-functions-create skill.
+
+  Covers:
+    - Routing (skill-invocation) for typical "create a function" prompts
+      across TypeScript HTTP, Python timer, and existing-project flows.
+    - Response-quality checks that the skill follows Path A (Azure MCP)
+      when available, does not fabricate template IDs, includes proper
+      verification, and suggests azure-functions-deploy as the next step.
+    - "Do not re-initialize an existing project" guardrail.
+
+  Notes:
+    - Built-in graders only (output-contains / output-matches /
+      output-not-matches / completed / skill-invocation). No custom
+      executor tags such as earlyTerminate are used because we rely on
+      Vally's standard `copilot-sdk` executor.
+    - Global graders (`completed`, `no_runtime_failure`) are duplicated
+      into each stimulus per evaluate#125. See ../_base/common-graders.yaml.
+
+tags:
+  type: integration
+  skill: azure-functions-create
+
+config:
+  runs: 3
+  timeout: "10m"
+  executor: copilot-sdk
+  model: claude-sonnet-4.6
+
+scoring:
+  threshold: 0.8
+  weights:
+    skill-invocation: 2.0
+    output-contains: 0.5
+    output-matches: 1.0
+    output-not-matches: 1.5
+    completed: 1.0
+
+stimuli:
+  # ─────────────────────────────────────────────────────────────────
+  # Routing — skill invocation (tier: smoke)
+  # Use runs: 5 / threshold 0.8 to measure invocation rate.
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Routing — create TypeScript HTTP function"
+    prompt: |
+      I want to create a new Azure Functions project in TypeScript with an HTTP trigger.
+      Please scaffold it for me.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: smoke
+      cost: llm
+      area: routing
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+    constraints:
+      max_turns: 12
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      # has_output
+      - type: completed
+      # no_runtime_failure
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Routing — create Python timer function"
+    prompt: |
+      Create a new Python Azure Functions project with a timer trigger that runs every 5 minutes.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: smoke
+      cost: llm
+      area: routing
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+    constraints:
+      max_turns: 12
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Routing — add function to existing project"
+    prompt: |
+      I already have an Azure Functions project (host.json is present).
+      Please add a new HTTP trigger function to it; do not re-initialize the project.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: smoke
+      cost: llm
+      area: routing
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+      files:
+        - src: fixtures/existing-project/host.json
+          dest: host.json
+        - src: fixtures/existing-project/package.json
+          dest: package.json
+    constraints:
+      max_turns: 12
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Response quality (tier: full)
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Quality — uses Azure MCP path when scaffolding TypeScript HTTP"
+    prompt: |
+      Create a TypeScript Azure Functions project with an HTTP trigger named "hello".
+      Walk me through the scaffolding step by step before writing files.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: full
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+    constraints:
+      max_turns: 20
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      # MCP-first guidance must be mentioned
+      - type: output-matches
+        config:
+          pattern: "(?i)functions_(template|project|language)_(get|list)|Azure MCP"
+      # Must reference a properly-suffixed MCP template ID, not a bare alias
+      - type: output-matches
+        config:
+          pattern: "http-trigger-typescript(-azd)?"
+      # Must NOT invent the bare ".NET-style" alias as the actual template ID
+      - type: output-not-matches
+        config:
+          pattern: "(?<![\\w-])HttpTrigger(?![\\w-])"
+      # Must propose `func start` based verification
+      - type: output-contains
+        config:
+          substring: "func start"
+      # Should suggest the deploy skill next
+      - type: output-matches
+        config:
+          pattern: "azure-functions-deploy"
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality — HTTP verify uses real request, not just host start"
+    prompt: |
+      I created an HTTP-triggered Azure Functions app.
+      How should I verify it end-to-end locally?
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: full
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+    constraints:
+      max_turns: 15
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      - type: output-contains
+        config:
+          substring: "func start"
+      # For HTTP triggers the skill must instruct a real request (curl / GET / localhost:7071)
+      - type: output-matches
+        config:
+          pattern: "(?i)curl|localhost:7071|GET .*?/api/"
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality — do NOT re-initialize an existing project"
+    prompt: |
+      I have an existing Azure Functions project (host.json present) and I want to
+      add a Service Bus queue triggered function. Please add it without re-initializing.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: full
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+      files:
+        - src: fixtures/existing-project/host.json
+          dest: host.json
+        - src: fixtures/existing-project/package.json
+          dest: package.json
+    constraints:
+      max_turns: 20
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      # Must NOT instruct `func init` (would overwrite host.json)
+      - type: output-not-matches
+        config:
+          pattern: "(?i)func init"
+      # Should reference the "add to existing project" path / functions_template_get with template
+      - type: output-matches
+        config:
+          pattern: "(?i)existing project|functions_template_get|add"
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"

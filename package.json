@@ -46,13 +46,18 @@
     "validate:skills": "npm run compile && node lib/build/validate-skills.js",
     "verify:plugin-payload": "npm run compile && node lib/build/verify-plugin-payload.js",
     "setup": "node bin/azure-functions-skills.js setup",
-    "release:local": "node scripts/release-local.mjs"
+    "release:local": "node scripts/release-local.mjs",
+    "eval:lint": "vally lint",
+    "eval:smoke": "vally eval --suite smoke",
+    "eval:full": "vally eval --suite full",
+    "eval": "vally eval"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@microsoft/vally-cli": "^0.5.0",
     "@types/node": "^25.6.0",
     "eslint": "^10.3.0",
     "typescript": "^6.0.3",

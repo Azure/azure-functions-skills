@@ -1,0 +1,82 @@
+name: Skill Evaluation - Vally
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Vally suite to run
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - pr
+          - triggers
+          - integration
+          - full
+      eval_spec:
+        description: Optional single eval spec (overrides suite if set)
+        required: false
+        type: string
+  schedule:
+    # Nightly full run at 06:00 UTC. Disabled until COPILOT_GITHUB_TOKEN is wired.
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vally-eval-${{ github.ref }}-${{ inputs.suite || 'nightly' }}
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    name: vally eval
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # GitHub Copilot SDK authentication used by the `copilot-sdk` executor.
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+    steps:
+      - name: Skip nightly when token is not configured
+        if: github.event_name == 'schedule' && env.COPILOT_GITHUB_TOKEN == ''
+        run: |
+          echo "COPILOT_GITHUB_TOKEN is not configured; skipping nightly run." >&2
+          exit 0
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate eval specs (vally lint)
+        run: npx vally lint --eval-spec evals
+
+      - name: Run vally eval
+        env:
+          SUITE: ${{ inputs.suite || 'full' }}
+          EVAL_SPEC: ${{ inputs.eval_spec }}
+        run: |
+          set -euo pipefail
+          if [ -n "${EVAL_SPEC}" ]; then
+            echo "Running single spec: ${EVAL_SPEC}"
+            npx vally eval --eval-spec "${EVAL_SPEC}" --output jsonl --output-dir ./vally-results --junit
+          else
+            echo "Running suite: ${SUITE}"
+            npx vally eval --suite "${SUITE}" --output jsonl --output-dir ./vally-results --junit
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vally-results-${{ github.run_id }}
+          path: vally-results/
+          if-no-files-found: warn
