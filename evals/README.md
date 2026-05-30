@@ -27,6 +27,10 @@ npx vally eval --eval-spec evals/azure-functions-create/eval.yaml
 # Full nightly run (all stimuli including LLM-backed graders)
 npx vally eval --suite full
 
+# Realistic user-experience check with Opus 4.7
+# (eval.yaml default is claude-sonnet-4.6 for cost/speed; override per-run with --model)
+npx vally eval --suite full --model claude-opus-4.7
+
 # Static-only checks (no LLM calls, no agent execution)
 npx vally lint
 ```
@@ -80,3 +84,24 @@ See [`_base/common-graders.yaml`](_base/common-graders.yaml). Highlights:
   Copilot agent at least once, which incurs LLM cost.
 - `tier: smoke` stimuli are intentionally small (1 prompt × N runs) for PRs.
 - Nightly `full` runs should be gated behind workflow_dispatch or schedule.
+
+## Model selection
+
+Eval specs default to `claude-sonnet-4.6` (matches the convention used by
+[`microsoft/GitHub-Copilot-for-Azure`](https://github.com/microsoft/GitHub-Copilot-for-Azure)
+and keeps PR / nightly cost and runtime stable). Override per run:
+
+| Layer | Model | When |
+| --- | --- | --- |
+| PR gate (`smoke`) | `claude-sonnet-4.6` | every push |
+| Nightly (`full`) | `claude-sonnet-4.6` | scheduled |
+| Reality check | `claude-opus-4.7` | manual via `--model claude-opus-4.7`, e.g. before a release, to mirror what GitHub Copilot CLI users typically run |
+
+Multi-model comparison runs are supported via comma-separated values:
+
+```bash
+npx vally eval --suite full --model claude-sonnet-4.6,claude-opus-4.7
+```
+
+The GitHub Actions workflow exposes a `model` input on `workflow_dispatch` for
+the same purpose.

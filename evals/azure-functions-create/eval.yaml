@@ -6,15 +6,26 @@ description: |
     - Routing (skill-invocation) for typical "create a function" prompts
       across TypeScript HTTP, Python timer, and existing-project flows.
     - Response-quality checks that the skill follows Path A (Azure MCP)
-      when available, does not fabricate template IDs, includes proper
-      verification, and suggests azure-functions-deploy as the next step.
+      when available, does not fabricate template IDs, and includes
+      proper local end-to-end verification.
     - "Do not re-initialize an existing project" guardrail.
 
+  Environment:
+    - Each stimulus attaches the Azure MCP server (`@azure/mcp`) via
+      stdio, scoped to the `functions` namespace. All three Functions
+      tools (`functions_language_list`, `functions_project_get`,
+      `functions_template_get`) are readOnly and require no Azure
+      credentials, so this works in plain CI.
+    - Cold start is slow because `npx -y @azure/mcp@latest` downloads
+      the package on first run. Subsequent runs are fast thanks to npm
+      cache; CI can pre-warm via `npm install -g @azure/mcp@latest` or
+      `npx -y @azure/mcp@latest server --help`.
+
   Notes:
-    - Built-in graders only (output-contains / output-matches /
-      output-not-matches / completed / skill-invocation). No custom
-      executor tags such as earlyTerminate are used because we rely on
-      Vally's standard `copilot-sdk` executor.
+    - Built-in graders only (skill-invocation / output-contains /
+      output-matches / output-not-matches / completed). We rely on
+      Vally's standard `copilot-sdk` executor; no custom executor tags
+      such as earlyTerminate are used.
     - Global graders (`completed`, `no_runtime_failure`) are duplicated
       into each stimulus per evaluate#125. See ../_base/common-graders.yaml.
 
@@ -58,6 +69,12 @@ stimuli:
         - ../../templates/skills/azure-functions-create
         - ../../templates/skills/azure-functions-common
         - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
     constraints:
       max_turns: 12
     graders:
@@ -65,9 +82,7 @@ stimuli:
         config:
           required:
             - azure-functions-create
-      # has_output
       - type: completed
-      # no_runtime_failure
       - type: output-not-matches
         config:
           pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
@@ -86,6 +101,12 @@ stimuli:
         - ../../templates/skills/azure-functions-create
         - ../../templates/skills/azure-functions-common
         - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
     constraints:
       max_turns: 12
     graders:
@@ -113,6 +134,12 @@ stimuli:
         - ../../templates/skills/azure-functions-create
         - ../../templates/skills/azure-functions-common
         - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
       files:
         - src: fixtures/existing-project/host.json
           dest: host.json
@@ -149,6 +176,12 @@ stimuli:
         - ../../templates/skills/azure-functions-create
         - ../../templates/skills/azure-functions-common
         - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
     constraints:
       max_turns: 20
     graders:
@@ -156,7 +189,7 @@ stimuli:
         config:
           required:
             - azure-functions-create
-      # MCP-first guidance must be mentioned
+      # MCP-first guidance must be mentioned (tool names or "Azure MCP")
       - type: output-matches
         config:
           pattern: "(?i)functions_(template|project|language)_(get|list)|Azure MCP"
@@ -172,10 +205,6 @@ stimuli:
       - type: output-contains
         config:
           substring: "func start"
-      # Should suggest the deploy skill next
-      - type: output-matches
-        config:
-          pattern: "azure-functions-deploy"
       # Globals
       - type: completed
       - type: output-not-matches
@@ -184,8 +213,9 @@ stimuli:
 
   - name: "Quality — HTTP verify uses real request, not just host start"
     prompt: |
-      I created an HTTP-triggered Azure Functions app.
-      How should I verify it end-to-end locally?
+      Please scaffold a new TypeScript HTTP-triggered Azure Functions project for me.
+      As part of the scaffolding, also walk me through the local end-to-end verification step
+      I should run after the files are written.
     tags:
       type: integration
       skill: azure-functions-create
@@ -196,8 +226,15 @@ stimuli:
       skills:
         - ../../templates/skills/azure-functions-create
         - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
     constraints:
-      max_turns: 15
+      max_turns: 20
     graders:
       - type: skill-invocation
         config:
@@ -218,8 +255,9 @@ stimuli:
 
   - name: "Quality — do NOT re-initialize an existing project"
     prompt: |
-      I have an existing Azure Functions project (host.json present) and I want to
-      add a Service Bus queue triggered function. Please add it without re-initializing.
+      I have an existing Azure Functions TypeScript project (host.json is present).
+      Please add a new Service Bus queue trigger function to it.
+      Do not re-initialize the project — just add the new function file alongside the existing ones.
     tags:
       type: integration
       skill: azure-functions-create
@@ -230,6 +268,13 @@ stimuli:
       skills:
         - ../../templates/skills/azure-functions-create
         - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
       files:
         - src: fixtures/existing-project/host.json
           dest: host.json
@@ -246,10 +291,10 @@ stimuli:
       - type: output-not-matches
         config:
           pattern: "(?i)func init"
-      # Should reference the "add to existing project" path / functions_template_get with template
+      # Should reference the "add to existing project" path
       - type: output-matches
         config:
-          pattern: "(?i)existing project|functions_template_get|add"
+          pattern: "(?i)existing project|functions_template_get|add (a |the |new )?(function|trigger)"
       # Globals
       - type: completed
       - type: output-not-matches

@@ -18,6 +18,10 @@ on:
         description: Optional single eval spec (overrides suite if set)
         required: false
         type: string
+      model:
+        description: Optional model override (e.g. claude-opus-4.7). Empty = use eval.yaml default (claude-sonnet-4.6).
+        required: false
+        type: string
   schedule:
     # Nightly full run at 06:00 UTC. Disabled until COPILOT_GITHUB_TOKEN is wired.
     - cron: "0 6 * * *"
@@ -56,6 +60,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Pre-warm @azure/mcp cache
+        # Functions evals attach an Azure MCP server (functions namespace) via
+        # stdio. Pulling the package once upfront keeps per-stimulus startup fast
+        # and avoids races where the agent answers before the MCP server is ready.
+        run: npx -y @azure/mcp@latest server --help >/dev/null
+
       - name: Validate eval specs (vally lint)
         run: npx vally lint --eval-spec evals
 
@@ -63,14 +73,22 @@ jobs:
         env:
           SUITE: ${{ inputs.suite || 'full' }}
           EVAL_SPEC: ${{ inputs.eval_spec }}
+          MODEL: ${{ inputs.model }}
         run: |
           set -euo pipefail
+          MODEL_ARG=()
+          if [ -n "${MODEL}" ]; then
+            MODEL_ARG=(--model "${MODEL}")
+            echo "Model override: ${MODEL}"
+          else
+            echo "Model: (eval.yaml default — claude-sonnet-4.6)"
+          fi
           if [ -n "${EVAL_SPEC}" ]; then
             echo "Running single spec: ${EVAL_SPEC}"
-            npx vally eval --eval-spec "${EVAL_SPEC}" --output jsonl --output-dir ./vally-results --junit
+            npx vally eval --eval-spec "${EVAL_SPEC}" --output jsonl --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
           else
             echo "Running suite: ${SUITE}"
-            npx vally eval --suite "${SUITE}" --output jsonl --output-dir ./vally-results --junit
+            npx vally eval --suite "${SUITE}" --output jsonl --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
           fi
 
       - name: Upload results
