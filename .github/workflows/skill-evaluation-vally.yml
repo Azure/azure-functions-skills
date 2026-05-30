@@ -1,0 +1,113 @@
+name: Skill Evaluation - Vally
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Vally suite to run
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - pr
+          - triggers
+          - integration
+          - full
+      eval_spec:
+        description: Optional single eval spec (overrides suite if set)
+        required: false
+        type: string
+      model:
+        description: Optional model override (e.g. claude-opus-4.7). Empty = use eval.yaml default (claude-sonnet-4.6).
+        required: false
+        type: string
+  schedule:
+    # Nightly full run at 06:00 UTC. Disabled until COPILOT_GITHUB_TOKEN is wired.
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vally-eval-${{ github.ref }}-${{ inputs.suite || 'nightly' }}
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    name: vally eval
+    runs-on: ubuntu-latest
+    # Reuse the existing functions-skills-live-e2e environment. It was
+    # already set up to host evaluation-style runs, ships
+    # COPILOT_CLI_TOKEN (the GitHub Copilot SDK token), and is gated by
+    # protected branches + required reviewers (Azure/azure-functions-bucees-team,
+    # prevent_self_review: false). No Azure variables are touched by this
+    # workflow — they remain available for future evals that need them.
+    environment: functions-skills-live-e2e
+    timeout-minutes: 60
+    env:
+      # Job-level boolean used by the schedule-skip check below. We do NOT
+      # expose the token at job level; the actual token is only set in the
+      # step that runs `vally eval`. This boolean is safe to expose.
+      HAS_COPILOT_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN != '' }}
+    steps:
+      - name: Skip nightly when token is not configured
+        if: github.event_name == 'schedule' && env.HAS_COPILOT_TOKEN != 'true'
+        run: |
+          echo "COPILOT_CLI_TOKEN is not configured on functions-skills-live-e2e; skipping nightly run." >&2
+          exit 0
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Pre-warm @azure/mcp cache
+        # Functions evals attach an Azure MCP server (functions namespace) via
+        # stdio. Pulling the package once upfront keeps per-stimulus startup fast
+        # and avoids races where the agent answers before the MCP server is ready.
+        run: npx -y @azure/mcp@latest server --help >/dev/null
+
+      - name: Validate eval specs (vally lint)
+        run: npx vally lint --eval-spec evals
+
+      - name: Run vally eval
+        # Token is scoped to this step only (least privilege). The @github/copilot-sdk
+        # reads COPILOT_GITHUB_TOKEN from the environment, so the existing
+        # COPILOT_CLI_TOKEN secret is mapped onto that variable name here.
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+          SUITE: ${{ inputs.suite || 'full' }}
+          EVAL_SPEC: ${{ inputs.eval_spec }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          set -euo pipefail
+          MODEL_ARG=()
+          if [ -n "${MODEL}" ]; then
+            MODEL_ARG=(--model "${MODEL}")
+            echo "Model override: ${MODEL}"
+          else
+            echo "Model: (eval.yaml default — claude-sonnet-4.6)"
+          fi
+          if [ -n "${EVAL_SPEC}" ]; then
+            echo "Running single spec: ${EVAL_SPEC}"
+            npx vally eval --eval-spec "${EVAL_SPEC}" --output jsonl --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
+          else
+            echo "Running suite: ${SUITE}"
+            npx vally eval --suite "${SUITE}" --output jsonl --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vally-results-${{ github.run_id }}
+          path: vally-results/
+          if-no-files-found: warn

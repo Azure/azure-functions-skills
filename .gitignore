@@ -445,3 +445,7 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Vally eval output
+vally-results/
+results/
