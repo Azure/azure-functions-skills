@@ -643,4 +643,79 @@ describe('CLI command integration', () => {
     expect(() => runCliOutput(['chat', '--dir', projectDir, '--skip-prerequisites'], { env }))
       .toThrow(/Multiple agents are installed/);
   });
+
+  it('update after install --local auto-detects local mode and preserves user customizations', () => {
+    const projectDir = makeTempDir('af-skills-e2e-local-update-');
+
+    // Step 1: Install locally for ghcp
+    runCli(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
+
+    // Verify initial install laid down workspace files
+    const instructionsPath = join(projectDir, '.github', 'copilot-instructions.md');
+    expect(existsSync(instructionsPath)).toBe(true);
+    const initialContent = readFileSync(instructionsPath, 'utf-8');
+    expect(initialContent).toContain('Azure Functions');
+
+    // Step 2: User customizes the routing file
+    const customContent = '# My Custom Project Rules\n\n' + initialContent + '\n\n## My Additional Notes\n';
+    writeFileSync(instructionsPath, customContent);
+
+    // Step 3: Run update (should auto-detect local mode from state)
+    runCli(['update', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
+
+    // Verify: original file preserved (no managed block → save-aside strategy)
+    const afterUpdate = readFileSync(instructionsPath, 'utf-8');
+    expect(afterUpdate).toContain('# My Custom Project Rules');
+    expect(afterUpdate).toContain('## My Additional Notes');
+    // New version saved aside
+    const asidePath = join(projectDir, '.github', 'copilot-instructions.azure-functions-skills-new.md');
+    expect(existsSync(asidePath)).toBe(true);
+    // Skills should be refreshed (overwrite strategy)
+    const skillsDir = join(projectDir, '.github', 'skills');
+    expect(existsSync(skillsDir)).toBe(true);
+    const skillIds = readdirSync(skillsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+    expect(skillIds.length).toBeGreaterThan(0);
+  });
+
+  it('update --force after install --local overwrites all files', () => {
+    const projectDir = makeTempDir('af-skills-e2e-local-update-force-');
+
+    // Install locally for claude
+    runCli(['install', '--local', '--agent', 'claude', '--dir', projectDir, '--yes']);
+
+    const claudePath = join(projectDir, 'CLAUDE.md');
+
+    // User customizes CLAUDE.md by removing managed block
+    writeFileSync(claudePath, '# My Custom Claude Rules\nNo managed block here.\n');
+
+    // Run update with --force
+    runCli(['update', '--agent', 'claude', '--dir', projectDir, '--yes', '--force']);
+
+    // Verify: file overwritten (no save-aside, custom content gone)
+    const updatedContent = readFileSync(claudePath, 'utf-8');
+    expect(updatedContent).not.toContain('No managed block here.');
+    expect(updatedContent).toContain('azure-functions-skills');
+    // No save-aside file
+    expect(existsSync(join(projectDir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(false);
+  });
+
+  it('update --dry-run after install --local reports planned actions', () => {
+    const projectDir = makeTempDir('af-skills-e2e-local-update-dryrun-');
+
+    // Install locally
+    runCli(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
+
+    const instructionsPath = join(projectDir, '.github', 'copilot-instructions.md');
+    const originalContent = readFileSync(instructionsPath, 'utf-8');
+
+    // Run update with --dry-run
+    const output = runCliOutput(['update', '--agent', 'ghcp', '--dir', projectDir, '--dry-run']);
+
+    // Verify: no files changed
+    expect(readFileSync(instructionsPath, 'utf-8')).toBe(originalContent);
+    // Output describes planned actions
+    expect(output).toContain('Planned local update');
+  });
 });

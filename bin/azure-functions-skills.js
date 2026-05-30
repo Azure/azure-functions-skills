@@ -39,12 +39,14 @@ Options:
   update: `Usage: azure-functions-skills update [options]
 
 Update Azure Functions Skills; uses existing state by default.
+Install mode (local/plugin) is auto-detected from state.
 
 Options:
   --agent <name>     Agent: ghcp, claude, codex (repeatable)
   --all              Update all supported agents explicitly
   --dir <path>       Target directory (default: current directory)
-  --local            Full workspace-local setup, equivalent to setup
+  --local            Force local update mode (auto-detected from state if omitted)
+  --force            Overwrite all files including user-customized files
   --dry-run          Print planned update without writing files
   --yes              Approve safe file updates such as managed blocks and state .gitignore entry
   --source <name>    marketplace, github, or local (default: marketplace)
@@ -400,6 +402,7 @@ if (command === 'install' || command === 'update') {
   let all = false;
   let dryRun = false;
   let yes = false;
+  let force = false;
   let includeMcp = true;
   let includeHooks = true;
   let source = 'marketplace';
@@ -413,6 +416,7 @@ if (command === 'install' || command === 'update') {
     else if (commandArgs[i] === '--local') local = true;
     else if (commandArgs[i] === '--dry-run') dryRun = true;
     else if (commandArgs[i] === '--yes') yes = true;
+    else if (commandArgs[i] === '--force') force = true;
     else if (commandArgs[i] === '--no-mcp') includeMcp = false;
     else if (commandArgs[i] === '--no-hooks') includeHooks = false;
     else if (commandArgs[i] === '--source' && commandArgs[i + 1]) source = commandArgs[++i];
@@ -421,7 +425,7 @@ if (command === 'install' || command === 'update') {
     else if (commandArgs[i] === '--skip-prerequisites') prerequisites = 'skip';
   }
 
-  const { readState, getInstalledTargets, recordInstallState, ensureStateIgnored, STATE_IGNORE_ENTRY } = await import('../lib/setup/state.js');
+  const { readState, getInstalledTargets, recordInstallState, ensureStateIgnored, STATE_IGNORE_ENTRY, resolveInstallMode } = await import('../lib/setup/state.js');
   const detectedAgents = await resolveInstallTargets({
     action: command,
     agents,
@@ -435,24 +439,79 @@ if (command === 'install' || command === 'update') {
     process.exit(1);
   }
 
+  // Auto-detect install mode from state when running 'update' without explicit --local
+  if (command === 'update' && !local) {
+    const state = readState(dir);
+    if (state) {
+      const mode = resolveInstallMode(state, detectedAgents);
+      if (mode === 'local') local = true;
+    }
+  }
+
   if (local) {
-    if (dryRun) {
-      console.log(`Planned local install:`);
-      for (const agent of detectedAgents) console.log(`  - ${agent}: workspace setup files`);
-    } else {
-      const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
-      const state = recordInstallState(dir, {
-        action: command,
+    if (command === 'update') {
+      // Use file-type-aware local update strategy
+      const { applyLocalUpdate } = await import('../lib/setup/local-update.js');
+      const result = await applyLocalUpdate(dir, {
         agents: detectedAgents,
-        mode: 'local',
-        source: 'local',
-        scope,
-        includeMcp: true,
-        includeHooks: true,
-        includeAgent: detectedAgents.includes('ghcp'),
+        force,
+        dryRun,
       });
-      const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
-      printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.filesWritten, state, gitignoreResult });
+      if (dryRun) {
+        console.log(`Planned local update:`);
+        if (result.overwritten.length > 0) {
+          console.log('  Overwrite:');
+          for (const f of result.overwritten) console.log(`    - ${f}`);
+        }
+        if (result.managedBlockUpdated.length > 0) {
+          console.log('  Managed-block update:');
+          for (const f of result.managedBlockUpdated) console.log(`    - ${f}`);
+        }
+        if (result.savedAside.length > 0) {
+          console.log('  Save aside (review & merge manually):');
+          for (const entry of result.savedAside) console.log(`    - ${entry.original} → ${entry.aside}`);
+        }
+      } else {
+        const state = recordInstallState(dir, {
+          action: command,
+          agents: detectedAgents,
+          mode: 'local',
+          source: 'local',
+          scope,
+          includeMcp: true,
+          includeHooks: true,
+          includeAgent: detectedAgents.includes('ghcp'),
+        });
+        const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
+        printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.overwritten.length + result.managedBlockUpdated.length + result.savedAside.length, state, gitignoreResult });
+        if (result.savedAside.length > 0) {
+          console.log('\n⚠️  Some files were saved aside for manual review:');
+          for (const entry of result.savedAside) {
+            console.log(`   ${entry.original} → ${entry.aside}`);
+          }
+          console.log('   Review these files and merge changes as needed.');
+        }
+      }
+    } else {
+      // install --local: use original applySetup()
+      if (dryRun) {
+        console.log(`Planned local install:`);
+        for (const agent of detectedAgents) console.log(`  - ${agent}: workspace setup files`);
+      } else {
+        const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
+        const state = recordInstallState(dir, {
+          action: command,
+          agents: detectedAgents,
+          mode: 'local',
+          source: 'local',
+          scope,
+          includeMcp: true,
+          includeHooks: true,
+          includeAgent: detectedAgents.includes('ghcp'),
+        });
+        const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
+        printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.filesWritten, state, gitignoreResult });
+      }
     }
   } else {
     const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
