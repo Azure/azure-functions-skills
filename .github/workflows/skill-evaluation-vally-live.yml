@@ -1,0 +1,253 @@
+name: Skill Evaluation - Vally Live
+
+# Live (Tier 3) Vally eval that ACTUALLY DEPLOYS to Azure.
+# Reviewer-gated via the functions-skills-live-e2e environment.
+
+on:
+  workflow_dispatch:
+    inputs:
+      eval_spec:
+        description: |
+          Single eval spec to run (path under repo root, e.g.
+          evals/azure-functions-deploy/eval.yaml). Empty = run the full
+          'live' suite.
+        required: false
+        type: string
+      model:
+        description: Optional model override (e.g. claude-opus-4.7). Empty = eval.yaml default.
+        required: false
+        type: string
+      keep_resources:
+        description: |
+          DEBUG ONLY. When true, the Azure resources created by this
+          run are NOT cleaned up at the end of the job. The safety net
+          workflow (cleanup-stale-vally-resources) will still nuke them
+          after 24h via the vally-eval=true tag.
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # Nightly full live run at 07:00 UTC (after the regular Vally workflow).
+    # Currently runs the full 'live' suite; gated by the environment's
+    # required reviewers so a scheduled run still needs approval until a
+    # non-gated identity is provisioned.
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: read
+  id-token: write    # required for azure/login@v3 federated credentials
+
+concurrency:
+  # Live runs touch real subscription resources; never cancel a running
+  # one because of a newer dispatch.
+  group: vally-live-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  live-eval:
+    name: vally live eval
+    runs-on: ubuntu-latest
+    environment: functions-skills-live-e2e
+    timeout-minutes: 90
+    env:
+      HAS_COPILOT_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN != '' }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_LOCATION: eastus2
+
+    steps:
+      - name: Skip nightly when token is not configured
+        if: github.event_name == 'schedule' && env.HAS_COPILOT_TOKEN != 'true'
+        run: |
+          echo "COPILOT_CLI_TOKEN is not configured; skipping nightly live run." >&2
+          exit 0
+
+      - name: Mask Azure identifiers
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in "$AZURE_CLIENT_ID" "$AZURE_TENANT_ID" "$AZURE_SUBSCRIPTION_ID"; do
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
+
+      - name: Validate required Azure configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required configuration: $name" >&2
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Azure Functions Core Tools (func)
+        run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
+
+      - name: Install Azure Developer CLI (azd)
+        run: curl -fsSL https://aka.ms/install-azd.sh | bash
+
+      - name: Verify prerequisites
+        run: |
+          set -euo pipefail
+          echo "node:    $(node --version)"
+          echo "npm:     $(npm --version)"
+          echo "az:      $(az --version | head -1)"
+          echo "azd:     $(azd version)"
+          echo "func:    $(func --version)"
+
+      - name: Pre-warm @azure/mcp cache
+        run: npx -y @azure/mcp@latest server --help >/dev/null
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: azd login via federated token
+        shell: bash
+        run: |
+          set -euo pipefail
+          azd auth login \
+            --client-id "$AZURE_CLIENT_ID" \
+            --federated-credential-provider github \
+            --tenant-id "$AZURE_TENANT_ID"
+
+      - name: Compute run identifiers
+        id: ids
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_RUN_ID="${GITHUB_RUN_ID: -8}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          ENV_NAME="afsvally-${SHORT_RUN_ID}-${SHORT_SHA}"
+          RG_NAME="rg-${ENV_NAME}"
+          CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          {
+            echo "env_name=$ENV_NAME"
+            echo "rg_name=$RG_NAME"
+            echo "created_at=$CREATED_AT"
+          } >> "$GITHUB_OUTPUT"
+          echo "AZURE_ENV_NAME=$ENV_NAME"
+          echo "AZURE_RESOURCE_GROUP=$RG_NAME"
+
+      - name: Pre-create tagged resource group
+        # Pre-creating the RG with vally-eval=true tags is how the
+        # cleanup safety net finds stale resources. azd / Bicep
+        # additions inside this RG inherit the same tag scope at the
+        # RG level even if the agent's templates do not set tags.
+        shell: bash
+        env:
+          RG_NAME: ${{ steps.ids.outputs.rg_name }}
+          CREATED_AT: ${{ steps.ids.outputs.created_at }}
+        run: |
+          set -euo pipefail
+          az group create \
+            --name "$RG_NAME" \
+            --location "$AZURE_LOCATION" \
+            --tags \
+              vally-eval=true \
+              "createdAt=$CREATED_AT" \
+              "run-id=$GITHUB_RUN_ID" \
+              "workflow=skill-evaluation-vally-live" \
+              "keep=${{ inputs.keep_resources || 'false' }}" \
+            --output none
+          echo "Created resource group: $RG_NAME"
+
+      - name: Run vally eval (live)
+        env:
+          # Step-scoped token (matches the regular Vally workflow).
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+          # azd / agent picked up from process env.
+          AZURE_ENV_NAME: ${{ steps.ids.outputs.env_name }}
+          AZURE_RESOURCE_GROUP: ${{ steps.ids.outputs.rg_name }}
+          EVAL_SPEC: ${{ inputs.eval_spec }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          set -euo pipefail
+          MODEL_ARG=()
+          if [ -n "${MODEL:-}" ]; then
+            MODEL_ARG=(--model "$MODEL")
+          fi
+          if [ -n "${EVAL_SPEC:-}" ]; then
+            echo "Running single live spec: $EVAL_SPEC"
+            npx vally eval \
+              --eval-spec "$EVAL_SPEC" \
+              --output jsonl --output-dir ./vally-results --junit \
+              "${MODEL_ARG[@]}"
+          else
+            echo "Running live suite"
+            npx vally eval \
+              --suite live \
+              --output jsonl --output-dir ./vally-results --junit \
+              "${MODEL_ARG[@]}"
+          fi
+
+      - name: Cleanup Azure resources
+        if: always() && inputs.keep_resources != true
+        shell: bash
+        env:
+          ENV_NAME: ${{ steps.ids.outputs.env_name }}
+          RG_NAME: ${{ steps.ids.outputs.rg_name }}
+        run: |
+          set +e
+          echo "Attempting azd down for $ENV_NAME ..."
+          # azd down only works if the agent wrote .azure/<env>/ — in
+          # most failure modes that file is missing, so we always rely
+          # on the az group delete fallback below.
+          if [ -d ".azure/$ENV_NAME" ]; then
+            azd down --force --purge --no-prompt || true
+          fi
+          echo "Deleting resource group $RG_NAME (no-wait) ..."
+          az group delete --name "$RG_NAME" --yes --no-wait || {
+            echo "::error::Failed to delete resource group $RG_NAME — clean it up manually with: az group delete --name $RG_NAME --yes --no-wait"
+            exit 1
+          }
+          echo "Resource group $RG_NAME deletion submitted."
+
+      - name: Skip cleanup (keep_resources=true)
+        if: always() && inputs.keep_resources == true
+        shell: bash
+        env:
+          RG_NAME: ${{ steps.ids.outputs.rg_name }}
+        run: |
+          set -euo pipefail
+          echo "::warning::Azure resources NOT cleaned up (keep_resources=true). Resource group: $RG_NAME"
+          {
+            echo "## ⚠️ Azure resources kept for debugging"
+            echo ""
+            echo "**Resource group:** \`$RG_NAME\`"
+            echo ""
+            echo "Clean up manually when finished:"
+            echo ""
+            echo '```bash'
+            echo "az group delete --name $RG_NAME --yes --no-wait"
+            echo '```'
+            echo ""
+            echo "Otherwise the [cleanup-stale-vally-resources](../../actions/workflows/cleanup-stale-vally-resources.yml) safety net workflow will remove it after 24h."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vally-live-results-${{ github.run_id }}
+          path: vally-results/
+          if-no-files-found: warn

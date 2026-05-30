@@ -56,7 +56,8 @@ Defined in [`.vally.yaml`](../.vally.yaml) at the repo root:
 | `pr` | `tier: smoke` | PR gate (alias of smoke) |
 | `triggers` | `area: routing` | all skill-invocation/routing checks |
 | `integration` | `type: integration` | LLM-backed behavior tests |
-| `full` | — | everything (nightly) |
+| `full` | `tier: [smoke, full]` | everything **except** live — nightly |
+| `live` | `tier: live` | **Tier 3 — deploys real Azure resources.** Manual / nightly only, via the dedicated [Skill Evaluation - Vally Live](../.github/workflows/skill-evaluation-vally-live.yml) workflow |
 
 ## Authoring conventions
 
@@ -112,6 +113,23 @@ See [`_base/common-graders.yaml`](_base/common-graders.yaml). Highlights:
   Copilot agent at least once, which incurs LLM cost.
 - `tier: smoke` stimuli are intentionally small (1 prompt × N runs) for PRs.
 - Nightly `full` runs should be gated behind workflow_dispatch or schedule.
+- `tier: live` stimuli additionally **create real Azure resources**. They run
+  only from the separate [Skill Evaluation - Vally Live](../.github/workflows/skill-evaluation-vally-live.yml)
+  workflow. See [`azure-functions-deploy/README.md`](azure-functions-deploy/README.md)
+  for the resource lifecycle, `keep_resources` debug option, and the
+  [cleanup-stale-vally-resources](../.github/workflows/cleanup-stale-vally-resources.yml)
+  safety net.
+
+## Live (Tier 3) workflow inputs
+
+The live workflow exposes the following `workflow_dispatch` inputs so a
+reviewer can iterate on one skill at a time:
+
+| input | type | default | effect |
+| --- | --- | --- | --- |
+| `eval_spec` | string | empty | path to a single eval spec (e.g. `evals/azure-functions-deploy/eval.yaml`); empty = run the full `live` suite |
+| `model` | string | empty | override the `claude-sonnet-4.6` default (e.g. `claude-opus-4.7`) |
+| `keep_resources` | boolean | `false` | **DEBUG ONLY.** Skip the per-run Azure cleanup step. The 24-hour safety net will still delete the resource group via the `vally-eval=true` tag |
 
 ## Model selection
 

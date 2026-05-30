@@ -1,0 +1,134 @@
+name: azure-functions-deploy-live-eval
+description: |
+  Live (Tier 3) evaluation for the azure-functions-deploy skill.
+
+  This eval ACTUALLY DEPLOYS resources to Azure. It only runs from the
+  Skill Evaluation - Vally Live workflow under the
+  functions-skills-live-e2e GitHub Environment (reviewer-gated).
+
+  Fixture:
+    Each stimulus runs in a fresh Vally workspace seeded by
+    `environment.commands` with the official Azure-Samples Flex
+    Consumption TypeScript HTTP quickstart pinned to a known commit.
+    That gives us a deploy-ready project so the stimulus exercises
+    the deploy skill, not the create skill.
+
+  Environment variables (provided by the workflow):
+    AZURE_ENV_NAME        unique azd env name (e.g. afsvally-<runid>-<sha>)
+    AZURE_LOCATION        eastus2
+    AZURE_SUBSCRIPTION_ID
+    AZURE_RESOURCE_GROUP  pre-created by the workflow with tags
+                          vally-eval=true so the cleanup safety net
+                          can find it later
+
+  Notes:
+    - Built-in graders only. Global graders (`completed`,
+      `no_runtime_failure`) are duplicated into each stimulus per
+      evaluate#125.
+    - tier: live → suite filter excludes from smoke/pr/full so this
+      never runs accidentally from the regular Vally workflow.
+
+tags:
+  type: integration
+  skill: azure-functions-deploy
+
+config:
+  runs: 1
+  timeout: "30m"
+  executor: copilot-sdk
+  model: claude-sonnet-4.6
+
+scoring:
+  threshold: 0.95
+  weights:
+    skill-invocation: 2.0
+    output-matches: 1.0
+    output-not-matches: 1.5
+    completed: 1.0
+
+stimuli:
+  - name: "Live — deploy TypeScript HTTP FC1 to Azure"
+    prompt: |
+      The current workspace contains a deploy-ready Azure Functions project
+      (TypeScript, HTTP trigger, targeting Flex Consumption / FC1).
+
+      Please deploy it to my Azure subscription using the
+      azure-functions-deploy workflow.
+
+      Environment variables that are already set in this session:
+        - AZURE_ENV_NAME          (use as the azd environment name)
+        - AZURE_LOCATION          (eastus2)
+        - AZURE_SUBSCRIPTION_ID
+        - AZURE_RESOURCE_GROUP    (pre-created with tags; reuse, do not delete)
+
+      Use the existing resource group; do not create a new one. After the
+      deploy finishes, report the Function App's HTTPS hostname so I can
+      verify it.
+
+      Do NOT run `azd down` — the workflow handles cleanup outside this
+      session.
+
+    tags:
+      type: integration
+      skill: azure-functions-deploy
+      tier: live
+      cost: azure
+      area: e2e-deploy
+
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-deploy
+        - ../../templates/skills/azure-functions-common
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
+      commands:
+        # Materialize the deploy-ready fixture inside the per-stimulus
+        # workspace. Pinned commit so the fixture is reproducible across
+        # runs even if upstream changes.
+        - "git init -q ."
+        - "git remote add origin https://github.com/Azure-Samples/functions-quickstart-typescript-azd.git"
+        - "git fetch --depth 1 -q origin cba392291ff7b6c994548aabaa8c06eb4055be54"
+        - "git checkout -q FETCH_HEAD"
+        - "rm -rf .git"
+
+    constraints:
+      max_turns: 40
+      max_duration: "25m"
+
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-deploy
+
+      # Must mention the Azure Skills hand-off in some form (the deploy
+      # skill's primary contract).
+      - type: output-matches
+        config:
+          pattern: "(?i)azure-(prepare|validate|deploy)|azd up"
+
+      # Must emit the Function App's azurewebsites.net hostname (proof
+      # that the deploy completed and got a URL back).
+      - type: output-matches
+        config:
+          pattern: "https?://[a-z0-9-]+\\.azurewebsites\\.net"
+
+      # Skill explicitly says: do not verify HTTP triggers with HEAD.
+      - type: output-not-matches
+        config:
+          pattern: "curl\\s+-I\\s+https?://"
+
+      # Common deployment failure signals.
+      - type: output-not-matches
+        config:
+          pattern: "(?i)quota exceeded|InvalidTemplateDeployment|AuthorizationFailed|SubscriptionNotRegistered|InsufficientPermissions"
+
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"

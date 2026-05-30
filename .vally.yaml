@@ -34,6 +34,14 @@ suites:
     filter:
       type: integration
 
+  live:
+    description: "Tier 3 — actually deploys Azure resources (manual / nightly only)"
+    filter:
+      tier: live
+
   full:
-    description: "All evals including LLM graders — nightly"
-    filter: {}
+    description: "All evals (including LLM graders, EXCLUDING live deploy) — nightly"
+    filter:
+      tier:
+        - smoke
+        - full
