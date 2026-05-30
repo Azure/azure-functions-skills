@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azure Functions Skills — 総合レビューレポート (2026-05-30)</title>
+<style>
+:root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #c9d1d9; --heading: #f0f6fc; --accent: #58a6ff; --critical: #f85149; --high: #f0883e; --medium: #d29922; --low: #3fb950; --info: #58a6ff; --pass: #3fb950; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 24px; max-width: 1200px; margin: 0 auto; }
+h1 { color: var(--heading); font-size: 2em; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+h2 { color: var(--heading); font-size: 1.5em; margin-top: 32px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+h3 { color: var(--accent); font-size: 1.15em; margin-top: 20px; margin-bottom: 8px; }
+h4 { color: var(--text); font-size: 1em; margin-top: 12px; margin-bottom: 4px; }
+p, li { margin-bottom: 6px; }
+ul { padding-left: 24px; }
+code { background: #1f2937; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: #e5c07b; }
+pre { background: #1f2937; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; font-size: 0.85em; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.subtitle { color: #8b949e; font-size: 0.95em; margin-bottom: 24px; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 20px 0; }
+.summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+.summary-card .number { font-size: 2.2em; font-weight: bold; }
+.summary-card .label { font-size: 0.85em; color: #8b949e; margin-top: 4px; }
+.critical .number { color: var(--critical); }
+.high .number { color: var(--high); }
+.medium .number { color: var(--medium); }
+.low .number { color: var(--low); }
+.pass .number { color: var(--pass); }
+.finding { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin: 12px 0; border-left: 4px solid var(--border); }
+.finding.sev-critical { border-left-color: var(--critical); }
+.finding.sev-high { border-left-color: var(--high); }
+.finding.sev-medium { border-left-color: var(--medium); }
+.finding.sev-low { border-left-color: var(--low); }
+.finding.sev-info { border-left-color: var(--info); }
+.finding-header { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75em; font-weight: 600; text-transform: uppercase; }
+.badge-critical { background: rgba(248,81,73,0.15); color: var(--critical); }
+.badge-high { background: rgba(240,136,62,0.15); color: var(--high); }
+.badge-medium { background: rgba(210,153,34,0.15); color: var(--medium); }
+.badge-low { background: rgba(63,185,80,0.15); color: var(--low); }
+.badge-info { background: rgba(88,166,255,0.15); color: var(--info); }
+.badge-cat { background: rgba(139,148,158,0.15); color: #8b949e; }
+.finding-title { font-weight: 600; color: var(--heading); }
+.finding-loc { font-size: 0.85em; color: #8b949e; margin-bottom: 6px; }
+.finding-desc { font-size: 0.93em; margin-bottom: 6px; }
+.finding-rec { font-size: 0.9em; color: var(--accent); }
+.section-summary { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin: 16px 0; }
+.good-finding { background: rgba(63,185,80,0.05); border-left: 4px solid var(--pass); }
+.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 20px 0; }
+.toc ul { list-style: none; padding-left: 0; }
+.toc li { margin: 4px 0; }
+.toc li::before { content: "→ "; color: var(--accent); }
+.toc a { color: var(--text); }
+.toc a:hover { color: var(--accent); }
+.checklist { list-style: none; padding-left: 0; }
+.checklist li { margin: 2px 0; }
+.checklist li::before { content: "✅ "; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+th, td { padding: 8px 12px; border: 1px solid var(--border); text-align: left; font-size: 0.9em; }
+th { background: var(--surface); color: var(--heading); }
+td { color: var(--text); }
+.positive-section { background: rgba(63,185,80,0.05); border: 1px solid rgba(63,185,80,0.2); border-radius: 10px; padding: 16px; margin: 16px 0; }
+.positive-section h3 { color: var(--pass); }
+</style>
+</head>
+<body>
+
+<h1>⚡ Azure Functions Skills — 総合レビューレポート</h1>
+<p class="subtitle">
+  実施日: 2026-05-30 ｜ 対象バージョン: 0.0.2-preview ｜ リポジトリ: Azure/azure-functions-skills<br>
+  レビュー範囲: コード・スキル・ドキュメント・クロスプラットフォーム対応
+</p>
+
+<!-- ───────────── Executive Summary ───────────── -->
+<h2 id="summary">📊 Executive Summary</h2>
+
+<div class="summary-grid">
+  <div class="summary-card critical"><div class="number">3</div><div class="label">Critical</div></div>
+  <div class="summary-card high"><div class="number">12</div><div class="label">High</div></div>
+  <div class="summary-card medium"><div class="number">18</div><div class="label">Medium</div></div>
+  <div class="summary-card low"><div class="number">10</div><div class="label">Low / Info</div></div>
+  <div class="summary-card pass"><div class="number">A−</div><div class="label">総合評価</div></div>
+</div>
+
+<p>全体として<strong>高品質</strong>なコードベースです。クロスプラットフォーム対応は特に優秀で、Node.js パス API の一貫した使用、<code>process.platform</code> による OS 分岐が適切に実装されています。主な改善点は、<strong>update コマンドの ghcp/codex 差別化不足</strong>、<strong>doctor ドキュメントと実装の乖離</strong>、<strong>内部ドキュメントの公開前整理</strong> の 3 領域です。</p>
+
+<!-- ───────────── Table of Contents ───────────── -->
+<div class="toc">
+<h3>目次</h3>
+<ul>
+  <li><a href="#summary">Executive Summary</a></li>
+  <li><a href="#sec1">1. Install / Chat / Update 機能</a></li>
+  <li><a href="#sec2">2. --dry-run 機能</a></li>
+  <li><a href="#sec3">3. デッドコード</a></li>
+  <li><a href="#sec4">4. ヘルプテキスト</a></li>
+  <li><a href="#sec5">5. Doctor コマンド</a></li>
+  <li><a href="#sec6">6. クロスプラットフォーム対応</a></li>
+  <li><a href="#sec7">7. スキル品質レビュー</a></li>
+  <li><a href="#sec8">8. ワークスペース構成の整合性</a></li>
+  <li><a href="#sec9">9. ドキュメントレビュー</a></li>
+  <li><a href="#sec10">10. 良い点（ポジティブ所見）</a></li>
+  <li><a href="#sec11">11. 推奨アクション優先度表</a></li>
+</ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec1">1. Install / Chat / Update 機能</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="positive-section">
+<h3>✅ 正常動作を確認した領域</h3>
+<ul class="checklist">
+  <li>3 エージェント (ghcp, claude, codex) の検出 — <code>detectAgents()</code> が正しく動作</li>
+  <li>デフォルト (marketplace) プラグインインストール — <code>runPluginOperation()</code> で全エージェント対応</li>
+  <li>ローカルインストール (<code>--local</code>) — <code>applySetup()</code> によるファイルコピー方式</li>
+  <li>Chat 機能 — 全 3 エージェント向け launcher 設定、プロジェクト検出、スタートアッププロンプト生成</li>
+  <li>状態管理 — <code>state.local.json</code> による install/update 状態の記録と復元</li>
+  <li>CLI 引数パース — <code>--agent</code>, <code>--all</code>, <code>--dir</code>, <code>--source</code>, <code>--scope</code> 等</li>
+</ul>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Update</span>
+    <span class="finding-title">F-01: ghcp / codex の update コマンドが install と同一</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/setup/plugin-install.ts</code> : 359–376</div>
+  <div class="finding-desc">
+    <code>officialPluginCommands()</code> は ghcp・codex について、<code>action === 'update'</code> を区別せず install と同じコマンドを生成する。Claude のみ <code>claudePluginCommands()</code> (L385–401) で update 専用パスがある。
+    <br><br>
+    ghcp/codex は <code>marketplace add</code> + <code>plugin install</code> がべき等の可能性があり、これが意図的な設計であれば問題ないが、明示的なドキュメントやコメントが不足。
+  </div>
+  <div class="finding-rec">💡 推奨: 意図的であればコードコメントで明記。意図的でなければ update 専用コマンドを追加。</div>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Update</span>
+    <span class="finding-title">F-02: Claude update コマンドの実在性が未検証</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/setup/plugin-install.ts</code> : 390–395</div>
+  <div class="finding-desc">
+    Claude 向けに <code>claude plugin marketplace update</code> と <code>claude plugin update</code> コマンドが定義されているが、これらの CLI コマンドが Claude Code CLI に実際に存在するか検証が必要。
+  </div>
+  <div class="finding-rec">💡 推奨: Claude Code CLI のドキュメント・実機で動作確認。存在しない場合は install ベースのアプローチに変更。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Update</span>
+    <span class="finding-title">F-03: Update コマンドが state 欠損時に非インタラクティブで失敗</span>
+  </div>
+  <div class="finding-loc">📄 <code>bin/azure-functions-skills.js</code> : 276–287</div>
+  <div class="finding-desc">
+    <code>update</code> は state ファイルからインストール済みエージェントを読み取るが、state が欠損/破損している場合、非インタラクティブモードではエラー終了する。<code>detectAgents()</code> へのフォールバックがない。
+  </div>
+  <div class="finding-rec">💡 推奨: state 欠損時に <code>detectAgents()</code> で自動検出し、ユーザーに確認。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Chat</span>
+    <span class="finding-title">F-04: Chat help で printHelp() が表示される</span>
+  </div>
+  <div class="finding-loc">📄 <code>bin/azure-functions-skills.js</code> : 612–614</div>
+  <div class="finding-desc">
+    <code>chat --help</code> でコマンド固有のヘルプではなく全体ヘルプ (<code>printHelp()</code>) が表示される。他のコマンドは <code>printCommandHelp(command)</code> を呼んでいる。
+  </div>
+  <div class="finding-rec">💡 推奨: <code>printCommandHelp('chat')</code> に変更。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec2">2. --dry-run 機能</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="positive-section">
+<h3>✅ 正常動作を確認した領域</h3>
+<ul class="checklist">
+  <li>install/update: プラグインコマンドとワークスペースファイルの一覧を正しく表示 (L483–491)</li>
+  <li>plugin install/update: <code>planPluginOperation()</code> でコマンド一覧を返し、実行しない</li>
+  <li>workspace apply: ファイル一覧を <code>plannedFiles</code> として返す</li>
+  <li>doctor: <code>--dry-run</code> は N/A (実行前レポートの概念がない)</li>
+</ul>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Dry-run</span>
+    <span class="finding-title">F-05: --local --dry-run で表示される情報が不十分</span>
+  </div>
+  <div class="finding-loc">📄 <code>bin/azure-functions-skills.js</code> : 438–442</div>
+  <div class="finding-desc">
+    <code>install --local --dry-run</code> では各エージェントに対して「workspace setup files」と表示するだけで、具体的にどのファイルが書き込まれるかが示されない。対して非ローカルモードの dry-run (L483–491) ではプラグインコマンドとファイルが一覧表示される。
+  </div>
+  <div class="finding-rec">💡 推奨: local モードでも <code>buildTarget()</code> の出力ファイル一覧をプレビュー表示。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Dry-run</span>
+    <span class="finding-title">F-06: Dry-run でも前提条件チェック内容が表示されない</span>
+  </div>
+  <div class="finding-loc">📄 <code>bin/azure-functions-skills.js</code>, <code>src/setup/index.ts</code></div>
+  <div class="finding-desc">
+    <code>install --dry-run</code> ではプラグイン操作とワークスペースファイルは表示されるが、前提条件チェック (Azure CLI, Core Tools 等) の計画は表示されない。
+  </div>
+  <div class="finding-rec">💡 推奨: 前提条件チェックの一覧も dry-run 出力に含める。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec3">3. デッドコード</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Dead Code</span>
+    <span class="finding-title">F-07: getPluginDir() の未使用パラメータ _target</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/setup/plugin-install.ts</code> : 84–86</div>
+  <div class="finding-desc">
+    <code>getPluginDir(_target: BuildTargetName)</code> はパラメータ <code>_target</code> を使用せず、常に同じパスを返す。アンダースコアプレフィックスで未使用を示しているが、将来の拡張性のために残しているならコメントで明記すべき。
+  </div>
+  <div class="finding-rec">💡 推奨: 使用予定がなければパラメータを削除。将来用ならコメント追記。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Dead Code</span>
+    <span class="finding-title">F-08: installPlugin / generateXxxSettings 系関数の利用範囲の限定</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/setup/plugin-install.ts</code> : 93, 107, 136, 148</div>
+  <div class="finding-desc">
+    <code>generateVscodeSettings()</code>, <code>generateCodexMarketplaceEntry()</code>, <code>generateClaudeSettings()</code>, <code>installPlugin()</code> はエクスポートされているが、<strong>メインの install/update フロー</strong>では使われず、レガシーの <code>setup --as-plugin</code> パス (L531–564) と <code>chat --as-plugin</code> (L640–661) でのみ使用。テストでもカバーされている。
+    <br><br>
+    デッドコードではないが、主要フローと別系統の実装が残っているため、メンテナンス負荷がある。
+  </div>
+  <div class="finding-rec">💡 推奨: パブリック API として維持するなら JSDoc に利用パターンを記載。不要なら内部関数に変更。</div>
+</div>
+
+<div class="finding sev-info">
+  <div class="finding-header">
+    <span class="badge badge-info">INFO</span>
+    <span class="badge badge-cat">Dead Code</span>
+    <span class="finding-title">F-09: packageDependenciesCheck はスタブ状態</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/doctor/checks.ts</code> : 460–475 / <code>docs/doctor-checks-best-practices-reference.md</code> : 447</div>
+  <div class="finding-desc">
+    <code>packageDependenciesCheck</code> は ALL_CHECKS に登録されているがスタブ実装。ドキュメントでも「Stub; needs implementation」と記載されている。
+  </div>
+  <div class="finding-rec">💡 推奨: 実装するか、GA 前にスタブであることを明示。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec4">4. ヘルプテキスト</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Help</span>
+    <span class="finding-title">F-10: chat --help が全体ヘルプを表示する（再掲 F-04）</span>
+  </div>
+  <div class="finding-loc">📄 <code>bin/azure-functions-skills.js</code> : 612–614</div>
+  <div class="finding-desc">
+    <code>azure-functions-skills chat --help</code> で <code>printHelp()</code> (全体ヘルプ) が呼ばれている。<code>HELP_TEXT.chat</code> が定義済み (L55–67) にもかかわらず、<code>printCommandHelp('chat')</code> が呼ばれていない。
+  </div>
+  <div class="finding-rec">💡 推奨: L613 を <code>printCommandHelp('chat')</code> に修正。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Help</span>
+    <span class="finding-title">F-11: --version フラグが未実装</span>
+  </div>
+  <div class="finding-loc">📄 <code>bin/azure-functions-skills.js</code></div>
+  <div class="finding-desc">
+    CLI に <code>--version</code> / <code>-v</code> フラグが存在しない。<code>package.json</code> からバージョンを読み取る仕組みがない。
+  </div>
+  <div class="finding-rec">💡 推奨: <code>--version</code> でパッケージバージョンを表示する機能を追加。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Help</span>
+    <span class="finding-title">F-12: setup の全体ヘルプに --all が記載されているが setup はサポートしない</span>
+  </div>
+  <div class="finding-loc">📄 <code>bin/azure-functions-skills.js</code> : 183–189 (全体ヘルプ) vs 507–525 (setup パース)</div>
+  <div class="finding-desc">
+    全体ヘルプの「Options (setup)」セクションに <code>--all</code> が含まれているが、setup コマンドのパース処理 (L507–525) では <code>--all</code> を処理しない。install/update 専用のオプション。
+  </div>
+  <div class="finding-rec">💡 推奨: setup セクションから <code>--all</code> を削除するか、setup にも --all を実装。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec5">5. Doctor コマンド</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="positive-section">
+<h3>✅ 優れた設計・実装</h3>
+<ul class="checklist">
+  <li>Tier 1 (組み込み) / Tier 2 (AI) の明確な分離</li>
+  <li>サプライチェーンチェック (lifecycle scripts, unpinned deps, lockfile, tracked secrets, install-script deps, Python) が充実</li>
+  <li>PR コンテキスト検出で --deep の不正使用を防止 (<code>isContributorPrContext()</code>)</li>
+  <li><code>--accept-deep-risk</code> による明示的な同意要求</li>
+  <li>4 種類の出力形式 (text, json, markdown, html)</li>
+  <li>Stacks API フォールバック戦略 (キャッシュ → フェッチ → 古いキャッシュ → ハードコード)</li>
+</ul>
+</div>
+
+<div class="finding sev-critical">
+  <div class="finding-header">
+    <span class="badge badge-critical">CRITICAL</span>
+    <span class="badge badge-cat">Doctor</span>
+    <span class="finding-title">F-13: ドキュメントが未実装チェックを「実装済み」のように記載</span>
+  </div>
+  <div class="finding-loc">📄 <code>docs/doctor-checks-best-practices-reference.md</code> : 124–136, 432–467</div>
+  <div class="finding-desc">
+    リファレンスドキュメントに SC-001 (ハードコードシークレット検出)、SC-002 (HTTP トリガー認証レベル)、CQ-001 (クライアント再利用パターン)、AS-006 (Application Insights) 等のチェックが記載されているが、実装は 20 チェック中これらは含まれていない。
+    <br><br>
+    実装状況テーブル (L436–451) は 13 チェック実装済みとしているが、実際の <code>ALL_CHECKS</code> (checks.ts L952–974) には 20 チェックが登録されている。
+  </div>
+  <div class="finding-rec">💡 推奨: 実装状況テーブルを最新化し、未実装チェックを「Planned」と明示。ユーザーに誤解を与えないよう区別を明確に。</div>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Doctor</span>
+    <span class="finding-title">F-14: Extension Bundle バージョン比較がメジャーバージョンのみ</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/doctor/checks.ts</code> : 153–159</div>
+  <div class="finding-desc">
+    <code>extensionBundleCheck</code> はバージョン範囲 <code>[X.Y.Z, A.B.C)</code> の比較でメジャーバージョンのみを比較。例えば <code>[4.99.0, 5.0.0)</code> と <code>[4.0.0, 5.0.0)</code> を区別できない。
+  </div>
+  <div class="finding-rec">💡 推奨: 完全なセマンティックバージョン比較を実装 (少なくとも minor まで)。</div>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Doctor</span>
+    <span class="finding-title">F-15: isContributorPrContext() が主要 3 CI のみ対応</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/doctor/runner.ts</code> : 318–325</div>
+  <div class="finding-desc">
+    PR コンテキスト検出が GitHub Actions, Azure DevOps, GitLab CI の 3 システムのみ。Jenkins, CircleCI, Travis CI 等のユーザーは検出されず、untrusted PR コードに対して <code>--deep</code> が実行される可能性がある。
+    <br><br>
+    ただし、コメント (L310–316) でヒューリスティクスとして 3 システムのみを明記しており、<code>AZURE_FUNCTIONS_DOCTOR_TRUST_PR=1</code> というオーバーライドも用意されている。
+  </div>
+  <div class="finding-rec">💡 推奨: 汎用 <code>CI</code> 環境変数 (<code>CI=true</code>) のチェックを追加するか、ドキュメントでサポート対象 CI を明記。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Doctor</span>
+    <span class="finding-title">F-16: readJsonFile() がエラー原因を区別しない</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/doctor/checks.ts</code> : 575–582 / <code>src/doctor/context.ts</code> : 8–14</div>
+  <div class="finding-desc">
+    JSON 読み取り関数がすべての例外を黙って捕捉し <code>null</code> を返す。ファイル不在と JSON パースエラーを区別できず、不正な host.json 等が黙って無視される。
+  </div>
+  <div class="finding-rec">💡 推奨: ファイル存在/パースエラーを区別し、パースエラー時は警告を出力。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Doctor</span>
+    <span class="finding-title">F-17: gitignore パターンマッチが簡易的</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/doctor/checks.ts</code> : 767–775</div>
+  <div class="finding-desc">
+    <code>isIgnored()</code> のパターンマッチングは <code>**</code> グロブ、<code>!</code> 否定パターン、サブディレクトリパターン等の gitignore フルセマンティクスに対応していない。
+  </div>
+  <div class="finding-rec">💡 推奨: 制限事項をドキュメント化するか、gitignore ライブラリを使用。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Doctor</span>
+    <span class="finding-title">F-18: V4 関数検出のトリガータイプが限定的</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/doctor/context.ts</code> : 73</div>
+  <div class="finding-desc">
+    <code>app\.(http|timer|storageBlob|storageQueue|serviceBus|eventHub|cosmosDB)</code> のみ検出。<code>app.eventGrid</code>, <code>app.durableClient</code>, <code>app.warmup</code> 等の新しいトリガーが未対応。
+  </div>
+  <div class="finding-rec">💡 推奨: v4 モデルの全トリガータイプを網羅するか、汎用パターン <code>app\.\w+\(</code> を使用。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec6">6. クロスプラットフォーム対応</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="positive-section">
+<h3>✅ 評価: A (優秀)</h3>
+<p>クロスプラットフォーム設計は非常に高品質です：</p>
+<ul class="checklist">
+  <li><code>path.join()</code> による一貫したパス構築 — 全ソースファイルで実践</li>
+  <li><code>process.platform === 'win32'</code> による適切な OS 分岐 (6 箇所以上)</li>
+  <li><code>os.tmpdir()</code>, <code>os.homedir()</code> の正しい使用</li>
+  <li>Windows .cmd/.bat ラッパーの解決 (chat/index.ts L246–251)</li>
+  <li>パスセパレータ正規化 (<code>replaceAll('\\', '/')</code> — verify-plugin-payload.ts)</li>
+  <li>スクリプトの .sh/.ps1 デュアル提供 (health-status, inventory)</li>
+  <li>ハードコードされた絶対パス・ユーザー名・マシン名なし</li>
+</ul>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Cross-Platform</span>
+    <span class="finding-title">F-19: Codex SessionStart フックが bash 依存</span>
+  </div>
+  <div class="finding-loc">📄 <code>src/build/build-target.ts</code> : 433–434</div>
+  <div class="finding-desc">
+    Codex の SessionStart フックが <code>bash -c '...'</code> を使用。Windows で bash がインストールされていない環境では動作しない。GHCP フックは Node.js ベースのインラインコマンドを使用しており、クロスプラットフォーム対応済み。
+  </div>
+  <div class="finding-rec">💡 推奨: GHCP と同様に <code>node -e</code> ベースのコマンドに変更するか、OS 検出でコマンドを分岐。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Cross-Platform</span>
+    <span class="finding-title">F-20: Doctor E2E テストスクリプトが Windows 専用</span>
+  </div>
+  <div class="finding-loc">📄 <code>scripts/doctor-e2e-setup.ps1</code>, <code>scripts/doctor-e2e-cleanup.ps1</code></div>
+  <div class="finding-desc">
+    E2E テスト用ヘルパースクリプトが PowerShell のみで、Linux/Mac の .sh 版がない。
+  </div>
+  <div class="finding-rec">💡 推奨: 対応する .sh バージョンを追加。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec7">7. スキル品質レビュー</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="positive-section">
+<h3>✅ Azure Functions 公式スキルとしての品質</h3>
+<ul class="checklist">
+  <li>10 スキルが体系的に設計されており、ワークフロー全体を網羅 (setup → create → deploy → diagnose → review)</li>
+  <li>MCP ファースト + フォールバックの一貫した設計パターン</li>
+  <li>承認ゲート付きの外部アーティファクト作成 (feedback スキル)</li>
+  <li>シークレット墨消しルールの明記</li>
+  <li>スキル名が <code>azure-functions-{verb}</code> パターンで統一、発見しやすい</li>
+  <li>バンドルスクリプトによるプラットフォーム別実行 (.sh / .ps1)</li>
+</ul>
+</div>
+
+<div class="finding sev-critical">
+  <div class="finding-header">
+    <span class="badge badge-critical">CRITICAL</span>
+    <span class="badge badge-cat">Skills</span>
+    <span class="finding-title">F-21: HTTP トリガー検証ガイダンスがスキル間で矛盾</span>
+  </div>
+  <div class="finding-loc">
+    📄 <code>templates/skills/azure-functions-deploy/SKILL.md</code> : L106<br>
+    📄 <code>templates/skills/azure-functions-create/SKILL.md</code> : L123
+  </div>
+  <div class="finding-desc">
+    <strong>azure-functions-deploy</strong> は「<code>curl -I</code> (HEAD) は偽陰性になるため使用しないこと」と明記。
+    しかし <strong>azure-functions-create</strong> は HTTP 検証方法について GET/HEAD を明示しておらず、矛盾するガイダンスにつながる可能性がある。
+  </div>
+  <div class="finding-rec">💡 推奨: 全スキルで「GET リクエストを使用、HEAD は使用しない」を統一的に記載。</div>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Skills</span>
+    <span class="finding-title">F-22: azure-functions-create のタイマートリガー検証で本番事故リスク</span>
+  </div>
+  <div class="finding-loc">📄 <code>templates/skills/azure-functions-create/SKILL.md</code> : 128–133</div>
+  <div class="finding-desc">
+    タイマートリガーの検証時に「開発用に短いスケジュールに一時変更」を推奨しているが、<strong>元のスケジュールに戻す</strong>ことの重要性が十分に強調されていない。本番でショートスケジュールが残る事故につながる可能性がある。
+  </div>
+  <div class="finding-rec">💡 推奨: ⚠️ 警告付きで「必ず元のスケジュールに復元すること」を明記し、検証完了チェックリストに含める。</div>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Skills</span>
+    <span class="finding-title">F-23: ローカルエミュレータ参照が不完全</span>
+  </div>
+  <div class="finding-loc">📄 <code>templates/skills/azure-functions-common/references/local-emulators.md</code> : 31–33</div>
+  <div class="finding-desc">
+    MySQL, RabbitMQ, Dapr のエミュレータについて「No Azure Functions-specific emulator page found」と記載。公式スキルとしてはギャップに見える。
+    <br><br>
+    ただし Azure Storage Emulator (引退済み) → Azurite への移行は正しく記載されている。
+  </div>
+  <div class="finding-rec">💡 推奨: コミュニティ推奨の代替手段を記載するか、「Azure Functions 固有の公式ドキュメントが存在しないサービス」と明確にラベル付け。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Skills</span>
+    <span class="finding-title">F-24: Extension Bundle マニフェストリンクが main ブランチ参照</span>
+  </div>
+  <div class="finding-loc">📄 <code>templates/skills/azure-functions-common/references/extensions/extension-bundles.md</code> : L17</div>
+  <div class="finding-desc">
+    Extension Bundle マニフェストへのリンクが GitHub の <code>main</code> ブランチを指している。スキーマ変更があった場合に参照が壊れるリスク。
+  </div>
+  <div class="finding-rec">💡 推奨: バージョン付きタグまたは安定版リンクに変更。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Skills</span>
+    <span class="finding-title">F-25: プログラミングモデル v1 の非推奨が明示されていない</span>
+  </div>
+  <div class="finding-loc">📄 <code>templates/skills/azure-functions-common/references/languages/</code></div>
+  <div class="finding-desc">
+    Python v1, Node.js v1/v2/v3 のプログラミングモデルが「古い」と示唆されているが、「非推奨」または「サポート終了」とは明記されていない。ユーザーがまだ使えると誤解する可能性がある。
+  </div>
+  <div class="finding-rec">💡 推奨: 各言語リファレンスに明確なサポートマトリクス（現行バージョン / 非推奨バージョン）を追加。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Skills</span>
+    <span class="finding-title">F-26: health-status / inventory の Bash スクリプトが Python 必須だが記載なし</span>
+  </div>
+  <div class="finding-loc">
+    📄 <code>templates/skills/azure-functions-health-status/scripts/get-functionapp-health-status.sh</code><br>
+    📄 <code>templates/skills/azure-functions-inventory/scripts/get-functionapp-inventory.sh</code>
+  </div>
+  <div class="finding-desc">
+    Bash スクリプトが内部で Python を使用しているが、SKILL.md にその前提条件が記載されていない。
+  </div>
+  <div class="finding-rec">💡 推奨: SKILL.md に Python 依存を明記するか、pure-Bash 実装に変更。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Skills</span>
+    <span class="finding-title">F-27: azure-functions-common のスキル名が内部用と分かりにくい</span>
+  </div>
+  <div class="finding-loc">📄 <code>templates/skills/azure-functions-common/SKILL.md</code></div>
+  <div class="finding-desc">
+    「Not intended as a standalone user-facing workflow」と記載されているが、スキル名からそれが読み取れない。ユーザーが直接呼び出す可能性がある。
+  </div>
+  <div class="finding-rec">💡 推奨: <code>azure-functions-reference-library</code> 等の名前を検討するか、スキル説明に「他のスキルから参照される内部リファレンス」と強調。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Skills</span>
+    <span class="finding-title">F-28: azure-functions-doctor と azure-functions-diagnostics の名前が紛らわしい</span>
+  </div>
+  <div class="finding-loc">📄 <code>templates/skills/azure-functions-doctor/</code>, <code>templates/skills/azure-functions-diagnostics/</code></div>
+  <div class="finding-desc">
+    doctor = デプロイ前の静的分析、diagnostics = ランタイムトラブルシューティング。用途は異なるが、名前が類似しており混同されやすい。
+  </div>
+  <div class="finding-rec">💡 推奨: スキル説明の冒頭で違いを明確に記載 (例: "Pre-deploy static analysis" vs "Runtime troubleshooting")。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec8">8. ワークスペース構成の整合性</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="positive-section">
+<h3>✅ 確認済みの整合性</h3>
+<ul class="checklist">
+  <li>3 エージェント用ルーティングファイル (ghcp.md, claude.md, codex.md) が同一テンプレートパターンで統一</li>
+  <li>MCP サーバー設定 (servers.yaml) が正しく @azure/mcp@latest を参照</li>
+  <li>プラグイン marketplace.json (.plugin/, .claude-plugin/) が同一コンテンツ</li>
+  <li>スタートアッププロンプト、Welcome フックが適切にテンプレート変数を使用</li>
+  <li>孤立した未使用コンポーネントなし</li>
+</ul>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Workspace</span>
+    <span class="finding-title">F-29: AGENTS.md の内容がリポジトリ開発標準とユーザープロジェクト標準で曖昧</span>
+  </div>
+  <div class="finding-loc">📄 <code>templates/agents/AGENTS.md</code></div>
+  <div class="finding-desc">
+    このファイルはユーザーのワークスペースにインストールされ、コーディングエージェントに開発標準を指示する。内容は「TDD」「Conventional Commits」「PR ガイダンス」等の汎用開発標準と、Azure Functions 固有の標準が混在。
+    <br><br>
+    Azure Functions 固有の部分 (L34–38) は適切だが、「Small Commits」「Conventional Commits」等はユーザーのプロジェクトに必ずしも適合しない可能性がある。
+  </div>
+  <div class="finding-rec">💡 推奨: Azure Functions 固有の標準に特化し、汎用開発標準は任意適用のセクションとして分離するか、ユーザーがカスタマイズしやすいよう明記。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Workspace</span>
+    <span class="finding-title">F-30: Azure Skills インストールガイダンスがスキル間で分散</span>
+  </div>
+  <div class="finding-loc">
+    📄 <code>templates/skills/azure-functions-setup/SKILL.md</code> : L40–45<br>
+    📄 <code>templates/skills/azure-functions-deploy/SKILL.md</code> : L80–88<br>
+    📄 <code>templates/hooks/welcome-setup.md</code> : L30–43
+  </div>
+  <div class="finding-desc">
+    Azure Skills (MCP サーバー) のインストール方法がスキルやフック間で分散しており、一元的なリファレンスがない。エントリポイントによって異なるインストール手順が表示される可能性がある。
+  </div>
+  <div class="finding-rec">💡 推奨: 共通リファレンスファイルに一元化し、各スキルからリンク。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Workspace</span>
+    <span class="finding-title">F-31: marketplace.json の同期メカニズム未整備</span>
+  </div>
+  <div class="finding-loc">📄 <code>.plugin/marketplace.json</code>, <code>.claude-plugin/marketplace.json</code></div>
+  <div class="finding-desc">
+    両ファイルは同一内容だが、バージョンバンプ時に片方だけ更新される可能性がある。同期を保証するビルドチェックがない。
+  </div>
+  <div class="finding-rec">💡 推奨: CI に両ファイルの同一性チェックを追加。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec9">9. ドキュメントレビュー</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="positive-section">
+<h3>✅ ドキュメントの良い点</h3>
+<ul class="checklist">
+  <li>CLI リファレンスが全コマンド・オプションを網羅</li>
+  <li>セキュリティモデルが明確に文書化 (SECURITY.md, doctor-guide.md)</li>
+  <li>開発者向けドキュメント (development.md) が充実</li>
+  <li>usage-scenarios.md で実用的なシナリオが提示</li>
+  <li>日本語ドキュメント (doctor-checks-best-practices-reference.ja.md) の提供</li>
+</ul>
+</div>
+
+<div class="finding sev-critical">
+  <div class="finding-header">
+    <span class="badge badge-critical">CRITICAL</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-32: 内部ドキュメントの公開前整理</span>
+  </div>
+  <div class="finding-loc">
+    📄 <code>docs/research/bug-bash-feedback-summary-20260519.md</code><br>
+    📄 <code>docs/research/bug-bash-chat-test-steps-20260519.md</code><br>
+    📄 <code>docs/internal/</code><br>
+    📄 <code>docs/prd-docs/</code>
+  </div>
+  <div class="finding-desc">
+    公開リポジトリに内部向けドキュメントが残っている：
+    <ul>
+      <li>Bug bash フィードバックサマリー（日本語コンテンツ含む）</li>
+      <li>内部テスト手順書</li>
+      <li>PRD ドキュメント（多くが「📋 Proposed」ステータスで実装済みのものと不一致）</li>
+      <li>内部設計ドキュメント</li>
+    </ul>
+    これらが一般公開時にユーザーを混乱させる可能性がある。
+  </div>
+  <div class="finding-rec">💡 推奨: (1) 内部ドキュメントの先頭に「⚠️ Internal Document」ヘッダーを追加、(2) PRD のステータスを最新化、(3) 必要に応じて .npmignore / GitHub リリースから除外を検討。</div>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-33: build コマンドのドキュメントが不足</span>
+  </div>
+  <div class="finding-loc">📄 <code>docs/cli-reference.md</code> : 242–250</div>
+  <div class="finding-desc">
+    <code>build</code> コマンドは 3 行程度の記載のみで、オプション (<code>--target</code>, <code>--dist-dir</code>) や使用例の詳細がない。コントリビューターに必要な情報が不足。
+  </div>
+  <div class="finding-rec">💡 推奨: CLI ヘルプテキスト (L236–238) の内容をドキュメントに反映。</div>
+</div>
+
+<div class="finding sev-high">
+  <div class="finding-header">
+    <span class="badge badge-high">HIGH</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-34: CHANGELOG / マイグレーションガイドの不在</span>
+  </div>
+  <div class="finding-loc">📄 リポジトリルート</div>
+  <div class="finding-desc">
+    CHANGELOG.md が存在しない。0.0.1-preview → 0.0.2-preview の変更点や、将来のバージョンアップ時の移行手順を知る手段がない。
+  </div>
+  <div class="finding-rec">💡 推奨: CHANGELOG.md を作成し、GA 前にリリースノート運用を開始。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-35: 環境変数ドキュメントが分散</span>
+  </div>
+  <div class="finding-loc">📄 <code>docs/cli-reference.md</code> : 267–271 / <code>docs/doctor-guide.md</code> : 155–156</div>
+  <div class="finding-desc">
+    環境変数は cli-reference.md に <code>AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE</code> のみ記載。<code>AZURE_FUNCTIONS_DOCTOR_TRUST_PR</code> 等は doctor-guide.md に散在。一元的なリファレンスがない。
+  </div>
+  <div class="finding-rec">💡 推奨: 全環境変数を cli-reference.md の専用セクションに集約。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-36: バージョンピンニングガイダンスの不在</span>
+  </div>
+  <div class="finding-loc">📄 <code>README.md</code>, <code>docs/cli-reference.md</code></div>
+  <div class="finding-desc">
+    <code>npx @azure/functions-skills</code> を使用する例はあるが、CI 環境でのバージョン固定方法 (<code>npx @azure/functions-skills@0.0.2-preview</code>) の説明がない。
+  </div>
+  <div class="finding-rec">💡 推奨: CI 利用時のバージョン固定推奨をドキュメントに追加。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-37: トラブルシューティングセクションの不在</span>
+  </div>
+  <div class="finding-loc">📄 全ドキュメント</div>
+  <div class="finding-desc">
+    プラグインインストール失敗、権限エラー、エージェント検出失敗等の一般的なトラブルに対するトラブルシューティングガイドがない。
+  </div>
+  <div class="finding-rec">💡 推奨: FAQ / Troubleshooting セクションを README.md または専用ドキュメントに追加。</div>
+</div>
+
+<div class="finding sev-medium">
+  <div class="finding-header">
+    <span class="badge badge-medium">MEDIUM</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-38: Azure Functions Skills と Azure Skills の関係が README の目立つ位置にない</span>
+  </div>
+  <div class="finding-loc">📄 <code>README.md</code> : L14 / <code>docs/skills-vs-azure-skills.md</code></div>
+  <div class="finding-desc">
+    関係を説明する専用ドキュメント (<code>skills-vs-azure-skills.md</code>) は良質だが、README での言及が目立たず、新規ユーザーが 2 つのパッケージを混同する可能性がある。
+  </div>
+  <div class="finding-rec">💡 推奨: README の冒頭付近に callout ボックスで関係を説明。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-39: パススルー引数の使用例がない</span>
+  </div>
+  <div class="finding-loc">📄 <code>docs/cli-reference.md</code> : 51–52</div>
+  <div class="finding-desc">
+    <code>-- &lt;args...&gt;</code> (パススルー引数) は記載されているが、具体的な使用例がない。
+  </div>
+  <div class="finding-rec">💡 推奨: <code>npx @azure/functions-skills install --agent ghcp -- --scope user</code> のような例を追加。</div>
+</div>
+
+<div class="finding sev-low">
+  <div class="finding-header">
+    <span class="badge badge-low">LOW</span>
+    <span class="badge badge-cat">Docs</span>
+    <span class="finding-title">F-40: doctor-guide.md の GitHub Actions 例でトークン取得方法が未説明</span>
+  </div>
+  <div class="finding-loc">📄 <code>docs/doctor-guide.md</code> : 127–129</div>
+  <div class="finding-desc">
+    <code>GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}</code> を使用しているが、COPILOT_TOKEN の取得・設定方法の説明がない。
+  </div>
+  <div class="finding-rec">💡 推奨: Copilot 認証ドキュメントへのリンクを追加。</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec10">10. 良い点（ポジティブ所見）</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<div class="positive-section">
+<h3>🏆 アーキテクチャ設計</h3>
+<ul>
+  <li><strong>モジュラー設計</strong>: setup, chat, doctor, build が独立モジュールとして分離</li>
+  <li><strong>ライブラリ/CLI 二重利用</strong>: <code>exports</code> で VS Code 拡張等から利用可能</li>
+  <li><strong>テンプレートデータ駆動</strong>: スキル・ルーティング・フックを YAML/MD で定義し、ビルド時に結合</li>
+</ul>
+</div>
+
+<div class="positive-section">
+<h3>🏆 セキュリティ</h3>
+<ul>
+  <li><strong>サプライチェーンチェック</strong>: lifecycle scripts, unpinned deps, lockfile, tracked secrets, install-script deps — 業界標準以上</li>
+  <li><strong>PR 安全ガード</strong>: untrusted PR での AI 分析を自動ブロック</li>
+  <li><strong>HTML エスケープ + 列挙型検証</strong>: <code>escapeHtml()</code> + <code>safeEnum()</code> で XSS 防止</li>
+  <li><strong>セキュリティリントスクリプト</strong>: <code>lint-package-scripts.mjs</code>, <code>lint-skill-content.mjs</code>, <code>audit-npm-token.mjs</code></li>
+</ul>
+</div>
+
+<div class="positive-section">
+<h3>🏆 テスト</h3>
+<ul>
+  <li>20 の doctor チェックすべてにテスト</li>
+  <li>Git 統合テスト（実際の git コマンド使用）</li>
+  <li>HTML インジェクション防御テスト</li>
+  <li>PR セキュリティ制御テスト</li>
+  <li>プラグインインストール・ワークスペース適用のテスト</li>
+</ul>
+</div>
+
+<div class="positive-section">
+<h3>🏆 クロスプラットフォーム</h3>
+<ul>
+  <li>Node.js パス API の一貫した使用 — <code>path.join()</code> がすべてのソースファイルで実践</li>
+  <li><code>process.platform</code> 検出が 6 箇所以上で適切に使用</li>
+  <li>Windows <code>.cmd</code>/<code>.bat</code> ラッパーの自動解決</li>
+  <li>ハードコードされたパス・ユーザー名・マシン名なし</li>
+</ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="sec11">11. 推奨アクション優先度表</h2>
+<!-- ═══════════════════════════════════════════════ -->
+
+<table>
+  <tr>
+    <th>優先度</th>
+    <th>ID</th>
+    <th>カテゴリ</th>
+    <th>概要</th>
+    <th>工数目安</th>
+  </tr>
+  <tr style="background: rgba(248,81,73,0.08);">
+    <td><span class="badge badge-critical">CRITICAL</span></td>
+    <td>F-13</td>
+    <td>Doctor</td>
+    <td>doctor ドキュメントと実装の乖離を解消</td>
+    <td>2h</td>
+  </tr>
+  <tr style="background: rgba(248,81,73,0.08);">
+    <td><span class="badge badge-critical">CRITICAL</span></td>
+    <td>F-21</td>
+    <td>Skills</td>
+    <td>HTTP トリガー検証ガイダンスの統一</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(248,81,73,0.08);">
+    <td><span class="badge badge-critical">CRITICAL</span></td>
+    <td>F-32</td>
+    <td>Docs</td>
+    <td>内部ドキュメントの公開前整理</td>
+    <td>2h</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-01</td>
+    <td>Update</td>
+    <td>ghcp/codex update コマンドの差別化/明記</td>
+    <td>1h</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-02</td>
+    <td>Update</td>
+    <td>Claude update コマンドの実在性検証</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-14</td>
+    <td>Doctor</td>
+    <td>Extension Bundle のフルバージョン比較</td>
+    <td>1h</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-15</td>
+    <td>Doctor</td>
+    <td>CI PR 検出の対象拡大</td>
+    <td>1h</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-19</td>
+    <td>Cross-Platform</td>
+    <td>Codex フックの bash 依存解消</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-22</td>
+    <td>Skills</td>
+    <td>タイマートリガー検証のスケジュール復元警告</td>
+    <td>15m</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-23</td>
+    <td>Skills</td>
+    <td>ローカルエミュレータ参照の補完</td>
+    <td>1h</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-33</td>
+    <td>Docs</td>
+    <td>build コマンドのドキュメント拡充</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-34</td>
+    <td>Docs</td>
+    <td>CHANGELOG 作成</td>
+    <td>1h</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-10</td>
+    <td>Help</td>
+    <td>chat --help の修正</td>
+    <td>5m</td>
+  </tr>
+  <tr style="background: rgba(240,136,62,0.08);">
+    <td><span class="badge badge-high">HIGH</span></td>
+    <td>F-11</td>
+    <td>Help</td>
+    <td>--version フラグ実装</td>
+    <td>15m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-03</td>
+    <td>Update</td>
+    <td>state 欠損時のフォールバック</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-05</td>
+    <td>Dry-run</td>
+    <td>--local --dry-run の出力改善</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-16</td>
+    <td>Doctor</td>
+    <td>JSON 読み取りエラーの区別</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-17</td>
+    <td>Doctor</td>
+    <td>gitignore パターンマッチの改善</td>
+    <td>1h</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-18</td>
+    <td>Doctor</td>
+    <td>V4 トリガータイプ検出の拡充</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-24</td>
+    <td>Skills</td>
+    <td>Extension Bundle リンクの安定化</td>
+    <td>15m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-25</td>
+    <td>Skills</td>
+    <td>プログラミングモデル非推奨の明示</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-26</td>
+    <td>Skills</td>
+    <td>Bash スクリプト Python 依存の明記</td>
+    <td>15m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-29</td>
+    <td>Workspace</td>
+    <td>AGENTS.md の内容精査</td>
+    <td>30m</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-30</td>
+    <td>Workspace</td>
+    <td>Azure Skills インストールガイダンス一元化</td>
+    <td>1h</td>
+  </tr>
+  <tr style="background: rgba(210,153,34,0.08);">
+    <td><span class="badge badge-medium">MEDIUM</span></td>
+    <td>F-35–38</td>
+    <td>Docs</td>
+    <td>環境変数・ピンニング・トラブルシューティング・Skills 関係説明</td>
+    <td>2h</td>
+  </tr>
+</table>
+
+<h3>推定総工数</h3>
+<table>
+  <tr><th>優先度</th><th>件数</th><th>推定工数</th></tr>
+  <tr><td><span class="badge badge-critical">CRITICAL</span></td><td>3</td><td>~4.5h</td></tr>
+  <tr><td><span class="badge badge-high">HIGH</span></td><td>12</td><td>~8h</td></tr>
+  <tr><td><span class="badge badge-medium">MEDIUM</span></td><td>18</td><td>~9h</td></tr>
+  <tr><td><span class="badge badge-low">LOW / INFO</span></td><td>10</td><td>~3h</td></tr>
+  <tr style="font-weight: bold;"><td>合計</td><td>43</td><td>~24.5h</td></tr>
+</table>
+
+<p style="margin-top: 24px; color: #8b949e; font-size: 0.85em; text-align: center; border-top: 1px solid var(--border); padding-top: 16px;">
+  Generated by azure-functions-skills comprehensive review — 2026-05-30
+</p>
+
+</body>
+</html>
