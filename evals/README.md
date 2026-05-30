@@ -12,11 +12,13 @@ single skill and contains an `eval.yaml` defining stimuli, graders, and configur
   itself does not get bundled into the published package — it is dev-only).
 - **GitHub Copilot CLI authentication**:
   - Local: `gh auth login` (Vally reuses your `gh` session).
-  - CI: `COPILOT_GITHUB_TOKEN` configured as an **environment secret** under
-    the `functions-skills-vally-eval` GitHub Environment. Recommended protection
-    rules: restrict `Deployment branches` to `main` (and any active eval-branch
-    pattern, e.g. `tsushi/vally-eval-*`), optionally add required reviewers for
-    cost-sensitive Opus / full runs.
+  - CI: the workflow uses the existing `functions-skills-live-e2e`
+    GitHub Environment and consumes the existing `COPILOT_CLI_TOKEN`
+    secret, mapping it onto `COPILOT_GITHUB_TOKEN` (the variable name
+    that `@github/copilot-sdk` reads). The token is set at **step level**
+    on the eval step only, so checkout / install / pre-warm / artifact
+    upload do not see it. Protected-branches policy + `azure-functions-bucees-team`
+    reviewers on the environment gate every run.
 - Run from the repository root so the relative paths in `.vally.yaml` resolve.
 
 ## Running

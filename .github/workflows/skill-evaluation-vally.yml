@@ -37,20 +37,24 @@ jobs:
   eval:
     name: vally eval
     runs-on: ubuntu-latest
-    # Scope COPILOT_GITHUB_TOKEN to a dedicated GitHub Environment so the
-    # secret is only available from approved branches (and, optionally,
-    # behind required reviewers for cost-sensitive Opus / full runs).
-    # Mirrors the pattern used by skill-evaluation-live-azure-login-smoke.yml.
-    environment: functions-skills-vally-eval
+    # Reuse the existing functions-skills-live-e2e environment. It was
+    # already set up to host evaluation-style runs, ships
+    # COPILOT_CLI_TOKEN (the GitHub Copilot SDK token), and is gated by
+    # protected branches + required reviewers (Azure/azure-functions-bucees-team,
+    # prevent_self_review: false). No Azure variables are touched by this
+    # workflow — they remain available for future evals that need them.
+    environment: functions-skills-live-e2e
     timeout-minutes: 60
     env:
-      # GitHub Copilot SDK authentication used by the `copilot-sdk` executor.
-      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+      # Job-level boolean used by the schedule-skip check below. We do NOT
+      # expose the token at job level; the actual token is only set in the
+      # step that runs `vally eval`. This boolean is safe to expose.
+      HAS_COPILOT_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN != '' }}
     steps:
       - name: Skip nightly when token is not configured
-        if: github.event_name == 'schedule' && env.COPILOT_GITHUB_TOKEN == ''
+        if: github.event_name == 'schedule' && env.HAS_COPILOT_TOKEN != 'true'
         run: |
-          echo "COPILOT_GITHUB_TOKEN is not configured; skipping nightly run." >&2
+          echo "COPILOT_CLI_TOKEN is not configured on functions-skills-live-e2e; skipping nightly run." >&2
           exit 0
 
       - name: Checkout
@@ -75,7 +79,11 @@ jobs:
         run: npx vally lint --eval-spec evals
 
       - name: Run vally eval
+        # Token is scoped to this step only (least privilege). The @github/copilot-sdk
+        # reads COPILOT_GITHUB_TOKEN from the environment, so the existing
+        # COPILOT_CLI_TOKEN secret is mapped onto that variable name here.
         env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
           SUITE: ${{ inputs.suite || 'full' }}
           EVAL_SPEC: ${{ inputs.eval_spec }}
           MODEL: ${{ inputs.model }}
