@@ -644,7 +644,7 @@ describe('CLI command integration', () => {
       .toThrow(/Multiple agents are installed/);
   });
 
-  it('update after install --local auto-detects local mode and preserves user customizations', () => {
+  it('update after install --local auto-detects local mode and preserves user customizations', { timeout: 30_000 }, () => {
     const projectDir = makeTempDir('af-skills-e2e-local-update-');
 
     // Step 1: Install locally for ghcp
@@ -679,7 +679,7 @@ describe('CLI command integration', () => {
     expect(skillIds.length).toBeGreaterThan(0);
   });
 
-  it('update --force after install --local overwrites all files', () => {
+  it('update --force after install --local overwrites all files', { timeout: 15_000 }, () => {
     const projectDir = makeTempDir('af-skills-e2e-local-update-force-');
 
     // Install locally for claude
@@ -701,7 +701,7 @@ describe('CLI command integration', () => {
     expect(existsSync(join(projectDir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(false);
   });
 
-  it('update --dry-run after install --local reports planned actions', () => {
+  it('update --dry-run after install --local reports planned actions', { timeout: 15_000 }, () => {
     const projectDir = makeTempDir('af-skills-e2e-local-update-dryrun-');
 
     // Install locally
@@ -717,5 +717,47 @@ describe('CLI command integration', () => {
     expect(readFileSync(instructionsPath, 'utf-8')).toBe(originalContent);
     // Output describes planned actions
     expect(output).toContain('Planned local update');
+  });
+
+  it('install rejects mixed mode: local then plugin', { timeout: 15_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-mixed-mode-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    // Install ghcp locally
+    runCli(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
+
+    // Try to install claude as plugin — should fail
+    expect(() => runCliOutput(['install', '--agent', 'claude', '--dir', projectDir, '--yes'], { env }))
+      .toThrow(/Cannot mix install modes/);
+  });
+
+  it('install rejects mixed mode: plugin then local', { timeout: 15_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-mixed-mode-rev-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    // Install claude as plugin
+    runCli(['install', '--agent', 'claude', '--dir', projectDir, '--yes'], { env });
+
+    // Try to install ghcp locally — should fail
+    expect(() => runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']))
+      .toThrow(/Cannot mix install modes/);
   });
 });

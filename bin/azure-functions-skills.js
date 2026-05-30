@@ -445,6 +445,28 @@ if (command === 'install' || command === 'update') {
     if (state) {
       const mode = resolveInstallMode(state, detectedAgents);
       if (mode === 'local') local = true;
+      if (mode === 'mixed') {
+        console.error('Mixed install modes detected: some agents were installed locally, others as plugins.');
+        console.error('Run update separately per agent with --agent <name>.');
+        process.exit(1);
+      }
+    }
+  }
+
+  // Prevent mixed-mode installs: block if existing agents use a different mode
+  if (command === 'install') {
+    const state = readState(dir);
+    if (state) {
+      const existingTargets = getInstalledTargets(state);
+      if (existingTargets.length > 0) {
+        const existingMode = resolveInstallMode(state, existingTargets);
+        const requestedMode = local ? 'local' : 'plugin';
+        if (existingMode !== 'mixed' && existingMode !== requestedMode) {
+          console.error(`Cannot mix install modes: existing agents use '${existingMode}' mode, but '${requestedMode}' was requested.`);
+          console.error(`Use --local to match, or reinstall all agents with the same mode.`);
+          process.exit(1);
+        }
+      }
     }
   }
 
