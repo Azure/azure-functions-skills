@@ -153,19 +153,17 @@ describe('applyLocalUpdate', () => {
   });
 
   describe('routing files use managed-block replacement', () => {
-    it('replaces managed block in copilot-instructions.md preserving user content', async () => {
+    it('leaves copilot-instructions.md untouched when not in build output', async () => {
       const dir = makeTempDir();
       setupLocalWorkspace(dir, 'ghcp');
+      const originalContent = readFileSync(join(dir, '.github', 'copilot-instructions.md'), 'utf-8');
 
       await applyLocalUpdate(dir, { agents: ['ghcp'] });
 
+      // copilot-instructions.md is no longer generated for GHCP,
+      // so existing user file should be left completely untouched
       const content = readFileSync(join(dir, '.github', 'copilot-instructions.md'), 'utf-8');
-      expect(content).toContain('# My Project Rules');
-      expect(content).toContain('Custom user content here.');
-      expect(content).toContain('More custom user content.');
-      expect(content).toContain('<!-- azure-functions-skills:start');
-      expect(content).not.toContain('old routing content');
-      expect(content).toContain('azure-functions-setup');
+      expect(content).toBe(originalContent);
     });
 
     it('replaces managed block in CLAUDE.md preserving user content', async () => {
@@ -206,7 +204,7 @@ describe('applyLocalUpdate', () => {
       // New file is saved aside
       const asidePath = join(dir, 'CLAUDE.azure-functions-skills-new.md');
       expect(existsSync(asidePath)).toBe(true);
-      expect(readFileSync(asidePath, 'utf-8')).toContain('azure-functions-skills');
+      expect(readFileSync(asidePath, 'utf-8')).toContain('azure-functions-setup');
       expect(result.savedAside.length).toBeGreaterThan(0);
     });
   });
@@ -267,7 +265,7 @@ describe('applyLocalUpdate', () => {
 
       const content = readFileSync(join(dir, 'CLAUDE.md'), 'utf-8');
       expect(content).not.toContain('No managed block here.');
-      expect(content).toContain('azure-functions-skills');
+      expect(content).toContain('azure-functions-setup');
       // No save-aside file created
       expect(existsSync(join(dir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(false);
     });
@@ -312,7 +310,8 @@ describe('applyLocalUpdate', () => {
       const result = await applyLocalUpdate(dir, { agents: ['ghcp'] });
 
       expect(result.overwritten.length).toBeGreaterThan(0);
-      expect(result.managedBlockUpdated.length).toBeGreaterThan(0);
+      // copilot-instructions.md is no longer generated for GHCP,
+      // so no managed-block updates happen
       expect(result.savedAside.length).toBeGreaterThan(0);
     });
   });
@@ -321,16 +320,13 @@ describe('applyLocalUpdate', () => {
     it('reports planned actions without writing files', async () => {
       const dir = makeTempDir();
       setupLocalWorkspace(dir, 'ghcp');
-      const originalInstructions = readFileSync(join(dir, '.github', 'copilot-instructions.md'), 'utf-8');
 
       const result = await applyLocalUpdate(dir, { agents: ['ghcp'], dryRun: true });
 
       // No files should be modified
-      expect(readFileSync(join(dir, '.github', 'copilot-instructions.md'), 'utf-8')).toBe(originalInstructions);
       expect(readFileSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'), 'utf-8')).toContain('OLD skill content');
       // But result should describe planned actions
       expect(result.overwritten.length).toBeGreaterThan(0);
-      expect(result.managedBlockUpdated.length).toBeGreaterThan(0);
       expect(result.dryRun).toBe(true);
     });
   });

@@ -37,10 +37,10 @@ function runCli(args: string[], options: { cwd?: string } = {}): string {
 
 describe('E2E: local update flow', () => {
   describe.each([
-    { agent: 'ghcp', routingFile: '.github/copilot-instructions.md', skillsDir: '.github/skills' },
-    { agent: 'claude', routingFile: 'CLAUDE.md', skillsDir: '.claude/skills' },
-    { agent: 'codex', routingFile: 'AGENTS.md', skillsDir: '.agents/skills' },
-  ] as const)('$agent', ({ agent, routingFile, skillsDir }) => {
+    { agent: 'ghcp', routingFile: null, settingsFile: '.vscode/mcp.json', skillsDir: '.github/skills' },
+    { agent: 'claude', routingFile: 'CLAUDE.md', settingsFile: '.claude/settings.json', skillsDir: '.claude/skills' },
+    { agent: 'codex', routingFile: 'AGENTS.md', settingsFile: '.codex/config.toml', skillsDir: '.agents/skills' },
+  ] as const)('$agent', ({ agent, routingFile, settingsFile, skillsDir }) => {
     it('install --local → update preserves user customizations', () => {
       const dir = makeTempDir(`af-e2e-update-${agent}-`);
 
@@ -48,19 +48,22 @@ describe('E2E: local update flow', () => {
       runCli(['install', '--local', '--agent', agent, '--dir', dir, '--yes']);
 
       // Verify workspace was created
-      expect(existsSync(join(dir, routingFile))).toBe(true);
       expect(existsSync(join(dir, skillsDir))).toBe(true);
+      if (routingFile) {
+        expect(existsSync(join(dir, routingFile))).toBe(true);
+      }
 
-      // User customizes routing file
-      const original = readFileSync(join(dir, routingFile), 'utf-8');
-      writeFileSync(join(dir, routingFile), `# My Custom Rules\n\n${original}`);
+      // User customizes settings file
+      const settingsPath = join(dir, settingsFile);
+      const original = readFileSync(settingsPath, 'utf-8');
+      writeFileSync(settingsPath, `// user customized\n${original}`);
 
       // Update (auto-detects local mode)
       runCli(['update', '--agent', agent, '--dir', dir, '--yes']);
 
-      // Routing file: original is preserved (save-aside strategy since no managed block)
-      const afterUpdate = readFileSync(join(dir, routingFile), 'utf-8');
-      expect(afterUpdate).toContain('# My Custom Rules');
+      // Settings file: original is preserved (save-aside strategy)
+      const afterUpdate = readFileSync(settingsPath, 'utf-8');
+      expect(afterUpdate).toContain('// user customized');
 
       // Skills refreshed
       const skills = readdirSync(join(dir, skillsDir), { withFileTypes: true })
@@ -73,24 +76,33 @@ describe('E2E: local update flow', () => {
       const dir = makeTempDir(`af-e2e-update-force-${agent}-`);
 
       runCli(['install', '--local', '--agent', agent, '--dir', dir, '--yes']);
-      writeFileSync(join(dir, routingFile), '# Custom content only\n');
 
-      runCli(['update', '--agent', agent, '--dir', dir, '--yes', '--force']);
+      if (routingFile) {
+        writeFileSync(join(dir, routingFile), '# Custom content only\n');
 
-      const content = readFileSync(join(dir, routingFile), 'utf-8');
-      expect(content).not.toContain('# Custom content only');
-      expect(content).toContain('Azure Functions');
+        runCli(['update', '--agent', agent, '--dir', dir, '--yes', '--force']);
+
+        const content = readFileSync(join(dir, routingFile), 'utf-8');
+        expect(content).not.toContain('# Custom content only');
+        expect(content).toContain('Azure Functions');
+      } else {
+        // GHCP: no routing file, but agent def should be refreshed
+        runCli(['update', '--agent', agent, '--dir', dir, '--yes', '--force']);
+        const agentDef = readFileSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'), 'utf-8');
+        expect(agentDef).toContain('functions-copilot');
+      }
     });
 
     it('install --local → update --dry-run does not modify files', () => {
       const dir = makeTempDir(`af-e2e-update-dryrun-${agent}-`);
 
       runCli(['install', '--local', '--agent', agent, '--dir', dir, '--yes']);
-      const original = readFileSync(join(dir, routingFile), 'utf-8');
+      const settingsPath = join(dir, settingsFile);
+      const original = readFileSync(settingsPath, 'utf-8');
 
       const output = runCli(['update', '--agent', agent, '--dir', dir, '--dry-run']);
 
-      expect(readFileSync(join(dir, routingFile), 'utf-8')).toBe(original);
+      expect(readFileSync(settingsPath, 'utf-8')).toBe(original);
       expect(output).toContain('Planned local update');
     });
   });
@@ -100,8 +112,8 @@ describe('E2E: local update flow', () => {
 
     runCli(['install', '--local', '--all', '--dir', dir, '--yes']);
 
-    // All routing files exist
-    expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+    // GHCP: no copilot-instructions.md, but agent def exists
+    expect(existsSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
     expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
     expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
 

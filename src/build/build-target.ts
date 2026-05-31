@@ -1,6 +1,10 @@
-import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { AgentDefinitions, BuildData, BuildTargetName, HookDefinitions, McpServer, Skill } from '../types.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 
 type TargetBuilder = (data: BuildData, distDir: string) => void;
 
@@ -123,9 +127,8 @@ function buildGhcp({ skills, mcpServers, agents, hooks }: BuildData, distDir: st
   mkdirSync(join(base, '.github', 'hooks'), { recursive: true });
   mkdirSync(join(base, '.vscode'), { recursive: true });
 
-  // copilot-instructions.md
-  const instructions = generateInstructions(skills, hooks);
-  writeFileSync(join(base, '.github', 'copilot-instructions.md'), instructions);
+  // No copilot-instructions.md — routing is handled by functions-copilot.agent.md
+  // and skills are in .github/skills/<id>/SKILL.md
 
   // mcp.json
   const mcpJson = generateVscodeMcp(mcpServers);
@@ -159,8 +162,8 @@ function buildClaude({ skills, mcpServers, agents, hooks }: BuildData, distDir: 
   const base = join(distDir, 'claude');
   mkdirSync(join(base, '.claude', 'skills'), { recursive: true });
 
-  // CLAUDE.md (instructions + skills inline)
-  const claudeMd = generateClaudeMd(skills, hooks, agents);
+  // CLAUDE.md — lightweight routing block (skills are in .claude/skills/)
+  const claudeMd = generateRoutingBlock('claude', skills);
   writeFileSync(join(base, 'CLAUDE.md'), claudeMd);
 
   // .claude/settings.json (MCP servers)
@@ -183,8 +186,9 @@ function buildCodex({ skills, mcpServers, agents, hooks }: BuildData, distDir: s
   mkdirSync(base, { recursive: true });
   mkdirSync(join(base, '.codex'), { recursive: true });
 
-  // AGENTS.md — Codex reads this for workspace instructions
-  const agentsMd = generateCodexAgents(skills, hooks, agents);
+  // AGENTS.md — routing block + development standards (skills are in .agents/skills/)
+  const routingBlock = generateRoutingBlock('codex', skills);
+  const agentsMd = `${routingBlock}\n\n${agents.agentsMd}\n`;
   writeFileSync(join(base, 'AGENTS.md'), agentsMd);
 
   // .agents/skills/<id>/SKILL.md — workspace-level skills
@@ -204,40 +208,18 @@ function buildCodex({ skills, mcpServers, agents, hooks }: BuildData, distDir: s
 
 // ─── Generators ───
 
-function generateInstructions(skills: Skill[], hooks: HookDefinitions): string {
-  const lines = [
-    '# Azure Functions Development',
-    '',
-    '> These instructions help your AI assistant guide you through Azure Functions development.',
-    '',
-    '## First-Time Setup',
-    '',
-    hooks.welcome,
-    '',
-    '## Available Skills',
-    '',
-    '| Skill | Description |',
-    '|-------|-------------|',
-  ];
-
-  for (const s of skills) {
-    lines.push(`| ${s.id} | ${s.description} |`);
-  }
-
-  lines.push('');
-  lines.push('## Skill Details');
-  lines.push('');
-
-  for (const s of skills) {
-    lines.push(`### ${s.id} — ${s.title}`);
-    lines.push('');
-    lines.push(s.content);
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-  }
-
-  return lines.join('\n');
+/**
+ * Generate a lightweight routing block from a template.
+ * The routing template uses {{skills}} as a placeholder for the skill list.
+ */
+function generateRoutingBlock(agent: 'ghcp' | 'claude' | 'codex', skills: Skill[]): string {
+  const template = readFileSync(join(TEMPLATES_DIR, 'routing', `${agent}.md`), 'utf-8');
+  const skillList = skills
+    .filter(s => s.category !== 'reference')
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(s => `- ${s.id}: ${s.description || s.title}`)
+    .join('\n');
+  return template.replace('{{skills}}', skillList).trimEnd();
 }
 
 function generateVscodeMcp(mcpServers: McpServer[]) {
@@ -337,45 +319,6 @@ function generatePluginMcpJson(mcpServers: McpServer[]) {
     };
   }
   return { mcpServers: result };
-}
-
-function generateClaudeMd(skills: Skill[], hooks: HookDefinitions, agents: AgentDefinitions): string {
-  return generateAgentMd(skills, hooks, agents, '## Available Skills');
-}
-
-function generateCodexAgents(skills: Skill[], hooks: HookDefinitions, agents: AgentDefinitions): string {
-  return generateAgentMd(skills, hooks, agents, '## Skills Reference');
-}
-
-function generateAgentMd(
-  skills: Skill[],
-  hooks: HookDefinitions,
-  agents: AgentDefinitions,
-  skillsHeading: string,
-): string {
-  const lines = [
-    '# Azure Functions Development',
-    '',
-    agents.agentsMd,
-    '',
-    '## First-Time Setup',
-    '',
-    hooks.welcome,
-    '',
-    skillsHeading,
-    '',
-  ];
-
-  for (const s of skills) {
-    lines.push(`### ${s.id} — ${s.title}`);
-    lines.push('');
-    lines.push(s.content);
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-  }
-
-  return lines.join('\n');
 }
 
 function generateClaudeSettings(mcpServers: McpServer[]) {
