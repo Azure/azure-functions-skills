@@ -42,6 +42,7 @@ scoring:
   threshold: 0.95
   weights:
     skill-invocation: 2.0
+    tool-calls: 2.0
     output-matches: 1.0
     output-not-matches: 1.5
     completed: 1.0
@@ -105,11 +106,26 @@ stimuli:
           required:
             - azure-functions-deploy
 
-      # Must mention the Azure Skills hand-off in some form (the deploy
-      # skill's primary contract).
-      - type: output-matches
+      # The deploy must actually happen via azd. We check the agent's
+      # tool calls directly (not the final assistant message) because
+      # `trajectory.output` is just the last message — a result-focused
+      # summary that may not echo command names like `azd up` even on
+      # a successful deploy. The tool-call grader sees every bash
+      # command the agent issued during the session.
+      - type: tool-calls
         config:
-          pattern: "(?i)azure-(prepare|validate|deploy)|azd up"
+          required:
+            - name: "^(bash|powershell|read_bash|run)$"
+              command: "\\bazd\\s+(up|provision|deploy)\\b"
+
+      # Agent must NOT tear down the resources it created — cleanup is
+      # owned by the workflow, not the agent. (Skill spec already says
+      # this in the prompt; this is the enforcement.)
+      - type: tool-calls
+        config:
+          disallowed:
+            - name: "^(bash|powershell|read_bash|run)$"
+              command: "\\bazd\\s+down\\b"
 
       # Must emit the Function App's azurewebsites.net hostname (proof
       # that the deploy completed and got a URL back).
@@ -126,6 +142,17 @@ stimuli:
       - type: output-not-matches
         config:
           pattern: "(?i)quota exceeded|InvalidTemplateDeployment|AuthorizationFailed|SubscriptionNotRegistered|InsufficientPermissions"
+
+      # Security regression guard: the FC1 quickstart template uses
+      # Managed Identity for both deployment storage and runtime
+      # storage. If the agent silently falls back to connection strings
+      # (e.g. because of missing roleAssignments/write), this grader
+      # turns red so we notice the security posture drop. The check is
+      # against the final summary because the agent typically reports
+      # the workaround it took.
+      - type: output-not-matches
+        config:
+          pattern: "(?i)connection string instead of managed identity|switching .* to use .* connection string"
 
       # Globals
       - type: completed
