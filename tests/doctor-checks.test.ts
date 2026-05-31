@@ -573,6 +573,8 @@ function initGit(dir: string) {
   if (r.status !== 0) throw new Error('git init failed (is git on PATH?)');
   spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir, shell: process.platform === 'win32' });
   spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir, shell: process.platform === 'win32' });
+  // Prevent CRLF conversion issues on Windows
+  spawnSync('git', ['config', 'core.autocrlf', 'false'], { cwd: dir, shell: process.platform === 'win32' });
 }
 
 function addAndCommit(dir: string, file: string) {

@@ -298,9 +298,9 @@ describe('chat launcher-only behavior', () => {
     const { applySetup } = await import('../src/setup/index.js');
     await applySetup(testDir, { agents: ['ghcp'], prerequisites: 'skip' });
 
-    // Get content of instructions file
-    const instrPath = join(testDir, '.github', 'copilot-instructions.md');
-    const contentBefore = readFileSync(instrPath, 'utf-8');
+    // Get content of agent definition (GHCP no longer generates copilot-instructions.md)
+    const agentDefPath = join(testDir, '.github', 'agents', 'functions-copilot.agent.md');
+    const contentBefore = readFileSync(agentDefPath, 'utf-8');
 
     try {
       const result = await chat({ agent: 'github-copilot', dir: testDir, prompt: 'test', prerequisites: 'skip' });
@@ -310,7 +310,7 @@ describe('chat launcher-only behavior', () => {
     }
 
     // File should not have been re-written (same content)
-    const contentAfter = readFileSync(instrPath, 'utf-8');
+    const contentAfter = readFileSync(agentDefPath, 'utf-8');
     expect(contentAfter).toBe(contentBefore);
   }, 15000);
 
