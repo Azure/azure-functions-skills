@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyLocalUpdate, saveAsidePath } from '../src/setup/local-update.js';
+import type { FilePrompter } from '../src/setup/local-update.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
 const TEMP_DIRS: string[] = [];
@@ -331,6 +332,88 @@ describe('applyLocalUpdate', () => {
       expect(result.overwritten.length).toBeGreaterThan(0);
       expect(result.managedBlockUpdated.length).toBeGreaterThan(0);
       expect(result.dryRun).toBe(true);
+    });
+  });
+
+  describe('interactive prompts', () => {
+    it('calls prompter for save-aside files when interactive', async () => {
+      const dir = makeTempDir();
+      setupLocalWorkspace(dir, 'ghcp');
+
+      const prompter: FilePrompter = vi.fn().mockResolvedValue('skip');
+      await applyLocalUpdate(dir, { agents: ['ghcp'], prompter });
+
+      // prompter should be called for each save-aside candidate
+      expect(prompter).toHaveBeenCalled();
+      const calls = vi.mocked(prompter).mock.calls;
+      // All calls should be for save-aside candidate files
+      for (const call of calls) {
+        expect(typeof call[0]).toBe('string'); // relativePath
+      }
+    });
+
+    it('overwrites file when prompter returns overwrite', async () => {
+      const dir = makeTempDir();
+      setupLocalWorkspace(dir, 'ghcp');
+
+      const prompter: FilePrompter = vi.fn().mockResolvedValue('overwrite');
+      const result = await applyLocalUpdate(dir, { agents: ['ghcp'], prompter });
+
+      // No save-aside files — all overwritten
+      expect(result.savedAside).toHaveLength(0);
+      // The files that would have been save-aside are now in overwritten
+      expect(result.overwritten.length).toBeGreaterThan(0);
+      // mcp.json should be overwritten (user's custom server gone)
+      const mcp = JSON.parse(readFileSync(join(dir, '.vscode', 'mcp.json'), 'utf-8'));
+      expect(mcp.servers?.['my-custom-server']).toBeUndefined();
+      // No save-aside file
+      expect(existsSync(join(dir, '.vscode', 'mcp.azure-functions-skills-new.json'))).toBe(false);
+    });
+
+    it('saves aside file when prompter returns skip', async () => {
+      const dir = makeTempDir();
+      setupLocalWorkspace(dir, 'ghcp');
+
+      const prompter: FilePrompter = vi.fn().mockResolvedValue('skip');
+      const result = await applyLocalUpdate(dir, { agents: ['ghcp'], prompter });
+
+      // Save-aside files created
+      expect(result.savedAside.length).toBeGreaterThan(0);
+      // User's custom MCP server preserved
+      const mcp = JSON.parse(readFileSync(join(dir, '.vscode', 'mcp.json'), 'utf-8'));
+      expect(mcp.servers['my-custom-server']).toBeDefined();
+    });
+
+    it('does not call prompter when not provided (non-interactive)', async () => {
+      const dir = makeTempDir();
+      setupLocalWorkspace(dir, 'ghcp');
+
+      // No prompter — should default to save-aside
+      const result = await applyLocalUpdate(dir, { agents: ['ghcp'] });
+
+      expect(result.savedAside.length).toBeGreaterThan(0);
+    });
+
+    it('does not call prompter when --force is set', async () => {
+      const dir = makeTempDir();
+      setupLocalWorkspace(dir, 'ghcp');
+
+      const prompter: FilePrompter = vi.fn().mockResolvedValue('skip');
+      await applyLocalUpdate(dir, { agents: ['ghcp'], force: true, prompter });
+
+      expect(prompter).not.toHaveBeenCalled();
+    });
+
+    it('does not call prompter when --yes is set', async () => {
+      const dir = makeTempDir();
+      setupLocalWorkspace(dir, 'ghcp');
+
+      const prompter: FilePrompter = vi.fn().mockResolvedValue('overwrite');
+      const result = await applyLocalUpdate(dir, { agents: ['ghcp'], yes: true, prompter });
+
+      expect(prompter).not.toHaveBeenCalled();
+      // --yes defaults to save-aside for shared files
+      expect(result.savedAside.length).toBeGreaterThan(0);
     });
   });
 });

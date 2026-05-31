@@ -21,10 +21,21 @@ const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 
 const BLOCK_PATTERN = /<!-- azure-functions-skills:start[^\n]* -->[\s\S]*?<!-- azure-functions-skills:end -->/;
 
+export type FilePromptResult = 'overwrite' | 'skip';
+
+/**
+ * A function that prompts the user for an action on a shared file.
+ * Receives the relative path and new content; returns the chosen action.
+ */
+export type FilePrompter = (relativePath: string, newContent: string, existingContent: string) => Promise<FilePromptResult>;
+
 export interface LocalUpdateOptions {
   agents: CliAgentName[];
   force?: boolean;
   dryRun?: boolean;
+  yes?: boolean;
+  /** When provided, called for each save-aside candidate to let user choose. */
+  prompter?: FilePrompter;
 }
 
 export interface LocalUpdateResult {
@@ -53,6 +64,8 @@ export async function applyLocalUpdate(targetDir: string, options: LocalUpdateOp
   const agents = options.agents;
   const force = options.force === true;
   const dryRun = options.dryRun === true;
+  const yes = options.yes === true;
+  const prompter = (!force && !yes && !dryRun) ? options.prompter : undefined;
 
   const data = loadBuildData();
   const tmpDir = join(tmpdir(), `af-skills-update-${Date.now()}`);
@@ -74,7 +87,7 @@ export async function applyLocalUpdate(targetDir: string, options: LocalUpdateOp
       const files = classifyFiles(agentDir, targetDir, agent, force);
 
       for (const file of files) {
-        applyFile(file, agentDir, targetDir, result, dryRun);
+        await applyFile(file, agentDir, targetDir, result, dryRun, prompter);
       }
     }
   } finally {
@@ -98,6 +111,60 @@ export function saveAsidePath(filePath: string): string {
     ? `${base}.azure-functions-skills-new${ext}`
     : `${base}.azure-functions-skills-new`;
   return dir === '.' ? aside : join(dir, aside);
+}
+
+/**
+ * Create an interactive prompter that asks the user via readline.
+ * Shows file path and offers: overwrite / skip / diff.
+ */
+export function createInteractivePrompter(): FilePrompter {
+  return async (relativePath: string, newContent: string, existingContent: string): Promise<FilePromptResult> => {
+    const { createInterface } = await import('node:readline/promises');
+
+    while (true) {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        console.log(`\n  File: ${relativePath}`);
+        console.log('  This file has been customized. Choose an action:');
+        console.log('    1. overwrite — Replace with new version');
+        console.log('    2. skip      — Keep current, save new as .azure-functions-skills-new');
+        console.log('    3. diff      — Show differences');
+        const answer = (await rl.question('  Choice [1/2/3] (default: 2): ')).trim();
+
+        if (answer === '1' || answer.toLowerCase() === 'overwrite') return 'overwrite';
+        if (answer === '' || answer === '2' || answer.toLowerCase() === 'skip') return 'skip';
+        if (answer === '3' || answer.toLowerCase() === 'diff') {
+          showSimpleDiff(relativePath, existingContent, newContent);
+          continue;
+        }
+        console.log('  Invalid choice. Please enter 1, 2, or 3.');
+      } finally {
+        rl.close();
+      }
+    }
+  };
+}
+
+function showSimpleDiff(relativePath: string, existing: string, updated: string): void {
+  const existingLines = existing.split('\n');
+  const updatedLines = updated.split('\n');
+  console.log(`\n  --- ${relativePath} (current)`);
+  console.log(`  +++ ${relativePath} (new)`);
+
+  const maxLines = Math.max(existingLines.length, updatedLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    const oldLine = existingLines[i];
+    const newLine = updatedLines[i];
+    if (oldLine === newLine) continue;
+    if (oldLine !== undefined && newLine !== undefined) {
+      console.log(`  - ${oldLine}`);
+      console.log(`  + ${newLine}`);
+    } else if (oldLine !== undefined) {
+      console.log(`  - ${oldLine}`);
+    } else {
+      console.log(`  + ${newLine}`);
+    }
+  }
 }
 
 // ── Internal helpers ──
@@ -214,9 +281,24 @@ function isPluginOnlyArtifact(agent: CliAgentName, relativePath: string): boolea
 /**
  * Apply a single file with the appropriate strategy.
  */
-function applyFile(file: GeneratedFile, _agentDir: string, targetDir: string, result: LocalUpdateResult, dryRun: boolean): void {
+async function applyFile(file: GeneratedFile, _agentDir: string, targetDir: string, result: LocalUpdateResult, dryRun: boolean, prompter?: FilePrompter): Promise<void> {
   const destPath = join(targetDir, file.relativePath);
   const newContent = readFileSync(file.stagedPath, 'utf-8');
+
+  // For save-aside candidates, ask the user if a prompter is available
+  if (file.action === 'save-aside' && prompter && existsSync(destPath)) {
+    const existingContent = readFileSync(destPath, 'utf-8');
+    const choice = await prompter(file.relativePath, newContent, existingContent);
+    if (choice === 'overwrite') {
+      if (!dryRun) {
+        mkdirSync(dirname(destPath), { recursive: true });
+        cpSync(file.stagedPath, destPath);
+      }
+      result.overwritten.push(file.relativePath);
+      return;
+    }
+    // choice === 'skip' → fall through to save-aside
+  }
 
   switch (file.action) {
     case 'overwrite': {

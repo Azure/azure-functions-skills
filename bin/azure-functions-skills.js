@@ -473,11 +473,14 @@ if (command === 'install' || command === 'update') {
   if (local) {
     if (command === 'update') {
       // Use file-type-aware local update strategy
-      const { applyLocalUpdate } = await import('../lib/setup/local-update.js');
+      const { applyLocalUpdate, createInteractivePrompter } = await import('../lib/setup/local-update.js');
+      const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
       const result = await applyLocalUpdate(dir, {
         agents: detectedAgents,
         force,
         dryRun,
+        yes,
+        prompter,
       });
       if (dryRun) {
         console.log(`Planned local update:`);
