@@ -20,6 +20,8 @@ single skill and contains an `eval.yaml` defining stimuli, graders, and configur
     upload do not see it. Protected-branches policy + `azure-functions-bucees-team`
     reviewers on the environment gate every run.
 - Run from the repository root so the relative paths in `.vally.yaml` resolve.
+- For the **live (Tier 3) deploy workflow**, additional Azure setup is required —
+  see [CI setup — repository / Azure side](#ci-setup--repository--azure-side) below.
 
 ## Running
 
@@ -106,6 +108,140 @@ See [`_base/common-graders.yaml`](_base/common-graders.yaml). Highlights:
   catches runtime crashes in the agent.
 - `output-not-matches` for connection-string / shared-key / master-key patterns —
   secret-leak guard.
+
+## CI setup — repository / Azure side
+
+The two workflows under `.github/workflows/` (the standard
+`skill-evaluation-vally.yml` and the live
+`skill-evaluation-vally-live.yml` + safety net) require **one-time
+configuration** on both the GitHub repository and the Azure
+subscription. This section is the authoritative checklist for a
+maintainer setting things up from scratch — for example after the
+subscription rotates, a new SP is provisioned, or someone forks this
+repo.
+
+> All values shown here come from the existing
+> `functions-skills-live-e2e` GitHub Environment. Read them directly
+> from
+> [repo Settings → Environments](https://github.com/Azure/azure-functions-skills/settings/environments)
+> rather than hard-coding them anywhere else.
+
+### 1. GitHub Environment: `functions-skills-live-e2e`
+
+| Setting | Value | Notes |
+| --- | --- | --- |
+| **Required reviewers** | `Azure/azure-functions-bucees-team` | `prevent_self_review: false` so the requester can self-approve |
+| **Deployment branches** | Protected branches only (= `main`) | Set in environment protection rules |
+| **Variables** | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | The federated identity used by `azure/login@v3` (see step 2). Plain variables, not secrets — they are non-sensitive identifiers |
+| **Secrets** | `COPILOT_CLI_TOKEN` | GitHub Copilot SDK token used by Vally's `copilot-sdk` executor. The workflow maps it to `COPILOT_GITHUB_TOKEN` at step level |
+
+### 2. Azure federated identity (OIDC) — workload identity federation
+
+The workflows authenticate via OIDC, not via a client secret. A single
+Microsoft Entra application (referenced by `AZURE_CLIENT_ID` above)
+needs federated credentials trusting this repository.
+
+Minimum subjects to add for both standard and live workflows:
+
+| Federation subject | Used by |
+| --- | --- |
+| `repo:Azure/azure-functions-skills:environment:functions-skills-live-e2e` | All workflows that pin `environment: functions-skills-live-e2e` (regular Vally, live deploy, safety net) |
+| `repo:Azure/azure-functions-skills:ref:refs/heads/main` *(optional)* | Convenient fallback for ad-hoc runs from `main` without an environment scope |
+
+These are added via Azure portal → Entra ID → App registrations →
+your app → **Certificates & secrets** → **Federated credentials**, or
+via CLI:
+
+```bash
+APP_OBJECT_ID=$(az ad app show --id "$AZURE_CLIENT_ID" --query id -o tsv)
+az ad app federated-credential create \
+  --id "$APP_OBJECT_ID" \
+  --parameters '{
+    "name": "azure-functions-skills-live-e2e",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:Azure/azure-functions-skills:environment:functions-skills-live-e2e",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+```
+
+### 3. Azure role assignments for the SP
+
+The federated identity (the **service principal** that backs
+`AZURE_CLIENT_ID`) needs different roles depending on which workflow
+should work. Find the SP's object ID once and reuse it:
+
+```bash
+SP_OBJECT_ID=$(az ad sp show --id "$AZURE_CLIENT_ID" --query id -o tsv)
+SUBSCRIPTION_ID="<value of AZURE_SUBSCRIPTION_ID from the environment>"
+```
+
+| Workflow | Required roles on `subscriptions/$SUBSCRIPTION_ID` | Why |
+| --- | --- | --- |
+| `skill-evaluation-vally.yml` (standard, no Azure resources) | *(none required)* — the workflow runs against the agent and does not call Azure ARM | The agent may probe Azure (via the Azure MCP `functions` namespace), but those tools are read-only and call non-ARM endpoints |
+| `skill-evaluation-vally-live.yml` (Tier 3 live deploy) | **`Contributor`** + **`Role Based Access Control Administrator`** | `Contributor` is needed for `az group create/delete`, Bicep deployment, and per-resource ops. `RBAC Administrator` is needed because the Azure-Samples FC1 quickstart template assigns Storage / Monitoring roles to the Function App's Managed Identity. Without it the agent has to fall back to less-secure auth modes (or modify the Bicep), which trips the security-regression grader in the live eval |
+| `cleanup-stale-vally-resources.yml` (24h safety net) | Subset of `Contributor` — at minimum `Microsoft.Resources/subscriptions/resourceGroups/delete` | The bundled `Contributor` from the live workflow already covers this; no separate assignment needed |
+
+Apply both roles with:
+
+```bash
+# Resource CRUD (required for live deploy)
+az role assignment create \
+  --assignee "$SP_OBJECT_ID" \
+  --role Contributor \
+  --scope "/subscriptions/$SUBSCRIPTION_ID"
+
+# Allow assigning Storage / Monitoring roles to the Function App MI
+az role assignment create \
+  --assignee "$SP_OBJECT_ID" \
+  --role "Role Based Access Control Administrator" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID"
+```
+
+Verify:
+
+```bash
+az role assignment list \
+  --assignee "$SP_OBJECT_ID" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID" \
+  --query "[].roleDefinitionName" -o tsv
+# Expected:
+#   Contributor
+#   Role Based Access Control Administrator
+```
+
+> Why subscription scope and not a single RG: the live workflow creates
+> a fresh `rg-afsvally-<runId>-<sha>` per run and the safety net needs
+> to enumerate / delete arbitrary RGs tagged `vally-eval=true`. RG-scoped
+> assignments cannot do either.
+>
+> If your subscription is shared with other workloads and you cannot
+> grant subscription-scope `Contributor`, the alternative is to pin
+> the live workflow to a single pre-created pool RG and rewrite cleanup
+> to use `az resource delete`. See the discussion in the
+> `azure-functions-deploy` live eval README for the trade-offs.
+
+### 4. Triggering a run
+
+Once the environment, federation, and roles are in place:
+
+1. **Repo → Actions → Skill Evaluation - Vally Live → Run workflow**.
+2. Pick the branch (`main`), `eval_spec` (optional, defaults to the
+   full `live` suite), `model` (optional), and `keep_resources` (debug
+   only).
+3. A bucees team member approves the deployment (or you self-approve;
+   `prevent_self_review: false`).
+4. Output lands in the `vally-live-results-<run_id>` artifact.
+
+### 5. Verifying cleanup
+
+After a run, regardless of pass/fail, the resource group should be
+gone (or pending deletion). To confirm:
+
+```bash
+az group list --tag vally-eval=true -o table
+# Empty list = clean. Lingering entries are picked up by the next
+# scheduled run of cleanup-stale-vally-resources.yml (within 24h).
+```
 
 ## Cost notes
 
