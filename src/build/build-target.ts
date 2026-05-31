@@ -1,7 +1,7 @@
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AgentDefinitions, BuildData, BuildTargetName, HookDefinitions, McpServer, Skill } from '../types.js';
+import type { BuildData, BuildTargetName, McpServer, Skill } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
@@ -121,7 +121,7 @@ function copySkillAssets(skill: Skill, skillDestDir: string): void {
 
 // ─── GHCP ───
 
-function buildGhcp({ skills, mcpServers, agents, hooks }: BuildData, distDir: string): void {
+function buildGhcp({ skills, mcpServers, agents }: BuildData, distDir: string): void {
   const base = join(distDir, 'ghcp');
   mkdirSync(join(base, '.github', 'agents'), { recursive: true });
   mkdirSync(join(base, '.github', 'hooks'), { recursive: true });
@@ -158,7 +158,7 @@ function buildGhcp({ skills, mcpServers, agents, hooks }: BuildData, distDir: st
 
 // ─── Claude Code ───
 
-function buildClaude({ skills, mcpServers, agents, hooks }: BuildData, distDir: string): void {
+function buildClaude({ skills, mcpServers }: BuildData, distDir: string): void {
   const base = join(distDir, 'claude');
   mkdirSync(join(base, '.claude', 'skills'), { recursive: true });
 
@@ -181,7 +181,7 @@ function buildClaude({ skills, mcpServers, agents, hooks }: BuildData, distDir: 
 
 // ─── Codex ───
 
-function buildCodex({ skills, mcpServers, agents, hooks }: BuildData, distDir: string): void {
+function buildCodex({ skills, mcpServers, agents }: BuildData, distDir: string): void {
   const base = join(distDir, 'codex');
   mkdirSync(base, { recursive: true });
   mkdirSync(join(base, '.codex'), { recursive: true });
