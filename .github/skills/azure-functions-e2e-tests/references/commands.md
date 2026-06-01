@@ -47,6 +47,9 @@ The command IDs and their semantics are platform-independent. The exact shell sy
 | `.github/skills/azure-functions-health-status/SKILL.md` | YES | — |
 | `.github/skills/azure-functions-inventory/SKILL.md` | YES | — |
 | `.github/skills/azure-functions-best-practices/SKILL.md` | YES | — |
+| `.github/skills/azure-functions-agents/SKILL.md` | YES | — |
+| `.github/skills/azure-functions-agents/references/*.md` | YES | 19 reference files |
+| `.github/skills/azure-functions-agents/assets/**` | YES | infra + quickstart-sample |
 | `.github/skills/azure-functions-common/SKILL.md` | YES | — |
 | `.github/hooks/welcome-setup.json` | YES | — |
 | `.vscode/mcp.json` | YES | — |
@@ -68,7 +71,7 @@ The command IDs and their semantics are platform-independent. The exact shell sy
 
 | File | Required | Max size |
 |------|----------|----------|
-| `CLAUDE.md` | YES | 3000 bytes |
+| `CLAUDE.md` | YES | 3072 bytes |
 | `.claude/settings.json` | YES | — |
 | `.claude/skills/azure-functions-setup/SKILL.md` | YES | — |
 | `.claude/skills/azure-functions-create/SKILL.md` | YES | — |
@@ -79,6 +82,9 @@ The command IDs and their semantics are platform-independent. The exact shell sy
 | `.claude/skills/azure-functions-health-status/SKILL.md` | YES | — |
 | `.claude/skills/azure-functions-inventory/SKILL.md` | YES | — |
 | `.claude/skills/azure-functions-best-practices/SKILL.md` | YES | — |
+| `.claude/skills/azure-functions-agents/SKILL.md` | YES | — |
+| `.claude/skills/azure-functions-agents/references/*.md` | YES | 19 reference files |
+| `.claude/skills/azure-functions-agents/assets/**` | YES | infra + quickstart-sample |
 | `.claude/skills/azure-functions-common/SKILL.md` | YES | — |
 | `.azure-functions-skills/state.local.json` | YES | — |
 
@@ -105,6 +111,9 @@ The command IDs and their semantics are platform-independent. The exact shell sy
 | `.agents/skills/azure-functions-health-status/SKILL.md` | YES | — |
 | `.agents/skills/azure-functions-inventory/SKILL.md` | YES | — |
 | `.agents/skills/azure-functions-best-practices/SKILL.md` | YES | — |
+| `.agents/skills/azure-functions-agents/SKILL.md` | YES | — |
+| `.agents/skills/azure-functions-agents/references/*.md` | YES | 19 reference files |
+| `.agents/skills/azure-functions-agents/assets/**` | YES | infra + quickstart-sample |
 | `.agents/skills/azure-functions-common/SKILL.md` | YES | — |
 | `.azure-functions-skills/state.local.json` | YES | — |
 
@@ -150,7 +159,7 @@ S1GL-2.  $CLI install --local --agent ghcp --dir $WS --yes --skip-prerequisites
 S1GL-3.  ls -R $WS | head -100   # list all workspace files; verify against "GHCP — local mode" table
 S1GL-4.  test ! -f $WS/.github/copilot-instructions.md && echo "PASS: copilot-instructions.md absent" || echo "FAIL: copilot-instructions.md exists"
 S1GL-5.  wc -c < $WS/AGENTS.md   # must be < 5120; then: cat $WS/AGENTS.md to verify content
-S1GL-6.  cat $WS/.github/agents/functions-copilot.agent.md | grep -c 'azure-functions-'   # count skill references; expect ≥ 8
+S1GL-6.  cat $WS/.github/agents/functions-copilot.agent.md | grep -c 'azure-functions-'   # count skill references; expect ≥ 9
 S1GL-7.  cat $WS/AGENTS.md | wc -c && cat $WS/.github/agents/functions-copilot.agent.md | wc -c   # neither should exceed 10KB; if both < 10KB, no duplicate inlining
 S1GL-8.  cat $WS/.azure-functions-skills/state.local.json   # verify state file content
 S1GL-9.  $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "List all visible Azure Functions skills, MCP servers, hooks, and agents you can see in this workspace. Return a structured summary." --output-format json -s --allow-all --no-ask-user
@@ -161,7 +170,7 @@ S1GL-9.  $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "
 - All files in the "GHCP — local mode" table exist (S1GL-3)
 - `.github/copilot-instructions.md` does NOT exist (S1GL-4)
 - AGENTS.md < 5KB and agent.md < 10KB (S1GL-5, S1GL-7)
-- Agent definition references ≥ 8 skill IDs (S1GL-6)
+- Agent definition references ≥ 9 skill IDs (S1GL-6)
 - S1GL-9 exits 0 and JSON output shows `skills_loaded` with Azure Functions skills, OR exits non-zero and is marked `blocked` with evidence
 
 **Fail criteria**:
@@ -186,7 +195,7 @@ S1GP-4.  $CLI install --agent ghcp --dir $WS --yes
 S1GP-5.  copilot plugin list   # verify azure-functions-skills appears
 S1GP-6.  ls -R $WS | head -50   # list workspace files; verify against "GHCP — plugin mode" table
 S1GP-7.  grep 'azure-functions-skills:start' $WS/.github/copilot-instructions.md   # verify managed block markers
-S1GP-8.  wc -c < $WS/.github/copilot-instructions.md   # must be < 3000
+S1GP-8.  wc -c < $WS/.github/copilot-instructions.md   # must be < 3072 (3KB)
 S1GP-9.  cat $WS/.azure-functions-skills/state.local.json
 S1GP-10. $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "List all visible Azure Functions skills, MCP servers, hooks, and agents. Return a structured summary." --output-format json -s --allow-all --no-ask-user
 S1GP-11. cat $WS/.azure-functions-skills/state.local.json
@@ -214,7 +223,7 @@ S1GP-11. cat $WS/.azure-functions-skills/state.local.json
 S1CL-1. mkdir -p $WS
 S1CL-2. $CLI install --local --agent claude --dir $WS --yes --skip-prerequisites
 S1CL-3. ls -R $WS | head -80   # list workspace files; verify against "Claude — local mode" table
-S1CL-4. wc -c < $WS/CLAUDE.md   # must be < 3000
+S1CL-4. wc -c < $WS/CLAUDE.md   # must be < 3072 (3KB)
 S1CL-5. cat $WS/CLAUDE.md | grep -c 'azure-functions-'   # verify skill routing list present
 S1CL-6. cat $WS/.claude/settings.json   # verify MCP server entries
 S1CL-7. cat $WS/.azure-functions-skills/state.local.json
@@ -240,7 +249,7 @@ S1CP-1. mkdir -p $WS
 S1CP-2. claude plugin list --json   (record current state)
 S1CP-3. $CLI install --agent claude --dir $WS --yes
 S1CP-4. ls -R $WS | head -50   # list workspace files; verify against "Claude — plugin mode" table
-S1CP-5. wc -c < $WS/CLAUDE.md && grep 'azure-functions-skills:start' $WS/CLAUDE.md   # managed block markers, must be < 3000 bytes
+S1CP-5. wc -c < $WS/CLAUDE.md && grep 'azure-functions-skills:start' $WS/CLAUDE.md   # managed block markers, must be < 3072 (3KB)
 S1CP-6. cat $WS/.azure-functions-skills/state.local.json
 S1CP-7. $CLI chat --agent claude-code --dir $WS --skip-prerequisites -- -p "List all visible Azure Functions skills, MCP servers in this workspace." --output-format json --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
 ```
@@ -289,7 +298,7 @@ S1XP-1. mkdir -p $WS
 S1XP-2. codex plugin marketplace list   (record current state)
 S1XP-3. $CLI install --agent codex --dir $WS --yes
 S1XP-4. ls -R $WS | head -50   # list workspace files; verify against "Codex — plugin mode" table
-S1XP-5. wc -c < $WS/AGENTS.md && grep 'azure-functions-skills' $WS/AGENTS.md   # managed markers, must be < 3000 bytes
+S1XP-5. wc -c < $WS/AGENTS.md && grep 'azure-functions-skills' $WS/AGENTS.md   # managed markers, must be < 3072 (3KB)
 S1XP-6. cat $WS/.codex/config.toml   # verify MCP entries
 S1XP-7. cat $WS/.azure-functions-skills/state.local.json
 S1XP-8. $CLI chat --agent codex --dir $WS --skip-prerequisites -- exec --sandbox workspace-write --json --output-last-message $WS/e2e-inspection.txt --ephemeral --skip-git-repo-check --cd $WS "List all visible Azure Functions skills, MCP servers, hooks, and agents."
@@ -374,9 +383,9 @@ S2CL-3. find $WS -type f | sort | while read f; do wc -c < "$f" | tr -d ' '; ech
 S2CL-4. wc -c < $WS/CLAUDE.md   # record pre-update size (may be large in old version)
 S2CL-5. $CLI update --dir $WS --yes
 S2CL-6. cat $WS/.azure-functions-skills/state.local.json   # verify JSON, agent claude, installMode local
-S2CL-7. wc -c < $WS/CLAUDE.md   # must be < 3000 after update; if still large, check for save-aside
+S2CL-7. wc -c < $WS/CLAUDE.md   # must be < 3072 (3KB) after update; if still large, check for save-aside
 S2CL-8. find $WS -name '*azure-functions-skills-new*' -type f   # list save-aside files
-S2CL-9. ls $WS/.claude/skills/*/SKILL.md | wc -l   # verify all skill files present (expect 10)
+S2CL-9. ls $WS/.claude/skills/*/SKILL.md | wc -l   # verify all skill files present (expect 11)
 ```
 
 **Pass criteria**:
@@ -419,7 +428,7 @@ S2XL-5. $CLI update --dir $WS --yes
 S2XL-6. cat $WS/.azure-functions-skills/state.local.json   # verify JSON, agent codex, installMode local
 S2XL-7. wc -c < $WS/AGENTS.md   # must be < 5120 after update; if still large, check for save-aside
 S2XL-8. find $WS -name '*azure-functions-skills-new*' -type f   # list save-aside files
-S2XL-9. ls $WS/.agents/skills/*/SKILL.md | wc -l   # verify all skill files present (expect 10)
+S2XL-9. ls $WS/.agents/skills/*/SKILL.md | wc -l   # verify all skill files present (expect 11)
 ```
 
 **Pass criteria**:
