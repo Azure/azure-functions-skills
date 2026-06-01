@@ -53,6 +53,10 @@ Default: run the **full matrix** (12 test cases). The user may narrow scope expl
 
 If the user does NOT narrow scope, run ALL 12 test cases. Do NOT decide on your own to skip any.
 
+## Fresh run policy
+
+Every invocation of this skill starts a **fresh run from scratch** with a new `<run-id>`. Do NOT reuse or read results from previous runs unless the user explicitly says to resume a specific run. Previous workspaces, checklists, and evidence are irrelevant to the new run.
+
 ## Preflight checks
 
 Before the matrix, run these commands and record the output. If an agent CLI is missing, mark ALL test cases for that agent as `blocked`:
@@ -97,7 +101,7 @@ After all test cases are executed and the report is generated, perform a cross-c
 
 ### Cross-check procedure
 
-1. **Use the rubber-duck agent** — invoke `/rubber-duck` (or the rubber-duck task agent) with a premium-tier model (e.g., `gpt-5.5`, `claude-opus-4.8`). The cross-checker must be a higher-capability model than the one that ran the tests.
+1. **Use the rubber-duck agent** — invoke `/rubber-duck` (or the rubber-duck task agent) with a premium-tier model (e.g., `gpt-5.5`, `claude-opus-4.8`). 
 2. **Provide the cross-checker with**:
    - The command reference (`commands.md`)
    - The generated report (`report.html`)
