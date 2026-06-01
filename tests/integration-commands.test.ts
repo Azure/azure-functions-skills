@@ -288,9 +288,10 @@ describe('CLI command integration', () => {
   });
 
   it('--version prints package version', () => {
+    const expectedVersion = JSON.parse(readFileSync(join(ROOT_DIR, 'package.json'), 'utf-8')).version;
     const output = runCliOutput(['--version']);
     expect(output).toMatch(/^\d+\.\d+\.\d+/);
-    expect(output).toContain('0.0.3-preview');
+    expect(output).toContain(expectedVersion);
   });
 
   it('prints focused help for top-level help and command help forms', () => {
