@@ -353,24 +353,33 @@ async function ensureGitRepo({ dir, yes, agents, action }) {
   }
   try {
     const { execFileSync } = await import('node:child_process');
+    const { resolve, normalize } = await import('node:path');
+    let needsInit = true;
     try {
-      execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: dir, stdio: 'pipe' });
-      return { status: 'detected' };
+      const toplevel = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: dir, stdio: 'pipe', encoding: 'utf-8' }).trim();
+      const resolvedDir = resolve(dir);
+      const resolvedToplevel = resolve(toplevel);
+      // Only "detected" if this workspace IS the git root — not a subdirectory of another repo
+      if (normalize(resolvedDir).toLowerCase() === normalize(resolvedToplevel).toLowerCase()) {
+        return { status: 'detected' };
+      }
+      // Inside a parent git repo but not the root — Copilot needs .git at workspace root
     } catch {
-      // Not a git repo — offer to init
-      if (yes) {
+      // Not inside any git repo
+    }
+    // Need to init — either not in any repo, or in a parent repo's subdirectory
+    if (yes) {
+      execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
+      return { status: 'initialized' };
+    }
+    if (isInteractive()) {
+      const approved = await askYesNo('Initialize git repository? GitHub Copilot requires a git repo to discover agent definitions.');
+      if (approved) {
         execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
         return { status: 'initialized' };
       }
-      if (isInteractive()) {
-        const approved = await askYesNo('Initialize git repository? GitHub Copilot requires a git repo to discover agent definitions.');
-        if (approved) {
-          execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
-          return { status: 'initialized' };
-        }
-      }
-      return { status: 'not-initialized' };
     }
+    return { status: 'not-initialized' };
   } catch {
     return { status: 'git-unavailable' };
   }
@@ -619,7 +628,8 @@ if (command === 'install' || command === 'update') {
         includeAgent: true,
       });
       const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
-      printInstallSummary({ action, agents: detectedAgents, dir, filesWritten: workspaceResult.filesWritten, state, gitignoreResult });
+      const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action });
+      printInstallSummary({ action, agents: detectedAgents, dir, filesWritten: workspaceResult.filesWritten, state, gitignoreResult, gitRepoResult });
     }
   }
 } else if (command === 'setup') {

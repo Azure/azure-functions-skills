@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { BuildTargetName, LauncherId } from '../src/types.js';
 import { LAUNCHERS } from '../src/chat/index.js';
@@ -792,6 +792,22 @@ describe('CLI command integration', () => {
     expect(log).toContain('initial');
   });
 
+  it('install --local --agent ghcp --yes inside parent git repo inits own .git', { timeout: 15_000 }, () => {
+    const parentDir = makeTempDir('af-skills-e2e-git-parent-');
+    execFileSync('git', ['init'], { cwd: parentDir, stdio: 'pipe' });
+    execFileSync('git', ['commit', '--allow-empty', '-m', 'parent'], { cwd: parentDir, stdio: 'pipe' });
+
+    // Create a subdirectory inside the parent git repo
+    const childDir = join(parentDir, 'my-project');
+    mkdirSync(childDir, { recursive: true });
+
+    const output = runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', childDir, '--yes', '--skip-prerequisites']);
+
+    // Should init its own .git because the child is not the git root
+    expect(existsSync(join(childDir, '.git'))).toBe(true);
+    expect(output).toContain('Git repo: initialized');
+  });
+
   it('install --local --agent claude --yes into non-git dir does not init git', { timeout: 15_000 }, () => {
     const projectDir = makeTempDir('af-skills-e2e-git-claude-');
 
@@ -800,5 +816,15 @@ describe('CLI command integration', () => {
     // Git init is only for GHCP — Claude-only install should not init
     expect(existsSync(join(projectDir, '.git'))).toBe(false);
     expect(output).not.toContain('Git repo: initialized');
+  });
+
+  it('install --agent ghcp --yes (plugin mode) into non-git dir auto-inits git repo', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-plugin-');
+
+    const output = runCliOutput(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes', '--skip-prerequisites']);
+
+    // Plugin mode GHCP also needs git for agent discovery
+    expect(existsSync(join(projectDir, '.git'))).toBe(true);
+    expect(output).toContain('Git repo: initialized');
   });
 });
