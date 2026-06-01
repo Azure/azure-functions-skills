@@ -82,7 +82,7 @@ Generate `reports/e2e/<run-id>/report.html` with:
 4. **Issues found** — actionable items with severity
 5. **Machine-checkable counters**: `expectedCommandCount`, `actualCommandCount`, `missingCommandIds`
 
-After cross-check, copy final report to `reports/e2e/current/report.html`.
+After cross-check, copy final report to `reports/e2e/current/report.html`. This is the **published** report visible in the repository — always update it after a successful run.
 
 ## Workspace isolation
 
@@ -136,4 +136,5 @@ Test cases: <completed>/<total>
   Blocked:
 Commands executed: <actual>/<expected>
 Report: reports/e2e/<run-id>/report.html
+Published: reports/e2e/current/report.html
 ```
