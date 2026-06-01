@@ -346,6 +346,36 @@ async function updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreE
   return result;
 }
 
+async function ensureGitRepo({ dir, yes, agents, action }) {
+  // Only relevant for GHCP installs — Copilot needs a git repo to discover agent definitions
+  if (!agents.includes('ghcp') || action === 'update') {
+    return { status: 'skipped' };
+  }
+  try {
+    const { execFileSync } = await import('node:child_process');
+    try {
+      execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: dir, stdio: 'pipe' });
+      return { status: 'detected' };
+    } catch {
+      // Not a git repo — offer to init
+      if (yes) {
+        execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
+        return { status: 'initialized' };
+      }
+      if (isInteractive()) {
+        const approved = await askYesNo('Initialize git repository? GitHub Copilot requires a git repo to discover agent definitions.');
+        if (approved) {
+          execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
+          return { status: 'initialized' };
+        }
+      }
+      return { status: 'not-initialized' };
+    }
+  } catch {
+    return { status: 'git-unavailable' };
+  }
+}
+
 async function askYesNo(question) {
   const { createInterface } = await import('node:readline/promises');
   const readline = createInterface({ input: process.stdin, output: process.stdout });
@@ -361,7 +391,7 @@ function isInteractive() {
   return process.stdin.isTTY === true && process.stdout.isTTY === true;
 }
 
-function printInstallSummary({ action, agents, dir, filesWritten, state, gitignoreResult }) {
+function printInstallSummary({ action, agents, dir, filesWritten, state, gitignoreResult, gitRepoResult }) {
   const noun = action === 'install' ? 'installed' : 'updated';
   const label = action === 'install' ? 'Installed' : 'Updated';
   console.log(`Azure Functions Skills ${noun}.`);
@@ -373,6 +403,9 @@ function printInstallSummary({ action, agents, dir, filesWritten, state, gitigno
   if (gitignoreResult.status === 'updated') console.log(`  Git ignore: added ${gitignoreResult.entry}`);
   else if (gitignoreResult.status === 'already-ignored') console.log(`  Git ignore: ${gitignoreResult.entry} already configured`);
   else console.log(`  Git ignore: add ${gitignoreResult.entry} to keep local state out of Git`);
+  if (gitRepoResult && gitRepoResult.status === 'initialized') console.log('  Git repo: initialized');
+  else if (gitRepoResult && gitRepoResult.status === 'not-initialized') console.log('  Git repo: not initialized — Copilot requires a git repo to discover agent definitions');
+  else if (gitRepoResult && gitRepoResult.status === 'git-unavailable') console.log('  Git repo: not checked — git executable not found');
   console.log(`  Next: azure-functions-skills chat --dir "${dir}"`);
 }
 
@@ -535,7 +568,8 @@ if (command === 'install' || command === 'update') {
           includeAgent: detectedAgents.includes('ghcp'),
         });
         const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
-        printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.filesWritten, state, gitignoreResult });
+        const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action: command });
+        printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.filesWritten, state, gitignoreResult, gitRepoResult });
       }
     }
   } else {

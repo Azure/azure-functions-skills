@@ -755,4 +755,50 @@ describe('CLI command integration', () => {
     expect(() => runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']))
       .toThrow(/Cannot mix install modes/);
   });
+
+  it('install --local --agent ghcp --yes into non-git dir auto-inits git repo', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-init-');
+
+    const output = runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes', '--skip-prerequisites']);
+
+    // Git repo should be initialized
+    expect(existsSync(join(projectDir, '.git'))).toBe(true);
+    expect(output).toContain('Git repo: initialized');
+  });
+
+  it('install --local --agent ghcp into non-git dir warns without --yes', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-init-warn-');
+
+    const output = runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--skip-prerequisites']);
+
+    // Git repo should NOT be initialized (non-interactive, no --yes)
+    expect(existsSync(join(projectDir, '.git'))).toBe(false);
+    // Should warn that git init is needed
+    expect(output).toMatch(/[Gg]it repo.*not initialized|[Cc]opilot.*requires.*git/);
+  });
+
+  it('install --local --agent ghcp into existing git repo does not re-init', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-existing-');
+    // Pre-init git repo
+    execFileSync('git', ['init'], { cwd: projectDir, stdio: 'pipe' });
+    execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@test.com', 'commit', '--allow-empty', '-m', 'initial'], { cwd: projectDir, stdio: 'pipe' });
+
+    const output = runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes', '--skip-prerequisites']);
+
+    // Should detect existing repo, not re-init
+    expect(output).not.toMatch(/Git repo: initialized/);
+    // Existing commit should still be there
+    const log = execFileSync('git', ['log', '--oneline'], { cwd: projectDir, encoding: 'utf-8' });
+    expect(log).toContain('initial');
+  });
+
+  it('install --local --agent claude --yes into non-git dir does not init git', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-claude-');
+
+    const output = runCliOutput(['install', '--local', '--agent', 'claude', '--dir', projectDir, '--yes', '--skip-prerequisites']);
+
+    // Git init is only for GHCP — Claude-only install should not init
+    expect(existsSync(join(projectDir, '.git'))).toBe(false);
+    expect(output).not.toContain('Git repo: initialized');
+  });
 });

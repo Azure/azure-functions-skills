@@ -24,7 +24,8 @@ Prescriptive E2E test runner for Azure Functions Skills CLI. This skill executes
 7. **Record command evidence** — for every command, capture: the exact command text executed, cwd, exit code, stdout excerpt (first 200 lines), stderr excerpt.
 8. **Never mark PASS without evidence** — a test case passes ONLY when all its pass criteria are satisfied with recorded evidence.
 9. **Continue after failures** — if a test case fails, mark it FAIL and proceed to the NEXT test case with a FRESH workspace. Do not stop the run.
-10. **Fresh workspace per test case** — each test case gets its own isolated directory under `reports/e2e/<run-id>/workspaces/<test-case-id>/`. Run `git init` in each workspace before chat commands (required for agent discovery).
+10. **Fresh workspace per test case** — each test case gets its own isolated directory under `reports/e2e/<run-id>/workspaces/<test-case-id>/`.
+11. **Do NOT add workarounds** — if a command fails, record the failure as-is. Do NOT add extra steps (e.g., `git init`, environment fixes) to make a failing command pass. Workarounds mask real bugs. If a test fails, that is a valid test result.
 
 ## Test matrix
 
@@ -89,6 +90,34 @@ After cross-check, copy final report to `reports/e2e/current/report.html`.
 - NEVER run install/setup/chat from the repository root
 - Always use `--dir <workspace>` with absolute paths
 - Verify `git status --short` in the repo root after the run — no generated files should leak
+
+## Cross-check (mandatory after all test cases complete)
+
+After all test cases are executed and the report is generated, perform a cross-check using a **different model** than the one that ran the tests. This prevents the executing LLM from marking its own workarounds as valid.
+
+### Cross-check procedure
+
+1. **Switch model** — use a different model family for the review (e.g., if tests ran on Claude, cross-check with GPT-5.x; if tests ran on GPT, cross-check with Claude).
+2. **Provide the cross-checker with**:
+   - The command reference (`commands.md`)
+   - The generated report (`report.html`)
+   - The checklist file (`checklist.md`)
+3. **The cross-checker must verify**:
+   - Every command ID in commands.md has a corresponding evidence entry in the report
+   - No commands were skipped, batched, or simplified
+   - No extra commands were added that are not in commands.md (workarounds)
+   - Pass/fail verdicts match the pass/fail criteria in commands.md
+   - Chat inspection commands were executed with the full `-p` prompt (not just `chat` without inspection)
+   - Failures were recorded as failures, not worked around
+4. **Cross-check output**: append a `## Cross-Check Results` section to the report with:
+   - Reviewer model name
+   - Commands verified: N/N
+   - Missing commands: list of IDs
+   - Workarounds detected: list
+   - Verdict overrides: list of test cases where the original verdict was wrong
+   - Overall: VALID or INVALID
+
+If the cross-check finds the run INVALID, the run must be re-executed.
 
 ## References
 

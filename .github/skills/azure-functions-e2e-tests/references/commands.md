@@ -142,7 +142,7 @@ Local-mode test cases do NOT require agent CLIs and should still run.
 ### TC-S1-GHCP-LOCAL
 
 **Description**: Install GHCP locally and verify workspace + chat.
-**Expected commands**: 10
+**Expected commands**: 9
 
 ```
 S1GL-1.  mkdir -p $WS
@@ -152,9 +152,8 @@ S1GL-4.  test ! -f $WS/.github/copilot-instructions.md && echo "PASS: copilot-in
 S1GL-5.  wc -c < $WS/AGENTS.md   # must be < 5120; then: cat $WS/AGENTS.md to verify content
 S1GL-6.  cat $WS/.github/agents/functions-copilot.agent.md | grep -c 'azure-functions-'   # count skill references; expect ≥ 8
 S1GL-7.  cat $WS/AGENTS.md | wc -c && cat $WS/.github/agents/functions-copilot.agent.md | wc -c   # neither should exceed 10KB; if both < 10KB, no duplicate inlining
-S1GL-8.  cd $WS && git init && git add -A && git commit -m "e2e workspace init"   # required for copilot agent discovery
+S1GL-8.  cat $WS/.azure-functions-skills/state.local.json   # verify state file content
 S1GL-9.  $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "List all visible Azure Functions skills, MCP servers, hooks, and agents you can see in this workspace. Return a structured summary." --output-format json -s --allow-all --no-ask-user
-S1GL-10. cat $WS/.azure-functions-skills/state.local.json   # verify state file content
 ```
 
 **Pass criteria**:
@@ -176,7 +175,7 @@ S1GL-10. cat $WS/.azure-functions-skills/state.local.json   # verify state file 
 ### TC-S1-GHCP-PLUGIN
 
 **Description**: Install GHCP as plugin and verify workspace activation + chat.
-**Expected commands**: 12
+**Expected commands**: 11
 **Requires**: `copilot` CLI (PF-3 must pass)
 
 ```
@@ -188,7 +187,7 @@ S1GP-5.  copilot plugin list   # verify azure-functions-skills appears
 S1GP-6.  ls -R $WS | head -50   # list workspace files; verify against "GHCP — plugin mode" table
 S1GP-7.  grep 'azure-functions-skills:start' $WS/.github/copilot-instructions.md   # verify managed block markers
 S1GP-8.  wc -c < $WS/.github/copilot-instructions.md   # must be < 3000
-S1GP-9.  cd $WS && git init && git add -A && git commit -m "e2e workspace init"
+S1GP-9.  cat $WS/.azure-functions-skills/state.local.json
 S1GP-10. $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "List all visible Azure Functions skills, MCP servers, hooks, and agents. Return a structured summary." --output-format json -s --allow-all --no-ask-user
 S1GP-11. copilot --agent azure-functions-skills:functions-copilot -p "What Azure Functions skills do you provide? List each skill name." --output-format json -s --allow-all --no-ask-user
 S1GP-12. cat $WS/.azure-functions-skills/state.local.json
@@ -478,8 +477,8 @@ Apply these checks to every test case during workspace verification steps:
 | Test case | Expected commands |
 |-----------|-------------------|
 | Preflight | 5 |
-| TC-S1-GHCP-LOCAL | 10 |
-| TC-S1-GHCP-PLUGIN | 12 |
+| TC-S1-GHCP-LOCAL | 9 |
+| TC-S1-GHCP-PLUGIN | 11 |
 | TC-S1-CLAUDE-LOCAL | 8 |
 | TC-S1-CLAUDE-PLUGIN | 7 |
 | TC-S1-CODEX-LOCAL | 9 |
@@ -490,6 +489,6 @@ Apply these checks to every test case during workspace verification steps:
 | TC-S2-CLAUDE-PLUGIN | 7 |
 | TC-S2-CODEX-LOCAL | 9 |
 | TC-S2-CODEX-PLUGIN | 7 |
-| **Total** | **109** |
+| **Total** | **106** |
 
 Every command must appear in the final report's evidence section. Missing commands make the run `incomplete`.
