@@ -418,6 +418,16 @@ function printInstallSummary({ action, agents, dir, filesWritten, state, gitigno
   console.log(`  Next: azure-functions-skills chat --dir "${dir}"`);
 }
 
+if (command === '--version' || command === '-V') {
+  const { readFileSync } = await import('node:fs');
+  const { join: joinPath, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const pkgDir = dirname(dirname(fileURLToPath(import.meta.url)));
+  const pkg = JSON.parse(readFileSync(joinPath(pkgDir, 'package.json'), 'utf-8'));
+  console.log(pkg.version);
+  process.exit(0);
+}
+
 if (!command || command === '--help' || command === '-h') {
   printHelp();
   process.exit(0);

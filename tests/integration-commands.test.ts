@@ -287,6 +287,12 @@ describe('CLI command integration', () => {
     expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
   });
 
+  it('--version prints package version', () => {
+    const output = runCliOutput(['--version']);
+    expect(output).toMatch(/^\d+\.\d+\.\d+/);
+    expect(output).toContain('0.0.3-preview');
+  });
+
   it('prints focused help for top-level help and command help forms', () => {
     const installHelp = runCliOutput(['help', 'install']);
     const installFlagHelp = runCliOutput(['install', '--help']);

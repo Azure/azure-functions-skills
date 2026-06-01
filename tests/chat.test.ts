@@ -121,13 +121,28 @@ describe('LAUNCHERS', () => {
     expect(args).toContain('hello');
   });
 
-  it('codex launcher forwards subcommands and CLI args before the startup prompt', () => {
+  it('codex launcher forwards subcommands and CLI args with explicit prompt', () => {
     const args = LAUNCHERS['codex'].buildArgs({
       startupPrompt: 'hello',
       passthroughArgs: ['exec', '--sandbox', 'read-only', '--json'],
     });
 
+    // Explicit --prompt is appended alongside passthrough args
     expect(args).toEqual(['exec', '--sandbox', 'read-only', '--json', 'hello']);
+  });
+
+  it('codex launcher skips prompt when passthrough args exist but no explicit prompt', () => {
+    const args = LAUNCHERS['codex'].buildArgs({
+      passthroughArgs: ['exec', '--sandbox', 'read-only', '--json'],
+    });
+
+    // No startupPrompt → nothing appended
+    expect(args).toEqual(['exec', '--sandbox', 'read-only', '--json']);
+  });
+
+  it('codex launcher uses startup prompt when no passthrough args', () => {
+    const args = LAUNCHERS['codex'].buildArgs({ startupPrompt: 'hello' });
+    expect(args).toEqual(['hello']);
   });
 
   it('launchers return empty args when no prompt', () => {
