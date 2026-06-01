@@ -16,13 +16,15 @@ Prescriptive E2E test runner for Azure Functions Skills CLI. This skill executes
 **MANDATORY RULES — violations make the run invalid:**
 
 1. **Load the command reference** — read [commands.md](references/commands.md) FIRST. It contains every test case with numbered commands.
-2. **Create a checklist file** at `reports/e2e/<run-id>/checklist.md` BEFORE running any test. The checklist must list every test case ID from commands.md.
-3. **Execute EVERY numbered command** in the command reference. Do NOT skip, summarize, or batch commands.
-4. **Update the checklist** after EACH command completes. Mark with exit code and status.
-5. **Record command evidence** — for every command, capture: command text, cwd, exit code, stdout excerpt (first 200 lines), stderr excerpt.
-6. **Never mark PASS without evidence** — a test case passes ONLY when all its pass criteria are satisfied with recorded evidence.
-7. **Continue after failures** — if a test case fails, mark it FAIL and proceed to the NEXT test case with a FRESH workspace. Do not stop the run.
-8. **Fresh workspace per test case** — each test case gets its own isolated directory under `reports/e2e/<run-id>/workspaces/<test-case-id>/`.
+2. **Create a checklist file** at `reports/e2e/<run-id>/checklist.md` BEFORE running any test. The checklist must list every command ID from commands.md.
+3. **Execute EVERY numbered command exactly as written** in the command reference. Do NOT skip, summarize, simplify, or batch commands. Each numbered command (e.g., S1GL-1, S1GL-2, ...) must be executed individually and its output recorded.
+4. **Copy-paste commands verbatim** — commands in code blocks are copy-paste-ready shell commands. Run them exactly as written, substituting only `$REPO`, `$CLI`, `$WS`, and `$RUN` variables. Do NOT drop flags, truncate argument lists, or remove `-- <passthrough args>` from chat commands.
+5. **Chat inspection commands are NOT optional** — every chat command includes a `-p` prompt with `--output-format json -s --allow-all --no-ask-user` (or agent-equivalent flags). These verify that the coding agent actually sees skills/MCP/hooks. Running `chat` without the inspection prompt is a test violation.
+6. **Update the checklist** after EACH command completes. Mark with exit code and status.
+7. **Record command evidence** — for every command, capture: the exact command text executed, cwd, exit code, stdout excerpt (first 200 lines), stderr excerpt.
+8. **Never mark PASS without evidence** — a test case passes ONLY when all its pass criteria are satisfied with recorded evidence.
+9. **Continue after failures** — if a test case fails, mark it FAIL and proceed to the NEXT test case with a FRESH workspace. Do not stop the run.
+10. **Fresh workspace per test case** — each test case gets its own isolated directory under `reports/e2e/<run-id>/workspaces/<test-case-id>/`. Run `git init` in each workspace before chat commands (required for agent discovery).
 
 ## Test matrix
 
