@@ -6,6 +6,30 @@ workflow under the `functions-skills-live-e2e` GitHub Environment, which is gate
 by required reviewers (`Azure/azure-functions-bucees-team`,
 `prevent_self_review: false`).
 
+## Prerequisites
+
+Before this eval can run successfully on CI, the repository and Azure subscription
+must already be configured per the
+[CI setup — repository / Azure side](../README.md#ci-setup--repository--azure-side)
+section of the eval suite README. The short checklist:
+
+1. **GitHub Environment** `functions-skills-live-e2e` exists with the
+   `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` variables
+   and the `COPILOT_CLI_TOKEN` secret.
+2. The service principal behind `AZURE_CLIENT_ID` has a **federated credential**
+   trusting subject `repo:Azure/azure-functions-skills:environment:functions-skills-live-e2e`.
+3. The same service principal holds **both** of the following roles on the
+   subscription:
+   - `Contributor` — for `az group create/delete`, Bicep deployment, etc.
+   - `Role Based Access Control Administrator` — so the FC1 quickstart can
+     assign Storage / Monitoring roles to the Function App's Managed Identity.
+     Without this role the agent has to silently fall back to less secure auth
+     modes (or modify the fixture Bicep), which trips the security-regression
+     grader below.
+
+See the parent README for the exact `az ad app federated-credential create` and
+`az role assignment create` commands.
+
 ## What it tests
 
 | # | Stimulus | What it asserts |
