@@ -801,7 +801,7 @@ describe('CLI command integration', () => {
   it('install --local --agent ghcp --yes inside parent git repo inits own .git', { timeout: 15_000 }, () => {
     const parentDir = makeTempDir('af-skills-e2e-git-parent-');
     execFileSync('git', ['init'], { cwd: parentDir, stdio: 'pipe' });
-    execFileSync('git', ['commit', '--allow-empty', '-m', 'parent'], { cwd: parentDir, stdio: 'pipe' });
+    execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@test.com', 'commit', '--allow-empty', '-m', 'parent'], { cwd: parentDir, stdio: 'pipe' });
 
     // Create a subdirectory inside the parent git repo
     const childDir = join(parentDir, 'my-project');
