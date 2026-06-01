@@ -93,11 +93,11 @@ After cross-check, copy final report to `reports/e2e/current/report.html`. This 
 
 ## Cross-check (mandatory after all test cases complete)
 
-After all test cases are executed and the report is generated, perform a cross-check using a **different model** than the one that ran the tests. This prevents the executing LLM from marking its own workarounds as valid.
+After all test cases are executed and the report is generated, perform a cross-check using the **rubber-duck agent with a premium model**. This prevents the executing LLM from marking its own workarounds as valid.
 
 ### Cross-check procedure
 
-1. **Switch model** — use a different model family for the review (e.g., if tests ran on Claude, cross-check with GPT-5.x; if tests ran on GPT, cross-check with Claude).
+1. **Use the rubber-duck agent** — invoke `/rubber-duck` (or the rubber-duck task agent) with a premium-tier model (e.g., `gpt-5.5`, `claude-opus-4.8`). The cross-checker must be a higher-capability model than the one that ran the tests.
 2. **Provide the cross-checker with**:
    - The command reference (`commands.md`)
    - The generated report (`report.html`)
