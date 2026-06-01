@@ -111,11 +111,12 @@ stimuli:
       # `trajectory.output` is just the last message — a result-focused
       # summary that may not echo command names like `azd up` even on
       # a successful deploy. The tool-call grader sees every bash
-      # command the agent issued during the session.
+      # command the agent issued during the session. Only include tools
+      # with a `command` argument here; read_bash only has `shellId`.
       - type: tool-calls
         config:
           required:
-            - name: "^(bash|powershell|read_bash|run)$"
+            - name: "^(bash|powershell|run)$"
               command: "\\bazd\\s+(up|provision|deploy)\\b"
 
       # Agent must NOT tear down the resources it created — cleanup is
@@ -124,7 +125,7 @@ stimuli:
       - type: tool-calls
         config:
           disallowed:
-            - name: "^(bash|powershell|read_bash|run)$"
+            - name: "^(bash|powershell|run)$"
               command: "\\bazd\\s+down\\b"
 
       # Must emit the Function App's azurewebsites.net hostname (proof
