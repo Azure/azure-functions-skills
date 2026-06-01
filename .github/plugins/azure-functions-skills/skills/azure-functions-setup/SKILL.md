@@ -78,11 +78,11 @@ For each failing check, provide:
 
 After the environment check completes and you have reported the results, update the local Azure Functions Skills setup state when a state command is available:
 
-1. If the startup context provided an exact `azure-functions-skills state setup-complete ...` command, run that exact command.
+1. If the startup context provided an exact `npx @azure/functions-skills state setup-complete ...` command, run that exact command.
 2. Otherwise, when running from a workspace that has `.azure-functions-skills/state.local.json`, run:
 
   ```bash
-  azure-functions-skills state setup-complete --dir .
+  npx @azure/functions-skills state setup-complete --dir .
   ```
 
 If the command is unavailable because the CLI is not installed, the npm package has not been updated yet, or the user reached the skill without using the CLI, update `.azure-functions-skills/state.local.json` directly when that file exists:
@@ -104,12 +104,14 @@ Do this only after the setup check has finished and the user has received the ch
 
 When all checks pass, suggest the next step:
 
-> ✅ Your environment is ready! Next: use **azure-functions-create** to scaffold a new Azure Functions project.
+> ✅ Your environment is ready! Next:
+> - Use **azure-functions-create** to scaffold a new Azure Functions project (HTTP triggers, timer triggers, queue triggers, etc.)
+> - Use **azure-functions-agents** to build an AI-powered agent app on Azure Functions (scheduled agents, chat agents, connector-triggered agents, background AI workflows)
 
 For deployment, confirm the Azure Skills plugin is available before suggesting **azure-functions-deploy**. `azure-functions-deploy` delegates to `azure-prepare`, `azure-validate`, and `azure-deploy`.
 
 ## Next steps
 
-- On success, suggest `azure-functions-create` because the environment is ready to create an Azure Functions app.
+- On success, suggest `azure-functions-create` for traditional Functions projects, or `azure-functions-agents` for AI agent apps — let the user choose based on their goal.
 - On failure, keep the user in `azure-functions-setup`: explain fixes, then ask them to rerun setup verification.
 - If deployment is requested and Azure Skills is missing, keep the user in `azure-functions-setup` until the Azure Skills plugin is installed or the user explicitly chooses a fallback deployment path.
