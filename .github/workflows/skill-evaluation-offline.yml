@@ -1,4 +1,4 @@
-name: Skill Evaluation - Vally
+name: Skill Evaluation - Offline
 
 on:
   workflow_dispatch:

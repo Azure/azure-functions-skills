@@ -1,4 +1,4 @@
-name: Skill Evaluation - Vally Live
+name: Skill Evaluation - Azure Live Deploy
 
 # Live (Tier 3) Vally eval that ACTUALLY DEPLOYS to Azure.
 # Reviewer-gated via the functions-skills-live-e2e environment.
@@ -21,7 +21,7 @@ on:
         description: |
           DEBUG ONLY. When true, the Azure resources created by this
           run are NOT cleaned up at the end of the job. The safety net
-          workflow (cleanup-stale-vally-resources) will still nuke them
+          workflow (cleanup-azure-live-eval-resources) will still nuke them
           after 24h via the vally-eval=true tag.
         required: false
         type: boolean
@@ -166,7 +166,7 @@ jobs:
               vally-eval=true \
               "createdAt=$CREATED_AT" \
               "run-id=$GITHUB_RUN_ID" \
-              "workflow=skill-evaluation-vally-live" \
+              "workflow=skill-evaluation-azure-live-deploy" \
               "keep=${{ inputs.keep_resources || 'false' }}" \
             --output none
           echo "Created resource group: $RG_NAME"
@@ -241,7 +241,7 @@ jobs:
             echo "az group delete --name $RG_NAME --yes --no-wait"
             echo '```'
             echo ""
-            echo "Otherwise the [cleanup-stale-vally-resources](../../actions/workflows/cleanup-stale-vally-resources.yml) safety net workflow will remove it after 24h."
+            echo "Otherwise the [cleanup-azure-live-eval-resources](../../actions/workflows/cleanup-azure-live-eval-resources.yml) safety net workflow will remove it after 24h."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload results

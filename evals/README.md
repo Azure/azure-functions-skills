@@ -59,7 +59,7 @@ Defined in [`.vally.yaml`](../.vally.yaml) at the repo root:
 | `triggers` | `area: routing` | all skill-invocation/routing checks |
 | `integration` | `type: integration` | LLM-backed behavior tests |
 | `full` | `tier: [smoke, full]` | everything **except** live — nightly |
-| `live` | `tier: live` | **Tier 3 — deploys real Azure resources.** Manual / nightly only, via the dedicated [Skill Evaluation - Vally Live](../.github/workflows/skill-evaluation-vally-live.yml) workflow |
+| `live` | `tier: live` | **Tier 3 — deploys real Azure resources.** Manual / nightly only, via the dedicated [Skill Evaluation - Azure Live Deploy](../.github/workflows/skill-evaluation-azure-live-deploy.yml) workflow |
 
 ## Authoring conventions
 
@@ -79,7 +79,7 @@ Defined in [`.vally.yaml`](../.vally.yaml) at the repo root:
 
 ## CI runner prerequisites
 
-The `Skill Evaluation - Vally` workflow installs the following before running
+The `Skill Evaluation - Offline` workflow installs the following before running
 evals, so any stimulus that triggers a prerequisite check (e.g. the
 `azure-functions-setup` eval) reflects the agent / skill behavior rather than a
 missing runner tool:
@@ -112,8 +112,8 @@ See [`_base/common-graders.yaml`](_base/common-graders.yaml). Highlights:
 ## CI setup — repository / Azure side
 
 The two workflows under `.github/workflows/` (the standard
-`skill-evaluation-vally.yml` and the live
-`skill-evaluation-vally-live.yml` + safety net) require **one-time
+`skill-evaluation-offline.yml` and the live
+`skill-evaluation-azure-live-deploy.yml` + safety net) require **one-time
 configuration** on both the GitHub repository and the Azure
 subscription. This section is the authoritative checklist for a
 maintainer setting things up from scratch — for example after the
@@ -177,9 +177,9 @@ SUBSCRIPTION_ID="<value of AZURE_SUBSCRIPTION_ID from the environment>"
 
 | Workflow | Required roles on `subscriptions/$SUBSCRIPTION_ID` | Why |
 | --- | --- | --- |
-| `skill-evaluation-vally.yml` (standard, no Azure resources) | *(none required)* — the workflow runs against the agent and does not call Azure ARM | The agent may probe Azure (via the Azure MCP `functions` namespace), but those tools are read-only and call non-ARM endpoints |
-| `skill-evaluation-vally-live.yml` (Tier 3 live deploy) | **`Contributor`** + **`Role Based Access Control Administrator`** | `Contributor` is needed for `az group create/delete`, Bicep deployment, and per-resource ops. `RBAC Administrator` is needed because the Azure-Samples FC1 quickstart template assigns Storage / Monitoring roles to the Function App's Managed Identity. Without it the agent has to fall back to less-secure auth modes (or modify the Bicep), which trips the security-regression grader in the live eval |
-| `cleanup-stale-vally-resources.yml` (24h safety net) | Subset of `Contributor` — at minimum `Microsoft.Resources/subscriptions/resourceGroups/delete` | The bundled `Contributor` from the live workflow already covers this; no separate assignment needed |
+| `skill-evaluation-offline.yml` (standard, no Azure resources) | *(none required)* — the workflow runs against the agent and does not call Azure ARM | The agent may probe Azure (via the Azure MCP `functions` namespace), but those tools are read-only and call non-ARM endpoints |
+| `skill-evaluation-azure-live-deploy.yml` (Tier 3 live deploy) | **`Contributor`** + **`Role Based Access Control Administrator`** | `Contributor` is needed for `az group create/delete`, Bicep deployment, and per-resource ops. `RBAC Administrator` is needed because the Azure-Samples FC1 quickstart template assigns Storage / Monitoring roles to the Function App's Managed Identity. Without it the agent has to fall back to less-secure auth modes (or modify the Bicep), which trips the security-regression grader in the live eval |
+| `cleanup-azure-live-eval-resources.yml` (24h safety net) | Subset of `Contributor` — at minimum `Microsoft.Resources/subscriptions/resourceGroups/delete` | The bundled `Contributor` from the live workflow already covers this; no separate assignment needed |
 
 Apply both roles with:
 
@@ -224,7 +224,7 @@ az role assignment list \
 
 Once the environment, federation, and roles are in place:
 
-1. **Repo → Actions → Skill Evaluation - Vally Live → Run workflow**.
+1. **Repo → Actions → Skill Evaluation - Azure Live Deploy → Run workflow**.
 2. Pick the branch (`main`), `eval_spec` (optional, defaults to the
    full `live` suite), `model` (optional), and `keep_resources` (debug
    only).
@@ -240,7 +240,7 @@ gone (or pending deletion). To confirm:
 ```bash
 az group list --tag vally-eval=true -o table
 # Empty list = clean. Lingering entries are picked up by the next
-# scheduled run of cleanup-stale-vally-resources.yml (within 24h).
+# scheduled run of cleanup-azure-live-eval-resources.yml (within 24h).
 ```
 
 ## Cost notes
@@ -250,10 +250,10 @@ az group list --tag vally-eval=true -o table
 - `tier: smoke` stimuli are intentionally small (1 prompt × N runs) for PRs.
 - Nightly `full` runs should be gated behind workflow_dispatch or schedule.
 - `tier: live` stimuli additionally **create real Azure resources**. They run
-  only from the separate [Skill Evaluation - Vally Live](../.github/workflows/skill-evaluation-vally-live.yml)
+  only from the separate [Skill Evaluation - Azure Live Deploy](../.github/workflows/skill-evaluation-azure-live-deploy.yml)
   workflow. See [`azure-functions-deploy/README.md`](azure-functions-deploy/README.md)
   for the resource lifecycle, `keep_resources` debug option, and the
-  [cleanup-stale-vally-resources](../.github/workflows/cleanup-stale-vally-resources.yml)
+  [cleanup-azure-live-eval-resources](../.github/workflows/cleanup-azure-live-eval-resources.yml)
   safety net.
 
 ## Live (Tier 3) workflow inputs

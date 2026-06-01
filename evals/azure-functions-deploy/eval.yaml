@@ -3,7 +3,7 @@ description: |
   Live (Tier 3) evaluation for the azure-functions-deploy skill.
 
   This eval ACTUALLY DEPLOYS resources to Azure. It only runs from the
-  Skill Evaluation - Vally Live workflow under the
+  Skill Evaluation - Azure Live Deploy workflow under the
   functions-skills-live-e2e GitHub Environment (reviewer-gated).
 
   Fixture:

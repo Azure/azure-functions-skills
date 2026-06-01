@@ -1,8 +1,8 @@
-name: Cleanup Stale Vally Resources
+name: Cleanup Azure Live Eval Resources
 
 # Safety net: deletes Azure resource groups tagged `vally-eval=true`
 # whose `createdAt` tag is older than the configured age. This runs
-# even if the Skill Evaluation - Vally Live workflow forgets to clean
+# even if the Skill Evaluation - Azure Live Deploy workflow forgets to clean
 # up (e.g. because keep_resources=true was used for debugging or the
 # workflow itself was cancelled mid-cleanup).
 #
