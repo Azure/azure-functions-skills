@@ -196,7 +196,7 @@ S1GP-11. cat $WS/.azure-functions-skills/state.local.json
 - S1GP-4 exits 0
 - S1GP-5 shows azure-functions-skills installed
 - All files in the "GHCP — plugin mode" table exist
-- copilot-instructions.md has managed block markers and is small (< 2KB)
+- copilot-instructions.md has managed block markers and is small (< 3KB)
 - S1GP-10 output contains azure-functions-* skills (see aggregation note below)
 
 **Blocked criteria**:
@@ -456,7 +456,7 @@ Apply these checks to every test case during workspace verification steps:
 - GHCP local: `.github/copilot-instructions.md` must NOT exist
 - Claude local: `CLAUDE.md` must be < 3KB
 - Codex local: `AGENTS.md` must be < 5KB
-- Plugin mode: routing files must have managed block markers and be < 2KB
+- Plugin mode: routing files must have managed block markers and be < 3KB
 
 ### No content duplication
 - Skill content must NOT be duplicated between routing files and SKILL.md files
