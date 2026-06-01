@@ -112,6 +112,7 @@ describe('loadAgents', () => {
     expect(agents.copilot).toBeTruthy();
     expect(agents.copilot).toContain('functions-copilot');
     expect(agents.copilot).toContain('azure-functions-best-practices');
+    expect(agents.copilot).toContain('azure-functions-agents');
     expect(agents.copilot).toContain('azure-functions-diagnostics');
     expect(agents.copilot).toContain('proxy to Azure Skills');
   });
@@ -233,6 +234,20 @@ describe('buildTarget — ghcp', () => {
       'references', 'language-snippets.md',
     );
     expect(existsSync(refsPath)).toBe(true);
+  });
+
+  it('ships bundled skill assets when generating skill files', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
+
+    const assetPath = join(
+      DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-agents',
+      'assets', 'quickstart-sample', 'src', 'function_app.py',
+    );
+    expect(existsSync(assetPath)).toBe(true);
   });
 
   it('generates hooks in .github/hooks/', () => {

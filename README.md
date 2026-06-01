@@ -68,6 +68,7 @@ For contributor guidance on the product boundary between Azure Skills and Azure 
 | --- | --- |
 | [`azure-functions-setup`](templates/skills/azure-functions-setup/SKILL.md) | Verify local prerequisites (Azure CLI, Core Tools, runtimes, Azure Skills) |
 | [`azure-functions-create`](templates/skills/azure-functions-create/SKILL.md) | Create new Functions projects or add functions via Azure MCP templates |
+| [`azure-functions-agents`](templates/skills/azure-functions-agents/SKILL.md) | Build Azure Functions hosted AI agent apps, scheduled agents, connector-triggered agents, and chat/API agents |
 | [`azure-functions-deploy`](templates/skills/azure-functions-deploy/SKILL.md) | Prepare, validate, and deploy via Azure Skills with Functions-specific guidance |
 | [`azure-functions-best-practices`](templates/skills/azure-functions-best-practices/SKILL.md) | Production-readiness review (config, security, reliability) |
 | [`azure-functions-diagnostics`](templates/skills/azure-functions-diagnostics/SKILL.md) | Investigate deployment, runtime, trigger, binding, logging issues |

@@ -1,0 +1,6 @@
+name: functions-quickstart-serverless-agents-azd
+services:
+  api:
+    project: ./src
+    language: python
+    host: function

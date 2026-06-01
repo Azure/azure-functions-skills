@@ -104,9 +104,15 @@ function copySkillScripts(skill: Skill, skillDestDir: string): void {
   copyDirRecursive(skill.scriptsDir, join(skillDestDir, 'scripts'));
 }
 
+function copyBundledAssets(skill: Skill, skillDestDir: string): void {
+  if (!skill.assetsDir) return;
+  copyDirRecursive(skill.assetsDir, join(skillDestDir, 'assets'));
+}
+
 function copySkillAssets(skill: Skill, skillDestDir: string): void {
   copySkillReferences(skill, skillDestDir);
   copySkillScripts(skill, skillDestDir);
+  copyBundledAssets(skill, skillDestDir);
 }
 
 // ─── GHCP ───
@@ -392,14 +398,20 @@ function generateCodexSkillMd(skill: Skill): string {
 }
 
 function generateSkillMd(skill: Skill): string {
-  return [
+  const frontmatter = [
     '---',
     `name: ${skill.id}`,
     `description: "${skill.description}"`,
+  ];
+  if (skill.argumentHint) {
+    frontmatter.push(`argument-hint: "${skill.argumentHint}"`);
+  }
+  frontmatter.push(
     '---',
     '',
     skill.content.trimEnd(),
-  ].join('\n');
+  );
+  return frontmatter.join('\n');
 }
 
 function generateCodexConfigToml(mcpServers: McpServer[]): string {

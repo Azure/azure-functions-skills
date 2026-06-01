@@ -12,10 +12,12 @@ export interface Skill {
   id: string;
   title: string;
   description: string;
+  argumentHint: string | null;
   category: string;
   content: string;
   referencesDir: string | null;
   scriptsDir: string | null;
+  assetsDir: string | null;
 }
 
 export interface McpServer {

@@ -4,7 +4,7 @@ import type { AgentDefinitions, HookDefinitions, McpServer, Skill } from '../typ
 
 /**
  * Load all skills from the skills directory.
- * Each skill dir contains SKILL.md with YAML frontmatter and optional references/ or scripts/ subdirs.
+ * Each skill dir contains SKILL.md with YAML frontmatter and optional references/, scripts/, or assets/ subdirs.
  */
 export function loadSkills(skillsDir: string): Skill[] {
   const dirs = readdirSync(skillsDir, { withFileTypes: true })
@@ -24,14 +24,20 @@ export function loadSkills(skillsDir: string): Skill[] {
     const scriptsDir =
       existsSync(scriptsPath) && statSync(scriptsPath).isDirectory() ? scriptsPath : null;
 
+    const assetsPath = join(base, 'assets');
+    const assetsDir =
+      existsSync(assetsPath) && statSync(assetsPath).isDirectory() ? assetsPath : null;
+
     return {
       id: frontmatter.name || dir,
       title: frontmatter.title || toTitle(frontmatter.name || dir),
       description: frontmatter.description || '',
+      argumentHint: frontmatter['argument-hint'] || null,
       category: frontmatter.category || 'development',
       content,
       referencesDir,
       scriptsDir,
+      assetsDir,
     };
   });
 }
