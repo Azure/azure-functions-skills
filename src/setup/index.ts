@@ -3,7 +3,7 @@
  * Usable as CLI (`npx @azure/functions-skills setup`) or library (VS Code extension).
  */
 
-import { existsSync, mkdirSync, cpSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, rmSync, mkdtempSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -76,7 +76,7 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
   const data: BuildData = { skills, mcpServers, agents: agentDefs, hooks };
 
   // Build each target to a temp location, then copy to targetDir
-  const tmpDir = join(tmpdir(), `af-skills-tmp-${Date.now()}`);
+  const tmpDir = mkdtempSync(join(tmpdir(), 'af-skills-tmp-'));
   let totalFiles = 0;
 
   try {

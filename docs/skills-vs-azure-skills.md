@@ -17,7 +17,7 @@ You will usually install **both**: Azure Functions Skills for Functions-specific
 | --- | --- | --- |
 | **Scope** | Azure Functions only | All Azure resource types (broad coverage) |
 | **Strengths** | Trigger/binding patterns, language-specific anti-patterns, doctor pre-deploy validation, durable orchestrator determinism | Deployment planning, validation, execution; cross-resource workflows |
-| **Key skills** | `azure-functions-create`, `azure-functions-doctor`, `azure-functions-best-practices`, `azure-functions-diagnostics`, `azure-functions-health-status`, `azure-functions-inventory`, `azure-functions-deploy` (facade), `azure-functions-feedback` | `azure-prepare`, `azure-validate`, `azure-deploy` |
+| **Key skills** | `azure-functions-create`, `azure-functions-agents`, `azure-functions-doctor`, `azure-functions-best-practices`, `azure-functions-diagnostics`, `azure-functions-health-status`, `azure-functions-inventory`, `azure-functions-deploy` (facade), `azure-functions-feedback` | `azure-prepare`, `azure-validate`, `azure-deploy` |
 | **Owner** | Azure Functions team | Azure (cross-team) |
 | **NPM package** | `@azure/functions-skills` | (host plugin marketplace install) |
 

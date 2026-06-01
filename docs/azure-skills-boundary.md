@@ -87,6 +87,7 @@ functions-copilot -> azure-functions-deploy -> azure-prepare -> azure-validate -
 | --- | --- |
 | Set up local tools or verify prerequisites | `azure-functions-setup` |
 | Create a new Functions project or add a function to an existing project | `azure-functions-create` |
+| Build or modify Azure Functions hosted AI agent apps, scheduled agents, connector-triggered agents, background AI workflows, or chat/API agents | `azure-functions-agents` |
 | Deploy a Functions app | `azure-functions-deploy`, then delegate to Azure Skills |
 | Review production readiness, best practices, security, observability, scale, or cost for a Function App | `azure-functions-best-practices` |
 | Diagnose runtime errors, trigger failures, binding issues, language worker errors, telemetry, logs, or deployment symptoms after Azure deployment recovery is exhausted | `azure-functions-diagnostics` |

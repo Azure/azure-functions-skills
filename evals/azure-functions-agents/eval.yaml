@@ -1,0 +1,311 @@
+name: azure-functions-agents-eval
+description: |
+  Evaluation suite for the azure-functions-agents skill.
+
+  Covers routing and response-quality checks for Azure Functions hosted AI agents,
+  including scheduled agents, chat/API endpoints, model upgrades, dynamic sessions,
+  Connector Namespaces, Office 365/Teams connectors, built-in MCP endpoints, and
+  local/deployed testing guidance.
+
+tags:
+  type: integration
+  skill: azure-functions-agents
+
+config:
+  runs: 1
+  timeout: "15m"
+  executor: copilot-sdk
+  model: claude-sonnet-4.6
+
+scoring:
+  threshold: 0.8
+  weights:
+    skill-invocation: 2.0
+    output-matches: 1.0
+    output-not-matches: 1.5
+    completed: 1.0
+
+stimuli:
+  - name: "Routing - scaffold chat UI and scheduled blog summary agent"
+    prompt: |
+      Create a new Azure Functions serverless agents app with a chat UI and a daily timer agent that summarizes Microsoft blog posts. It should use code execution for browsing and deploy with azd.
+    tags:
+      type: integration
+      skill: azure-functions-agents
+      tier: smoke
+      cost: llm
+      area: routing
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-deploy
+    constraints:
+      max_turns: 20
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-agents
+      - type: output-matches
+        config:
+          pattern: "(?i)quickstart|assets/quickstart-sample|azurefunctions-agents-runtime"
+      - type: output-matches
+        config:
+          pattern: "(?i)builtin_endpoints|debug_chat_ui|chat_api"
+      - type: output-matches
+        config:
+          pattern: "(?i)dynamic_sessions|session pool|code interpreter|web browsing"
+      - type: output-matches
+        config:
+          pattern: "(?i)azd (up|provision)|model.*quota|subscription"
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality - upgrade from gpt-4.1 with quota checks"
+    prompt: |
+      Upgrade my serverless agents app to use a stronger model than gpt-4.1 in eastus2 if I have access.
+    tags:
+      type: integration
+      skill: azure-functions-agents
+      tier: full
+      cost: llm
+      area: model-selection
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-agents
+    constraints:
+      max_turns: 16
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-agents
+      - type: output-matches
+        config:
+          pattern: "(?i)az cognitiveservices (model|usage) list|quota|AIServices"
+      - type: output-matches
+        config:
+          pattern: "(?i)gpt-5|reasoning-capable|reasoning model"
+      - type: output-matches
+        config:
+          pattern: "(?i)reasoning effort.*medium|medium.*reasoning effort"
+      - type: output-matches
+        config:
+          pattern: "(?i)azd env set|azd provision|FOUNDRY_MODEL"
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality - Outlook connector-triggered draft replies"
+    prompt: |
+      Add an Office 365 Outlook connector-triggered agent that drafts replies when new email arrives.
+    tags:
+      type: integration
+      skill: azure-functions-agents
+      tier: full
+      cost: llm
+      area: connectors
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-agents
+    constraints:
+      max_turns: 20
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-agents
+      - type: output-matches
+        config:
+          pattern: "(?i)Connector Namespace|connectorGateways|Microsoft.Web/connectorGateways"
+      - type: output-matches
+        config:
+          pattern: "(?i)generic_trigger|connectorTrigger|trigger.args"
+      - type: output-matches
+        config:
+          pattern: "(?i)mcp.json|connection MCP|draft"
+      - type: output-matches
+        config:
+          pattern: "(?i)trigger-config|connector_extension|second-step"
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality - local testing and deployed timer invocation"
+    prompt: |
+      How do I test my Azure Functions agent locally and then manually trigger the deployed timer function?
+    tags:
+      type: integration
+      skill: azure-functions-agents
+      tier: full
+      cost: llm
+      area: testing
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-agents
+    constraints:
+      max_turns: 14
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-agents
+      - type: output-matches
+        config:
+          pattern: "(?i)azd provision|local.settings.json|Azurite"
+      - type: output-matches
+        config:
+          pattern: "(?i)func start|/admin/functions"
+      - type: output-matches
+        config:
+          pattern: "(?i)Application Insights|telemetry|requests|traces|exceptions"
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality - built-in MCP endpoint and chat session IDs"
+    prompt: |
+      Expose my daily_report.agent.md as a built-in MCP tool and explain how session IDs work with the chat APIs.
+    tags:
+      type: integration
+      skill: azure-functions-agents
+      tier: full
+      cost: llm
+      area: built-in-endpoints
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-agents
+    constraints:
+      max_turns: 14
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-agents
+      - type: output-matches
+        config:
+          pattern: '(?i)builtin_endpoints|mcp:\s*true'
+      - type: output-matches
+        config:
+          pattern: "(?i)/runtime/webhooks/mcp|mcp_extension"
+      - type: output-matches
+        config:
+          pattern: "(?i)x-ms-session-id|session ID|chat(stream)?"
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality - scheduled Teams briefing without chat surface"
+    prompt: |
+      Create a scheduled morning briefing agent that reads recent email and posts a Teams summary every weekday. I don't need to chat with it.
+    tags:
+      type: integration
+      skill: azure-functions-agents
+      tier: smoke
+      cost: llm
+      area: background-agents
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-agents
+    constraints:
+      max_turns: 20
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-agents
+      - type: output-matches
+        config:
+          pattern: "(?i)timer_trigger|schedule|timeout.*1800|functionTimeout"
+      - type: output-matches
+        config:
+          pattern: "(?i)do not add|omit|without.*(debug_chat_ui|chat_api|builtin_endpoints|main.agent.md)"
+      - type: output-matches
+        config:
+          pattern: "(?i)Teams|Outlook|Connector Namespace|mcp.json"
+      - type: output-matches
+        config:
+          pattern: "(?i)Application Insights|admin/functions|side effect|smoke test"
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality - Teams chat link and direct connector smoke test"
+    prompt: |
+      I need my Azure Functions agent to post Teams updates to this chat link: https://teams.microsoft.com/l/chat/19:49fc0a217754474cb887f684c0bc70ae@thread.v2/conversations?context=%7B%22contextType%22%3A%22chat%22%7D. Also show me how to smoke test the direct connector runtime if messages do not appear.
+    tags:
+      type: integration
+      skill: azure-functions-agents
+      tier: full
+      cost: llm
+      area: teams-connectors
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-agents
+    constraints:
+      max_turns: 20
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-agents
+      - type: output-matches
+        config:
+          pattern: '19:49fc0a217754474cb887f684c0bc70ae@thread\.v2'
+      - type: output-matches
+        config:
+          pattern: "(?i)PostMessageToConversation|Group chat|Flow bot"
+      - type: output-matches
+        config:
+          pattern: 'service\.flow\.microsoft\.com//\.default'
+      - type: output-matches
+        config:
+          pattern: 'apihub\.azure\.com/\.default'
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality - Teams notes-to-self target"
+    prompt: |
+      Can my agent post a note to my own Teams Notes chat? Here is the link: https://teams.microsoft.com/l/chat/48:notes/conversations?context=%7B%22contextType%22%3A%22chat%22%7D
+    tags:
+      type: integration
+      skill: azure-functions-agents
+      tier: full
+      cost: llm
+      area: teams-connectors
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-agents
+    constraints:
+      max_turns: 16
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-agents
+      - type: output-matches
+        config:
+          pattern: "48:notes"
+      - type: output-matches
+        config:
+          pattern: "(?i)PostMessageToSelf|notes-to-self|Notes chat"
+      - type: output-matches
+        config:
+          pattern: "(?i)body.*contentType.*html|body.*content"
+      - type: output-matches
+        config:
+          pattern: 'apihub\.azure\.com/\.default'
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
