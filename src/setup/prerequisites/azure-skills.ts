@@ -75,11 +75,14 @@ async function run(context: PrerequisiteContext, command: string, args: string[]
 
 async function defaultRunner(command: string, args: string[]) {
   const { execFileSync } = await import('node:child_process');
+  // On Windows, wrap with cmd.exe instead of shell: true to avoid DEP0190
+  const isWin = process.platform === 'win32';
+  const execCommand = isWin ? 'cmd.exe' : command;
+  const execArgs = isWin ? ['/d', '/s', '/c', command, ...args] : args;
   try {
-    const stdout = execFileSync(command, args, {
+    const stdout = execFileSync(execCommand, execArgs, {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32',
     });
     return { exitCode: 0, stdout, stderr: '' };
   } catch (error) {

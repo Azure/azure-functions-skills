@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { BuildTargetName, LauncherId } from '../src/types.js';
 import { LAUNCHERS } from '../src/chat/index.js';
@@ -78,7 +78,7 @@ function assertAgentFiles(root: string, expectedAgentFiles: string[]): void {
 
 function assertWorkspaceLayout(root: string, target: BuildTargetName, expectedSkillIds: string[], expectedAgentFiles: string[]): void {
   if (target === 'ghcp') {
-    expect(existsSync(join(root, '.github', 'copilot-instructions.md'))).toBe(true);
+    // No copilot-instructions.md (routing handled by agent definition)
     expect(existsSync(join(root, '.vscode', 'mcp.json'))).toBe(true);
     expect(existsSync(join(root, '.github', 'hooks', 'welcome-setup.json'))).toBe(true);
     assertAgentFiles(join(root, '.github', 'agents'), expectedAgentFiles);
@@ -285,6 +285,12 @@ describe('CLI command integration', () => {
     expect(output).toContain('.vscode/mcp.json');
     expect(output).toContain('.github/hooks/welcome-setup.json');
     expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
+  });
+
+  it('--version prints package version', () => {
+    const output = runCliOutput(['--version']);
+    expect(output).toMatch(/^\d+\.\d+\.\d+/);
+    expect(output).toContain('0.0.3-preview');
   });
 
   it('prints focused help for top-level help and command help forms', () => {
@@ -642,5 +648,189 @@ describe('CLI command integration', () => {
 
     expect(() => runCliOutput(['chat', '--dir', projectDir, '--skip-prerequisites'], { env }))
       .toThrow(/Multiple agents are installed/);
+  });
+
+  it('update after install --local auto-detects local mode and preserves user customizations', { timeout: 30_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-local-update-');
+
+    // Step 1: Install locally for ghcp
+    runCli(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
+
+    // Verify initial install laid down workspace files (no copilot-instructions.md for GHCP)
+    const agentDefPath = join(projectDir, '.github', 'agents', 'functions-copilot.agent.md');
+    expect(existsSync(agentDefPath)).toBe(true);
+    const mcpPath = join(projectDir, '.vscode', 'mcp.json');
+    expect(existsSync(mcpPath)).toBe(true);
+
+    // Step 2: User customizes the MCP file
+    const mcpContent = readFileSync(mcpPath, 'utf-8');
+    const customMcp = mcpContent.replace('{', '{\n  "// my custom note": true,');
+    writeFileSync(mcpPath, customMcp);
+
+    // Step 3: Run update (should auto-detect local mode from state)
+    runCli(['update', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
+
+    // Verify: MCP file preserved (save-aside strategy)
+    const afterUpdate = readFileSync(mcpPath, 'utf-8');
+    expect(afterUpdate).toContain('my custom note');
+    // New version saved aside
+    const asidePath = join(projectDir, '.vscode', 'mcp.azure-functions-skills-new.json');
+    expect(existsSync(asidePath)).toBe(true);
+    // Skills should be refreshed (overwrite strategy)
+    const skillsDir = join(projectDir, '.github', 'skills');
+    expect(existsSync(skillsDir)).toBe(true);
+    const skillIds = readdirSync(skillsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+    expect(skillIds.length).toBeGreaterThan(0);
+  });
+
+  it('update --force after install --local overwrites all files', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-local-update-force-');
+
+    // Install locally for claude
+    runCli(['install', '--local', '--agent', 'claude', '--dir', projectDir, '--yes']);
+
+    const claudePath = join(projectDir, 'CLAUDE.md');
+
+    // User customizes CLAUDE.md by removing managed block
+    writeFileSync(claudePath, '# My Custom Claude Rules\nNo managed block here.\n');
+
+    // Run update with --force
+    runCli(['update', '--agent', 'claude', '--dir', projectDir, '--yes', '--force']);
+
+    // Verify: file overwritten (no save-aside, custom content gone)
+    const updatedContent = readFileSync(claudePath, 'utf-8');
+    expect(updatedContent).not.toContain('No managed block here.');
+    expect(updatedContent).toContain('azure-functions-setup');
+    // No save-aside file
+    expect(existsSync(join(projectDir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(false);
+  });
+
+  it('update --dry-run after install --local reports planned actions', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-local-update-dryrun-');
+
+    // Install locally
+    runCli(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
+
+    // Run update with --dry-run
+    const output = runCliOutput(['update', '--agent', 'ghcp', '--dir', projectDir, '--dry-run']);
+
+    // Output describes planned actions
+    expect(output).toContain('Planned local update');
+  });
+
+  it('install rejects mixed mode: local then plugin', { timeout: 15_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-mixed-mode-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    // Install ghcp locally
+    runCli(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
+
+    // Try to install claude as plugin — should fail
+    expect(() => runCliOutput(['install', '--agent', 'claude', '--dir', projectDir, '--yes'], { env }))
+      .toThrow(/Cannot mix install modes/);
+  });
+
+  it('install rejects mixed mode: plugin then local', { timeout: 15_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-mixed-mode-rev-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    // Install claude as plugin
+    runCli(['install', '--agent', 'claude', '--dir', projectDir, '--yes'], { env });
+
+    // Try to install ghcp locally — should fail
+    expect(() => runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes']))
+      .toThrow(/Cannot mix install modes/);
+  });
+
+  it('install --local --agent ghcp --yes into non-git dir auto-inits git repo', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-init-');
+
+    const output = runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes', '--skip-prerequisites']);
+
+    // Git repo should be initialized
+    expect(existsSync(join(projectDir, '.git'))).toBe(true);
+    expect(output).toContain('Git repo: initialized');
+  });
+
+  it('install --local --agent ghcp into non-git dir warns without --yes', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-init-warn-');
+
+    const output = runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--skip-prerequisites']);
+
+    // Git repo should NOT be initialized (non-interactive, no --yes)
+    expect(existsSync(join(projectDir, '.git'))).toBe(false);
+    // Should warn that git init is needed
+    expect(output).toMatch(/[Gg]it repo.*not initialized|[Cc]opilot.*requires.*git/);
+  });
+
+  it('install --local --agent ghcp into existing git repo does not re-init', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-existing-');
+    // Pre-init git repo
+    execFileSync('git', ['init'], { cwd: projectDir, stdio: 'pipe' });
+    execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@test.com', 'commit', '--allow-empty', '-m', 'initial'], { cwd: projectDir, stdio: 'pipe' });
+
+    const output = runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--yes', '--skip-prerequisites']);
+
+    // Should detect existing repo, not re-init
+    expect(output).not.toMatch(/Git repo: initialized/);
+    // Existing commit should still be there
+    const log = execFileSync('git', ['log', '--oneline'], { cwd: projectDir, encoding: 'utf-8' });
+    expect(log).toContain('initial');
+  });
+
+  it('install --local --agent ghcp --yes inside parent git repo inits own .git', { timeout: 15_000 }, () => {
+    const parentDir = makeTempDir('af-skills-e2e-git-parent-');
+    execFileSync('git', ['init'], { cwd: parentDir, stdio: 'pipe' });
+    execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@test.com', 'commit', '--allow-empty', '-m', 'parent'], { cwd: parentDir, stdio: 'pipe' });
+
+    // Create a subdirectory inside the parent git repo
+    const childDir = join(parentDir, 'my-project');
+    mkdirSync(childDir, { recursive: true });
+
+    const output = runCliOutput(['install', '--local', '--agent', 'ghcp', '--dir', childDir, '--yes', '--skip-prerequisites']);
+
+    // Should init its own .git because the child is not the git root
+    expect(existsSync(join(childDir, '.git'))).toBe(true);
+    expect(output).toContain('Git repo: initialized');
+  });
+
+  it('install --local --agent claude --yes into non-git dir does not init git', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-claude-');
+
+    const output = runCliOutput(['install', '--local', '--agent', 'claude', '--dir', projectDir, '--yes', '--skip-prerequisites']);
+
+    // Git init is only for GHCP — Claude-only install should not init
+    expect(existsSync(join(projectDir, '.git'))).toBe(false);
+    expect(output).not.toContain('Git repo: initialized');
+  });
+
+  it('install --agent ghcp --yes (plugin mode) into non-git dir auto-inits git repo', { timeout: 15_000 }, () => {
+    const projectDir = makeTempDir('af-skills-e2e-git-plugin-');
+
+    const output = runCliOutput(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes', '--skip-prerequisites']);
+
+    // Plugin mode GHCP also needs git for agent discovery
+    expect(existsSync(join(projectDir, '.git'))).toBe(true);
+    expect(output).toContain('Git repo: initialized');
   });
 });

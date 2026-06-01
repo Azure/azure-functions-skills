@@ -191,6 +191,19 @@ export function getInstalledTargets(state: AzureFunctionsSkillsState): BuildTarg
   return (Object.keys(state.agents) as BuildTargetName[]).filter(target => state.agents[target]?.installed === true);
 }
 
+/**
+ * Resolve the install mode for a set of agents from state.
+ * Prefers per-agent `installMode`; falls back to top-level `install.mode`.
+ * Returns `'mixed'` when selected agents have different modes.
+ */
+export function resolveInstallMode(state: AzureFunctionsSkillsState, agents: BuildTargetName[]): PluginInstallMode | 'mixed' {
+  const modes = new Set(
+    agents.map(target => state.agents[target]?.installMode ?? state.install.mode),
+  );
+  if (modes.size === 1) return [...modes][0];
+  return 'mixed';
+}
+
 export function getInstalledLaunchers(state: AzureFunctionsSkillsState): LauncherId[] {
   return getInstalledTargets(state).map(target => state.agents[target].launcherId);
 }

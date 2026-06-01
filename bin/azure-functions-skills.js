@@ -39,12 +39,14 @@ Options:
   update: `Usage: azure-functions-skills update [options]
 
 Update Azure Functions Skills; uses existing state by default.
+Install mode (local/plugin) is auto-detected from state.
 
 Options:
   --agent <name>     Agent: ghcp, claude, codex (repeatable)
   --all              Update all supported agents explicitly
   --dir <path>       Target directory (default: current directory)
-  --local            Full workspace-local setup, equivalent to setup
+  --local            Force local update mode (auto-detected from state if omitted)
+  --force            Overwrite all files including user-customized files
   --dry-run          Print planned update without writing files
   --yes              Approve safe file updates such as managed blocks and state .gitignore entry
   --source <name>    marketplace, github, or local (default: marketplace)
@@ -344,6 +346,44 @@ async function updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreE
   return result;
 }
 
+async function ensureGitRepo({ dir, yes, agents, action }) {
+  // Only relevant for GHCP installs — Copilot needs a git repo to discover agent definitions
+  if (!agents.includes('ghcp') || action === 'update') {
+    return { status: 'skipped' };
+  }
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const { resolve, normalize } = await import('node:path');
+    try {
+      const toplevel = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: dir, stdio: 'pipe', encoding: 'utf-8' }).trim();
+      const resolvedDir = resolve(dir);
+      const resolvedToplevel = resolve(toplevel);
+      // Only "detected" if this workspace IS the git root — not a subdirectory of another repo
+      if (normalize(resolvedDir).toLowerCase() === normalize(resolvedToplevel).toLowerCase()) {
+        return { status: 'detected' };
+      }
+      // Inside a parent git repo but not the root — Copilot needs .git at workspace root
+    } catch {
+      // Not inside any git repo
+    }
+    // Need to init — either not in any repo, or in a parent repo's subdirectory
+    if (yes) {
+      execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
+      return { status: 'initialized' };
+    }
+    if (isInteractive()) {
+      const approved = await askYesNo('Initialize git repository? GitHub Copilot requires a git repo to discover agent definitions.');
+      if (approved) {
+        execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
+        return { status: 'initialized' };
+      }
+    }
+    return { status: 'not-initialized' };
+  } catch {
+    return { status: 'git-unavailable' };
+  }
+}
+
 async function askYesNo(question) {
   const { createInterface } = await import('node:readline/promises');
   const readline = createInterface({ input: process.stdin, output: process.stdout });
@@ -359,7 +399,7 @@ function isInteractive() {
   return process.stdin.isTTY === true && process.stdout.isTTY === true;
 }
 
-function printInstallSummary({ action, agents, dir, filesWritten, state, gitignoreResult }) {
+function printInstallSummary({ action, agents, dir, filesWritten, state, gitignoreResult, gitRepoResult }) {
   const noun = action === 'install' ? 'installed' : 'updated';
   const label = action === 'install' ? 'Installed' : 'Updated';
   console.log(`Azure Functions Skills ${noun}.`);
@@ -371,7 +411,20 @@ function printInstallSummary({ action, agents, dir, filesWritten, state, gitigno
   if (gitignoreResult.status === 'updated') console.log(`  Git ignore: added ${gitignoreResult.entry}`);
   else if (gitignoreResult.status === 'already-ignored') console.log(`  Git ignore: ${gitignoreResult.entry} already configured`);
   else console.log(`  Git ignore: add ${gitignoreResult.entry} to keep local state out of Git`);
+  if (gitRepoResult && gitRepoResult.status === 'initialized') console.log('  Git repo: initialized');
+  else if (gitRepoResult && gitRepoResult.status === 'not-initialized') console.log('  Git repo: not initialized — Copilot requires a git repo to discover agent definitions');
+  else if (gitRepoResult && gitRepoResult.status === 'git-unavailable') console.log('  Git repo: not checked — git executable not found');
   console.log(`  Next: azure-functions-skills chat --dir "${dir}"`);
+}
+
+if (command === '--version' || command === '-V') {
+  const { readFileSync } = await import('node:fs');
+  const { join: joinPath, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const pkgDir = dirname(dirname(fileURLToPath(import.meta.url)));
+  const pkg = JSON.parse(readFileSync(joinPath(pkgDir, 'package.json'), 'utf-8'));
+  console.log(pkg.version);
+  process.exit(0);
 }
 
 if (!command || command === '--help' || command === '-h') {
@@ -400,6 +453,7 @@ if (command === 'install' || command === 'update') {
   let all = false;
   let dryRun = false;
   let yes = false;
+  let force = false;
   let includeMcp = true;
   let includeHooks = true;
   let source = 'marketplace';
@@ -413,6 +467,7 @@ if (command === 'install' || command === 'update') {
     else if (commandArgs[i] === '--local') local = true;
     else if (commandArgs[i] === '--dry-run') dryRun = true;
     else if (commandArgs[i] === '--yes') yes = true;
+    else if (commandArgs[i] === '--force') force = true;
     else if (commandArgs[i] === '--no-mcp') includeMcp = false;
     else if (commandArgs[i] === '--no-hooks') includeHooks = false;
     else if (commandArgs[i] === '--source' && commandArgs[i + 1]) source = commandArgs[++i];
@@ -421,7 +476,7 @@ if (command === 'install' || command === 'update') {
     else if (commandArgs[i] === '--skip-prerequisites') prerequisites = 'skip';
   }
 
-  const { readState, getInstalledTargets, recordInstallState, ensureStateIgnored, STATE_IGNORE_ENTRY } = await import('../lib/setup/state.js');
+  const { readState, getInstalledTargets, recordInstallState, ensureStateIgnored, STATE_IGNORE_ENTRY, resolveInstallMode } = await import('../lib/setup/state.js');
   const detectedAgents = await resolveInstallTargets({
     action: command,
     agents,
@@ -435,24 +490,105 @@ if (command === 'install' || command === 'update') {
     process.exit(1);
   }
 
+  // Auto-detect install mode from state when running 'update' without explicit --local
+  if (command === 'update' && !local) {
+    const state = readState(dir);
+    if (state) {
+      const mode = resolveInstallMode(state, detectedAgents);
+      if (mode === 'local') local = true;
+      if (mode === 'mixed') {
+        console.error('Mixed install modes detected: some agents were installed locally, others as plugins.');
+        console.error('Run update separately per agent with --agent <name>.');
+        process.exit(1);
+      }
+    }
+  }
+
+  // Prevent mixed-mode installs: block if existing agents use a different mode
+  if (command === 'install') {
+    const state = readState(dir);
+    if (state) {
+      const existingTargets = getInstalledTargets(state);
+      if (existingTargets.length > 0) {
+        const existingMode = resolveInstallMode(state, existingTargets);
+        const requestedMode = local ? 'local' : 'plugin';
+        if (existingMode !== 'mixed' && existingMode !== requestedMode) {
+          console.error(`Cannot mix install modes: existing agents use '${existingMode}' mode, but '${requestedMode}' was requested.`);
+          console.error(`Use --local to match, or reinstall all agents with the same mode.`);
+          process.exit(1);
+        }
+      }
+    }
+  }
+
   if (local) {
-    if (dryRun) {
-      console.log(`Planned local install:`);
-      for (const agent of detectedAgents) console.log(`  - ${agent}: workspace setup files`);
-    } else {
-      const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
-      const state = recordInstallState(dir, {
-        action: command,
+    if (command === 'update') {
+      // Use file-type-aware local update strategy
+      const { applyLocalUpdate, createInteractivePrompter } = await import('../lib/setup/local-update.js');
+      const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
+      const result = await applyLocalUpdate(dir, {
         agents: detectedAgents,
-        mode: 'local',
-        source: 'local',
-        scope,
-        includeMcp: true,
-        includeHooks: true,
-        includeAgent: detectedAgents.includes('ghcp'),
+        force,
+        dryRun,
+        yes,
+        prompter,
       });
-      const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
-      printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.filesWritten, state, gitignoreResult });
+      if (dryRun) {
+        console.log(`Planned local update:`);
+        if (result.overwritten.length > 0) {
+          console.log('  Overwrite:');
+          for (const f of result.overwritten) console.log(`    - ${f}`);
+        }
+        if (result.managedBlockUpdated.length > 0) {
+          console.log('  Managed-block update:');
+          for (const f of result.managedBlockUpdated) console.log(`    - ${f}`);
+        }
+        if (result.savedAside.length > 0) {
+          console.log('  Save aside (review & merge manually):');
+          for (const entry of result.savedAside) console.log(`    - ${entry.original} → ${entry.aside}`);
+        }
+      } else {
+        const state = recordInstallState(dir, {
+          action: command,
+          agents: detectedAgents,
+          mode: 'local',
+          source: 'local',
+          scope,
+          includeMcp: true,
+          includeHooks: true,
+          includeAgent: detectedAgents.includes('ghcp'),
+        });
+        const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
+        printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.overwritten.length + result.managedBlockUpdated.length + result.savedAside.length, state, gitignoreResult });
+        if (result.savedAside.length > 0) {
+          console.log('\n⚠️  Some files were saved aside for manual review:');
+          for (const entry of result.savedAside) {
+            console.log(`   ${entry.original} → ${entry.aside}`);
+          }
+          console.log('   Review these files and merge changes as needed.');
+        }
+      }
+    } else {
+      // install --local: use original applySetup()
+      if (dryRun) {
+        console.log(`Planned local install:`);
+        for (const agent of detectedAgents) console.log(`  - ${agent}: workspace setup files`);
+      } else {
+        const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
+        const state = recordInstallState(dir, {
+          action: command,
+          agents: detectedAgents,
+          mode: 'local',
+          source: 'local',
+          scope,
+          includeMcp: true,
+          includeHooks: true,
+          includeAgent: detectedAgents.includes('ghcp'),
+        });
+        const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
+        const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action: command });
+        printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.filesWritten, state, gitignoreResult, gitRepoResult });
+      }
     }
   } else {
     const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
@@ -501,7 +637,8 @@ if (command === 'install' || command === 'update') {
         includeAgent: true,
       });
       const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
-      printInstallSummary({ action, agents: detectedAgents, dir, filesWritten: workspaceResult.filesWritten, state, gitignoreResult });
+      const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action });
+      printInstallSummary({ action, agents: detectedAgents, dir, filesWritten: workspaceResult.filesWritten, state, gitignoreResult, gitRepoResult });
     }
   }
 } else if (command === 'setup') {

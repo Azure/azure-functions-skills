@@ -183,10 +183,13 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
     throw new Error(`Unknown agent: ${agentId}. Available: ${Object.keys(LAUNCHERS).join(', ')}`);
   }
 
-  const basePrompt = options.prompt || await buildStartupPrompt(dir);
-  const startupPrompt = options.setupSkillPending
-    ? `${setupInstruction(options.setupCompleteCommand)} ${basePrompt}`
-    : basePrompt;
+  // Skip auto-generated startup prompt when passthrough args are present and
+  // no explicit --prompt was given — the user is controlling the agent CLI directly
+  const hasPassthrough = options.passthroughArgs && options.passthroughArgs.length > 0;
+  const basePrompt = options.prompt || (hasPassthrough ? undefined : await buildStartupPrompt(dir));
+  const startupPrompt = basePrompt
+    ? (options.setupSkillPending ? `${setupInstruction(options.setupCompleteCommand)} ${basePrompt}` : basePrompt)
+    : undefined;
   const args = launcher.buildArgs({ startupPrompt, passthroughArgs: options.passthroughArgs });
   const resolvedLauncher = resolveLauncherCommand(launcher.command);
 
@@ -206,7 +209,7 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
     });
 
     child.on('spawn', () => {
-      resolve({ childProcess: child, agent: agentId, prompt: startupPrompt });
+      resolve({ childProcess: child, agent: agentId, prompt: startupPrompt || '' });
     });
   });
 }

@@ -74,7 +74,7 @@ describe('loadSkills', () => {
 
   it('azure-functions-setup marks local setup state complete after checks finish', () => {
     const setupSkill = skills.find(skill => skill.id === 'azure-functions-setup');
-    expect(setupSkill?.content).toContain('azure-functions-skills state setup-complete --dir');
+    expect(setupSkill?.content).toContain('npx @azure/functions-skills state setup-complete --dir');
     expect(setupSkill?.content).toContain('After the environment check completes');
     expect(setupSkill?.content).toContain('If the command is unavailable');
     expect(setupSkill?.content).toContain('.azure-functions-skills/state.local.json');
@@ -135,7 +135,7 @@ describe('buildTarget — ghcp', () => {
     resetDistDir();
   });
 
-  it('generates copilot-instructions.md', () => {
+  it('does not generate copilot-instructions.md (routing is handled by functions-copilot.agent.md)', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
@@ -143,11 +143,7 @@ describe('buildTarget — ghcp', () => {
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
     const instrPath = join(DIST_DIR, 'ghcp', '.github', 'copilot-instructions.md');
-    expect(existsSync(instrPath)).toBe(true);
-    const content = readFileSync(instrPath, 'utf-8');
-    expect(content).toContain('azure-functions-setup');
-    expect(content).toContain('azure-functions-create');
-    expect(content).toContain('azure-functions-deploy');
+    expect(existsSync(instrPath)).toBe(false);
   });
 
   it('generates mcp.json with servers', () => {
@@ -286,7 +282,7 @@ describe('buildTarget — claude', () => {
     resetDistDir();
   });
 
-  it('generates CLAUDE.md', () => {
+  it('generates CLAUDE.md as lightweight routing block (not inlined skills)', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
@@ -296,7 +292,12 @@ describe('buildTarget — claude', () => {
     const claudePath = join(DIST_DIR, 'claude', 'CLAUDE.md');
     expect(existsSync(claudePath)).toBe(true);
     const content = readFileSync(claudePath, 'utf-8');
+    // Should contain skill routing list
     expect(content).toContain('azure-functions-setup');
+    // Should be small (routing only, not full skill content)
+    expect(content.length).toBeLessThan(3000);
+    // Should NOT contain full skill content (that's in .claude/skills/)
+    expect(content).not.toContain('## First-Time Setup');
   });
 
   it('generates .claude/settings.json with mcpServers', () => {
@@ -331,7 +332,7 @@ describe('buildTarget — codex', () => {
     resetDistDir();
   });
 
-  it('generates AGENTS.md with full instructions', () => {
+  it('generates AGENTS.md with routing and dev standards (not inlined skills)', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
@@ -341,9 +342,14 @@ describe('buildTarget — codex', () => {
     const agentsPath = join(DIST_DIR, 'codex', 'AGENTS.md');
     expect(existsSync(agentsPath)).toBe(true);
     const content = readFileSync(agentsPath, 'utf-8');
+    // Should contain skill routing list
     expect(content).toContain('azure-functions-setup');
-    expect(content).toContain('azure-functions-create');
-    expect(content).toContain('azure-functions-deploy');
+    // Should contain dev standards from AGENTS.md template
+    expect(content).toContain('Code Quality');
+    // Should be small (routing + standards, not full skill content)
+    expect(content.length).toBeLessThan(5000);
+    // Should NOT contain full skill content
+    expect(content).not.toContain('## First-Time Setup');
   });
 
   it('generates skill files in .agents/skills/', () => {
@@ -401,18 +407,20 @@ describe('skill instruction embedding', () => {
     resetDistDir();
   });
 
-  it('GHCP instructions include skill-authored next step guidance', () => {
+  it('GHCP agent definition includes skill routing and next step guidance', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
     const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
-    const instrPath = join(DIST_DIR, 'ghcp', '.github', 'copilot-instructions.md');
-    const content = readFileSync(instrPath, 'utf-8');
-    expect(content).toContain('## Next steps');
-    expect(content).toContain('suggest `azure-functions-create`');
-    expect(content).toContain('suggest `azure-functions-deploy`');
+    // Agent definition has routing rules and next step guidance
+    const agentPath = join(DIST_DIR, 'ghcp', '.github', 'agents', 'functions-copilot.agent.md');
+    const content = readFileSync(agentPath, 'utf-8');
+    expect(content).toContain('azure-functions-setup');
+    expect(content).toContain('azure-functions-create');
+    expect(content).toContain('azure-functions-deploy');
+    expect(content).toContain('suggest');
   });
 });
 
@@ -582,8 +590,8 @@ describe('setup module', () => {
   it('applySetup copies files to target directory', async () => {
     await applySetup(DIST_DIR, { agents: ['ghcp'], prerequisites: 'skip' });
 
-    // Should have copilot-instructions.md
-    expect(existsSync(join(DIST_DIR, '.github', 'copilot-instructions.md'))).toBe(true);
+    // GHCP: agent definition + mcp + AGENTS.md (no copilot-instructions.md)
+    expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.vscode', 'mcp.json'))).toBe(true);
     expect(existsSync(join(DIST_DIR, 'AGENTS.md'))).toBe(true);
   });
@@ -641,7 +649,8 @@ describe('setup module', () => {
   it('applySetup handles multiple agents at once', async () => {
     await applySetup(DIST_DIR, { agents: ['ghcp', 'claude', 'codex'], prerequisites: 'skip' });
 
-    expect(existsSync(join(DIST_DIR, '.github', 'copilot-instructions.md'))).toBe(true);
+    // GHCP: no copilot-instructions.md (routing via agent definition)
+    expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, 'CLAUDE.md'))).toBe(true);
     expect(existsSync(join(DIST_DIR, '.codex', 'config.toml'))).toBe(true);
   });
