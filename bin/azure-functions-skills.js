@@ -354,7 +354,6 @@ async function ensureGitRepo({ dir, yes, agents, action }) {
   try {
     const { execFileSync } = await import('node:child_process');
     const { resolve, normalize } = await import('node:path');
-    let needsInit = true;
     try {
       const toplevel = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: dir, stdio: 'pipe', encoding: 'utf-8' }).trim();
       const resolvedDir = resolve(dir);
