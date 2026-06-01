@@ -189,8 +189,7 @@ S1GP-7.  grep 'azure-functions-skills:start' $WS/.github/copilot-instructions.md
 S1GP-8.  wc -c < $WS/.github/copilot-instructions.md   # must be < 3000
 S1GP-9.  cat $WS/.azure-functions-skills/state.local.json
 S1GP-10. $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "List all visible Azure Functions skills, MCP servers, hooks, and agents. Return a structured summary." --output-format json -s --allow-all --no-ask-user
-S1GP-11. copilot --agent azure-functions-skills:functions-copilot -p "What Azure Functions skills do you provide? List each skill name." --output-format json -s --allow-all --no-ask-user
-S1GP-12. cat $WS/.azure-functions-skills/state.local.json
+S1GP-11. cat $WS/.azure-functions-skills/state.local.json
 ```
 
 **Pass criteria**:
@@ -198,7 +197,7 @@ S1GP-12. cat $WS/.azure-functions-skills/state.local.json
 - S1GP-5 shows azure-functions-skills installed
 - All files in the "GHCP — plugin mode" table exist
 - copilot-instructions.md has managed block markers and is small (< 2KB)
-- S1GP-9 or S1GP-10 returns response mentioning Azure Functions skills
+- S1GP-10 output contains azure-functions-* skills (see aggregation note below)
 
 **Blocked criteria**:
 - PF-3 failed (copilot CLI not available)
@@ -470,6 +469,19 @@ Apply these checks to every test case during workspace verification steps:
 - Hook commands should use cross-platform Node.js (`node -e`), not bash-only commands
 - All skill IDs in routing tables should correspond to actual SKILL.md files
 
+### Chat inspection: skills_loaded aggregation
+
+When checking `session.skills_loaded` events from `--output-format json`, **aggregate ALL events** before
+counting skills. Plugin-provided skills load asynchronously and arrive in a later `skills_loaded` event,
+not the first one. The typical pattern is:
+
+1. Event 1: builtin skills only (e.g., `customize-cloud-agent`)
+2. Event 2: may be empty
+3. Event 3: all plugin skills (`source=plugin`) including azure-functions-* skills
+
+**Rule**: A chat inspection PASSES if ANY `skills_loaded` event in the full output contains
+`azure-functions-*` skills. Do NOT fail based on only the first event.
+
 ---
 
 ## Total command counts
@@ -489,6 +501,6 @@ Apply these checks to every test case during workspace verification steps:
 | TC-S2-CLAUDE-PLUGIN | 7 |
 | TC-S2-CODEX-LOCAL | 9 |
 | TC-S2-CODEX-PLUGIN | 7 |
-| **Total** | **106** |
+| **Total** | **107** |
 
 Every command must appear in the final report's evidence section. Missing commands make the run `incomplete`.

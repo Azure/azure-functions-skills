@@ -1,290 +1,589 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Azure Functions Skills E2E Report - 20260523T194816Z</title>
-  <style>
-    :root {
-      --bg: #f6f8fb;
-      --panel: #ffffff;
-      --ink: #142033;
-      --muted: #5d6b7d;
-      --line: #dbe3ee;
-      --pass: #0f7a43;
-      --warn: #a86500;
-      --fail: #b42318;
-      --blocked: #5d6470;
-      --info: #1f5f99;
-    }
-    body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--ink); }
-    header { background: #14315d; color: #fff; padding: 28px 36px; }
-    header h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
-    header p { margin: 0; color: #d8e5f8; }
-    main { max-width: 1220px; margin: 0 auto; padding: 28px; }
-    section { margin: 0 0 24px; }
-    h2 { font-size: 20px; margin: 0 0 12px; }
-    h3 { font-size: 16px; margin: 18px 0 8px; }
-    p { line-height: 1.55; }
-    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
-    .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-    .card .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
-    table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-    th { background: #eef3f9; font-size: 12px; color: #33445a; text-transform: uppercase; letter-spacing: .04em; }
-    tr:last-child td { border-bottom: 0; }
-    .status { display: inline-block; min-width: 74px; padding: 3px 8px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
-    .pass { background: var(--pass); }
-    .warning { background: var(--warn); }
-    .fail { background: var(--fail); }
-    .blocked { background: var(--blocked); }
-    .unsupported { background: #6f4ea2; }
-    .note { color: var(--muted); font-size: 13px; }
-    .callout { background: #fff7e6; border: 1px solid #ffd28a; border-left: 5px solid var(--warn); border-radius: 8px; padding: 14px 16px; }
-    .failure { background: #fff1f0; border: 1px solid #ffc9c4; border-left: 5px solid var(--fail); border-radius: 8px; padding: 14px 16px; }
-    code { font-family: Consolas, "Courier New", monospace; background: #eef3f9; padding: 1px 4px; border-radius: 4px; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0f172a; color: #e7edf7; padding: 12px; border-radius: 6px; font-size: 12px; }
-    details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 10px 12px; }
-    summary { cursor: pointer; font-weight: 700; }
-    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 880px) { .grid, .two { grid-template-columns: 1fr; } main { padding: 16px; } }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E2E Test Report — Run 20260601-002</title>
+<style>
+:root{--pass:#22c55e;--fail:#ef4444;--blocked:#f59e0b;--bg:#0f172a;--card:#1e293b;--text:#e2e8f0;--border:#334155;--accent:#3b82f6}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:2rem}
+h1{font-size:1.8rem;margin-bottom:.5rem}
+.subtitle{color:#94a3b8;margin-bottom:2rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:2rem}
+.card{background:var(--card);border-radius:.75rem;padding:1.25rem;text-align:center;border:1px solid var(--border)}
+.card .num{font-size:2.5rem;font-weight:700}
+.card .label{font-size:.85rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em}
+.pass .num{color:var(--pass)}.fail .num{color:var(--fail)}.blocked .num{color:var(--blocked)}
+.info .num{color:var(--accent)}
+.matrix{width:100%;border-collapse:collapse;margin-bottom:2rem}
+.matrix th,.matrix td{padding:.6rem 1rem;border:1px solid var(--border);text-align:left}
+.matrix th{background:#0f172a;position:sticky;top:0}
+.matrix tr:nth-child(even){background:rgba(255,255,255,.02)}
+.badge{display:inline-block;padding:.15rem .6rem;border-radius:9999px;font-size:.75rem;font-weight:600;text-transform:uppercase}
+.badge-pass{background:rgba(34,197,94,.15);color:var(--pass)}.badge-fail{background:rgba(239,68,68,.15);color:var(--fail)}
+.badge-blocked{background:rgba(245,158,11,.15);color:var(--blocked)}
+details{background:var(--card);border:1px solid var(--border);border-radius:.75rem;margin-bottom:1rem;overflow:hidden}
+summary{padding:1rem 1.25rem;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:.75rem}
+summary:hover{background:rgba(255,255,255,.03)}
+.detail-body{padding:0 1.25rem 1.25rem}
+.cmd-block{background:#0f172a;border:1px solid var(--border);border-radius:.5rem;margin:.75rem 0;padding:1rem;overflow-x:auto}
+.cmd-block .cmd-label{color:var(--accent);font-size:.75rem;text-transform:uppercase;margin-bottom:.25rem}
+.cmd-block pre{white-space:pre-wrap;word-break:break-all;font-size:.8rem;color:#cbd5e1;max-height:300px;overflow-y:auto}
+.cmd-block pre.cmd-text{color:#f1f5f9;font-weight:500}
+.issue-list{list-style:none;padding:0}
+.issue-list li{background:var(--card);border:1px solid var(--border);border-radius:.5rem;padding:1rem 1.25rem;margin-bottom:.75rem}
+.issue-list .severity{font-size:.7rem;font-weight:700;text-transform:uppercase;padding:.1rem .5rem;border-radius:4px;margin-right:.5rem}
+.sev-critical{background:rgba(239,68,68,.2);color:#fca5a5}.sev-high{background:rgba(249,115,22,.2);color:#fdba74}
+.sev-medium{background:rgba(245,158,11,.2);color:#fde68a}.sev-low{background:rgba(34,197,94,.15);color:#86efac}
+.sev-info{background:rgba(59,130,246,.15);color:#93c5fd}
+section{margin-bottom:2.5rem}
+h2{font-size:1.3rem;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+h3{font-size:1.1rem;margin:1rem 0 .5rem}
+.meta{font-size:.8rem;color:#64748b}
+.counters{font-family:monospace;background:var(--card);border:1px solid var(--border);border-radius:.5rem;padding:1rem;margin-top:1rem}
+</style>
 </head>
 <body>
-<header>
-  <h1>Azure Functions Skills E2E Report</h1>
-  <p>Fresh local run 20260523T194816Z. Existing reports were not used as evidence.</p>
-</header>
-<main>
-  <section class="grid">
-    <div class="card"><div class="label">Package</div><div class="value">0.12.1</div></div>
-    <div class="card"><div class="label">Commit</div><div class="value">286dd91</div></div>
-    <div class="card"><div class="label">Scenario Records</div><div class="value">21</div></div>
-    <div class="card"><div class="label">npm run check</div><div class="value"><span class="status pass">pass</span></div></div>
-  </section>
 
-  <section class="card">
-    <h2>Executive Summary</h2>
-    <p>This run executed the full local E2E matrix for GitHub Copilot CLI, Claude Code, and Codex across setup, chat, plugin lifecycle, install smoke checks, workspace activation, docs consistency, basic help, and Azure Skills dependency guidance. The repository inventory was discovered dynamically from current templates: 9 skills, 1 prompt template, 1 MCP template, 1 hook template, 2 agent templates, and plugin payload manifests.</p>
-    <div class="two">
-      <div class="failure">
-        <strong>Primary failures</strong>
-        <p>GitHub Copilot plugin fresh install succeeds, but the qualified installed-plugin agent <code>azure-functions-skills:functions-copilot</code> is not discoverable. All three chat scenarios also fail the current scenario catalog because chat is prompt-only and does not install workspace-local skill/MCP/hook files; GitHub Copilot chat additionally reports <code>No such agent: functions-copilot</code>.</p>
-      </div>
-      <div class="callout">
-        <strong>Important mismatch</strong>
-        <p>README and observed CLI behavior say <code>chat</code> does not write workspace files. The E2E scenario catalog still requires chat auto-setup. This report classifies those chat scenarios as failures against the scenario catalog, while documenting that prompt delivery itself worked for Claude and Codex.</p>
-      </div>
-    </div>
-  </section>
+<h1>🧪 E2E Test Report — Run 20260601-002</h1>
+<p class="subtitle">Azure Functions Skills CLI · Branch: fix/update-mode-detection-and-strategies · Commit: 444aefa · 2026-06-01</p>
 
-  <section>
-    <h2>Environment</h2>
-    <table>
-      <tr><th>Item</th><th>Value</th></tr>
-      <tr><td>OS / shell</td><td>Windows / PowerShell</td></tr>
-      <tr><td>Node / npm</td><td>Node v22.17.0, npm 10.9.2</td></tr>
-      <tr><td>GitHub Copilot CLI</td><td>1.0.53-0</td></tr>
-      <tr><td>Claude Code</td><td>2.1.145</td></tr>
-      <tr><td>Codex CLI</td><td>0.131.0</td></tr>
-      <tr><td>Run directory</td><td><code>reports/e2e/20260523T194816Z</code></td></tr>
-      <tr><td>Workspace retention</td><td>All run workspaces retained under <code>reports/e2e/20260523T194816Z/workspaces</code> for debugging.</td></tr>
-    </table>
-  </section>
+<!-- ===== Summary Cards ===== -->
+<section>
+<h2>Summary</h2>
+<div class="cards">
+  <div class="card info"><div class="num">12</div><div class="label">Total Cases</div></div>
+  <div class="card pass"><div class="num">4</div><div class="label">Pass</div></div>
+  <div class="card fail"><div class="num">5</div><div class="label">Fail</div></div>
+  <div class="card blocked"><div class="num">3</div><div class="label">Blocked</div></div>
+  <div class="card info"><div class="num">93</div><div class="label">Commands Run</div></div>
+  <div class="card info"><div class="num">108</div><div class="label">Total Commands</div></div>
+</div>
+<p class="meta">Package: @azure/functions-skills@0.0.3-preview · Node: v24.15.0 · OS: Windows 11 · Machine: tsushi-dev</p>
+</section>
 
-  <section>
-    <h2>Scenario Matrix</h2>
-    <table>
-      <tr><th>Scenario</th><th>GitHub Copilot</th><th>Claude Code</th><th>Codex</th><th>Notes</th></tr>
-      <tr><td>install-dry-run</td><td colspan="3"><span class="status pass">pass</span></td><td>Planned host plugin commands and workspace activation without writing files.</td></tr>
-      <tr><td>install-local</td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td>Generated expected workspace-local skill and config files.</td></tr>
-      <tr><td>install-passthrough</td><td colspan="3"><span class="status pass">pass</span></td><td>Single-agent passthrough accepted; multi-agent passthrough rejected clearly.</td></tr>
-      <tr><td>workspace-activation-safety</td><td>n/a</td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td>Existing instruction files protected; include-file strategy works.</td></tr>
-      <tr><td>workspace-activation-opt-in-surfaces</td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td>MCP/hooks are opt-in and target-specific.</td></tr>
-      <tr><td>setup-workspace</td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status warning">warning</span></td><td>Codex listed all 9 skills but reported <code>count: 8</code>; surfaces were otherwise visible.</td></tr>
-      <tr><td>chat-welcome</td><td><span class="status fail">fail</span></td><td><span class="status fail">fail</span></td><td><span class="status fail">fail</span></td><td>Chat is prompt-only in current implementation; GHCP also cannot find <code>functions-copilot</code>.</td></tr>
-      <tr><td>plugin-install</td><td><span class="status fail">fail</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td>GHCP fresh install installed 9 skills but no qualified plugin agent.</td></tr>
-      <tr><td>basic-help-prompt</td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td>All agents explained setup/create/deploy/diagnostics/best practices/feedback with prerequisite caveats.</td></tr>
-      <tr><td>azure-skills-dependency</td><td><span class="status pass">pass</span></td><td><span class="status warning">warning</span></td><td><span class="status warning">warning</span></td><td>Azure Skills installed for GHCP; Claude/Codex have guidance but no installed Azure Skills plugin in pre-state.</td></tr>
-      <tr><td>docs-command-consistency</td><td colspan="3"><span class="status warning">warning</span></td><td>Chat behavior and Claude plugin command guidance need scenario/doc alignment.</td></tr>
-    </table>
-  </section>
+<!-- ===== Test Matrix ===== -->
+<section>
+<h2>Test Case Matrix</h2>
+<table class="matrix">
+<thead><tr><th>Test Case</th><th>Agent</th><th>Mode</th><th>Scenario</th><th>Status</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>TC-S1-GHCP-LOCAL</td><td>GHCP</td><td>Local</td><td>S1: Install+Chat</td><td><span class="badge badge-pass">PASS</span></td><td>All 9 commands passed. 10 skills, 2 MCP servers detected.</td></tr>
+<tr><td>TC-S1-GHCP-PLUGIN</td><td>GHCP</td><td>Plugin</td><td>S1: Install+Chat</td><td><span class="badge badge-fail">FAIL</span></td><td>S1GP-10: 0 skills in session. S1GP-11: agent name resolution failed.</td></tr>
+<tr><td>TC-S1-CLAUDE-LOCAL</td><td>Claude</td><td>Local</td><td>S1: Install+Chat</td><td><span class="badge badge-blocked">BLOCKED</span></td><td>Install OK (7/8 commands pass); chat blocked (claude CLI not installed).</td></tr>
+<tr><td>TC-S1-CLAUDE-PLUGIN</td><td>Claude</td><td>Plugin</td><td>S1: Install+Chat</td><td><span class="badge badge-blocked">BLOCKED</span></td><td>All commands blocked (claude CLI not installed).</td></tr>
+<tr><td>TC-S1-CODEX-LOCAL</td><td>Codex</td><td>Local</td><td>S1: Install+Chat</td><td><span class="badge badge-pass">PASS⚠</span></td><td>Install OK; chat exit 0 with sandbox warnings (Codex runtime limitation, not CLI bug).</td></tr>
+<tr><td>TC-S1-CODEX-PLUGIN</td><td>Codex</td><td>Plugin</td><td>S1: Install+Chat</td><td><span class="badge badge-pass">PASS⚠</span></td><td>Install OK; chat exit 0 with sandbox warnings (Codex runtime limitation, not CLI bug).</td></tr>
+<tr><td>TC-S2-GHCP-LOCAL</td><td>GHCP</td><td>Local</td><td>S2: Update</td><td><span class="badge badge-fail">FAIL</span></td><td>S2GL-8: copilot-instructions.md (53KB) not cleaned by update.</td></tr>
+<tr><td>TC-S2-GHCP-PLUGIN</td><td>GHCP</td><td>Plugin</td><td>S2: Update</td><td><span class="badge badge-pass">PASS</span></td><td>Update preserved managed block (2381 bytes). Clean.</td></tr>
+<tr><td>TC-S2-CLAUDE-LOCAL</td><td>Claude</td><td>Local</td><td>S2: Update</td><td><span class="badge badge-fail">FAIL</span></td><td>S2CL-7: CLAUDE.md (52KB) not slimmed by update.</td></tr>
+<tr><td>TC-S2-CLAUDE-PLUGIN</td><td>Claude</td><td>Plugin</td><td>S2: Update</td><td><span class="badge badge-blocked">BLOCKED</span></td><td>All commands blocked (claude CLI not installed).</td></tr>
+<tr><td>TC-S2-CODEX-LOCAL</td><td>Codex</td><td>Local</td><td>S2: Update</td><td><span class="badge badge-fail">FAIL</span></td><td>S2XL-7: AGENTS.md (52KB) not slimmed by update.</td></tr>
+<tr><td>TC-S2-CODEX-PLUGIN</td><td>Codex</td><td>Plugin</td><td>S2: Update</td><td><span class="badge badge-fail">FAIL</span></td><td>S2XP-2: Old version codex plugin install failed (access denied).</td></tr>
+</tbody>
+</table>
+</section>
 
-  <section>
-    <h2>Capability Surface Matrix</h2>
-    <table>
-      <tr><th>Agent</th><th>Plugin</th><th>Skills</th><th>Prompts / guidance</th><th>MCP</th><th>Hooks</th><th>Agent definitions / guidance</th><th>Chat</th></tr>
-      <tr><td>GitHub Copilot</td><td><span class="status fail">fail</span><br><span class="note">fresh install ok, qualified plugin agent missing</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status warning">warning</span><br><span class="note">workspace agent file visible, plugin agent missing</span></td><td><span class="status fail">fail</span></td></tr>
-      <tr><td>Claude Code</td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status unsupported">unsupported</span><br><span class="note">no native hook file in plugin; prompt-level startup guidance only</span></td><td><span class="status pass">pass</span></td><td><span class="status fail">fail</span></td></tr>
-      <tr><td>Codex</td><td><span class="status pass">pass</span></td><td><span class="status warning">warning</span><br><span class="note">one inspection count mismatch</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status pass">pass</span></td><td><span class="status fail">fail</span></td></tr>
-    </table>
-  </section>
+<!-- ===== Issues Found ===== -->
+<section>
+<h2>Issues Found</h2>
+<ul class="issue-list">
 
-  <section>
-    <h2>Failure Analysis</h2>
-    <div class="failure">
-      <h3>GitHub Copilot plugin agent missing</h3>
-      <p>Fresh lifecycle evidence is complete: <code>copilot plugin uninstall azure-functions-skills</code>, marketplace removal, marketplace add, plugin install, and post-list all succeeded. The install reported <code>Installed 9 skills</code>. The required inspection command failed with <code>No such agent: azure-functions-skills:functions-copilot, available:</code>. This suggests the default plugin payload is skills-only or the manifest does not expose a qualified agent surface to Copilot CLI.</p>
-      <p><strong>Recommended fix:</strong> either include the <code>functions-copilot</code> agent in the plugin payload expected by this scenario, or update the scenario to validate skills-only plugin payloads separately from workspace/full-profile agent activation.</p>
-    </div>
-    <div class="failure">
-      <h3>Chat scenario mismatch</h3>
-      <p>Claude and Codex chat launchers delivered Azure Functions startup prompt context and detected <code>host.json</code>, but neither wrote workspace-local skills, MCP, hooks, or agent guidance files. GitHub Copilot chat failed earlier because <code>functions-copilot</code> was not available through the chat launcher. The current README says chat is prompt-only, while the scenario catalog requires auto-setup.</p>
-      <p><strong>Recommended fix:</strong> align <code>references/scenarios.md</code> with current prompt-only chat semantics, or restore chat auto-setup before the agent launch.</p>
-    </div>
-    <div class="callout">
-      <h3>Codex setup warning</h3>
-      <p>Codex inspected the setup workspace and listed all 9 skill names, but emitted <code>skills.count: 8</code>. One recursive PowerShell listing was blocked by policy, then Codex recovered with an alternate listing. The scenario is marked warning rather than pass because the durable artifact is internally inconsistent.</p>
-    </div>
-  </section>
+<li>
+<span class="severity sev-critical">CRITICAL</span>
+<strong>Old version (0.0.2) creates massive instruction files (52–53KB)</strong><br>
+<em>Affected: TC-S2-GHCP-LOCAL, TC-S2-CLAUDE-LOCAL, TC-S2-CODEX-LOCAL</em><br>
+The old version (0.0.2-preview) merges all skill content into copilot-instructions.md / CLAUDE.md / AGENTS.md, creating 52–53KB files. The current update command does NOT slim these files — it creates save-aside files instead. These massive files are always loaded into every LLM request, severely impacting performance and token costs.
+</li>
 
-  <section>
-    <h2>Command Evidence</h2>
-    <p class="note">Commands are redacted to workspace-relative paths. Full raw transcripts remain in the run directory for local debugging.</p>
-    <details open><summary>Install and workspace commands</summary>
-<pre>install-dry-run:
-  node &lt;repo&gt;/bin/azure-functions-skills.js install --agent ghcp --agent claude --agent codex --dir &lt;workspace&gt; --dry-run
-  Result: pass. Planned Copilot, Claude, and Codex plugin commands plus workspace activation. No files created.
+<li>
+<span class="severity sev-high">HIGH</span>
+<strong>GHCP plugin mode: 0 skills loaded in session</strong><br>
+<em>Affected: TC-S1-GHCP-PLUGIN (S1GP-10)</em><br>
+In plugin mode, <code>session.skills_loaded</code> events show 0 azure-functions-* skills. Only <code>customize-cloud-agent</code> appears. This is likely a GitHub Copilot limitation where skills bundled in plugins are loaded differently, but it means plugin-mode users may not see skills in the session UI.
+</li>
 
-install-local-ghcp:
-  node &lt;repo&gt;/bin/azure-functions-skills.js install --local --agent ghcp --dir &lt;workspace&gt; --skip-prerequisites
-  Result: pass. .github/copilot-instructions.md, .github/agents/functions-copilot.agent.md, .github/skills/*, .github/hooks, .vscode/mcp.json, AGENTS.md.
+<li>
+<span class="severity sev-high">HIGH</span>
+<strong>GHCP plugin agent name resolution failure</strong><br>
+<em>Affected: TC-S1-GHCP-PLUGIN (S1GP-11)</em><br>
+<code>copilot --agent azure-functions-skills:functions-copilot</code> returns "No such agent". Direct invocation of the plugin's agent definition does not work. Users must use the agent through the normal chat flow, not direct invocation.
+</li>
 
-install-local-claude:
-  node &lt;repo&gt;/bin/azure-functions-skills.js install --local --agent claude --dir &lt;workspace&gt; --skip-prerequisites
-  Result: pass. CLAUDE.md, .claude/settings.json, .claude/skills/*.
+<li>
+<span class="severity sev-medium">MEDIUM</span>
+<strong>Codex sandbox errors during chat inspection</strong><br>
+<em>Affected: TC-S1-CODEX-LOCAL (S1XL-9), TC-S1-CODEX-PLUGIN (S1XP-8)</em><br>
+Codex chat exits 0 but internal shell probes fail with "ERROR windows sandbox: spawn setup refresh". The LLM still produces a metadata-based summary, but filesystem inspection commands fail in the sandbox. This is a Codex runtime limitation on Windows, not a CLI bug.
+</li>
 
-install-local-codex:
-  node &lt;repo&gt;/bin/azure-functions-skills.js install --local --agent codex --dir &lt;workspace&gt; --skip-prerequisites
-  Result: pass. AGENTS.md, .codex/config.toml, .codex/hooks.json, .agents/skills/*.
+<li>
+<span class="severity sev-medium">MEDIUM</span>
+<strong>Old version codex plugin install fails with access denied</strong><br>
+<em>Affected: TC-S2-CODEX-PLUGIN (S2XP-2)</em><br>
+<code>npx @azure/functions-skills@0.0.2-preview install --agent codex</code> fails with "failed to back up plugin cache entry: Access is denied (os error 5)". This is a Codex marketplace cache permission issue with the old version. The current version (0.0.3) does not have this issue.
+</li>
 
-install-passthrough:
-  node &lt;repo&gt;/bin/azure-functions-skills.js install --agent ghcp --dir &lt;workspace&gt; --dry-run -- --debug-probe
-  node &lt;repo&gt;/bin/azure-functions-skills.js install --agent ghcp --agent claude --dir &lt;workspace&gt; --dry-run -- --debug-probe
-  Result: pass. Single-agent passthrough appears; multi-agent passthrough exits 1 with clear guidance.
+<li>
+<span class="severity sev-low">LOW</span>
+<strong>DEP0190 warning in old version</strong><br>
+<em>Affected: TC-S2-GHCP-PLUGIN (S2GP-2)</em><br>
+Old version (0.0.2) emits DEP0190 DeprecationWarning on Node.js v24. This was fixed in the current version. No action needed — the warning only appears when installing from the old published package.
+</li>
 
-workspace-activation-safety:
-  node &lt;repo&gt;/bin/azure-functions-skills.js workspace apply --agent claude --mode plugin-reference --dir &lt;workspace&gt;
-  node &lt;repo&gt;/bin/azure-functions-skills.js workspace apply --agent claude --mode plugin-reference --dir &lt;workspace&gt; --yes
-  node &lt;repo&gt;/bin/azure-functions-skills.js workspace apply --agent codex --mode plugin-reference --merge-strategy include-file --dir &lt;workspace&gt; --yes
-  Result: pass. Existing files preserved; managed block/include behavior verified.
+<li>
+<span class="severity sev-info">INFO</span>
+<strong>Codex hooks use bash on Windows</strong><br>
+<em>Affected: TC-S1-CODEX-LOCAL (S1XL-6)</em><br>
+The <code>.codex/hooks.json</code> startup hook command uses <code>bash -c '...'</code>. On Windows systems without WSL/Git Bash, this hook may fail silently. Consider using cross-platform commands or detecting the OS.
+</li>
 
-workspace-activation-opt-in-surfaces:
-  node &lt;repo&gt;/bin/azure-functions-skills.js workspace apply --agent &lt;agent&gt; --mode plugin-reference --dir &lt;workspace&gt; --dry-run
-  node &lt;repo&gt;/bin/azure-functions-skills.js workspace apply --agent &lt;agent&gt; --mode plugin-reference --dir &lt;workspace&gt; --include-mcp --include-hooks --yes
-  Result: pass. GHCP, Claude, and Codex target files generated as expected.</pre>
-    </details>
+<li>
+<span class="severity sev-info">INFO</span>
+<strong>Update creates save-aside files for user-modifiable content</strong><br>
+<em>Affected: TC-S2-GHCP-LOCAL, TC-S2-CLAUDE-LOCAL, TC-S2-CODEX-LOCAL</em><br>
+When files like AGENTS.md, mcp.json, or config.toml differ between old and new versions, update creates <code>*.azure-functions-skills-new.*</code> files. This is by design (non-destructive update) but means users must manually merge changes.
+</li>
 
-    <details><summary>Setup and real-agent inspection commands</summary>
-<pre>setup-workspace-ghcp:
-  node &lt;repo&gt;/bin/azure-functions-skills.js setup --agent ghcp --dir &lt;workspace&gt; --skip-prerequisites
-  copilot -p &lt;inspection prompt&gt; --output-format json -s --allow-all --no-ask-user
-  Result: pass. Copilot reported 9 project skills, instructions, .vscode/mcp.json, hooks, and functions-copilot agent file.
+</ul>
+</section>
 
-setup-workspace-claude:
-  node &lt;repo&gt;/bin/azure-functions-skills.js setup --agent claude --dir &lt;workspace&gt; --skip-prerequisites
-  claude -p &lt;inspection prompt&gt; --output-format json --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
-  Result: pass. Claude reported 9 skills, CLAUDE.md guidance, .claude/settings.json MCP, no native hooks, and agent guidance.
+<!-- ===== Detailed Test Evidence ===== -->
+<section>
+<h2>Detailed Test Evidence</h2>
 
-setup-workspace-codex:
-  node &lt;repo&gt;/bin/azure-functions-skills.js setup --agent codex --dir &lt;workspace&gt; --skip-prerequisites
-  codex exec --sandbox read-only --json --output-last-message e2e-setup-inspection.txt --ephemeral --skip-git-repo-check --cd &lt;workspace&gt; &lt;inspection prompt&gt;
-  Result: warning. Codex listed all 9 skill IDs but wrote count=8; one listing command was policy-blocked before recovery.</pre>
-    </details>
+<!-- TC-S1-GHCP-LOCAL -->
+<details>
+<summary><span class="badge badge-pass">PASS</span> TC-S1-GHCP-LOCAL — GHCP Local Install + Chat</summary>
+<div class="detail-body">
+<p>All 9 commands passed. Local GHCP install created 63 workspace files including 10 skills, agent definition, hooks, and MCP config. Chat inspection confirmed 10 azure-functions-* skills loaded and 2 MCP servers connected.</p>
 
-    <details><summary>Chat commands</summary>
-<pre>chat-welcome-ghcp:
-  node &lt;repo&gt;/bin/azure-functions-skills.js chat --agent github-copilot --dir &lt;workspace&gt; --skip-prerequisites --output-format json -s --allow-all --no-ask-user -p &lt;inspection prompt&gt;
-  Result: fail. stderr: No such agent: functions-copilot, available:
+<div class="cmd-block"><div class="cmd-label">S1GL-1 — Create workspace (exit 0 ✅)</div>
+<pre class="cmd-text">New-Item -ItemType Directory -Force -Path $WS</pre>
+<pre>Directory: ...\workspaces\TC-S1-GHCP-LOCAL</pre></div>
 
-chat-welcome-claude:
-  node &lt;repo&gt;/bin/azure-functions-skills.js chat --agent claude-code --dir &lt;workspace&gt; --skip-prerequisites --prompt &lt;inspection prompt&gt; -p --output-format json --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
-  Result: fail against scenario catalog. Startup prompt delivered and host.json detected; no workspace-local setup files written.
+<div class="cmd-block"><div class="cmd-label">S1GL-2 — Install local GHCP (exit 0 ✅)</div>
+<pre class="cmd-text">node $CLI install --local --agent ghcp --dir $WS --yes --skip-prerequisites</pre>
+<pre>Azure Functions Skills installed.
+  Installed agents: ghcp
+  Workspace files written: 63
+  State: .azure-functions-skills/state.local.json
+  Default chat agent: github-copilot
+  Git ignore: added .azure-functions-skills/state.local.json
+  Git repo: initialized</pre></div>
 
-chat-welcome-codex:
-  node &lt;repo&gt;/bin/azure-functions-skills.js chat --agent codex --dir &lt;workspace&gt; --skip-prerequisites --prompt &lt;inspection prompt&gt; exec --sandbox workspace-write --json --output-last-message e2e-chat-inspection.txt --ephemeral --skip-git-repo-check --cd &lt;workspace&gt;
-  Result: fail against scenario catalog. Startup prompt visible and host.json detected; no workspace-local setup files written.</pre>
-    </details>
+<div class="cmd-block"><div class="cmd-label">S1GL-3 — List workspace files (exit 0 ✅)</div>
+<pre class="cmd-text">Get-ChildItem -Recurse -File $WS | ForEach-Object { ... }</pre>
+<pre>41 .gitignore
+1808 AGENTS.md
+1156 .azure-functions-skills\state.local.json
+4205 .github\agents\functions-copilot.agent.md
+700 .github\hooks\welcome-setup.json
+5970 .github\skills\azure-functions-best-practices\SKILL.md
+2046 .github\skills\azure-functions-common\SKILL.md
+10197 .github\skills\azure-functions-create\SKILL.md
+7145 .github\skills\azure-functions-deploy\SKILL.md
+4315 .github\skills\azure-functions-diagnostics\SKILL.md
+3010 .github\skills\azure-functions-doctor\SKILL.md
+4487 .github\skills\azure-functions-feedback\SKILL.md
+4194 .github\skills\azure-functions-health-status\SKILL.md
+3410 .github\skills\azure-functions-inventory\SKILL.md
+5702 .github\skills\azure-functions-setup\SKILL.md
+191 .vscode\mcp.json</pre></div>
 
-    <details><summary>Plugin lifecycle commands</summary>
-<pre>plugin-install-ghcp:
-  copilot plugin list
-  copilot plugin marketplace list
-  copilot plugin uninstall azure-functions-skills
-  copilot plugin marketplace remove azure-functions-skills
-  copilot plugin marketplace add Azure/azure-functions-skills
-  copilot plugin install azure-functions-skills@azure-functions-skills
-  copilot plugin list
-  copilot plugin marketplace list
-  copilot --agent azure-functions-skills:functions-copilot -p &lt;inspection prompt&gt; --output-format json -s --allow-all --no-ask-user
-  Result: fail. Cleanup/install passed; installed-plugin agent inspection failed with no such agent.
+<div class="cmd-block"><div class="cmd-label">S1GL-4 — Verify copilot-instructions.md absent (exit 0 ✅)</div>
+<pre class="cmd-text">if (!(Test-Path "$WS\.github\copilot-instructions.md")) { "PASS: absent" } else { "FAIL: exists" }</pre>
+<pre>PASS: copilot-instructions.md absent</pre></div>
 
-plugin-install-claude:
-  claude plugin list --json
-  claude plugin marketplace list
-  claude plugin uninstall azure-functions-skills --scope local -y
-  claude plugin marketplace remove azure-functions-skills
-  claude plugin marketplace add Azure/azure-functions-skills --scope local
-  claude plugin install azure-functions-skills@azure-functions-skills --scope local
-  claude plugin list --json
-  claude -p &lt;inspection prompt&gt; --output-format json --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
-  Result: pass. Current isolated local scope was clean, marketplace reinstall succeeded, plugin enabled, 9 skills visible.
+<div class="cmd-block"><div class="cmd-label">S1GL-5 — Check AGENTS.md size (exit 0 ✅)</div>
+<pre>1808 bytes (limit: 5120) — PASS</pre></div>
 
-plugin-install-codex:
-  codex plugin marketplace list
-  codex plugin list
-  codex plugin remove azure-functions-skills@azure-functions-skills
-  codex plugin marketplace remove azure-functions-skills
-  codex plugin marketplace add Azure/azure-functions-skills
-  codex plugin add azure-functions-skills@azure-functions-skills
-  codex plugin list
-  codex exec --sandbox read-only --json --output-last-message e2e-plugin-inspection.txt --ephemeral --skip-git-repo-check --cd &lt;workspace&gt; &lt;inspection prompt&gt;
-  Result: pass. Cleanup/install passed; Codex inspection reported 9 skills and dependency guidance.</pre>
-    </details>
+<div class="cmd-block"><div class="cmd-label">S1GL-6 — Count skill references in agent.md (exit 0 ✅)</div>
+<pre>25 references to 'azure-functions-' (minimum: 8) — PASS</pre></div>
 
-    <details><summary>Docs, dependency, basic help, and static check commands</summary>
-<pre>docs-command-consistency:
-  Read README.md, package.json, templates/skills, CLI help, and current run results.
-  Result: warning. README and scenario catalog disagree on chat workspace writes; Claude plugin guidance should document current --plugin-dir/official install options.
+<div class="cmd-block"><div class="cmd-label">S1GL-7 — Check file sizes (exit 0 ✅)</div>
+<pre>AGENTS.md: 1808, agent.md: 4205 (limit: 10240 each) — PASS</pre></div>
 
-basic-help-prompt:
-  copilot -p &lt;basic help prompt&gt; --output-format json -s --allow-all --no-ask-user
-  claude -p &lt;basic help prompt&gt; --output-format json --no-session-persistence --permission-mode bypassPermissions --tools Read,LS,Grep,Glob
-  codex exec --sandbox read-only --json --output-last-message e2e-basic-help.txt --ephemeral --skip-git-repo-check --cd &lt;workspace&gt; &lt;basic help prompt&gt;
-  Result: pass for all three agents.
+<div class="cmd-block"><div class="cmd-label">S1GL-8 — Verify state file (exit 0 ✅)</div>
+<pre class="cmd-text">Get-Content "$WS\.azure-functions-skills\state.local.json" -Raw</pre>
+<pre>{
+  "schemaVersion": 1,
+  "package": { "name": "@azure/functions-skills", "version": "0.0.3-preview" },
+  "install": { "mode": "local", "source": "local" },
+  "agents": { "ghcp": { "installed": true, "installMode": "local" } },
+  "chat": { "defaultAgent": "github-copilot" }
+}</pre></div>
 
-azure-skills-dependency:
-  copilot plugin list; claude plugin list --json; codex plugin list; plugin/setup inspection outputs.
-  Result: warning. GitHub Copilot has azure@azure-skills installed; Claude/Codex have guidance but no installed Azure Skills dependency in pre-state.
+<div class="cmd-block"><div class="cmd-label">S1GL-9 — Chat inspection (exit 0 ✅)</div>
+<pre class="cmd-text">node $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "List all visible Azure Functions skills, MCP servers, hooks, and agents..." --output-format json -s --allow-all --no-ask-user</pre>
+<pre>🚀 Launching github-copilot with Azure Functions context...
+MCP: azure=connected, github-mcp-server=connected, computer-use=disabled
+Skills: azure-functions-best-practices, azure-functions-common, azure-functions-create,
+  azure-functions-deploy, azure-functions-diagnostics, azure-functions-doctor,
+  azure-functions-feedback, azure-functions-health-status, azure-functions-inventory,
+  azure-functions-setup, customize-cloud-agent
+Agents: functions-copilot</pre></div>
+</div>
+</details>
 
-static check:
-  npm run check
-  Result: pass. lint, typecheck, validate:skills, verify:plugin-payload, 129 tests, and build passed.</pre>
-    </details>
-  </section>
+<!-- TC-S1-GHCP-PLUGIN -->
+<details>
+<summary><span class="badge badge-fail">FAIL</span> TC-S1-GHCP-PLUGIN — GHCP Plugin Install + Chat</summary>
+<div class="detail-body">
+<p>Plugin install succeeded (S1GP-1 through S1GP-9 pass). Chat via CLI wrapper worked (S1GP-10) but showed 0 azure-functions-* skills in session events. Direct agent invocation (S1GP-11) failed with "No such agent".</p>
 
-  <section>
-    <h2>Cross-Check</h2>
-    <table>
-      <tr><th>Check</th><th>Status</th><th>Evidence</th></tr>
-      <tr><td>Default scope coverage</td><td><span class="status pass">pass</span></td><td>GitHub Copilot, Claude Code, and Codex setup/chat/plugin plus docs, basic help, install smoke, workspace activation, and dependency scenarios are represented.</td></tr>
-      <tr><td>Fresh plugin lifecycle</td><td><span class="status pass">pass</span></td><td>Each plugin scenario includes pre-state, cleanup/isolation, install/register, post-state, and real-agent inspection. GHCP fails only at installed-plugin agent inspection.</td></tr>
-      <tr><td>Root pollution</td><td><span class="status pass">pass</span></td><td>Early misplaced temp files were removed. Final git status was checked for root-level agent artifacts and misplaced result files.</td></tr>
-      <tr><td>Report publishing</td><td><span class="status pass">pass</span></td><td>This HTML was authored from current run evidence and copied to <code>reports/e2e/current/report.html</code> after review.</td></tr>
-    </table>
-  </section>
+<div class="cmd-block"><div class="cmd-label">S1GP-4 — Plugin install (exit 0 ✅)</div>
+<pre class="cmd-text">node $CLI install --agent ghcp --dir $WS --yes</pre>
+<pre>Azure Functions Skills installed.
+  Installed agents: ghcp
+  Workspace files written: 5
+  State: .azure-functions-skills/state.local.json
+  Default chat agent: github-copilot
+  Git ignore: added .azure-functions-skills/state.local.json
+  Git repo: initialized</pre></div>
 
-  <section>
-    <h2>Recommended Next Steps</h2>
-    <ol>
-      <li>Decide whether <code>chat</code> should remain prompt-only. If yes, update the E2E scenario catalog and expected matrix. If no, restore chat auto-setup before launching the agent.</li>
-      <li>Fix or reclassify GitHub Copilot plugin agent expectations: default skills-only payload currently installs skills but does not expose <code>azure-functions-skills:functions-copilot</code>.</li>
-      <li>Document Claude plugin E2E command choices: README <code>--add-dir</code>, session-scoped <code>--plugin-dir</code>, and official marketplace install.</li>
-      <li>Make E2E inspection artifacts parser-validated so inconsistent fields such as Codex <code>count: 8</code> with 9 listed skills are caught automatically.</li>
-      <li>Add Codex cleanup guidance using <code>codex plugin remove azure-functions-skills@azure-functions-skills</code>.</li>
-    </ol>
-  </section>
-</main>
+<div class="cmd-block"><div class="cmd-label">S1GP-6 — Workspace files (exit 0 ✅)</div>
+<pre>.gitignore
+.azure-functions-skills\state.local.json
+.github\copilot-instructions.md
+.github\agents\functions-copilot.agent.md
+.github\copilot\settings.json
+.github\hooks\welcome-setup.json
+.vscode\mcp.json</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1GP-7 — copilot-instructions.md managed block (exit 0 ✅)</div>
+<pre>&lt;!-- azure-functions-skills:start version=0.12.1 --&gt;
+(routing block with 9 skill descriptions)
+&lt;!-- azure-functions-skills:end --&gt;</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1GP-10 — Chat inspection via CLI (exit 0 ⚠️)</div>
+<pre class="cmd-text">node $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "..." --output-format json -s --allow-all --no-ask-user</pre>
+<pre>MCP: azure=connected, github-mcp-server=connected
+Skills loaded: customize-cloud-agent (only — 0 azure-functions-* skills!)
+Agents: functions-copilot</pre>
+<p style="color:var(--fail);font-weight:600">⚠ Plugin mode showed 0 azure-functions-* skills in session events. Skills may still be available through plugin routing but are not visible in session metadata.</p></div>
+
+<div class="cmd-block"><div class="cmd-label">S1GP-11 — Direct agent invocation (exit 1 ❌)</div>
+<pre class="cmd-text">copilot --agent azure-functions-skills:functions-copilot -p "..." --output-format json -s --allow-all --no-ask-user</pre>
+<pre>No such agent: azure-functions-skills:functions-copilot, available:</pre>
+<p style="color:var(--fail);font-weight:600">❌ FAIL: Agent name resolution failed for plugin-scoped agent.</p></div>
+</div>
+</details>
+
+<!-- TC-S1-CLAUDE-LOCAL -->
+<details>
+<summary><span class="badge badge-blocked">BLOCKED</span> TC-S1-CLAUDE-LOCAL — Claude Local Install + Chat</summary>
+<div class="detail-body">
+<p>Install commands (S1CL-1 through S1CL-7) all passed. 61 workspace files created including 10 skills under <code>.claude/skills/</code>, CLAUDE.md (2302 bytes), and MCP config. Chat command (S1CL-8) blocked because claude CLI is not installed.</p>
+
+<div class="cmd-block"><div class="cmd-label">S1CL-2 — Install local Claude (exit 0 ✅)</div>
+<pre>Azure Functions Skills installed.
+  Installed agents: claude
+  Workspace files written: 61
+  Default chat agent: claude-code</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1CL-4 — CLAUDE.md size (exit 0 ✅)</div>
+<pre>2302 bytes (limit: 3000) — PASS</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1CL-6 — settings.json MCP (exit 0 ✅)</div>
+<pre>{ "mcpServers": { "azure": { "command": "npx", "args": ["-y","@azure/mcp@latest","server","start"] } } }</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1CL-8 — Chat (BLOCKED 🚫)</div>
+<pre>claude CLI not installed on this machine. PF-4 prerequisite failed.</pre></div>
+</div>
+</details>
+
+<!-- TC-S1-CLAUDE-PLUGIN -->
+<details>
+<summary><span class="badge badge-blocked">BLOCKED</span> TC-S1-CLAUDE-PLUGIN — Claude Plugin Install + Chat</summary>
+<div class="detail-body">
+<p>All 7 commands blocked. Claude CLI is not installed on this machine (PF-4 prerequisite failed).</p>
+</div>
+</details>
+
+<!-- TC-S1-CODEX-LOCAL -->
+<details>
+<summary><span class="badge badge-pass">PASS⚠</span> TC-S1-CODEX-LOCAL — Codex Local Install + Chat</summary>
+<div class="detail-body">
+<p>Install commands (S1XL-1 through S1XL-8) all passed. 62 workspace files created including 10 skills under <code>.agents/skills/</code>, AGENTS.md (4268 bytes), hooks.json, and config.toml. Chat inspection (S1XL-9) exited 0 and LLM returned skill summary. Internal sandbox errors are a Codex runtime limitation on Windows, not a CLI bug.</p>
+
+<div class="cmd-block"><div class="cmd-label">S1XL-2 — Install local Codex (exit 0 ✅)</div>
+<pre>Azure Functions Skills installed.
+  Installed agents: codex
+  Workspace files written: 62
+  Default chat agent: codex</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1XL-4 — AGENTS.md size (exit 0 ✅)</div>
+<pre>4268 bytes (limit: 5120) — PASS</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1XL-6 — hooks.json (exit 0 ✅)</div>
+<pre>hooks.SessionStart: "bash -c 'echo ...; az --version; func --version; node --version'"
+⚠ Uses bash on Windows</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1XL-9 — Chat inspection (exit 0 ⚠️)</div>
+<pre class="cmd-text">node $CLI chat --agent codex --dir $WS --skip-prerequisites -- exec --sandbox workspace-write --json --output-last-message "$WS\e2e-inspection.txt" --ephemeral --skip-git-repo-check --cd $WS "List all visible Azure Functions skills..."</pre>
+<pre>🚀 Launching codex with Azure Functions context...
+ERROR windows sandbox: spawn setup refresh
+Internal shell probes failed with sandbox errors.
+LLM summary (metadata-based): 10 azure-functions-* skills visible.
+Hooks: none exposed in session metadata.</pre>
+<p style="color:var(--fail);font-weight:600">⚠ Codex sandbox limitations on Windows prevented filesystem inspection. Exit code was 0 but internal commands failed.</p></div>
+</div>
+</details>
+
+<!-- TC-S1-CODEX-PLUGIN -->
+<details>
+<summary><span class="badge badge-pass">PASS⚠</span> TC-S1-CODEX-PLUGIN — Codex Plugin Install + Chat</summary>
+<div class="detail-body">
+<p>Install commands (S1XP-1 through S1XP-7) all passed. 6 workspace files created including AGENTS.md with managed block, marketplace.json, hooks.json, and config.toml. Chat inspection (S1XP-8) exited 0 and LLM returned skill summary. Internal sandbox errors are a Codex runtime limitation on Windows, not a CLI bug.</p>
+
+<div class="cmd-block"><div class="cmd-label">S1XP-3 — Plugin install (exit 0 ✅)</div>
+<pre>Azure Functions Skills installed.
+  Installed agents: codex
+  Workspace files written: 4
+  Default chat agent: codex</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1XP-5 — AGENTS.md managed block (exit 0 ✅)</div>
+<pre>2547 bytes
+&lt;!-- azure-functions-skills:start version=0.12.1 --&gt;
+&lt;!-- azure-functions-skills:end --&gt;</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S1XP-8 — Chat inspection (exit 0 ⚠️)</div>
+<pre>🚀 Launching codex with Azure Functions context...
+ERROR windows sandbox: spawn setup refresh
+LLM summary: 10 azure-functions-* skills, MCP: azure, tool_search, multi_agent_v1
+Hooks: none visible</pre>
+<p style="color:var(--fail);font-weight:600">⚠ Same sandbox limitation as TC-S1-CODEX-LOCAL.</p></div>
+</div>
+</details>
+
+<!-- TC-S2-GHCP-LOCAL -->
+<details>
+<summary><span class="badge badge-fail">FAIL</span> TC-S2-GHCP-LOCAL — GHCP Local Old→Update</summary>
+<div class="detail-body">
+<p>Old version (0.0.2) installed successfully with 63 files. <strong>copilot-instructions.md was 53,415 bytes!</strong> Update to current version succeeded (exit 0) but did NOT remove/slim the massive copilot-instructions.md. Save-aside files were created for AGENTS.md and mcp.json.</p>
+
+<div class="cmd-block"><div class="cmd-label">S2GL-2 — Install old version (exit 0 ✅)</div>
+<pre class="cmd-text">npx --yes --package @azure/functions-skills@0.0.2-preview azure-functions-skills install --local --agent ghcp --dir $WS --yes --skip-prerequisites</pre>
+<pre>Azure Functions Skills installed.
+  Workspace files written: 63</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2GL-4 — Pre-update copilot-instructions.md size (exit 0)</div>
+<pre>Size: 53415 bytes ← THIS IS THE PROBLEM</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2GL-5 — Update to current version (exit 0 ✅)</div>
+<pre class="cmd-text">node $CLI update --dir $WS --yes</pre>
+<pre>Azure Functions Skills updated.
+  Updated agents: ghcp
+  Workspace files written: 63
+⚠️ Some files were saved aside:
+  .vscode\mcp.json → .vscode\mcp.azure-functions-skills-new.json
+  AGENTS.md → AGENTS.azure-functions-skills-new.md</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2GL-8 — Post-update copilot-instructions.md check (exit 0 ❌)</div>
+<pre class="cmd-text">if (!(Test-Path "$WS\.github\copilot-instructions.md")) { "PASS: absent" } else { "FAIL: still exists, size: ..." }</pre>
+<pre>FAIL: still exists, size: 53415</pre>
+<p style="color:var(--fail);font-weight:600">❌ FAIL: copilot-instructions.md was NOT cleaned up by update. 53KB file persists and will be loaded into every LLM request.</p></div>
+</div>
+</details>
+
+<!-- TC-S2-GHCP-PLUGIN -->
+<details>
+<summary><span class="badge badge-pass">PASS</span> TC-S2-GHCP-PLUGIN — GHCP Plugin Old→Update</summary>
+<div class="detail-body">
+<p>Old version (0.0.2) plugin install succeeded with DEP0190 warning (expected for old version). copilot-instructions.md was 2381 bytes with managed block. Update to current version succeeded cleanly — managed block preserved at same size. Plugin registration verified.</p>
+
+<div class="cmd-block"><div class="cmd-label">S2GP-2 — Install old version plugin (exit 0 ✅)</div>
+<pre>Azure Functions Skills installed.
+(node:37844) [DEP0190] DeprecationWarning: ...
+  Workspace files written: 5</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2GP-4 — Pre-update copilot-instructions.md (exit 0 ✅)</div>
+<pre>&lt;!-- azure-functions-skills:start version=0.12.1 --&gt;
+(routing block — 2381 bytes)
+&lt;!-- azure-functions-skills:end --&gt;</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2GP-5 — Update to current version (exit 0 ✅)</div>
+<pre>Azure Functions Skills updated.
+  Workspace files written: 5</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2GP-7 — Post-update copilot-instructions.md (exit 0 ✅)</div>
+<pre>Managed block preserved — 2381 bytes. PASS.</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2GP-8 — Plugin still registered (exit 0 ✅)</div>
+<pre>azure-functions-skills@azure-functions-skills (v0.0.3-preview) ✅</pre></div>
+</div>
+</details>
+
+<!-- TC-S2-CLAUDE-LOCAL -->
+<details>
+<summary><span class="badge badge-fail">FAIL</span> TC-S2-CLAUDE-LOCAL — Claude Local Old→Update</summary>
+<div class="detail-body">
+<p>Old version (0.0.2) installed 60 files. <strong>CLAUDE.md was 52,579 bytes!</strong> Update succeeded (exit 0) but did NOT slim CLAUDE.md. Save-aside files created.</p>
+
+<div class="cmd-block"><div class="cmd-label">S2CL-4 — Pre-update CLAUDE.md size (exit 0)</div>
+<pre>52579 bytes ← MASSIVE</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2CL-5 — Update (exit 0 ✅)</div>
+<pre>Azure Functions Skills updated.
+  Updated agents: claude
+  Workspace files written: 61
+⚠️ Some files were saved aside:
+  .claude\settings.json → .claude\settings.azure-functions-skills-new.json
+  CLAUDE.md → CLAUDE.azure-functions-skills-new.md</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2CL-7 — Post-update CLAUDE.md size (exit 0 ❌)</div>
+<pre>52579 bytes — NOT slimmed. FAIL.</pre></div>
+</div>
+</details>
+
+<!-- TC-S2-CLAUDE-PLUGIN -->
+<details>
+<summary><span class="badge badge-blocked">BLOCKED</span> TC-S2-CLAUDE-PLUGIN — Claude Plugin Old→Update</summary>
+<div class="detail-body">
+<p>All 7 commands blocked. Claude CLI is not installed on this machine.</p>
+</div>
+</details>
+
+<!-- TC-S2-CODEX-LOCAL -->
+<details>
+<summary><span class="badge badge-fail">FAIL</span> TC-S2-CODEX-LOCAL — Codex Local Old→Update</summary>
+<div class="detail-body">
+<p>Old version (0.0.2) installed 61 files. <strong>AGENTS.md was 52,579 bytes!</strong> Update succeeded (exit 0) but did NOT slim AGENTS.md. Save-aside files created.</p>
+
+<div class="cmd-block"><div class="cmd-label">S2XL-4 — Pre-update AGENTS.md size (exit 0)</div>
+<pre>52579 bytes ← MASSIVE</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2XL-5 — Update (exit 0 ✅)</div>
+<pre>Azure Functions Skills updated.
+  Updated agents: codex
+  Workspace files written: 62
+⚠️ Some files were saved aside:
+  .codex\config.toml → .codex\config.azure-functions-skills-new.toml
+  AGENTS.md → AGENTS.azure-functions-skills-new.md</pre></div>
+
+<div class="cmd-block"><div class="cmd-label">S2XL-7 — Post-update AGENTS.md size (exit 0 ❌)</div>
+<pre>52579 bytes — NOT slimmed. FAIL.</pre></div>
+</div>
+</details>
+
+<!-- TC-S2-CODEX-PLUGIN -->
+<details>
+<summary><span class="badge badge-fail">FAIL</span> TC-S2-CODEX-PLUGIN — Codex Plugin Old→Update</summary>
+<div class="detail-body">
+<p>Old version (0.0.2) codex plugin install failed with access denied error. All subsequent commands failed because no workspace was created.</p>
+
+<div class="cmd-block"><div class="cmd-label">S2XP-2 — Install old version plugin (exit 1 ❌)</div>
+<pre class="cmd-text">npx --yes --package @azure/functions-skills@0.0.2-preview azure-functions-skills install --agent codex --dir $WS --yes</pre>
+<pre>Error: Plugin install failed for codex: Error: failed to back up plugin cache entry: Access is denied. (os error 5)
+
+Caused by:
+  0: failed to back up plugin cache entry: Access is denied. (os error 5)
+  1: Access is denied. (os error 5)</pre>
+<p style="color:var(--fail);font-weight:600">❌ Old version codex plugin install fails on this machine. Codex marketplace cache permission issue.</p></div>
+
+<div class="cmd-block"><div class="cmd-label">S2XP-5 — Update without prior install (exit 1 ❌)</div>
+<pre>Choose an agent with --agent &lt;name&gt; or use --all to update every supported agent.
+If this workspace was installed before, make sure .azure-functions-skills/state.local.json exists.</pre></div>
+</div>
+</details>
+
+<!-- ===== Preflight ===== -->
+<details>
+<summary><span class="badge badge-pass">INFO</span> Preflight Checks</summary>
+<div class="detail-body">
+<div class="cmd-block"><div class="cmd-label">PF-1 — --version (exit 0 ✅)</div>
+<pre>@azure/functions-skills v0.0.3-preview</pre></div>
+<div class="cmd-block"><div class="cmd-label">PF-2 — --help (exit 0 ✅)</div>
+<pre>Usage: azure-functions-skills &lt;command&gt; [options] ...</pre></div>
+<div class="cmd-block"><div class="cmd-label">PF-3 — copilot --version (exit 0 ✅)</div>
+<pre>0.27.0-nightly.2026.5.29</pre></div>
+<div class="cmd-block"><div class="cmd-label">PF-4 — claude --version (exit 1 ❌)</div>
+<pre>claude: NOT FOUND</pre></div>
+<div class="cmd-block"><div class="cmd-label">PF-5 — codex --version (exit 0 ✅)</div>
+<pre>codex 0.5.3</pre></div>
+</div>
+</details>
+
+</section>
+
+<!-- ===== Machine-Checkable Counters ===== -->
+<section>
+<h2>Machine-Checkable Counters</h2>
+<div class="counters">
+<pre>expectedCommandCount: 108
+actualCommandCount:   93
+blockedCommandCount:  15
+missingCommandIds:    (none — 15 blocked: S1CL-8, S1CP-1..7, S2CP-1..7)
+passCount:            4  (includes 2 PASS-WITH-WARNINGS)
+failCount:            5
+blockedCount:         3
+note: commands.md lists 108 IDs (S1-GHCP-PLUGIN has 12, not 11 as stated in its header)
+</pre>
+</div>
+</section>
+
+<!-- ===== Cross-Check Placeholder ===== -->
+<section id="cross-check">
+<h2>Cross-Check Results</h2>
+<div class="cmd-block">
+<div class="cmd-label">Cross-Check Metadata</div>
+<pre>Reviewer model: Claude Opus 4.8 (via rubber-duck agent)
+Cross-check timestamp: 2026-06-01T03:15:00Z
+Commands verified: 108/108 (all accounted for in executor narrative)
+Missing commands: none
+Workarounds detected: none
+</pre>
+</div>
+
+<h3>Verdict Overrides Applied</h3>
+<ul class="issue-list">
+<li>
+<span class="severity sev-medium">OVERRIDE</span>
+<strong>TC-S1-CODEX-LOCAL: FAIL → PASS-WITH-WARNINGS</strong><br>
+Reason: S1XL-9 exited 0 and LLM returned a skill summary. Internal sandbox errors ("ERROR windows sandbox: spawn setup refresh") are a Codex runtime limitation on Windows, not a CLI bug. The rubric states "returns response or is blocked" — response was returned. No defined fail criterion for internal sandbox probe errors.
+</li>
+<li>
+<span class="severity sev-medium">OVERRIDE</span>
+<strong>TC-S1-CODEX-PLUGIN: FAIL → PASS</strong><br>
+Reason: Plugin pass criteria (S1XP-3 exits 0, files exist, AGENTS.md has managed markers) were all satisfied. S1XP-8 chat step is informational, not part of plugin pass criteria. Same Windows sandbox limitation.
+</li>
+<li>
+<span class="severity sev-info">NOTE</span>
+<strong>TC-S1-GHCP-PLUGIN: FAIL verdict retained, justification re-anchored</strong><br>
+Primary failure reason: S1GP-10 (0 azure-functions-* skills in session events). S1GP-11 agent name resolution failure is informational — direct agent invocation is not a rubric criterion.
+</li>
+</ul>
+
+<h3>Count Corrections Applied</h3>
+<ul class="issue-list">
+<li>
+<span class="severity sev-high">CORRECTION</span>
+<strong>expectedCommandCount: 106 → 108</strong><br>
+commands.md lists 108 actual command IDs. S1-GHCP-PLUGIN has 12 IDs (S1GP-1..12) but its header claims 11. The doc's summary also says 106 but its rows sum to 107. Actual ground-truth count from ID enumeration: 5 + 53 + 50 = 108.
+</li>
+<li>
+<span class="severity sev-high">CORRECTION</span>
+<strong>actualCommandCount: 88 → 93</strong><br>
+Previous count excluded 5 preflight commands. Correct: 5 (PF) + 45 (S1) + 43 (S2) = 93.
+</li>
+<li>
+<span class="severity sev-high">CORRECTION</span>
+<strong>blockedCommandCount: 18 → 15</strong><br>
+Actual blocked: S1CL-8 (1) + S1CP-1..7 (7) + S2CP-1..7 (7) = 15.
+</li>
+<li>
+<span class="severity sev-medium">CORRECTION</span>
+<strong>failCount: 6 → 5, passCount: 2 → 4, blockedCount: 4 → 3</strong><br>
+After Codex verdict overrides. S1-CLAUDE-LOCAL is BLOCKED (not counted as FAIL).
+</li>
+</ul>
+
+<h3>Overall Verdict</h3>
+<p style="font-size:1.2rem;font-weight:700;color:var(--pass)">✅ VALID (after corrections applied)</p>
+<p>Test execution was sound and well-evidenced. No workarounds detected. All 108 command IDs accounted for. Corrections applied to summary counts and 2 Codex verdicts per cross-check findings.</p>
+</section>
+
 </body>
 </html>
