@@ -10,7 +10,19 @@ by required reviewers (`Azure/azure-functions-bucees-team`,
 
 | # | Stimulus | What it asserts |
 | --- | --- | --- |
-| 1 | Live — deploy TypeScript HTTP FC1 to Azure | `azure-functions-deploy` skill is invoked, agent runs the prepare → validate → deploy hand-off (or `azd up` directly), output contains a `*.azurewebsites.net` Function App URL, and no Azure error patterns appear |
+| 1 | Live — deploy TypeScript HTTP FC1 to Azure | `azure-functions-deploy` skill is invoked; the agent **actually invokes `azd up`/`provision`/`deploy`** (verified via the `tool-call` grader against the trajectory, not the final message); the agent does **not** run `azd down` (cleanup is the workflow's job); the final summary contains a `*.azurewebsites.net` Function App URL; no known Azure failure patterns; **no silent security regression** (agent must not silently fall back from Managed Identity to a storage connection string) |
+
+### Why the deploy check uses `tool-call`, not `output-matches`
+
+`trajectory.output` is the agent's **final assistant message only** — a
+result-focused summary. Even on a successful deploy the agent's last
+message may not echo the literal string `azd up`. We learned this the
+hard way on [run #26702663944](https://github.com/Azure/azure-functions-skills/actions/runs/26702663944):
+the deploy succeeded end-to-end (a real `*.azurewebsites.net` URL was
+returned) but `output-matches /azd up/` failed because the summary
+focused on "what was provisioned" rather than "how I did it". The
+`tool-call` grader sees every bash command issued during the session,
+which is the right place to assert on agent behavior.
 
 ## Fixture
 
