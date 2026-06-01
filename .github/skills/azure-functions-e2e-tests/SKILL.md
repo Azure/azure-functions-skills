@@ -57,9 +57,31 @@ If the user does NOT narrow scope, run ALL 12 test cases. Do NOT decide on your 
 
 Every invocation of this skill starts a **fresh run from scratch** with a new `<run-id>`. Do NOT reuse or read results from previous runs unless the user explicitly says to resume a specific run. Previous workspaces, checklists, and evidence are irrelevant to the new run.
 
+## Prerequisite gate (run FIRST — before anything else)
+
+Before running preflight or any test case, verify that **all three agent CLIs are installed, authenticated, and functional**. Run these checks and **STOP immediately** if any fail — do not proceed to the test matrix with missing prerequisites.
+
+```
+copilot --version          # must exit 0
+claude --version           # must exit 0
+claude -p "ping" --output-format json --max-turns 1   # must return a result (not "Not logged in")
+codex --version            # must exit 0
+```
+
+### If a check fails
+
+| Check | Action |
+|-------|--------|
+| `copilot --version` fails | **STOP.** Ask the user to install GitHub Copilot CLI: `npm install -g @githubnext/github-copilot-cli` or update VS Code with Copilot extension. |
+| `claude --version` fails | **STOP.** Ask the user to install Claude Code: `npm install -g @anthropic-ai/claude-code` |
+| `claude -p "ping"` returns "Not logged in" | **STOP.** Ask the user to run `claude` and complete `/login` interactively. |
+| `codex --version` fails | **STOP.** Ask the user to install Codex CLI: `npm install -g @openai/codex` |
+
+**Do NOT proceed with partial coverage.** All 3 agents must be available. If the user explicitly requests a subset (e.g., "ghcp only"), then only that agent's CLI is required.
+
 ## Preflight checks
 
-Before the matrix, run these commands and record the output. If an agent CLI is missing, mark ALL test cases for that agent as `blocked`:
+After the prerequisite gate passes, run these commands and record the output for the report:
 
 ```
 node bin/azure-functions-skills.js --version
