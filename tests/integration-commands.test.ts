@@ -197,7 +197,7 @@ describe('CLI command integration', () => {
 
   it('workspace apply --dry-run prints planned plugin-reference changes without writing files for each target', () => {
     const expectations: Array<{ target: BuildTargetName; files: string[] }> = [
-      { target: 'ghcp', files: ['.github/copilot-instructions.md', '.github/copilot/settings.json'] },
+      { target: 'ghcp', files: ['AGENTS.md', '.github/copilot/settings.json'] },
       { target: 'claude', files: ['CLAUDE.md', '.claude/settings.json'] },
       { target: 'codex', files: ['AGENTS.md', '.agents/plugins/marketplace.json'] },
     ];
@@ -283,9 +283,10 @@ describe('CLI command integration', () => {
     expect(output).toContain('Plugin:');
     expect(output).toContain('copilot plugin marketplace add Azure/azure-functions-skills');
     expect(output).toContain('Workspace:');
-    expect(output).toContain('.github/copilot-instructions.md');
+    expect(output).toContain('AGENTS.md');
     expect(output).toContain('.github/agents/functions-copilot.agent.md');
     expect(output).toContain('.mcp.json');
+    expect(output).not.toContain('.github/copilot-instructions.md');
     expect(output).toContain('.github/hooks/welcome-setup.json');
     expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
   });

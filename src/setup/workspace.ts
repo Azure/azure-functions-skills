@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadMcpServers, loadSkills } from '../build/loader.js';
+import { loadAgents, loadMcpServers, loadSkills } from '../build/loader.js';
 import { applySetup, detectAgents } from './index.js';
 import type { CliAgentName, McpServer, MergeStrategy, WorkspaceApplyOptions, WorkspaceApplyResult, WorkspaceMode } from '../types.js';
 
@@ -71,7 +71,7 @@ export async function applyWorkspace(targetDir: string, options: WorkspaceApplyO
 }
 
 function plannedCopyFiles(agent: CliAgentName): string[] {
-  if (agent === 'ghcp') return ['.github/copilot-instructions.md', '.github/skills/<skill-id>/SKILL.md'];
+  if (agent === 'ghcp') return ['AGENTS.md', '.github/agents/functions-copilot.agent.md', '.github/skills/<skill-id>/SKILL.md'];
   if (agent === 'claude') return ['CLAUDE.md', '.claude/skills/<skill-id>/SKILL.md'];
   return ['AGENTS.md', '.agents/skills/<skill-id>/SKILL.md'];
 }
@@ -79,7 +79,7 @@ function plannedCopyFiles(agent: CliAgentName): string[] {
 function activationFiles(agent: CliAgentName, mode: WorkspaceMode, options: WorkspaceApplyOptions): PlannedFile[] {
   const files: PlannedFile[] = [];
   if (agent === 'ghcp') {
-    files.push({ path: '.github/copilot-instructions.md', content: routingBlock(agent), merge: true });
+    files.push({ path: 'AGENTS.md', content: agentsMdDefinition(), merge: true });
     if (options.includeAgent) files.push({ path: '.github/agents/functions-copilot.agent.md', content: ghcpAgentDefinition() });
     if (mode === 'plugin-reference') files.push({ path: '.github/copilot/settings.json', content: JSON.stringify(ghcpPluginSettings(), null, 2) });
     if (options.includeMcp) files.push({ path: '.mcp.json', content: JSON.stringify(ghcpMcpSettings(), null, 2) });
@@ -323,6 +323,10 @@ function routingBlock(agent: CliAgentName): string {
 
 function ghcpAgentDefinition(): string {
   return readFileSync(join(TEMPLATES_DIR, 'agents', 'functions-copilot.agent.md'), 'utf-8').trimEnd();
+}
+
+function agentsMdDefinition(): string {
+  return loadAgents(join(TEMPLATES_DIR, 'agents')).agentsMd.trimEnd();
 }
 
 function skillRoutingList(): string {

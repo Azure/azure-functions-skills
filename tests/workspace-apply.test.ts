@@ -126,11 +126,11 @@ describe('applyWorkspace', () => {
       mergeStrategy: 'managed-block',
     });
 
-    expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+    expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
+    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
     expect(existsSync(join(dir, '.github', 'copilot', 'settings.json'))).toBe(true);
     expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
     expect(existsSync(join(dir, '.claude', 'settings.json'))).toBe(true);
-    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
     expect(existsSync(join(dir, '.agents', 'plugins', 'marketplace.json'))).toBe(true);
 
     expect(existsSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
@@ -152,8 +152,13 @@ describe('applyWorkspace', () => {
     const agentPath = join(dir, '.github', 'agents', 'functions-copilot.agent.md');
     expect(existsSync(agentPath)).toBe(true);
     expect(readFileSync(agentPath, 'utf-8')).toContain('name: functions-copilot');
+    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+    expect(readFileSync(join(dir, 'AGENTS.md'), 'utf-8')).toContain('Azure Functions Development Standards');
+    expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
     expect(existsSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
     expect(result.plannedFiles).toContain('.github/agents/functions-copilot.agent.md');
+    expect(result.plannedFiles).toContain('AGENTS.md');
+    expect(result.plannedFiles).not.toContain('.github/copilot-instructions.md');
   });
 
   it('dry-run reports planned changes without writing files', async () => {

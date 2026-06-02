@@ -204,7 +204,7 @@ describe('planPluginOperation', () => {
         { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
       ]);
-      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
       expect(existsSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
       expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
       expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
@@ -234,7 +234,7 @@ describe('planPluginOperation', () => {
         { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
       ]);
-      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
       expect(existsSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
       expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
       expect(result.filesWritten).toBeGreaterThan(0);
