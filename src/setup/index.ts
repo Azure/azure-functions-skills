@@ -149,7 +149,7 @@ function isPluginOnlyArtifact(agent: CliAgentName, relativePath: string): boolea
   const [topLevel, secondLevel] = relativePath.split(/[\\/]/);
 
   if (agent === 'ghcp') {
-    return ['plugin.json', 'skills', 'agents', 'hooks.json', '.mcp.json'].includes(topLevel);
+    return ['plugin.json', 'skills', 'agents', 'hooks.json'].includes(topLevel);
   }
 
   if (agent === 'codex') {

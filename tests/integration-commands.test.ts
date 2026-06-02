@@ -79,7 +79,8 @@ function assertAgentFiles(root: string, expectedAgentFiles: string[]): void {
 function assertWorkspaceLayout(root: string, target: BuildTargetName, expectedSkillIds: string[], expectedAgentFiles: string[]): void {
   if (target === 'ghcp') {
     // No copilot-instructions.md (routing handled by agent definition)
-    expect(existsSync(join(root, '.vscode', 'mcp.json'))).toBe(true);
+    expect(existsSync(join(root, '.mcp.json'))).toBe(true);
+    expect(existsSync(join(root, '.vscode', 'mcp.json'))).toBe(false);
     expect(existsSync(join(root, '.github', 'hooks', 'welcome-setup.json'))).toBe(true);
     assertAgentFiles(join(root, '.github', 'agents'), expectedAgentFiles);
     assertSkillDirectories(join(root, '.github', 'skills'), expectedSkillIds);
@@ -255,7 +256,8 @@ describe('CLI command integration', () => {
       '--yes',
     ]);
 
-    expect(existsSync(join(projectDir, '.vscode', 'mcp.json'))).toBe(true);
+    expect(existsSync(join(projectDir, '.mcp.json'))).toBe(true);
+    expect(existsSync(join(projectDir, '.vscode', 'mcp.json'))).toBe(false);
     expect(existsSync(join(projectDir, '.github', 'hooks', 'welcome-setup.json'))).toBe(true);
     expect(existsSync(join(projectDir, '.claude', 'settings.json'))).toBe(true);
     expect(existsSync(join(projectDir, '.codex', 'config.toml'))).toBe(true);
@@ -282,7 +284,7 @@ describe('CLI command integration', () => {
     expect(output).toContain('Workspace:');
     expect(output).toContain('.github/copilot-instructions.md');
     expect(output).toContain('.github/agents/functions-copilot.agent.md');
-    expect(output).toContain('.vscode/mcp.json');
+    expect(output).toContain('.mcp.json');
     expect(output).toContain('.github/hooks/welcome-setup.json');
     expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
   });
@@ -660,7 +662,7 @@ describe('CLI command integration', () => {
     // Verify initial install laid down workspace files (no copilot-instructions.md for GHCP)
     const agentDefPath = join(projectDir, '.github', 'agents', 'functions-copilot.agent.md');
     expect(existsSync(agentDefPath)).toBe(true);
-    const mcpPath = join(projectDir, '.vscode', 'mcp.json');
+    const mcpPath = join(projectDir, '.mcp.json');
     expect(existsSync(mcpPath)).toBe(true);
 
     // Step 2: User customizes the MCP file
@@ -675,7 +677,7 @@ describe('CLI command integration', () => {
     const afterUpdate = readFileSync(mcpPath, 'utf-8');
     expect(afterUpdate).toContain('my custom note');
     // New version saved aside
-    const asidePath = join(projectDir, '.vscode', 'mcp.azure-functions-skills-new.json');
+    const asidePath = join(projectDir, '.mcp.azure-functions-skills-new.json');
     expect(existsSync(asidePath)).toBe(true);
     // Skills should be refreshed (overwrite strategy)
     const skillsDir = join(projectDir, '.github', 'skills');

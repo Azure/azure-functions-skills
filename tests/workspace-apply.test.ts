@@ -177,7 +177,8 @@ describe('applyWorkspace', () => {
       includeHooks: true,
     });
 
-    expect(existsSync(join(dir, '.vscode', 'mcp.json'))).toBe(true);
+    expect(existsSync(join(dir, '.mcp.json'))).toBe(true);
+    expect(existsSync(join(dir, '.vscode', 'mcp.json'))).toBe(false);
     expect(existsSync(join(dir, '.github', 'hooks', 'welcome-setup.json'))).toBe(true);
     expect(existsSync(join(dir, '.claude', 'settings.json'))).toBe(true);
     expect(existsSync(join(dir, '.codex', 'config.toml'))).toBe(true);

@@ -37,11 +37,10 @@ function setupLocalWorkspace(dir: string, agent: 'ghcp' | 'claude' | 'codex'): v
       '',
       'More custom user content.',
     ].join('\n'));
-    mkdirSync(join(dir, '.vscode'), { recursive: true });
-    writeFileSync(join(dir, '.vscode', 'mcp.json'), JSON.stringify({
-      servers: {
+    writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
+      mcpServers: {
         'my-custom-server': { type: 'stdio', command: 'my-tool', args: [] },
-        'azure-functions': { type: 'stdio', command: 'npx', args: ['@azure/mcp@old'] },
+        'azure-functions': { type: 'stdio', command: 'npx', args: ['@azure/mcp@old'], tools: ['*'] },
       },
     }, null, 2));
     mkdirSync(join(dir, '.github', 'hooks'), { recursive: true });
@@ -210,18 +209,18 @@ describe('applyLocalUpdate', () => {
   });
 
   describe('MCP settings use save-aside', () => {
-    it('saves aside .vscode/mcp.json preserving existing file', async () => {
+    it('saves aside .mcp.json preserving existing file', async () => {
       const dir = makeTempDir();
       setupLocalWorkspace(dir, 'ghcp');
 
       await applyLocalUpdate(dir, { agents: ['ghcp'] });
 
       // Original file preserved with user's custom server
-      const original = JSON.parse(readFileSync(join(dir, '.vscode', 'mcp.json'), 'utf-8'));
-      expect(original.servers['my-custom-server']).toBeDefined();
+      const original = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf-8'));
+      expect(original.mcpServers['my-custom-server']).toBeDefined();
 
       // New file saved aside
-      const asidePath = join(dir, '.vscode', 'mcp.azure-functions-skills-new.json');
+      const asidePath = join(dir, '.mcp.azure-functions-skills-new.json');
       expect(existsSync(asidePath)).toBe(true);
     });
 
@@ -276,11 +275,11 @@ describe('applyLocalUpdate', () => {
 
       await applyLocalUpdate(dir, { agents: ['ghcp'], force: true });
 
-      const mcp = JSON.parse(readFileSync(join(dir, '.vscode', 'mcp.json'), 'utf-8'));
+      const mcp = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf-8'));
       // User's custom server is gone (overwritten)
-      expect(mcp.servers?.['my-custom-server']).toBeUndefined();
+      expect(mcp.mcpServers?.['my-custom-server']).toBeUndefined();
       // No save-aside file created
-      expect(existsSync(join(dir, '.vscode', 'mcp.azure-functions-skills-new.json'))).toBe(false);
+      expect(existsSync(join(dir, '.mcp.azure-functions-skills-new.json'))).toBe(false);
     });
   });
 
@@ -359,11 +358,11 @@ describe('applyLocalUpdate', () => {
       expect(result.savedAside).toHaveLength(0);
       // The files that would have been save-aside are now in overwritten
       expect(result.overwritten.length).toBeGreaterThan(0);
-      // mcp.json should be overwritten (user's custom server gone)
-      const mcp = JSON.parse(readFileSync(join(dir, '.vscode', 'mcp.json'), 'utf-8'));
-      expect(mcp.servers?.['my-custom-server']).toBeUndefined();
+      // .mcp.json should be overwritten (user's custom server gone)
+      const mcp = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf-8'));
+      expect(mcp.mcpServers?.['my-custom-server']).toBeUndefined();
       // No save-aside file
-      expect(existsSync(join(dir, '.vscode', 'mcp.azure-functions-skills-new.json'))).toBe(false);
+      expect(existsSync(join(dir, '.mcp.azure-functions-skills-new.json'))).toBe(false);
     });
 
     it('saves aside file when prompter returns skip', async () => {
@@ -376,8 +375,8 @@ describe('applyLocalUpdate', () => {
       // Save-aside files created
       expect(result.savedAside.length).toBeGreaterThan(0);
       // User's custom MCP server preserved
-      const mcp = JSON.parse(readFileSync(join(dir, '.vscode', 'mcp.json'), 'utf-8'));
-      expect(mcp.servers['my-custom-server']).toBeDefined();
+      const mcp = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf-8'));
+      expect(mcp.mcpServers['my-custom-server']).toBeDefined();
     });
 
     it('does not call prompter when not provided (non-interactive)', async () => {
@@ -419,7 +418,7 @@ describe('saveAsidePath', () => {
     expect(saveAsidePath('CLAUDE.md')).toBe('CLAUDE.azure-functions-skills-new.md');
     expect(saveAsidePath('settings.json')).toBe('settings.azure-functions-skills-new.json');
     expect(saveAsidePath('config.toml')).toBe('config.azure-functions-skills-new.toml');
-    expect(saveAsidePath(join('.vscode', 'mcp.json'))).toBe(join('.vscode', 'mcp.azure-functions-skills-new.json'));
+    expect(saveAsidePath('.mcp.json')).toBe('.mcp.azure-functions-skills-new.json');
   });
 
   it('handles files without extension', () => {

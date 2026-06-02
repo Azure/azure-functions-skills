@@ -93,7 +93,7 @@ function activationFiles(agent: CliAgentName, mode: WorkspaceMode, options: Work
     files.push({ path: '.github/copilot-instructions.md', content: routingBlock(agent), merge: true });
     if (options.includeAgent) files.push({ path: '.github/agents/functions-copilot.agent.md', content: ghcpAgentDefinition() });
     if (mode === 'plugin-reference') files.push({ path: '.github/copilot/settings.json', content: JSON.stringify(ghcpPluginSettings(), null, 2) });
-    if (options.includeMcp) files.push({ path: '.vscode/mcp.json', content: JSON.stringify(ghcpMcpSettings(), null, 2) });
+    if (options.includeMcp) files.push({ path: '.mcp.json', content: JSON.stringify(ghcpMcpSettings(), null, 2) });
     if (options.includeHooks) files.push({ path: '.github/hooks/welcome-setup.json', content: JSON.stringify(crossPlatformHooks(), null, 2) });
   }
 
@@ -212,15 +212,16 @@ function mcpServers(): McpServer[] {
 }
 
 function ghcpMcpSettings() {
-  const servers: Record<string, { type: string; command: string; args: string[] }> = {};
+  const servers: Record<string, { type: string; command: string; args: string[]; tools: string[] }> = {};
   for (const server of mcpServers()) {
     servers[server.id] = {
       type: server.type || 'stdio',
       command: server.command,
       args: server.args,
+      tools: ['*'],
     };
   }
-  return { servers };
+  return { mcpServers: servers };
 }
 
 function claudeMcpSettings() {

@@ -125,14 +125,12 @@ function buildGhcp({ skills, mcpServers, agents }: BuildData, distDir: string): 
   const base = join(distDir, 'ghcp');
   mkdirSync(join(base, '.github', 'agents'), { recursive: true });
   mkdirSync(join(base, '.github', 'hooks'), { recursive: true });
-  mkdirSync(join(base, '.vscode'), { recursive: true });
 
   // No copilot-instructions.md — routing is handled by functions-copilot.agent.md
   // and skills are in .github/skills/<id>/SKILL.md
 
-  // mcp.json
-  const mcpJson = generateVscodeMcp(mcpServers);
-  writeFileSync(join(base, '.vscode', 'mcp.json'), JSON.stringify(mcpJson, null, 2));
+  // .mcp.json — Copilot CLI workspace MCP configuration
+  writeFileSync(join(base, '.mcp.json'), JSON.stringify(generateCopilotMcpJson(mcpServers), null, 2));
 
   // Agent definition
   writeFileSync(join(base, '.github', 'agents', 'functions-copilot.agent.md'), agents.copilot);
@@ -222,16 +220,17 @@ function generateRoutingBlock(agent: 'ghcp' | 'claude' | 'codex', skills: Skill[
   return template.replace('{{skills}}', skillList).trimEnd();
 }
 
-function generateVscodeMcp(mcpServers: McpServer[]) {
-  const servers: Record<string, { type: string; command: string; args: string[] }> = {};
+function generateCopilotMcpJson(mcpServers: McpServer[]) {
+  const servers: Record<string, { type: string; command: string; args: string[]; tools: string[] }> = {};
   for (const s of mcpServers) {
     servers[s.id] = {
       type: s.type || 'stdio',
       command: s.command,
       args: s.args,
+      tools: ['*'],
     };
   }
-  return { servers };
+  return { mcpServers: servers };
 }
 
 function generateGhcpSkillMd(skill: Skill): string {
@@ -311,14 +310,7 @@ function generatePluginMarketplace({ packageVersion, pluginSource }: PluginMarke
 }
 
 function generatePluginMcpJson(mcpServers: McpServer[]) {
-  const result: Record<string, { command: string; args: string[] }> = {};
-  for (const s of mcpServers) {
-    result[s.id] = {
-      command: s.command,
-      args: s.args,
-    };
-  }
-  return { mcpServers: result };
+  return generateCopilotMcpJson(mcpServers);
 }
 
 function generateClaudeSettings(mcpServers: McpServer[]) {

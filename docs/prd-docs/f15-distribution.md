@@ -93,7 +93,7 @@ GitHub Copilot CLI:
 .github/agents/functions-copilot.agent.md
 .github/copilot-instructions.md        # thin routing only
 .github/hooks/welcome-setup.json       # opt-in setup mode only
-.vscode/mcp.json                       # VS Code MCP, opt-in
+.mcp.json                              # Copilot CLI workspace MCP, opt-in
 AGENTS.md                              # optional cross-agent fallback
 ```
 
