@@ -1,7 +1,7 @@
 # azure-functions-deploy — live evaluation
 
 This eval **deploys real Azure resources**. It runs only from the
-[Skill Evaluation - Vally Live](../../.github/workflows/skill-evaluation-vally-live.yml)
+[Skill Evaluation - Azure Live Deploy](../../.github/workflows/skill-evaluation-azure-live-deploy.yml)
 workflow under the `functions-skills-live-e2e` GitHub Environment, which is gated
 by required reviewers (`Azure/azure-functions-bucees-team`,
 `prevent_self_review: false`).
@@ -78,7 +78,7 @@ The live workflow:
      annotation and the `az group delete` command for that run are
      written to `$GITHUB_STEP_SUMMARY` so a human can investigate and
      clean up later.
-5. The [cleanup-stale-vally-resources](../../.github/workflows/cleanup-stale-vally-resources.yml)
+5. The [cleanup-azure-live-eval-resources](../../.github/workflows/cleanup-azure-live-eval-resources.yml)
    safety net workflow deletes any RG tagged `vally-eval=true` that is
    older than 24h, so even forgotten `keep_resources` runs cannot linger.
 
