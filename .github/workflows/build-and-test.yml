@@ -71,7 +71,8 @@ jobs:
         run: |
           echo "=== GHCP ==="
           ls -la dist/workspace/ghcp/.github/
-          ls -la dist/workspace/ghcp/.vscode/
+          test -f dist/workspace/ghcp/.mcp.json
+          test ! -e dist/workspace/ghcp/.vscode/mcp.json
           echo "=== Claude ==="
           ls -la dist/workspace/claude/.claude/
           ls -la dist/workspace/claude/.claude/skills/
