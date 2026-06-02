@@ -310,7 +310,14 @@ function generatePluginMarketplace({ packageVersion, pluginSource }: PluginMarke
 }
 
 function generatePluginMcpJson(mcpServers: McpServer[]) {
-  return generateCopilotMcpJson(mcpServers);
+  const result: Record<string, { command: string; args: string[] }> = {};
+  for (const s of mcpServers) {
+    result[s.id] = {
+      command: s.command,
+      args: s.args,
+    };
+  }
+  return { mcpServers: result };
 }
 
 function generateClaudeSettings(mcpServers: McpServer[]) {

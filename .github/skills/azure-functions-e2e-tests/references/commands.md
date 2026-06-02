@@ -52,7 +52,8 @@ The command IDs and their semantics are platform-independent. The exact shell sy
 | `.github/skills/azure-functions-agents/assets/**` | YES | infra + quickstart-sample |
 | `.github/skills/azure-functions-common/SKILL.md` | YES | — |
 | `.github/hooks/welcome-setup.json` | YES | — |
-| `.vscode/mcp.json` | YES | — |
+| `.mcp.json` | YES | Copilot CLI workspace MCP config |
+| `.vscode/mcp.json` | **NO** | Must NOT exist for GHCP CLI MCP activation |
 | `AGENTS.md` | YES | — |
 | `.github/copilot-instructions.md` | **NO** | Must NOT exist |
 | `.azure-functions-skills/state.local.json` | YES | — |
@@ -64,7 +65,8 @@ The command IDs and their semantics are platform-independent. The exact shell sy
 | `.github/copilot-instructions.md` | YES | Small routing block with managed markers |
 | `.github/agents/functions-copilot.agent.md` | YES | — |
 | `.github/hooks/welcome-setup.json` | YES | — |
-| `.vscode/mcp.json` | YES | — |
+| `.mcp.json` | YES | Copilot CLI workspace MCP config |
+| `.vscode/mcp.json` | **NO** | Must NOT exist for GHCP CLI MCP activation |
 | `.github/copilot/settings.json` | YES | Plugin reference |
 
 ### Claude — local mode (`install --local --agent claude`)
@@ -474,7 +476,7 @@ Apply these checks to every test case during workspace verification steps:
 - If routing file contains full skill instructions/steps, that is a FAIL
 
 ### Cross-file consistency
-- MCP server entries should match between `.vscode/mcp.json` / `.claude/settings.json` / `.codex/config.toml`
+- MCP server entries should match between `.mcp.json` / `.claude/settings.json` / `.codex/config.toml`
 - Hook commands should use cross-platform Node.js (`node -e`), not bash-only commands
 - All skill IDs in routing tables should correspond to actual SKILL.md files
 

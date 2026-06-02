@@ -531,6 +531,11 @@ describe('buildPluginPayload', () => {
     expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
     expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
     expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
+    const mcpConfig = JSON.parse(readFileSync(join(payloadDir, '.mcp.json'), 'utf-8'));
+    expect(mcpConfig.mcpServers.azure).toEqual({
+      command: 'npx',
+      args: ['-y', '@azure/mcp@latest', 'server', 'start'],
+    });
 
     const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
     expect(manifest.skills).toBe('./skills/');
