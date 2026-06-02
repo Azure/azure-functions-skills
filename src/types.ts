@@ -66,6 +66,7 @@ export interface WorkspaceApplyOptions {
   update?: boolean;
   dryRun?: boolean;
   yes?: boolean;
+  force?: boolean;
   includeMcp?: boolean;
   includeHooks?: boolean;
   includeAgent?: boolean;

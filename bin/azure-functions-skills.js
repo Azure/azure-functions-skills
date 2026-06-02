@@ -94,6 +94,7 @@ Options:
   --no-workspace     Skip workspace activation
   --dry-run          Print planned changes without writing files
   --yes              Approve workspace activation changes to existing instruction files
+  --force            Overwrite workspace activation files instead of saving aside
 `,
   'workspace apply': `Usage: azure-functions-skills workspace apply [options]
 
@@ -614,6 +615,7 @@ if (command === 'install' || command === 'update') {
       includeMcp,
       includeHooks,
       includeAgent: true,
+      force,
     });
 
     if (dryRun) {
@@ -919,6 +921,7 @@ if (command === 'install' || command === 'update') {
   let workspace = true;
   let dryRun = false;
   let yes = false;
+  let force = false;
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
@@ -930,6 +933,7 @@ if (command === 'install' || command === 'update') {
     else if (args[i] === '--no-workspace') workspace = false;
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--yes') yes = true;
+    else if (args[i] === '--force') force = true;
   }
 
   const detectedAgents = agents.length > 0 ? agents : await detectAgents();
@@ -945,6 +949,7 @@ if (command === 'install' || command === 'update') {
       version,
       workspace,
       yes,
+      force,
     });
   } catch (err) {
     console.error(err.message);

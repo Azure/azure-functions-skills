@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadSkills } from '../src/build/loader.js';
@@ -87,6 +87,93 @@ describe('applyWorkspace', () => {
     expect(content).toContain('For Azure Functions work, prefer the Azure Functions Skills plugin');
     expect(content).not.toContain('old generated content');
     expect(result.filesWritten).toBeGreaterThan(0);
+  });
+
+  it('plugin-reference update saves customer-owned routing aside instead of appending', async () => {
+    const dir = makeTempDir();
+    const agentsPath = join(dir, 'AGENTS.md');
+    const customContent = ['# Project Agents', '', 'Keep this file custom.'].join('\n');
+    writeFileSync(agentsPath, customContent);
+
+    await applyWorkspace(dir, {
+      agents: ['codex'],
+      mode: 'plugin-reference',
+      mergeStrategy: 'managed-block',
+      update: true,
+      yes: true,
+    });
+
+    expect(readFileSync(agentsPath, 'utf-8')).toBe(customContent);
+    const asidePath = join(dir, 'AGENTS.azure-functions-skills-new.md');
+    expect(existsSync(asidePath)).toBe(true);
+    expect(readFileSync(asidePath, 'utf-8')).toContain('Azure Functions Skills');
+  });
+
+  it('plugin-reference update saves existing settings aside instead of overwriting', async () => {
+    const dir = makeTempDir();
+    const configPath = join(dir, '.codex', 'config.toml');
+    mkdirSync(dirname(configPath), { recursive: true });
+    const customConfig = [
+      '# Custom Codex MCP config',
+      '',
+      '[mcp_servers.custom]',
+      'command = "custom-tool"',
+      '',
+    ].join('\n');
+    writeFileSync(configPath, customConfig);
+
+    await applyWorkspace(dir, {
+      agents: ['codex'],
+      mode: 'plugin-reference',
+      update: true,
+      includeMcp: true,
+      yes: true,
+    });
+
+    expect(readFileSync(configPath, 'utf-8')).toBe(customConfig);
+    const asidePath = join(dir, '.codex', 'config.azure-functions-skills-new.toml');
+    expect(existsSync(asidePath)).toBe(true);
+    expect(readFileSync(asidePath, 'utf-8')).toContain('[mcp_servers.');
+  });
+
+  it('plugin-reference update dry-run reports save-aside targets for existing settings', async () => {
+    const dir = makeTempDir();
+    const configPath = join(dir, '.codex', 'config.toml');
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, '[mcp_servers.custom]\ncommand = "custom-tool"\n');
+
+    const result = await applyWorkspace(dir, {
+      agents: ['codex'],
+      mode: 'plugin-reference',
+      update: true,
+      includeMcp: true,
+      dryRun: true,
+    });
+
+    expect(result.filesWritten).toBe(0);
+    expect(result.plannedFiles).toContain(join('.codex', 'config.azure-functions-skills-new.toml'));
+    expect(result.plannedFiles).not.toContain(join('.codex', 'config.toml'));
+    expect(readFileSync(configPath, 'utf-8')).toContain('custom-tool');
+  });
+
+  it('plugin-reference update force overwrites existing settings', async () => {
+    const dir = makeTempDir();
+    const configPath = join(dir, '.codex', 'config.toml');
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, '[mcp_servers.custom]\ncommand = "custom-tool"\n');
+
+    await applyWorkspace(dir, {
+      agents: ['codex'],
+      mode: 'plugin-reference',
+      update: true,
+      includeMcp: true,
+      force: true,
+    });
+
+    const updated = readFileSync(configPath, 'utf-8');
+    expect(updated).not.toContain('custom-tool');
+    expect(updated).toContain('[mcp_servers.');
+    expect(existsSync(join(dir, '.codex', 'config.azure-functions-skills-new.toml'))).toBe(false);
   });
 
   it('generates routing guidance from current skill templates', async () => {

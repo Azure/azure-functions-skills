@@ -723,6 +723,45 @@ describe('CLI command integration', () => {
     expect(output).toContain('Planned local update');
   });
 
+  it('update after plugin install auto-detects plugin mode and preserves workspace settings', { timeout: 30_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-plugin-update-preserve-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'codex', '--dir', projectDir, '--yes'], { env });
+
+    const configPath = join(projectDir, '.codex', 'config.toml');
+    const customConfig = [
+      '# Custom Codex MCP config',
+      '',
+      '[mcp_servers.custom]',
+      'command = "custom-tool"',
+      '',
+    ].join('\n');
+    writeFileSync(configPath, customConfig);
+
+    runCli(['update', '--agent', 'codex', '--dir', projectDir, '--yes'], { env });
+
+    expect(readFileSync(configPath, 'utf-8')).toBe(customConfig);
+    const asidePath = join(projectDir, '.codex', 'config.azure-functions-skills-new.toml');
+    expect(existsSync(asidePath)).toBe(true);
+    expect(readFileSync(asidePath, 'utf-8')).toContain('[mcp_servers.');
+
+    runCli(['update', '--agent', 'codex', '--dir', projectDir, '--yes', '--force'], { env });
+
+    const forcedUpdate = readFileSync(configPath, 'utf-8');
+    expect(forcedUpdate).not.toBe(customConfig);
+    expect(forcedUpdate).toContain('[mcp_servers.');
+  });
+
   it('install rejects mixed mode: local then plugin', { timeout: 15_000 }, () => {
     const fakeBinDir = createFakeAgentCliDirectory();
     const projectDir = makeTempDir('af-skills-e2e-mixed-mode-');

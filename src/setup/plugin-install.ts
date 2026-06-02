@@ -46,6 +46,7 @@ export interface PluginOperationOptions {
   runner?: CommandRunner;
   platform?: NodeJS.Platform;
   yes?: boolean;
+  force?: boolean;
   passthroughArgs?: string[];
 }
 
@@ -272,6 +273,7 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
       mergeStrategy: 'managed-block',
       update: options.action === 'update',
       yes: options.yes,
+      force: options.force,
       includeAgent: true,
     });
     result.filesWritten += workspaceResult.filesWritten;

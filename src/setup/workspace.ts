@@ -3,17 +3,24 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadMcpServers, loadSkills } from '../build/loader.js';
 import { applySetup, detectAgents } from './index.js';
+import { resolveUniqueAsidePath } from './save-aside.js';
 import type { CliAgentName, McpServer, MergeStrategy, WorkspaceApplyOptions, WorkspaceApplyResult, WorkspaceMode } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 const BLOCK_START = '<!-- azure-functions-skills:start';
 const BLOCK_END = '<!-- azure-functions-skills:end -->';
+const BLOCK_PATTERN = /<!-- azure-functions-skills:start[^\n]* -->[\s\S]*?<!-- azure-functions-skills:end -->/;
 
 type PlannedFile = {
   path: string;
   content: string;
   merge?: boolean;
+};
+
+type PlannedWrite = {
+  path: string;
+  content: string;
 };
 
 export async function applyWorkspace(targetDir: string, options: WorkspaceApplyOptions = {}): Promise<WorkspaceApplyResult> {
@@ -22,6 +29,7 @@ export async function applyWorkspace(targetDir: string, options: WorkspaceApplyO
   const mergeStrategy = options.mergeStrategy || 'managed-block';
   const dryRun = options.dryRun === true;
   const approved = options.yes === true;
+  const force = options.force === true;
 
   if (mode === 'copy') {
     if (dryRun) {
@@ -44,27 +52,34 @@ export async function applyWorkspace(targetDir: string, options: WorkspaceApplyO
   }
 
   const plannedFiles = agents.flatMap(agent => activationFiles(agent, mode, options));
+  const combinedFiles = combinePlannedFiles(plannedFiles);
   if (dryRun) {
     return {
       agents,
       mode,
       filesWritten: 0,
-      plannedFiles: plannedFiles.flatMap(file => plannedWorkspacePaths(file, mergeStrategy)),
+      plannedFiles: plannedDryRunPaths(targetDir, combinedFiles, mergeStrategy, options.update === true, force),
       dryRun,
     };
   }
 
-  let filesWritten = 0;
-  for (const file of plannedFiles) {
-    const fullPath = join(targetDir, file.path);
-    const content = file.merge
-      ? mergeInstructionFile(fullPath, file.content, mergeStrategy, options.update === true, approved)
-      : mergeJsonLikeFile(fullPath, file.content);
-    mkdirSync(dirname(fullPath), { recursive: true });
-    writeFileSync(fullPath, content);
-    filesWritten++;
+  const existingAtStart = new Set(
+    combinedFiles
+      .map(file => file.path)
+      .filter(path => existsSync(join(targetDir, path))),
+  );
 
-    if (file.merge && mergeStrategy === 'include-file') {
+  let filesWritten = 0;
+  for (const file of combinedFiles) {
+    const writes = plannedWritesForFile(targetDir, file, mergeStrategy, options.update === true, approved, force, existingAtStart);
+    for (const write of writes) {
+      const fullPath = join(targetDir, write.path);
+      mkdirSync(dirname(fullPath), { recursive: true });
+      writeFileSync(fullPath, write.content);
+      filesWritten++;
+    }
+
+    if (file.merge && mergeStrategy === 'include-file' && writes.some(write => write.path === file.path)) {
       const includeFullPath = join(targetDir, includeInstructionPath(file.path));
       mkdirSync(dirname(includeFullPath), { recursive: true });
       writeFileSync(includeFullPath, ensureTrailingNewline(file.content));
@@ -118,15 +133,93 @@ function plannedWorkspacePaths(file: PlannedFile, strategy: MergeStrategy): stri
   return [file.path];
 }
 
-function mergeInstructionFile(filePath: string, generatedContent: string, strategy: MergeStrategy, update: boolean, approved: boolean): string {
+function plannedDryRunPaths(targetDir: string, files: PlannedFile[], strategy: MergeStrategy, update: boolean, force: boolean): string[] {
+  return files.flatMap(file => {
+    if (force || !update) return plannedWorkspacePaths(file, strategy);
+
+    if (file.merge) {
+      const fullPath = join(targetDir, file.path);
+      if (!existsSync(fullPath)) return plannedWorkspacePaths(file, strategy);
+      const existing = readFileSync(fullPath, 'utf-8');
+      if (BLOCK_PATTERN.test(existing)) return plannedWorkspacePaths(file, strategy);
+      return [resolveUniqueAsidePath(targetDir, file.path)];
+    }
+
+    if (existsSync(join(targetDir, file.path)) && isSettingsFile(file.path)) {
+      return [resolveUniqueAsidePath(targetDir, file.path)];
+    }
+
+    return [file.path];
+  });
+}
+
+function combinePlannedFiles(files: PlannedFile[]): PlannedFile[] {
+  const combined = new Map<string, PlannedFile>();
+  const result: PlannedFile[] = [];
+
+  for (const file of files) {
+    const existing = combined.get(file.path);
+    if (!existing || existing.merge || file.merge) {
+      combined.set(file.path, file);
+      result.push(file);
+      continue;
+    }
+
+    existing.content = mergeGeneratedContent(existing.content, file.content);
+  }
+
+  return result;
+}
+
+function mergeGeneratedContent(existingContent: string, nextContent: string): string {
+  try {
+    const existing = JSON.parse(existingContent) as Record<string, unknown>;
+    const next = JSON.parse(nextContent) as Record<string, unknown>;
+    return JSON.stringify(deepMerge(existing, next), null, 2);
+  } catch {
+    return nextContent;
+  }
+}
+
+function plannedWritesForFile(
+  targetDir: string,
+  file: PlannedFile,
+  strategy: MergeStrategy,
+  update: boolean,
+  approved: boolean,
+  force: boolean,
+  existingAtStart: Set<string>,
+): PlannedWrite[] {
+  if (file.merge) {
+    return instructionFileWrites(targetDir, file.path, file.content, strategy, update, approved, force);
+  }
+
+  if (force) {
+    return [{ path: file.path, content: ensureTrailingNewline(file.content) }];
+  }
+
+  if (update && existingAtStart.has(file.path) && isSettingsFile(file.path)) {
+    return [{ path: resolveUniqueAsidePath(targetDir, file.path), content: ensureTrailingNewline(file.content) }];
+  }
+
+  const fullPath = join(targetDir, file.path);
+  return [{ path: file.path, content: mergeJsonLikeFile(fullPath, file.content) }];
+}
+
+function instructionFileWrites(targetDir: string, relativePath: string, generatedContent: string, strategy: MergeStrategy, update: boolean, approved: boolean, force: boolean): PlannedWrite[] {
+  const filePath = join(targetDir, relativePath);
   const block = managedBlock(generatedContent);
-  if (!existsSync(filePath)) return `${block}\n`;
+  if (force) return [{ path: relativePath, content: `${block}\n` }];
+  if (!existsSync(filePath)) return [{ path: relativePath, content: `${block}\n` }];
 
   const existing = readFileSync(filePath, 'utf-8');
-  const blockPattern = /<!-- azure-functions-skills:start[^\n]* -->[\s\S]*?<!-- azure-functions-skills:end -->/;
-  if (blockPattern.test(existing)) {
-    if (!update) return existing;
-    return ensureTrailingNewline(existing.replace(blockPattern, block));
+  if (BLOCK_PATTERN.test(existing)) {
+    if (!update) return [{ path: relativePath, content: existing }];
+    return [{ path: relativePath, content: ensureTrailingNewline(existing.replace(BLOCK_PATTERN, block)) }];
+  }
+
+  if (update) {
+    return [{ path: resolveUniqueAsidePath(targetDir, relativePath), content: `${block}\n` }];
   }
 
   if (strategy === 'fail-if-exists') {
@@ -138,16 +231,19 @@ function mergeInstructionFile(filePath: string, generatedContent: string, strate
   }
 
   if (strategy === 'append' || strategy === 'managed-block') {
-    return `${existing.trimEnd()}\n\n${block}\n`;
+    return [{ path: relativePath, content: `${existing.trimEnd()}\n\n${block}\n` }];
   }
 
   if (strategy === 'include-file') {
     const includePath = includeInstructionPath(filePath);
     const includeLine = `See ${includePath} for Azure Functions routing.`;
-    return existing.includes(includeLine) ? ensureTrailingNewline(existing) : `${existing.trimEnd()}\n\n${includeLine}\n`;
+    return [{
+      path: relativePath,
+      content: existing.includes(includeLine) ? ensureTrailingNewline(existing) : `${existing.trimEnd()}\n\n${includeLine}\n`,
+    }];
   }
 
-  return `${existing.trimEnd()}\n\n${block}\n`;
+  return [{ path: relativePath, content: `${existing.trimEnd()}\n\n${block}\n` }];
 }
 
 function mergeJsonLikeFile(filePath: string, generatedContent: string): string {
@@ -175,6 +271,16 @@ function deepMerge(existing: Record<string, unknown>, generated: Record<string, 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSettingsFile(relativePath: string): boolean {
+  const normalized = relativePath.replaceAll('\\', '/');
+  return normalized === '.mcp.json' ||
+    normalized === '.vscode/mcp.json' ||
+    normalized === '.claude/settings.json' ||
+    normalized === '.codex/config.toml' ||
+    normalized === '.github/copilot/settings.json' ||
+    normalized === '.agents/plugins/marketplace.json';
 }
 
 function managedBlock(content: string): string {
