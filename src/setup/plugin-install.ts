@@ -9,7 +9,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import type { BuildTargetName } from '../types.js';
+import type { BuildTargetName, FilePrompter } from '../types.js';
 import type { CommandRunner } from './prerequisites/types.js';
 import { applyWorkspace } from './workspace.js';
 
@@ -46,6 +46,8 @@ export interface PluginOperationOptions {
   runner?: CommandRunner;
   platform?: NodeJS.Platform;
   yes?: boolean;
+  force?: boolean;
+  prompter?: FilePrompter;
   passthroughArgs?: string[];
 }
 
@@ -272,6 +274,8 @@ export async function runPluginOperation(options: PluginOperationOptions): Promi
       mergeStrategy: 'managed-block',
       update: options.action === 'update',
       yes: options.yes,
+      force: options.force,
+      prompter: options.prompter,
       includeAgent: true,
     });
     result.filesWritten += workspaceResult.filesWritten;

@@ -14,20 +14,13 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { buildTarget } from '../build/build-target.js';
 import { loadAgents, loadHooks, loadMcpServers, loadSkills } from '../build/loader.js';
-import type { BuildData, CliAgentName } from '../types.js';
+import type { BuildData, CliAgentName, FilePrompter, FilePromptResult } from '../types.js';
+export type { FilePrompter, FilePromptResult } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 
 const BLOCK_PATTERN = /<!-- azure-functions-skills:start[^\n]* -->[\s\S]*?<!-- azure-functions-skills:end -->/;
-
-export type FilePromptResult = 'overwrite' | 'skip';
-
-/**
- * A function that prompts the user for an action on a shared file.
- * Receives the relative path and new content; returns the chosen action.
- */
-export type FilePrompter = (relativePath: string, newContent: string, existingContent: string) => Promise<FilePromptResult>;
 
 export interface LocalUpdateOptions {
   agents: CliAgentName[];

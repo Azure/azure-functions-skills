@@ -222,7 +222,7 @@ describe('CLI command integration', () => {
     }
   });
 
-  it('workspace apply --yes appends routing to an existing Claude instructions file', () => {
+  it('workspace apply --yes saves aside routing for an existing Claude instructions file', () => {
     const projectDir = makeTempDir('af-skills-e2e-workspace-yes-');
     writeFileSync(join(projectDir, 'CLAUDE.md'), '# Existing Claude rules\n');
 
@@ -237,7 +237,8 @@ describe('CLI command integration', () => {
 
     const content = readFileSync(join(projectDir, 'CLAUDE.md'), 'utf-8');
     expect(content).toContain('# Existing Claude rules');
-    expect(content).toContain('<!-- azure-functions-skills:start');
+    expect(content).not.toContain('<!-- azure-functions-skills:start');
+    expect(existsSync(join(projectDir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(true);
   });
 
   it('workspace apply can opt into MCP and hooks from the CLI', () => {
@@ -827,6 +828,60 @@ describe('CLI command integration', () => {
 
     // Output describes planned actions
     expect(output).toContain('Planned local update');
+  });
+
+  it('update after plugin install saves aside customer-owned routing files', { timeout: 15_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-plugin-update-save-aside-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'claude', '--dir', projectDir, '--yes'], { env });
+    const claudePath = join(projectDir, 'CLAUDE.md');
+    writeFileSync(claudePath, '# My Custom Claude Rules\nNo managed block here.\n');
+
+    const output = runCliOutput(['update', '--agent', 'claude', '--dir', projectDir, '--yes'], { env });
+
+    const updatedContent = readFileSync(claudePath, 'utf-8');
+    expect(updatedContent).toContain('No managed block here.');
+    expect(updatedContent).not.toContain('azure-functions-skills:start');
+    const asidePath = join(projectDir, 'CLAUDE.azure-functions-skills-new.md');
+    expect(existsSync(asidePath)).toBe(true);
+    expect(readFileSync(asidePath, 'utf-8')).toContain('Azure Functions Skills');
+    expect(output).toContain('saved aside');
+    expect(output).toContain('CLAUDE.azure-functions-skills-new.md');
+  });
+
+  it('update --force after plugin install overwrites customer-owned routing files', { timeout: 15_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-plugin-update-force-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'claude', '--dir', projectDir, '--yes'], { env });
+    const claudePath = join(projectDir, 'CLAUDE.md');
+    writeFileSync(claudePath, '# My Custom Claude Rules\nNo managed block here.\n');
+
+    runCli(['update', '--agent', 'claude', '--dir', projectDir, '--yes', '--force'], { env });
+
+    const updatedContent = readFileSync(claudePath, 'utf-8');
+    expect(updatedContent).not.toContain('No managed block here.');
+    expect(updatedContent).toContain('Azure Functions Skills');
+    expect(existsSync(join(projectDir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(false);
   });
 
   it('install rejects mixed mode: local then plugin', { timeout: 15_000 }, () => {

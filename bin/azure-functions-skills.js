@@ -80,6 +80,7 @@ Options:
   --workspace        Apply workspace plugin-reference activation (default)
   --no-workspace     Skip workspace activation
   --dry-run          Print planned changes without writing files
+  --force            Overwrite customer-owned workspace activation files
   --yes              Approve workspace activation changes to existing instruction files
 `,
   'plugin update': `Usage: azure-functions-skills plugin update [options]
@@ -94,6 +95,7 @@ Options:
   --workspace        Apply workspace plugin-reference activation (default)
   --no-workspace     Skip workspace activation
   --dry-run          Print planned changes without writing files
+  --force            Overwrite customer-owned workspace activation files
   --yes              Approve workspace activation changes to existing instruction files
 `,
   'workspace apply': `Usage: azure-functions-skills workspace apply [options]
@@ -106,6 +108,7 @@ Options:
   --mode <name>      minimal, copy, plugin-reference (default: copy)
   --merge-strategy <name> managed-block, include-file, fail-if-exists, append
   --dry-run          Print planned changes without writing files
+  --force            Overwrite customer-owned workspace activation files
   --yes              Approve modifying existing instruction files without prompting
   --include-agent    Add the GHCP functions-copilot workspace agent definition
   --include-mcp      Add workspace MCP configuration files
@@ -121,6 +124,7 @@ Options:
   --mode <name>      minimal, copy, plugin-reference (default: copy)
   --merge-strategy <name> managed-block, include-file, fail-if-exists, append
   --dry-run          Print planned changes without writing files
+  --force            Overwrite customer-owned workspace activation files
   --yes              Approve modifying existing instruction files without prompting
   --include-agent    Add the GHCP functions-copilot workspace agent definition
   --include-mcp      Add workspace MCP configuration files
@@ -210,6 +214,7 @@ function printHelp() {
     --merge-strategy <name> managed-block, include-file, fail-if-exists, append
     --update           Replace existing Azure Functions managed blocks
     --dry-run          Print planned changes without writing files
+    --force            Overwrite customer-owned workspace activation files
     --yes              Approve modifying existing instruction files without prompting
     --include-agent    Add the GHCP functions-copilot workspace agent definition
     --include-mcp      Add workspace MCP configuration files
@@ -271,6 +276,33 @@ function printChatDryRun(result, setupSkillPending) {
   console.log(`  Startup prompt: ${startupPromptIncluded ? 'included' : 'not included'}`);
   console.log(`  Setup instruction: ${setupSkillPending && startupPromptIncluded ? 'included' : 'not included'}`);
   if (startupPromptIncluded) console.log(`  Prompt preview: ${previewPrompt(result.prompt)}`);
+}
+
+function printWorkspaceResultDetails(result, indent = '  ') {
+  if (result.overwritten.length > 0) {
+    console.log(`${indent}Overwrite:`);
+    for (const file of result.overwritten) console.log(`${indent}  - ${file}`);
+  }
+  if (result.managedBlockUpdated.length > 0) {
+    console.log(`${indent}Managed update:`);
+    for (const file of result.managedBlockUpdated) console.log(`${indent}  - ${file}`);
+  }
+  if (result.savedAside.length > 0) {
+    console.log(`${indent}Save aside (review & merge manually):`);
+    for (const entry of result.savedAside) console.log(`${indent}  - ${entry.original} → ${entry.aside}`);
+  }
+  if (result.overwritten.length === 0 && result.managedBlockUpdated.length === 0 && result.savedAside.length === 0) {
+    for (const file of result.plannedFiles) console.log(`${indent}- ${file}`);
+  }
+}
+
+function printSavedAsideWarning(savedAside) {
+  if (savedAside.length === 0) return;
+  console.log('\n⚠️  Some files were saved aside for manual review:');
+  for (const entry of savedAside) {
+    console.log(`   ${entry.original} → ${entry.aside}`);
+  }
+  console.log('   Review these files and merge changes as needed.');
 }
 
 function chatPromptIncludedInArgs(result) {
@@ -627,7 +659,9 @@ if (command === 'install' || command === 'update') {
   } else {
     const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
     const { applyWorkspace } = await import('../lib/setup/workspace.js');
+    const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
     const action = command;
+    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
     const pluginResult = await runPluginOperation({
       action,
       agents: detectedAgents,
@@ -645,6 +679,8 @@ if (command === 'install' || command === 'update') {
       update: action === 'update',
       dryRun,
       yes,
+      force,
+      prompter,
       includeMcp,
       includeHooks,
       includeAgent: true,
@@ -658,7 +694,7 @@ if (command === 'install' || command === 'update') {
         for (const pluginCommand of step.commands || []) console.log(`        $ ${pluginCommand}`);
       }
       console.log('  Workspace:');
-      for (const file of workspaceResult.plannedFiles) console.log(`    - ${file}`);
+      printWorkspaceResultDetails(workspaceResult, '    ');
     } else {
       const state = recordInstallState(dir, {
         action,
@@ -673,6 +709,7 @@ if (command === 'install' || command === 'update') {
       const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
       const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action });
       printInstallSummary({ action, agents: detectedAgents, dir, filesWritten: workspaceResult.filesWritten, state, gitignoreResult, gitRepoResult });
+      printSavedAsideWarning(workspaceResult.savedAside);
     }
   }
 } else if (command === 'setup') {
@@ -884,6 +921,7 @@ if (command === 'install' || command === 'update') {
   }
 
   const { applyWorkspace } = await import('../lib/setup/workspace.js');
+  const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
   const agents = [];
   let dir = process.cwd();
   let mode = 'copy';
@@ -891,6 +929,7 @@ if (command === 'install' || command === 'update') {
   let dryRun = false;
   let update = action === 'update';
   let yes = false;
+  let force = false;
   let includeMcp = false;
   let includeHooks = false;
   let includeAgent = false;
@@ -903,6 +942,7 @@ if (command === 'install' || command === 'update') {
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--update') update = true;
     else if (args[i] === '--yes') yes = true;
+    else if (args[i] === '--force') force = true;
     else if (args[i] === '--include-mcp') includeMcp = true;
     else if (args[i] === '--include-hooks') includeHooks = true;
     else if (args[i] === '--include-agent') includeAgent = true;
@@ -910,6 +950,7 @@ if (command === 'install' || command === 'update') {
 
   let result;
   try {
+    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
     result = await applyWorkspace(dir, {
       agents: agents.length > 0 ? agents : undefined,
       mode,
@@ -917,6 +958,8 @@ if (command === 'install' || command === 'update') {
       update,
       dryRun,
       yes,
+      force,
+      prompter,
       includeMcp,
       includeHooks,
       includeAgent,
@@ -928,12 +971,13 @@ if (command === 'install' || command === 'update') {
 
   if (dryRun) {
     console.log('Planned workspace changes:');
-    for (const file of result.plannedFiles) console.log(`  - ${file}`);
+    printWorkspaceResultDetails(result, '  ');
   } else {
     console.log(`Workspace ${action} complete.`);
     console.log(`  Agents configured: ${result.agents.join(', ')}`);
     console.log(`  Mode: ${result.mode}`);
     console.log(`  Files written: ${result.filesWritten}`);
+    printSavedAsideWarning(result.savedAside);
   }
 } else if (command === 'plugin') {
   const action = args[1];
@@ -949,6 +993,7 @@ if (command === 'install' || command === 'update') {
 
   const { detectAgents } = await import('../lib/setup/index.js');
   const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
+  const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
   const agents = [];
   let dir = process.cwd();
   let scope = 'workspace';
@@ -957,6 +1002,7 @@ if (command === 'install' || command === 'update') {
   let workspace = true;
   let dryRun = false;
   let yes = false;
+  let force = false;
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
@@ -968,11 +1014,13 @@ if (command === 'install' || command === 'update') {
     else if (args[i] === '--no-workspace') workspace = false;
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--yes') yes = true;
+    else if (args[i] === '--force') force = true;
   }
 
   const detectedAgents = agents.length > 0 ? agents : await detectAgents();
   let result;
   try {
+    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
     result = await runPluginOperation({
       action,
       agents: detectedAgents,
@@ -983,6 +1031,8 @@ if (command === 'install' || command === 'update') {
       version,
       workspace,
       yes,
+      force,
+      prompter,
     });
   } catch (err) {
     console.error(err.message);
