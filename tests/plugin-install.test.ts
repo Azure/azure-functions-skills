@@ -319,8 +319,9 @@ describe('planPluginOperation', () => {
     });
 
     const command = plan.steps[0].commands?.[0] || '';
+    const normalizedRoot = process.cwd().replaceAll('\\', '/');
     expect(command.replaceAll('\\', '/')).toContain('claude plugin marketplace add');
-    expect(command.replaceAll('\\', '/')).toContain('/azure-functions-skills --scope local');
+    expect(command.replaceAll('\\', '/')).toContain(`${normalizedRoot} --scope local`);
     expect(plan.steps[0].commands?.[1]).toBe('claude plugin install azure-functions-skills@azure-functions-skills --scope local');
   });
 
