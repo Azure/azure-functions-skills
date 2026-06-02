@@ -781,12 +781,11 @@ describe('CLI command integration', () => {
     // Step 3: Run update (should auto-detect local mode from state)
     runCli(['update', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
 
-    // Verify: MCP file preserved (save-aside strategy)
+    // Verify: MCP file preserved and live settings deep-merged
     const afterUpdate = readFileSync(mcpPath, 'utf-8');
     expect(afterUpdate).toContain('my custom note');
-    // New version saved aside
     const asidePath = join(projectDir, '.mcp.azure-functions-skills-new.json');
-    expect(existsSync(asidePath)).toBe(true);
+    expect(existsSync(asidePath)).toBe(false);
     // Skills should be refreshed (overwrite strategy)
     const skillsDir = join(projectDir, '.github', 'skills');
     expect(existsSync(skillsDir)).toBe(true);

@@ -4,7 +4,7 @@
  * Unlike `applySetup()` which overwrites everything via cpSync, this module:
  * - Overwrites managed content (skills, agent definitions, hooks)
  * - Uses managed-block replacement for routing files (preserves user customizations)
- * - Saves aside settings files for user to merge manually
+ * - Deep-merges JSON settings files and saves aside non-JSON settings files for manual merge
  * - Supports --force to overwrite everything
  */
 
@@ -39,7 +39,7 @@ export interface LocalUpdateResult {
   dryRun: boolean;
 }
 
-type FileAction = 'overwrite' | 'managed-block' | 'save-aside';
+type FileAction = 'overwrite' | 'managed-block' | 'save-aside' | 'deep-merge-json';
 
 interface GeneratedFile {
   /** Relative path within the workspace (e.g., '.github/copilot-instructions.md') */
@@ -220,6 +220,7 @@ function resolveAction(relativePath: string, targetDir: string, force: boolean):
   if (isSettingsFile(relativePath)) {
     const existing = join(targetDir, relativePath);
     if (!existsSync(existing)) return 'overwrite';
+    if (canDeepMergeJson(existing)) return 'deep-merge-json';
     return 'save-aside';
   }
 
@@ -314,6 +315,15 @@ async function applyFile(file: GeneratedFile, _agentDir: string, targetDir: stri
       break;
     }
 
+    case 'deep-merge-json': {
+      if (!dryRun) {
+        const updated = deepMergeJsonFile(destPath, newContent);
+        writeFileSync(destPath, updated);
+      }
+      result.managedBlockUpdated.push(file.relativePath);
+      break;
+    }
+
     case 'save-aside': {
       const asideRelative = resolveUniqueAsidePath(targetDir, file.relativePath);
       if (!dryRun) {
@@ -325,6 +335,38 @@ async function applyFile(file: GeneratedFile, _agentDir: string, targetDir: stri
       break;
     }
   }
+}
+
+function canDeepMergeJson(filePath: string): boolean {
+  if (!filePath.endsWith('.json')) return false;
+  try {
+    JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function deepMergeJsonFile(filePath: string, generatedContent: string): string {
+  const existing = JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+  const generated = JSON.parse(generatedContent) as Record<string, unknown>;
+  return `${JSON.stringify(deepMerge(existing, generated), null, 2)}\n`;
+}
+
+function deepMerge(existing: Record<string, unknown>, generated: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...existing };
+  for (const [key, value] of Object.entries(generated)) {
+    if (isRecord(result[key]) && isRecord(value)) {
+      result[key] = deepMerge(result[key], value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
