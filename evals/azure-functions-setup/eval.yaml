@@ -4,7 +4,7 @@ description: |
 
   Doubles as a CI environment sanity check: when the agent runs the
   prerequisite-version commands listed in the skill (az, azd, func,
-  node, python3, dotnet), every one of those tools must actually be
+  node, python/python3, dotnet), every one of those tools must actually be
   present on the runner. If any of them is missing the eval will
   surface it through the `prereq_*_ok` graders below.
 
@@ -139,6 +139,77 @@ stimuli:
         type: output-not-matches
         config:
           pattern: "(?i)(command not found|not installed|missing|❌)\\s*(:|—|-)?\\s*(azure cli|az\\b|azure developer cli|azd\\b|core tools|func\\b|node\\.?js|python|\\.net|dotnet)"
+
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Response quality (tier: smoke) — cross-platform fix guidance
+  # The setup skill must not regress to Linux-only install commands or
+  # stale language versions when a prerequisite is missing.
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Quality — cross-platform fix instructions"
+    prompt: |
+      Assume Azure Functions Core Tools, Node.js, and Python are missing
+      from my machine. I have not told you whether I use Windows, macOS,
+      or Linux. Provide the Fix Instructions part only: what's wrong,
+      how to fix it, and docs links. Make the install guidance universal
+      across Windows, macOS, and Linux.
+    tags:
+      type: integration
+      skill: azure-functions-setup
+      tier: smoke
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-setup
+        - ../../templates/skills/azure-functions-common
+    constraints:
+      max_turns: 12
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-setup
+
+      - name: fix_mentions_windows
+        type: output-matches
+        config:
+          pattern: "(?i)Windows|winget|MSI"
+      - name: fix_mentions_macos
+        type: output-matches
+        config:
+          pattern: "(?i)macOS|Homebrew|\\bbrew\\b"
+      - name: fix_mentions_linux
+        type: output-matches
+        config:
+          pattern: "(?i)Linux|distro|package manager"
+      - name: fix_recommends_current_node
+        type: output-matches
+        config:
+          pattern: "(?i)Node\\.?js[^\\n]*(24|latest GA)|(?:24|latest GA)[^\\n]*Node\\.?js"
+      - name: fix_recommends_current_python
+        type: output-matches
+        config:
+          pattern: "(?i)Python[^\\n]*3\\.13|3\\.13[^\\n]*Python"
+      - name: fix_links_functions_versions
+        type: output-matches
+        config:
+          pattern: "https://learn\\.microsoft\\.com/.*/azure-functions/functions-versions"
+
+      - name: fix_avoids_stale_linux_only_commands
+        type: output-not-matches
+        config:
+          pattern: "(?i)(sudo apt install python3\\.11|nvm install 22|InstallAzureCLIDeb|unsafe-perm|dotnet-install\\.sh --channel 8\\.0)"
+      - name: fix_does_not_default_to_python_preview
+        type: output-not-matches
+        config:
+          pattern: "(?i)(recommend|install|default).{0,40}Python 3\\.14|Python 3\\.14.{0,40}(recommend|install|default)"
 
       # Globals
       - type: completed

@@ -18,8 +18,9 @@ Run each check and report results:
 az --version        # Azure CLI ≥ 2.60
 azd version         # Azure Developer CLI, required for Azure Skills deployment workflows
 func --version      # Azure Functions Core Tools ≥ 4.x
-node --version      # Node.js ≥ 18 (if Node project)
-python3 --version   # Python ≥ 3.9 (if Python project)
+node --version      # Node.js 24 or 22 for new Node.js/TypeScript projects
+python --version    # Python 3.13 preferred; 3.10-3.13 supported for Python projects
+python3 --version   # Use this fallback when python is not on PATH
 dotnet --version    # .NET SDK ≥ 8.0 (if .NET project)
 ```
 
@@ -62,17 +63,23 @@ Azure Functions Environment Check
 
 For each failing check, provide:
 1. **What's wrong** — one-line description
-2. **How to fix** — exact install/fix command
+2. **How to fix** — exact install/fix command for the user's OS and shell
 3. **Docs link** — Microsoft Learn URL
 
-| Tool | Install Command | Docs |
-|------|----------------|------|
-| Azure CLI | `curl -sL https://aka.ms/InstallAzureCLIDeb \| sudo bash` | https://learn.microsoft.com/cli/azure/install-azure-cli |
-| Azure Developer CLI | See docs for OS-specific install | https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd |
-| Core Tools | `npm install -g azure-functions-core-tools@4 --unsafe-perm true` | https://learn.microsoft.com/azure/azure-functions/functions-run-local |
-| Node.js | `nvm install 22` or download from https://nodejs.org | https://nodejs.org |
-| Python | `sudo apt install python3.11` or download from https://python.org | https://python.org |
-| .NET SDK | `dotnet-install.sh --channel 8.0` | https://learn.microsoft.com/dotnet/core/install/ |
+Use the user's operating system when choosing fix commands. Do **not** give Linux-only installation commands to Windows or macOS users. If the operating system or package manager is unclear, show the OS-specific choices and ask the user to run the one that matches their machine.
+
+For language runtimes, prefer the latest Azure Functions **GA-supported** version for new installs. Do not recommend preview runtimes unless the user explicitly asks for previews.
+
+| Tool | Recommended version | Windows | macOS | Linux | Docs |
+|------|---------------------|---------|-------|-------|------|
+| Azure CLI | Latest stable, ≥ 2.60 | `winget install --exact --id Microsoft.AzureCLI` | `brew update && brew install azure-cli` | Use the distro-specific Microsoft Learn command for your package manager | https://learn.microsoft.com/cli/azure/install-azure-cli |
+| Azure Developer CLI | Latest stable | `winget install --exact --id Microsoft.Azd` | `brew install azure/azd/azd` | Use the Microsoft Learn instructions for your distro or install the signed `.deb`/`.rpm` package from the Azure Developer CLI release | https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd |
+| Core Tools | v4.x | Download and run the v4.x 64-bit MSI installer from Microsoft Learn | `brew tap azure/functions && brew install azure-functions-core-tools@4` | Use the Microsoft package repository for your distro, then install `azure-functions-core-tools-4` | https://learn.microsoft.com/azure/azure-functions/functions-run-local |
+| Node.js | Node.js 24 GA for new apps; Node.js 22 also supported | `winget install --exact --id OpenJS.NodeJS.LTS` or `fnm install 24` | `brew install node@24` or `fnm install 24` | Use your distro package manager or a version manager such as `fnm install 24` | https://learn.microsoft.com/azure/azure-functions/functions-versions |
+| Python | Python 3.13 GA for new apps; 3.10-3.13 supported | `winget install --exact --id Python.Python.3.13` | `brew install python@3.13` | Use your distro package manager or a version manager such as `pyenv install 3.13` | https://learn.microsoft.com/azure/azure-functions/functions-versions |
+| .NET SDK | .NET 8 LTS minimum; use the latest GA version supported by the target Functions model | `winget install --exact --id Microsoft.DotNet.SDK.8` | `brew install --cask dotnet-sdk` | Use the Microsoft Learn instructions for your distro | https://learn.microsoft.com/dotnet/core/install/ |
+
+Azure Functions runtime 4.x currently supports Node.js 24 and 22 for Node.js/TypeScript apps, and Python 3.10 through 3.13 for Python apps. Python 3.14 can appear in preview; keep Python 3.13 as the default recommendation until the user opts into preview support. Mention hosting caveats when relevant: newer language versions might not be available on Linux Consumption, so Flex Consumption is the safer default for new Linux-hosted apps.
 
 ## After Setup
 
