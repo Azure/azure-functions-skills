@@ -121,7 +121,7 @@ Files placed based on detected agent:
 | File | Target Agent | Content |
 |------|-------------|--------|
 | `.github/copilot-instructions.md` | GitHub Copilot | Functions-specific coding guidance |
-| `.vscode/mcp.json` | GitHub Copilot | Templates MCP server config (F19) |
+| `.mcp.json` | GitHub Copilot CLI | Templates MCP server config (F19) |
 | `.claude/settings.json` | Claude Code | MCP server + project settings |
 | `.cursor/rules/azure-functions.mdc` | Cursor | Functions rules |
 | `AGENTS.md` | Codex / generic | Agent-agnostic instructions |
@@ -141,7 +141,7 @@ agentPaths:
     github-copilot:
       instructions: ".github/copilot-instructions.md"
       agentDefs: ".github/agents/"
-      mcp: ".vscode/mcp.json"
+      mcp: ".mcp.json"
     cursor:
       rules: ".cursor/rules/"
       mcp: ".cursor/mcp.json"
@@ -165,7 +165,7 @@ Generated skill files and instruction files are customized to match the detected
 
 | Target | Surfacing |
 |--------|-----------|
-| GHCP | Skill runs checks via shell commands, configures `.github/` + `.vscode/mcp.json` |
+| GHCP | Skill runs checks via shell commands, configures `.github/` + `.mcp.json` |
 | Claude Code | Skill configures `.claude/` directory with skills, instructions, MCP |
 | Codex | Agent instruction with prerequisite verification + `AGENTS.md` generation |
 | Cursor | Skill configures `.cursor/rules/` and `.cursor/mcp.json` |

@@ -146,18 +146,20 @@ describe('buildTarget — ghcp', () => {
     expect(existsSync(instrPath)).toBe(false);
   });
 
-  it('generates mcp.json with servers', () => {
+  it('generates root .mcp.json with mcpServers for Copilot CLI', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
     const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
-    const mcpPath = join(DIST_DIR, 'ghcp', '.vscode', 'mcp.json');
+    const mcpPath = join(DIST_DIR, 'ghcp', '.mcp.json');
     expect(existsSync(mcpPath)).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.vscode', 'mcp.json'))).toBe(false);
     const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'));
-    expect(mcp.servers).toBeTruthy();
-    expect(mcp.servers['azure']).toBeTruthy();
+    expect(mcp.mcpServers).toBeTruthy();
+    expect(mcp.mcpServers['azure']).toBeTruthy();
+    expect(mcp.mcpServers['azure'].tools).toEqual(['*']);
   });
 
   it('generates agent definition', () => {
@@ -271,7 +273,8 @@ describe('buildTarget — ghcp', () => {
     expect(existsSync(join(DIST_DIR, 'ghcp', 'plugin.json'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'ghcp', 'skills'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'ghcp', 'agents'))).toBe(false);
-    expect(existsSync(join(DIST_DIR, 'ghcp', '.mcp.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.mcp.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.vscode', 'mcp.json'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'ghcp', 'hooks.json'))).toBe(false);
   });
 
@@ -528,6 +531,11 @@ describe('buildPluginPayload', () => {
     expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
     expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
     expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
+    const mcpConfig = JSON.parse(readFileSync(join(payloadDir, '.mcp.json'), 'utf-8'));
+    expect(mcpConfig.mcpServers.azure).toEqual({
+      command: 'npx',
+      args: ['-y', '@azure/mcp@latest', 'server', 'start'],
+    });
 
     const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
     expect(manifest.skills).toBe('./skills/');
@@ -592,7 +600,8 @@ describe('setup module', () => {
 
     // GHCP: agent definition + mcp + AGENTS.md (no copilot-instructions.md)
     expect(existsSync(join(DIST_DIR, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
-    expect(existsSync(join(DIST_DIR, '.vscode', 'mcp.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, '.vscode', 'mcp.json'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'AGENTS.md'))).toBe(true);
   });
 
@@ -606,7 +615,7 @@ describe('setup module', () => {
     expect(existsSync(join(DIST_DIR, 'agents'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'plugin.json'))).toBe(false);
     expect(existsSync(join(DIST_DIR, 'hooks.json'))).toBe(false);
-    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(false);
+    expect(existsSync(join(DIST_DIR, '.mcp.json'))).toBe(true);
   });
 
   it('applySetup handles codex target', async () => {

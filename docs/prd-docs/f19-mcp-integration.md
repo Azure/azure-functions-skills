@@ -39,13 +39,14 @@ The Azure MCP Server includes Azure Functions tools for template discovery and p
 During `azure-functions-setup` (F3) workspace configuration, MCP settings are placed based on the detected agent:
 
 ```json
-// .vscode/mcp.json (GitHub Copilot)
+// .mcp.json (GitHub Copilot CLI)
 {
-  "servers": {
+  "mcpServers": {
     "azure": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure/mcp@latest", "server", "start"]
+      "args": ["-y", "@azure/mcp@latest", "server", "start"],
+      "tools": ["*"]
     }
   }
 }
@@ -105,7 +106,7 @@ The build system generates MCP config files per target:
 
 | Target | Output File | Format |
 |--------|------------|--------|
-| GHCP | `.vscode/mcp.json` | `{ "servers": { ... } }` |
+| GHCP | `.mcp.json` | `{ "mcpServers": { ... } }` |
 | Claude Code | `.claude/settings.json` | `{ "mcpServers": { ... } }` |
 | Cursor | `.cursor/mcp.json` | `{ "mcpServers": { ... } }` |
 | Codex | `codex-mcp.json` | Agent-specific format |
@@ -143,7 +144,7 @@ entry_conditions:
 
 | Target | Surfacing |
 |--------|-----------|
-| GHCP | Place MCP config in `.vscode/mcp.json`. Skill instructs MCP tool invocations |
+| GHCP | Place MCP config in `.mcp.json`. Skill instructs MCP tool invocations |
 | Claude Code | Place MCP config in `.claude/settings.json` |
 | Codex | Include MCP config in agent definition |
 | Repo Template | Include MCP config template in repo template |

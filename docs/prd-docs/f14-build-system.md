@@ -184,7 +184,7 @@ agentPaths:
       scopedInstructions: ".github/instructions/"  # *.instructions.md
       agentDefs: ".github/agents/"                  # *.agent.md
       prompts: ".github/prompts/"                    # *.prompt.md
-      mcp: ".vscode/mcp.json"
+      mcp: ".mcp.json"
     cursor:
       rules: ".cursor/rules/"                        # *.mdc
       mcp: ".cursor/mcp.json"
@@ -203,7 +203,7 @@ The build system also generates MCP config files per target (see F19):
 
 | Target | Output File | Format |
 |--------|------------|--------|
-| GHCP | `.vscode/mcp.json` | `{ "servers": { ... } }` |
+| GHCP | `.mcp.json` | `{ "mcpServers": { ... } }` |
 | Claude Code | `.claude/settings.json` | `{ "mcpServers": { ... } }` |
 | Cursor | `.cursor/mcp.json` | `{ "mcpServers": { ... } }` |
 
@@ -230,7 +230,7 @@ Step 3.5: Inject standard directives
 
 | Target | Output Format |
 |--------|--------------|
-| GHCP | `.md` skills, `.md` agents, `.js` hooks, `.github/` repo template, `.vscode/mcp.json` |
+| GHCP | `.md` skills, `.md` agents, `.js` hooks, `.github/` repo template, `.mcp.json` |
 | Claude Code | `.md` skills in `.claude/skills/`, `.json` agent manifest, `.claude/settings.json` MCP |
 | Cursor | `.md` skills in `.agents/skills/`, `.mdc` rules, `.cursor/mcp.json` |
 | Codex | `.md` skills in `.agents/skills/`, `AGENTS.md` instructions, post-task config |

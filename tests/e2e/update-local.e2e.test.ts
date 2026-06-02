@@ -37,7 +37,7 @@ function runCli(args: string[], options: { cwd?: string } = {}): string {
 
 describe('E2E: local update flow', () => {
   describe.each([
-    { agent: 'ghcp', routingFile: null, settingsFile: '.vscode/mcp.json', skillsDir: '.github/skills' },
+    { agent: 'ghcp', routingFile: null, settingsFile: '.mcp.json', skillsDir: '.github/skills' },
     { agent: 'claude', routingFile: 'CLAUDE.md', settingsFile: '.claude/settings.json', skillsDir: '.claude/skills' },
     { agent: 'codex', routingFile: 'AGENTS.md', settingsFile: '.codex/config.toml', skillsDir: '.agents/skills' },
   ] as const)('$agent', ({ agent, routingFile, settingsFile, skillsDir }) => {

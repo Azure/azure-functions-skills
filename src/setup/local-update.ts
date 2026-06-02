@@ -259,7 +259,8 @@ function isRoutingFile(relativePath: string): boolean {
 
 function isSettingsFile(relativePath: string): boolean {
   const normalized = relativePath.replaceAll('\\', '/');
-  return normalized === '.vscode/mcp.json' ||
+  return normalized === '.mcp.json' ||
+    normalized === '.vscode/mcp.json' ||
     normalized === '.claude/settings.json' ||
     normalized === '.codex/config.toml' ||
     normalized === '.github/copilot/settings.json' ||
@@ -269,7 +270,7 @@ function isSettingsFile(relativePath: string): boolean {
 function isPluginOnlyArtifact(agent: CliAgentName, relativePath: string): boolean {
   const [topLevel, secondLevel] = relativePath.split(/[\\/]/);
   if (agent === 'ghcp') {
-    return ['plugin.json', 'skills', 'agents', 'hooks.json', '.mcp.json'].includes(topLevel);
+    return ['plugin.json', 'skills', 'agents', 'hooks.json'].includes(topLevel);
   }
   if (agent === 'codex') {
     if (['.codex-plugin', 'skills', '.mcp.json'].includes(topLevel)) return true;
