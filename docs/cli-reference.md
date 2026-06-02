@@ -100,6 +100,8 @@ npx @azure/functions-skills chat --agent github-copilot --dir ./my-app
 | `--agent <name>` | state | `github-copilot`, `claude-code`, `codex`. |
 | `--prompt <text>` | startup template | Custom prompt. |
 | `--dir <path>` | `cwd` | Working directory. |
+| `--as-plugin` | off | Ensure the native plugin is registered before launching the agent. |
+| `--dry-run` | off | Print the planned agent launch without starting the agent or updating state. |
 | `--check-prerequisites` | off | Check external prerequisites and exit. |
 | `--skip-prerequisites` | off | Skip prerequisite checks. |
 | `-- <args...>` | — | Pass-through to the underlying agent CLI. |

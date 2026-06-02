@@ -63,6 +63,7 @@ Options:
   --agent <name>     Agent: github-copilot, claude-code, codex
   --prompt <text>    Custom prompt (overrides startup template)
   --dir <path>       Working directory (default: current directory)
+  --dry-run          Print planned launch without starting the agent or updating state
   --check-prerequisites  Check external prerequisites without installing them
   --skip-prerequisites   Skip external prerequisite checks
   -- <args...>       Pass remaining arguments through to the selected agent CLI
@@ -230,6 +231,7 @@ function printHelp() {
     --prompt <text>    Custom prompt (overrides startup template)
     --dir <path>       Working directory (default: current directory)
     --as-plugin        Ensure plugin is registered before launching agent
+    --dry-run          Print planned launch without starting the agent or updating state
     --check-prerequisites  Check external prerequisites without installing them
     --skip-prerequisites   Skip external prerequisite checks
     -- <args...>       Pass remaining arguments through to the selected agent CLI
@@ -257,6 +259,38 @@ function printCommandHelp(topic) {
     process.exit(1);
   }
   console.log(text);
+}
+
+function printChatDryRun(result, setupSkillPending) {
+  const startupPromptIncluded = chatPromptIncludedInArgs(result);
+  console.log('Planned chat launch:');
+  console.log(`  Agent: ${result.agent}`);
+  console.log(`  Working directory: ${result.cwd}`);
+  console.log(`  Command: ${result.command}`);
+  console.log(`  Arguments: ${formatChatArgs(result.args, result.prompt)}`);
+  console.log(`  Startup prompt: ${startupPromptIncluded ? 'included' : 'not included'}`);
+  console.log(`  Setup instruction: ${setupSkillPending && startupPromptIncluded ? 'included' : 'not included'}`);
+  if (startupPromptIncluded) console.log(`  Prompt preview: ${previewPrompt(result.prompt)}`);
+}
+
+function chatPromptIncludedInArgs(result) {
+  return Boolean(result.prompt && result.args.includes(result.prompt));
+}
+
+function formatChatArgs(args, prompt) {
+  return args
+    .map(arg => (prompt && arg === prompt ? '<startup prompt>' : formatShellArg(arg)))
+    .join(' ');
+}
+
+function formatShellArg(arg) {
+  if (/^[A-Za-z0-9_@%+=:,./\\-]+$/.test(arg)) return arg;
+  return JSON.stringify(arg);
+}
+
+function previewPrompt(prompt) {
+  const normalized = prompt.replace(/\s+/g, ' ').trim();
+  return normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
 }
 
 /** Extract the value following a flag from args, e.g. getFlag('--dir') → '/path'. */
@@ -755,6 +789,7 @@ if (command === 'install' || command === 'update') {
   let prompt = null;
   let dir = process.cwd();
   let asPlugin = false;
+  let dryRun = false;
   let prerequisites = 'auto';
   const passthroughArgs = [];
 
@@ -763,6 +798,7 @@ if (command === 'install' || command === 'update') {
     else if (args[i] === '--prompt' && args[i + 1]) prompt = args[++i];
     else if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
     else if (args[i] === '--as-plugin') asPlugin = true;
+    else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--check-prerequisites') prerequisites = 'check-only';
     else if (args[i] === '--skip-prerequisites') prerequisites = 'skip';
     else if (args[i] === '--') {
@@ -774,7 +810,7 @@ if (command === 'install' || command === 'update') {
   }
 
   // If --as-plugin, ensure plugin is registered first
-  if (asPlugin) {
+  if (asPlugin && !dryRun) {
     const { installPlugin, getPluginDir } = await import('../lib/setup/plugin-install.js');
     const { existsSync } = await import('node:fs');
 
@@ -820,19 +856,21 @@ if (command === 'install' || command === 'update') {
     }
   }
 
-  console.log(`\n🚀 Launching ${agent} with Azure Functions context...\n`);
+  if (!dryRun) console.log(`\n🚀 Launching ${agent} with Azure Functions context...\n`);
 
   const options = { agent, dir };
   if (prompt) options.prompt = prompt;
   if (passthroughArgs.length > 0) options.passthroughArgs = passthroughArgs;
   options.prerequisites = prerequisites;
-  const setupSkillPending = state && state.setupSkill.status !== 'completed';
+  options.dryRun = dryRun;
+  const setupSkillPending = Boolean(state && state.setupSkill.status !== 'completed');
   if (setupSkillPending) {
-    markSetupPrompted(dir, agent);
     options.setupSkillPending = true;
     options.setupCompleteCommand = `azure-functions-skills state setup-complete --dir "${dir}" --agent ${agent}`;
   }
-  await chat(options);
+  const result = await chat(options);
+  if (dryRun) printChatDryRun(result, setupSkillPending);
+  else if (setupSkillPending && chatPromptIncludedInArgs(result)) markSetupPrompted(dir, agent);
 } else if (command === 'workspace') {
   const action = args[1];
   if ((action === 'apply' || action === 'update') && (args.includes('--help') || args.includes('-h'))) {

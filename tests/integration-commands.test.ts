@@ -601,6 +601,112 @@ describe('CLI command integration', () => {
     expect(readFileSync(argsFile, 'utf-8').trim()).toBe('--help hello');
   });
 
+  it('chat --dry-run prints the launch plan without launching or marking setup prompted', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-dry-run-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes'], { env });
+    writeFileSync(argsFile, '');
+
+    const output = runCliOutput(['chat', '--dir', projectDir, '--skip-prerequisites', '--dry-run', '--', '--yolo'], { env });
+
+    expect(output).toContain('Planned chat launch:');
+    expect(output).toContain('Agent: github-copilot');
+    expect(output).toContain('Command: copilot');
+    expect(output).toContain('--agent functions-copilot');
+    expect(output).toContain('--yolo');
+    expect(output).toContain('Startup prompt: included');
+    expect(output).toContain('Setup instruction: included');
+    expect(readFileSync(argsFile, 'utf-8')).toBe('');
+
+    const state = JSON.parse(readFileSync(join(projectDir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      setupSkill: { status: string };
+    };
+    expect(state.setupSkill.status).toBe('not-run');
+  });
+
+  it('chat --dry-run reports generated setup context as not included when an explicit agent prompt prevents it', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-dry-run-explicit-prompt-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes'], { env });
+    writeFileSync(argsFile, '');
+
+    const output = runCliOutput([
+      'chat',
+      '--dir', projectDir,
+      '--skip-prerequisites',
+      '--dry-run',
+      '--',
+      '-p', 'headless prompt',
+    ], { env });
+
+    expect(output).toContain('Planned chat launch:');
+    expect(output).toContain('-p "headless prompt"');
+    expect(output).toContain('Startup prompt: not included');
+    expect(output).toContain('Setup instruction: not included');
+    expect(output).not.toContain('<startup prompt>');
+    expect(readFileSync(argsFile, 'utf-8')).toBe('');
+
+    const state = JSON.parse(readFileSync(join(projectDir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      setupSkill: { status: string };
+    };
+    expect(state.setupSkill.status).toBe('not-run');
+  });
+
+  it('chat does not mark setup prompted when an explicit agent prompt prevents generated setup context', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-explicit-agent-prompt-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes'], { env });
+    writeFileSync(argsFile, '');
+
+    runCli(['chat', '--dir', projectDir, '--skip-prerequisites', '--', '-p', 'headless prompt'], { env });
+
+    const firstArgs = readFileSync(argsFile, 'utf-8');
+    expect(firstArgs).toContain('-p');
+    expect(firstArgs).toContain('headless prompt');
+    expect(firstArgs).not.toContain('First run azure-functions-setup');
+
+    const state = JSON.parse(readFileSync(join(projectDir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      setupSkill: { status: string };
+    };
+    expect(state.setupSkill.status).toBe('not-run');
+  });
+
   it('chat uses state to select the installed agent and prompts setup only until setup-complete', () => {
     const fakeBinDir = createFakeAgentCliDirectory();
     const projectDir = makeTempDir('af-skills-e2e-chat-state-');

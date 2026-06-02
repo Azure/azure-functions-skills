@@ -101,14 +101,31 @@ export interface ChatOptions {
   prompt?: string;
   dir?: string;
   passthroughArgs?: string[];
+  dryRun?: boolean;
   prerequisites?: PrerequisiteMode;
   prerequisiteRunner?: CommandRunner;
   setupSkillPending?: boolean;
   setupCompleteCommand?: string;
 }
 
-export interface ChatResult {
+export interface ChatLaunchResult {
+  dryRun: false;
   childProcess: ChildProcess;
   agent: LauncherId;
   prompt: string;
+  command: string;
+  args: string[];
+  cwd: string;
 }
+
+export interface ChatDryRunResult {
+  dryRun: true;
+  childProcess: null;
+  agent: LauncherId;
+  prompt: string;
+  command: string;
+  args: string[];
+  cwd: string;
+}
+
+export type ChatResult = ChatLaunchResult | ChatDryRunResult;
