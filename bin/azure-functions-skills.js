@@ -63,6 +63,7 @@ Options:
   --agent <name>     Agent: github-copilot, claude-code, codex
   --prompt <text>    Custom prompt (overrides startup template)
   --dir <path>       Working directory (default: current directory)
+  --dry-run          Print planned launch without starting the agent or updating state
   --check-prerequisites  Check external prerequisites without installing them
   --skip-prerequisites   Skip external prerequisite checks
   -- <args...>       Pass remaining arguments through to the selected agent CLI
@@ -79,6 +80,7 @@ Options:
   --workspace        Apply workspace plugin-reference activation (default)
   --no-workspace     Skip workspace activation
   --dry-run          Print planned changes without writing files
+  --force            Overwrite customer-owned workspace activation files
   --yes              Approve workspace activation changes to existing instruction files
 `,
   'plugin update': `Usage: azure-functions-skills plugin update [options]
@@ -93,6 +95,7 @@ Options:
   --workspace        Apply workspace plugin-reference activation (default)
   --no-workspace     Skip workspace activation
   --dry-run          Print planned changes without writing files
+  --force            Overwrite customer-owned workspace activation files
   --yes              Approve workspace activation changes to existing instruction files
 `,
   'workspace apply': `Usage: azure-functions-skills workspace apply [options]
@@ -105,6 +108,7 @@ Options:
   --mode <name>      minimal, copy, plugin-reference (default: copy)
   --merge-strategy <name> managed-block, include-file, fail-if-exists, append
   --dry-run          Print planned changes without writing files
+  --force            Overwrite customer-owned workspace activation files
   --yes              Approve modifying existing instruction files without prompting
   --include-agent    Add the GHCP functions-copilot workspace agent definition
   --include-mcp      Add workspace MCP configuration files
@@ -120,6 +124,7 @@ Options:
   --mode <name>      minimal, copy, plugin-reference (default: copy)
   --merge-strategy <name> managed-block, include-file, fail-if-exists, append
   --dry-run          Print planned changes without writing files
+  --force            Overwrite customer-owned workspace activation files
   --yes              Approve modifying existing instruction files without prompting
   --include-agent    Add the GHCP functions-copilot workspace agent definition
   --include-mcp      Add workspace MCP configuration files
@@ -209,6 +214,7 @@ function printHelp() {
     --merge-strategy <name> managed-block, include-file, fail-if-exists, append
     --update           Replace existing Azure Functions managed blocks
     --dry-run          Print planned changes without writing files
+    --force            Overwrite customer-owned workspace activation files
     --yes              Approve modifying existing instruction files without prompting
     --include-agent    Add the GHCP functions-copilot workspace agent definition
     --include-mcp      Add workspace MCP configuration files
@@ -230,6 +236,7 @@ function printHelp() {
     --prompt <text>    Custom prompt (overrides startup template)
     --dir <path>       Working directory (default: current directory)
     --as-plugin        Ensure plugin is registered before launching agent
+    --dry-run          Print planned launch without starting the agent or updating state
     --check-prerequisites  Check external prerequisites without installing them
     --skip-prerequisites   Skip external prerequisite checks
     -- <args...>       Pass remaining arguments through to the selected agent CLI
@@ -257,6 +264,65 @@ function printCommandHelp(topic) {
     process.exit(1);
   }
   console.log(text);
+}
+
+function printChatDryRun(result, setupSkillPending) {
+  const startupPromptIncluded = chatPromptIncludedInArgs(result);
+  console.log('Planned chat launch:');
+  console.log(`  Agent: ${result.agent}`);
+  console.log(`  Working directory: ${result.cwd}`);
+  console.log(`  Command: ${result.command}`);
+  console.log(`  Arguments: ${formatChatArgs(result.args, result.prompt)}`);
+  console.log(`  Startup prompt: ${startupPromptIncluded ? 'included' : 'not included'}`);
+  console.log(`  Setup instruction: ${setupSkillPending && startupPromptIncluded ? 'included' : 'not included'}`);
+  if (startupPromptIncluded) console.log(`  Prompt preview: ${previewPrompt(result.prompt)}`);
+}
+
+function printWorkspaceResultDetails(result, indent = '  ') {
+  if (result.overwritten.length > 0) {
+    console.log(`${indent}Overwrite:`);
+    for (const file of result.overwritten) console.log(`${indent}  - ${file}`);
+  }
+  if (result.managedBlockUpdated.length > 0) {
+    console.log(`${indent}Managed update:`);
+    for (const file of result.managedBlockUpdated) console.log(`${indent}  - ${file}`);
+  }
+  if (result.savedAside.length > 0) {
+    console.log(`${indent}Save aside (review & merge manually):`);
+    for (const entry of result.savedAside) console.log(`${indent}  - ${entry.original} → ${entry.aside}`);
+  }
+  if (result.overwritten.length === 0 && result.managedBlockUpdated.length === 0 && result.savedAside.length === 0) {
+    for (const file of result.plannedFiles) console.log(`${indent}- ${file}`);
+  }
+}
+
+function printSavedAsideWarning(savedAside) {
+  if (savedAside.length === 0) return;
+  console.log('\n⚠️  Some files were saved aside for manual review:');
+  for (const entry of savedAside) {
+    console.log(`   ${entry.original} → ${entry.aside}`);
+  }
+  console.log('   Review these files and merge changes as needed.');
+}
+
+function chatPromptIncludedInArgs(result) {
+  return Boolean(result.prompt && result.args.includes(result.prompt));
+}
+
+function formatChatArgs(args, prompt) {
+  return args
+    .map(arg => (prompt && arg === prompt ? '<startup prompt>' : formatShellArg(arg)))
+    .join(' ');
+}
+
+function formatShellArg(arg) {
+  if (/^[A-Za-z0-9_@%+=:,./\\-]+$/.test(arg)) return arg;
+  return JSON.stringify(arg);
+}
+
+function previewPrompt(prompt) {
+  const normalized = prompt.replace(/\s+/g, ' ').trim();
+  return normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
 }
 
 /** Extract the value following a flag from args, e.g. getFlag('--dir') → '/path'. */
@@ -593,7 +659,9 @@ if (command === 'install' || command === 'update') {
   } else {
     const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
     const { applyWorkspace } = await import('../lib/setup/workspace.js');
+    const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
     const action = command;
+    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
     const pluginResult = await runPluginOperation({
       action,
       agents: detectedAgents,
@@ -611,6 +679,8 @@ if (command === 'install' || command === 'update') {
       update: action === 'update',
       dryRun,
       yes,
+      force,
+      prompter,
       includeMcp,
       includeHooks,
       includeAgent: true,
@@ -624,7 +694,7 @@ if (command === 'install' || command === 'update') {
         for (const pluginCommand of step.commands || []) console.log(`        $ ${pluginCommand}`);
       }
       console.log('  Workspace:');
-      for (const file of workspaceResult.plannedFiles) console.log(`    - ${file}`);
+      printWorkspaceResultDetails(workspaceResult, '    ');
     } else {
       const state = recordInstallState(dir, {
         action,
@@ -639,6 +709,7 @@ if (command === 'install' || command === 'update') {
       const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
       const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action });
       printInstallSummary({ action, agents: detectedAgents, dir, filesWritten: workspaceResult.filesWritten, state, gitignoreResult, gitRepoResult });
+      printSavedAsideWarning(workspaceResult.savedAside);
     }
   }
 } else if (command === 'setup') {
@@ -755,6 +826,7 @@ if (command === 'install' || command === 'update') {
   let prompt = null;
   let dir = process.cwd();
   let asPlugin = false;
+  let dryRun = false;
   let prerequisites = 'auto';
   const passthroughArgs = [];
 
@@ -763,6 +835,7 @@ if (command === 'install' || command === 'update') {
     else if (args[i] === '--prompt' && args[i + 1]) prompt = args[++i];
     else if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
     else if (args[i] === '--as-plugin') asPlugin = true;
+    else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--check-prerequisites') prerequisites = 'check-only';
     else if (args[i] === '--skip-prerequisites') prerequisites = 'skip';
     else if (args[i] === '--') {
@@ -774,7 +847,7 @@ if (command === 'install' || command === 'update') {
   }
 
   // If --as-plugin, ensure plugin is registered first
-  if (asPlugin) {
+  if (asPlugin && !dryRun) {
     const { installPlugin, getPluginDir } = await import('../lib/setup/plugin-install.js');
     const { existsSync } = await import('node:fs');
 
@@ -820,19 +893,21 @@ if (command === 'install' || command === 'update') {
     }
   }
 
-  console.log(`\n🚀 Launching ${agent} with Azure Functions context...\n`);
+  if (!dryRun) console.log(`\n🚀 Launching ${agent} with Azure Functions context...\n`);
 
   const options = { agent, dir };
   if (prompt) options.prompt = prompt;
   if (passthroughArgs.length > 0) options.passthroughArgs = passthroughArgs;
   options.prerequisites = prerequisites;
-  const setupSkillPending = state && state.setupSkill.status !== 'completed';
+  options.dryRun = dryRun;
+  const setupSkillPending = Boolean(state && state.setupSkill.status !== 'completed');
   if (setupSkillPending) {
-    markSetupPrompted(dir, agent);
     options.setupSkillPending = true;
     options.setupCompleteCommand = `azure-functions-skills state setup-complete --dir "${dir}" --agent ${agent}`;
   }
-  await chat(options);
+  const result = await chat(options);
+  if (dryRun) printChatDryRun(result, setupSkillPending);
+  else if (setupSkillPending && chatPromptIncludedInArgs(result)) markSetupPrompted(dir, agent);
 } else if (command === 'workspace') {
   const action = args[1];
   if ((action === 'apply' || action === 'update') && (args.includes('--help') || args.includes('-h'))) {
@@ -846,6 +921,7 @@ if (command === 'install' || command === 'update') {
   }
 
   const { applyWorkspace } = await import('../lib/setup/workspace.js');
+  const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
   const agents = [];
   let dir = process.cwd();
   let mode = 'copy';
@@ -853,6 +929,7 @@ if (command === 'install' || command === 'update') {
   let dryRun = false;
   let update = action === 'update';
   let yes = false;
+  let force = false;
   let includeMcp = false;
   let includeHooks = false;
   let includeAgent = false;
@@ -865,6 +942,7 @@ if (command === 'install' || command === 'update') {
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--update') update = true;
     else if (args[i] === '--yes') yes = true;
+    else if (args[i] === '--force') force = true;
     else if (args[i] === '--include-mcp') includeMcp = true;
     else if (args[i] === '--include-hooks') includeHooks = true;
     else if (args[i] === '--include-agent') includeAgent = true;
@@ -872,6 +950,7 @@ if (command === 'install' || command === 'update') {
 
   let result;
   try {
+    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
     result = await applyWorkspace(dir, {
       agents: agents.length > 0 ? agents : undefined,
       mode,
@@ -879,6 +958,8 @@ if (command === 'install' || command === 'update') {
       update,
       dryRun,
       yes,
+      force,
+      prompter,
       includeMcp,
       includeHooks,
       includeAgent,
@@ -890,12 +971,13 @@ if (command === 'install' || command === 'update') {
 
   if (dryRun) {
     console.log('Planned workspace changes:');
-    for (const file of result.plannedFiles) console.log(`  - ${file}`);
+    printWorkspaceResultDetails(result, '  ');
   } else {
     console.log(`Workspace ${action} complete.`);
     console.log(`  Agents configured: ${result.agents.join(', ')}`);
     console.log(`  Mode: ${result.mode}`);
     console.log(`  Files written: ${result.filesWritten}`);
+    printSavedAsideWarning(result.savedAside);
   }
 } else if (command === 'plugin') {
   const action = args[1];
@@ -911,6 +993,7 @@ if (command === 'install' || command === 'update') {
 
   const { detectAgents } = await import('../lib/setup/index.js');
   const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
+  const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
   const agents = [];
   let dir = process.cwd();
   let scope = 'workspace';
@@ -919,6 +1002,7 @@ if (command === 'install' || command === 'update') {
   let workspace = true;
   let dryRun = false;
   let yes = false;
+  let force = false;
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
@@ -930,11 +1014,13 @@ if (command === 'install' || command === 'update') {
     else if (args[i] === '--no-workspace') workspace = false;
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--yes') yes = true;
+    else if (args[i] === '--force') force = true;
   }
 
   const detectedAgents = agents.length > 0 ? agents : await detectAgents();
   let result;
   try {
+    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
     result = await runPluginOperation({
       action,
       agents: detectedAgents,
@@ -945,6 +1031,8 @@ if (command === 'install' || command === 'update') {
       version,
       workspace,
       yes,
+      force,
+      prompter,
     });
   } catch (err) {
     console.error(err.message);

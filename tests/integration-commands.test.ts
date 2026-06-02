@@ -197,7 +197,7 @@ describe('CLI command integration', () => {
 
   it('workspace apply --dry-run prints planned plugin-reference changes without writing files for each target', () => {
     const expectations: Array<{ target: BuildTargetName; files: string[] }> = [
-      { target: 'ghcp', files: ['.github/copilot-instructions.md', '.github/copilot/settings.json'] },
+      { target: 'ghcp', files: ['AGENTS.md', '.github/copilot/settings.json'] },
       { target: 'claude', files: ['CLAUDE.md', '.claude/settings.json'] },
       { target: 'codex', files: ['AGENTS.md', '.agents/plugins/marketplace.json'] },
     ];
@@ -222,7 +222,7 @@ describe('CLI command integration', () => {
     }
   });
 
-  it('workspace apply --yes appends routing to an existing Claude instructions file', () => {
+  it('workspace apply --yes saves aside routing for an existing Claude instructions file', () => {
     const projectDir = makeTempDir('af-skills-e2e-workspace-yes-');
     writeFileSync(join(projectDir, 'CLAUDE.md'), '# Existing Claude rules\n');
 
@@ -237,7 +237,8 @@ describe('CLI command integration', () => {
 
     const content = readFileSync(join(projectDir, 'CLAUDE.md'), 'utf-8');
     expect(content).toContain('# Existing Claude rules');
-    expect(content).toContain('<!-- azure-functions-skills:start');
+    expect(content).not.toContain('<!-- azure-functions-skills:start');
+    expect(existsSync(join(projectDir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(true);
   });
 
   it('workspace apply can opt into MCP and hooks from the CLI', () => {
@@ -282,9 +283,10 @@ describe('CLI command integration', () => {
     expect(output).toContain('Plugin:');
     expect(output).toContain('copilot plugin marketplace add Azure/azure-functions-skills');
     expect(output).toContain('Workspace:');
-    expect(output).toContain('.github/copilot-instructions.md');
+    expect(output).toContain('AGENTS.md');
     expect(output).toContain('.github/agents/functions-copilot.agent.md');
     expect(output).toContain('.mcp.json');
+    expect(output).not.toContain('.github/copilot-instructions.md');
     expect(output).toContain('.github/hooks/welcome-setup.json');
     expect(existsSync(join(projectDir, '.github', 'copilot-instructions.md'))).toBe(false);
   });
@@ -601,6 +603,112 @@ describe('CLI command integration', () => {
     expect(readFileSync(argsFile, 'utf-8').trim()).toBe('--help hello');
   });
 
+  it('chat --dry-run prints the launch plan without launching or marking setup prompted', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-dry-run-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes'], { env });
+    writeFileSync(argsFile, '');
+
+    const output = runCliOutput(['chat', '--dir', projectDir, '--skip-prerequisites', '--dry-run', '--', '--yolo'], { env });
+
+    expect(output).toContain('Planned chat launch:');
+    expect(output).toContain('Agent: github-copilot');
+    expect(output).toContain('Command: copilot');
+    expect(output).toContain('--agent functions-copilot');
+    expect(output).toContain('--yolo');
+    expect(output).toContain('Startup prompt: included');
+    expect(output).toContain('Setup instruction: included');
+    expect(readFileSync(argsFile, 'utf-8')).toBe('');
+
+    const state = JSON.parse(readFileSync(join(projectDir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      setupSkill: { status: string };
+    };
+    expect(state.setupSkill.status).toBe('not-run');
+  });
+
+  it('chat --dry-run reports generated setup context as not included when an explicit agent prompt prevents it', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-dry-run-explicit-prompt-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes'], { env });
+    writeFileSync(argsFile, '');
+
+    const output = runCliOutput([
+      'chat',
+      '--dir', projectDir,
+      '--skip-prerequisites',
+      '--dry-run',
+      '--',
+      '-p', 'headless prompt',
+    ], { env });
+
+    expect(output).toContain('Planned chat launch:');
+    expect(output).toContain('-p "headless prompt"');
+    expect(output).toContain('Startup prompt: not included');
+    expect(output).toContain('Setup instruction: not included');
+    expect(output).not.toContain('<startup prompt>');
+    expect(readFileSync(argsFile, 'utf-8')).toBe('');
+
+    const state = JSON.parse(readFileSync(join(projectDir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      setupSkill: { status: string };
+    };
+    expect(state.setupSkill.status).toBe('not-run');
+  });
+
+  it('chat does not mark setup prompted when an explicit agent prompt prevents generated setup context', () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-chat-explicit-agent-prompt-');
+    const argsFile = join(projectDir, 'agent-args.txt');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      AF_SKILLS_FAKE_ARGS_FILE: argsFile,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'ghcp', '--dir', projectDir, '--yes'], { env });
+    writeFileSync(argsFile, '');
+
+    runCli(['chat', '--dir', projectDir, '--skip-prerequisites', '--', '-p', 'headless prompt'], { env });
+
+    const firstArgs = readFileSync(argsFile, 'utf-8');
+    expect(firstArgs).toContain('-p');
+    expect(firstArgs).toContain('headless prompt');
+    expect(firstArgs).not.toContain('First run azure-functions-setup');
+
+    const state = JSON.parse(readFileSync(join(projectDir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      setupSkill: { status: string };
+    };
+    expect(state.setupSkill.status).toBe('not-run');
+  });
+
   it('chat uses state to select the installed agent and prompts setup only until setup-complete', () => {
     const fakeBinDir = createFakeAgentCliDirectory();
     const projectDir = makeTempDir('af-skills-e2e-chat-state-');
@@ -673,12 +781,11 @@ describe('CLI command integration', () => {
     // Step 3: Run update (should auto-detect local mode from state)
     runCli(['update', '--agent', 'ghcp', '--dir', projectDir, '--yes']);
 
-    // Verify: MCP file preserved (save-aside strategy)
+    // Verify: MCP file preserved and live settings deep-merged
     const afterUpdate = readFileSync(mcpPath, 'utf-8');
     expect(afterUpdate).toContain('my custom note');
-    // New version saved aside
     const asidePath = join(projectDir, '.mcp.azure-functions-skills-new.json');
-    expect(existsSync(asidePath)).toBe(true);
+    expect(existsSync(asidePath)).toBe(false);
     // Skills should be refreshed (overwrite strategy)
     const skillsDir = join(projectDir, '.github', 'skills');
     expect(existsSync(skillsDir)).toBe(true);
@@ -721,6 +828,60 @@ describe('CLI command integration', () => {
 
     // Output describes planned actions
     expect(output).toContain('Planned local update');
+  });
+
+  it('update after plugin install saves aside customer-owned routing files', { timeout: 15_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-plugin-update-save-aside-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'claude', '--dir', projectDir, '--yes'], { env });
+    const claudePath = join(projectDir, 'CLAUDE.md');
+    writeFileSync(claudePath, '# My Custom Claude Rules\nNo managed block here.\n');
+
+    const output = runCliOutput(['update', '--agent', 'claude', '--dir', projectDir, '--yes'], { env });
+
+    const updatedContent = readFileSync(claudePath, 'utf-8');
+    expect(updatedContent).toContain('No managed block here.');
+    expect(updatedContent).not.toContain('azure-functions-skills:start');
+    const asidePath = join(projectDir, 'CLAUDE.azure-functions-skills-new.md');
+    expect(existsSync(asidePath)).toBe(true);
+    expect(readFileSync(asidePath, 'utf-8')).toContain('Azure Functions Skills');
+    expect(output).toContain('saved aside');
+    expect(output).toContain('CLAUDE.azure-functions-skills-new.md');
+  });
+
+  it('update --force after plugin install overwrites customer-owned routing files', { timeout: 15_000 }, () => {
+    const fakeBinDir = createFakeAgentCliDirectory();
+    const projectDir = makeTempDir('af-skills-e2e-plugin-update-force-');
+    const pathValue = `${fakeBinDir}${delimiter}${process.env.PATH || ''}`;
+    const pathext = process.platform === 'win32'
+      ? `.CMD;.EXE;.BAT;.COM;${process.env.PATHEXT || ''}`
+      : process.env.PATHEXT;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      ...(pathext ? { PATHEXT: pathext } : {}),
+    };
+
+    runCli(['install', '--agent', 'claude', '--dir', projectDir, '--yes'], { env });
+    const claudePath = join(projectDir, 'CLAUDE.md');
+    writeFileSync(claudePath, '# My Custom Claude Rules\nNo managed block here.\n');
+
+    runCli(['update', '--agent', 'claude', '--dir', projectDir, '--yes', '--force'], { env });
+
+    const updatedContent = readFileSync(claudePath, 'utf-8');
+    expect(updatedContent).not.toContain('No managed block here.');
+    expect(updatedContent).toContain('Azure Functions Skills');
+    expect(existsSync(join(projectDir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(false);
   });
 
   it('install rejects mixed mode: local then plugin', { timeout: 15_000 }, () => {

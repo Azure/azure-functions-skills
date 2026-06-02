@@ -172,7 +172,7 @@ export async function buildStartupPrompt(dir: string, options: StartupPromptOpti
  * @param {string} [options.agent] - Agent ID (github-copilot, claude-code, codex)
  * @param {string} [options.prompt] - Custom prompt (overrides startup template)
  * @param {string} [options.dir] - Working directory
- * @returns {Promise<{childProcess: object, agent: string, prompt: string}>}
+ * @returns {Promise<{childProcess: object | null, agent: string, prompt: string}>}
  */
 export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
   const dir = options.dir || process.cwd();
@@ -183,14 +183,25 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
     throw new Error(`Unknown agent: ${agentId}. Available: ${Object.keys(LAUNCHERS).join(', ')}`);
   }
 
-  // Skip auto-generated startup prompt when passthrough args are present and
-  // no explicit --prompt was given — the user is controlling the agent CLI directly
-  const hasPassthrough = options.passthroughArgs && options.passthroughArgs.length > 0;
-  const basePrompt = options.prompt || (hasPassthrough ? undefined : await buildStartupPrompt(dir));
+  const basePrompt = options.prompt || await buildStartupPrompt(dir);
   const startupPrompt = basePrompt
     ? (options.setupSkillPending ? `${setupInstruction(options.setupCompleteCommand)} ${basePrompt}` : basePrompt)
     : undefined;
   const args = launcher.buildArgs({ startupPrompt, passthroughArgs: options.passthroughArgs });
+  const prompt = startupPrompt || '';
+
+  if (options.dryRun) {
+    return {
+      dryRun: true,
+      childProcess: null,
+      agent: agentId,
+      prompt,
+      command: launcher.command,
+      args,
+      cwd: dir,
+    };
+  }
+
   const resolvedLauncher = resolveLauncherCommand(launcher.command);
 
   const child = spawn(resolvedLauncher.command, [...resolvedLauncher.argsPrefix, ...args], {
@@ -209,7 +220,15 @@ export async function chat(options: ChatOptions = {}): Promise<ChatResult> {
     });
 
     child.on('spawn', () => {
-      resolve({ childProcess: child, agent: agentId, prompt: startupPrompt || '' });
+      resolve({
+        dryRun: false,
+        childProcess: child,
+        agent: agentId,
+        prompt,
+        command: launcher.command,
+        args,
+        cwd: dir,
+      });
     });
   });
 }

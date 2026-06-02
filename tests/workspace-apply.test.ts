@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadSkills } from '../src/build/loader.js';
@@ -23,21 +23,24 @@ afterEach(() => {
 });
 
 describe('applyWorkspace', () => {
-  it('refuses to append to existing Claude instructions without approval', async () => {
+  it('saves aside generated routing without modifying existing Claude instructions when not approved', async () => {
     const dir = makeTempDir();
     const claudePath = join(dir, 'CLAUDE.md');
     writeFileSync(claudePath, ['# Project Rules', '', 'Keep this file careful.'].join('\n'));
 
-    await expect(applyWorkspace(dir, {
+    const result = await applyWorkspace(dir, {
       agents: ['claude'],
       mode: 'plugin-reference',
       mergeStrategy: 'managed-block',
-    })).rejects.toThrow(/Refusing to modify existing customer-owned file/);
+    });
 
     expect(readFileSync(claudePath, 'utf-8')).not.toContain('azure-functions-skills:start');
+    expect(readFileSync(claudePath, 'utf-8')).toContain('Keep this file careful.');
+    expect(existsSync(join(dir, 'CLAUDE.azure-functions-skills-new.md'))).toBe(true);
+    expect(result.savedAside).toHaveLength(1);
   });
 
-  it('appends a managed block to existing Claude instructions when approved', async () => {
+  it('saves aside generated routing when existing Claude instructions are customer-owned', async () => {
     const dir = makeTempDir();
     const claudePath = join(dir, 'CLAUDE.md');
     writeFileSync(claudePath, ['# Project Rules', '', 'Keep this file careful.'].join('\n'));
@@ -51,8 +54,12 @@ describe('applyWorkspace', () => {
 
     const content = readFileSync(claudePath, 'utf-8');
     expect(content).toContain('Keep this file careful.');
-    expect(content).toContain('<!-- azure-functions-skills:start');
+    expect(content).not.toContain('<!-- azure-functions-skills:start');
+    const asidePath = join(dir, 'CLAUDE.azure-functions-skills-new.md');
+    expect(existsSync(asidePath)).toBe(true);
+    expect(readFileSync(asidePath, 'utf-8')).toContain('Azure Functions Skills');
     expect(result.filesWritten).toBeGreaterThan(0);
+    expect(result.savedAside).toEqual([{ original: 'CLAUDE.md', aside: 'CLAUDE.azure-functions-skills-new.md' }]);
   });
 
   it('preserves customer content while replacing the managed block', async () => {
@@ -119,11 +126,11 @@ describe('applyWorkspace', () => {
       mergeStrategy: 'managed-block',
     });
 
-    expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+    expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
+    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
     expect(existsSync(join(dir, '.github', 'copilot', 'settings.json'))).toBe(true);
     expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
     expect(existsSync(join(dir, '.claude', 'settings.json'))).toBe(true);
-    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
     expect(existsSync(join(dir, '.agents', 'plugins', 'marketplace.json'))).toBe(true);
 
     expect(existsSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
@@ -145,8 +152,13 @@ describe('applyWorkspace', () => {
     const agentPath = join(dir, '.github', 'agents', 'functions-copilot.agent.md');
     expect(existsSync(agentPath)).toBe(true);
     expect(readFileSync(agentPath, 'utf-8')).toContain('name: functions-copilot');
+    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+    expect(readFileSync(join(dir, 'AGENTS.md'), 'utf-8')).toContain('Azure Functions Development Standards');
+    expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
     expect(existsSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(false);
     expect(result.plannedFiles).toContain('.github/agents/functions-copilot.agent.md');
+    expect(result.plannedFiles).toContain('AGENTS.md');
+    expect(result.plannedFiles).not.toContain('.github/copilot-instructions.md');
   });
 
   it('dry-run reports planned changes without writing files', async () => {
@@ -187,6 +199,98 @@ describe('applyWorkspace', () => {
     const codexHooks = readFileSync(join(dir, '.codex', 'hooks.json'), 'utf-8');
     expect(codexHooks).toContain('node -e');
     expect(codexHooks).not.toContain('bash -c');
+  });
+
+  it('deep-merges JSON settings so plugin activation stays live', async () => {
+    const dir = makeTempDir();
+    const settingsPath = join(dir, '.github', 'copilot', 'settings.json');
+    mkdirSync(dirname(settingsPath), { recursive: true });
+    writeFileSync(settingsPath, JSON.stringify({ existingSetting: true }, null, 2));
+
+    const result = await applyWorkspace(dir, {
+      agents: ['ghcp'],
+      mode: 'plugin-reference',
+      includeMcp: true,
+      includeHooks: true,
+      includeAgent: true,
+    });
+
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as {
+      existingSetting?: boolean;
+      enabledPlugins?: Record<string, boolean>;
+      extraKnownMarketplaces?: Record<string, unknown>;
+    };
+    expect(settings.existingSetting).toBe(true);
+    expect(settings.enabledPlugins?.['azure-functions-skills@azure-functions-skills']).toBe(true);
+    expect(settings.extraKnownMarketplaces?.['azure-functions-skills']).toBeTruthy();
+    expect(result.savedAside).toHaveLength(0);
+  });
+
+  it('coalesces Claude plugin and MCP settings before applying conflict policy', async () => {
+    const dir = makeTempDir();
+    const settingsPath = join(dir, '.claude', 'settings.json');
+    mkdirSync(dirname(settingsPath), { recursive: true });
+    writeFileSync(settingsPath, JSON.stringify({ existingSetting: true }, null, 2));
+
+    await applyWorkspace(dir, {
+      agents: ['claude'],
+      mode: 'plugin-reference',
+      includeMcp: true,
+    });
+
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as {
+      existingSetting?: boolean;
+      enabledPlugins?: Record<string, boolean>;
+      mcpServers?: Record<string, unknown>;
+    };
+    expect(settings.existingSetting).toBe(true);
+    expect(settings.enabledPlugins?.['azure-functions-skills@azure-functions-skills']).toBe(true);
+    expect(Object.keys(settings.mcpServers || {}).length).toBeGreaterThan(0);
+  });
+
+  it('saves aside non-JSON settings unless force is set', async () => {
+    const dir = makeTempDir();
+    const configPath = join(dir, '.codex', 'config.toml');
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, 'custom = true\n');
+
+    const result = await applyWorkspace(dir, {
+      agents: ['codex'],
+      mode: 'plugin-reference',
+      includeMcp: true,
+      yes: true,
+    });
+
+    expect(readFileSync(configPath, 'utf-8')).toBe('custom = true\n');
+    const asidePath = join(dir, '.codex', 'config.azure-functions-skills-new.toml');
+    expect(existsSync(asidePath)).toBe(true);
+    expect(readFileSync(asidePath, 'utf-8')).toContain('Azure Functions MCP Servers');
+    expect(result.savedAside).toEqual([{ original: '.codex/config.toml', aside: join('.codex', 'config.azure-functions-skills-new.toml') }]);
+  });
+
+  it('force overwrites customer-owned routing and non-JSON settings', async () => {
+    const dir = makeTempDir();
+    const agentsPath = join(dir, 'AGENTS.md');
+    const configPath = join(dir, '.codex', 'config.toml');
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(agentsPath, 'CUSTOM AGENTS\n');
+    writeFileSync(configPath, 'custom = true\n');
+
+    const result = await applyWorkspace(dir, {
+      agents: ['codex'],
+      mode: 'plugin-reference',
+      includeMcp: true,
+      force: true,
+      yes: true,
+    });
+
+    expect(readFileSync(agentsPath, 'utf-8')).not.toContain('CUSTOM AGENTS');
+    expect(readFileSync(agentsPath, 'utf-8')).toContain('For Azure Functions work');
+    expect(readFileSync(configPath, 'utf-8')).not.toContain('custom = true');
+    expect(readFileSync(configPath, 'utf-8')).toContain('Azure Functions MCP Servers');
+    expect(result.savedAside).toHaveLength(0);
+    expect(result.overwritten).toContain('AGENTS.md');
+    expect(result.overwritten).toContain('.codex/config.toml');
   });
 
   it('include-file strategy creates an include target and avoids duplicate include lines', async () => {

@@ -204,7 +204,7 @@ describe('planPluginOperation', () => {
         { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
       ]);
-      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
       expect(existsSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
       expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
       expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
@@ -234,7 +234,7 @@ describe('planPluginOperation', () => {
         { command: 'codex', args: ['plugin', 'marketplace', 'add', 'Azure/azure-functions-skills'] },
         { command: 'codex', args: ['plugin', 'add', 'azure-functions-skills@azure-functions-skills'] },
       ]);
-      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(true);
+      expect(existsSync(join(dir, '.github', 'copilot-instructions.md'))).toBe(false);
       expect(existsSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
       expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
       expect(result.filesWritten).toBeGreaterThan(0);
@@ -319,8 +319,9 @@ describe('planPluginOperation', () => {
     });
 
     const command = plan.steps[0].commands?.[0] || '';
+    const normalizedRoot = process.cwd().replaceAll('\\', '/');
     expect(command.replaceAll('\\', '/')).toContain('claude plugin marketplace add');
-    expect(command.replaceAll('\\', '/')).toContain('/azure-functions-skills --scope local');
+    expect(command.replaceAll('\\', '/')).toContain(`${normalizedRoot} --scope local`);
     expect(plan.steps[0].commands?.[1]).toBe('claude plugin install azure-functions-skills@azure-functions-skills --scope local');
   });
 

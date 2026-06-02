@@ -59,6 +59,10 @@ export interface SetupResult {
   prerequisites?: PrerequisiteResult[];
 }
 
+export type FilePromptResult = 'overwrite' | 'skip';
+
+export type FilePrompter = (relativePath: string, newContent: string, existingContent: string) => Promise<FilePromptResult>;
+
 export interface WorkspaceApplyOptions {
   agents?: CliAgentName[];
   mode?: WorkspaceMode;
@@ -66,6 +70,8 @@ export interface WorkspaceApplyOptions {
   update?: boolean;
   dryRun?: boolean;
   yes?: boolean;
+  force?: boolean;
+  prompter?: FilePrompter;
   includeMcp?: boolean;
   includeHooks?: boolean;
   includeAgent?: boolean;
@@ -77,6 +83,9 @@ export interface WorkspaceApplyResult {
   filesWritten: number;
   plannedFiles: string[];
   dryRun: boolean;
+  overwritten: string[];
+  managedBlockUpdated: string[];
+  savedAside: Array<{ original: string; aside: string }>;
 }
 
 export interface LauncherContext {
@@ -101,14 +110,31 @@ export interface ChatOptions {
   prompt?: string;
   dir?: string;
   passthroughArgs?: string[];
+  dryRun?: boolean;
   prerequisites?: PrerequisiteMode;
   prerequisiteRunner?: CommandRunner;
   setupSkillPending?: boolean;
   setupCompleteCommand?: string;
 }
 
-export interface ChatResult {
+export interface ChatLaunchResult {
+  dryRun: false;
   childProcess: ChildProcess;
   agent: LauncherId;
   prompt: string;
+  command: string;
+  args: string[];
+  cwd: string;
 }
+
+export interface ChatDryRunResult {
+  dryRun: true;
+  childProcess: null;
+  agent: LauncherId;
+  prompt: string;
+  command: string;
+  args: string[];
+  cwd: string;
+}
+
+export type ChatResult = ChatLaunchResult | ChatDryRunResult;

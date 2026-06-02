@@ -208,35 +208,37 @@ describe('applyLocalUpdate', () => {
     });
   });
 
-  describe('MCP settings use save-aside', () => {
-    it('saves aside .mcp.json preserving existing file', async () => {
+  describe('settings update strategies', () => {
+    it('deep-merges .mcp.json preserving existing custom servers', async () => {
       const dir = makeTempDir();
       setupLocalWorkspace(dir, 'ghcp');
 
-      await applyLocalUpdate(dir, { agents: ['ghcp'] });
+      const result = await applyLocalUpdate(dir, { agents: ['ghcp'] });
 
-      // Original file preserved with user's custom server
-      const original = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf-8'));
-      expect(original.mcpServers['my-custom-server']).toBeDefined();
+      const merged = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf-8'));
+      expect(merged.mcpServers['my-custom-server']).toBeDefined();
+      expect(merged.mcpServers['azure-functions']).toBeDefined();
 
-      // New file saved aside
       const asidePath = join(dir, '.mcp.azure-functions-skills-new.json');
-      expect(existsSync(asidePath)).toBe(true);
+      expect(existsSync(asidePath)).toBe(false);
+      expect(result.managedBlockUpdated).toContain('.mcp.json');
+      expect(result.savedAside).toHaveLength(0);
     });
 
-    it('saves aside .claude/settings.json preserving existing file', async () => {
+    it('deep-merges .claude/settings.json preserving existing custom servers', async () => {
       const dir = makeTempDir();
       setupLocalWorkspace(dir, 'claude');
 
-      await applyLocalUpdate(dir, { agents: ['claude'] });
+      const result = await applyLocalUpdate(dir, { agents: ['claude'] });
 
-      // Original file preserved
-      const original = JSON.parse(readFileSync(join(dir, '.claude', 'settings.json'), 'utf-8'));
-      expect(original.mcpServers['my-custom-server']).toBeDefined();
+      const merged = JSON.parse(readFileSync(join(dir, '.claude', 'settings.json'), 'utf-8'));
+      expect(merged.mcpServers['my-custom-server']).toBeDefined();
+      expect(merged.mcpServers['azure-functions']).toBeDefined();
 
-      // New file saved aside
       const asidePath = join(dir, '.claude', 'settings.azure-functions-skills-new.json');
-      expect(existsSync(asidePath)).toBe(true);
+      expect(existsSync(asidePath)).toBe(false);
+      expect(result.managedBlockUpdated).toContain(join('.claude', 'settings.json'));
+      expect(result.savedAside).toHaveLength(0);
     });
 
     it('saves aside .codex/config.toml preserving existing file', async () => {
@@ -310,8 +312,9 @@ describe('applyLocalUpdate', () => {
 
       expect(result.overwritten.length).toBeGreaterThan(0);
       // copilot-instructions.md is no longer generated for GHCP,
-      // so no managed-block updates happen
-      expect(result.savedAside.length).toBeGreaterThan(0);
+      // so only JSON settings are merged.
+      expect(result.managedBlockUpdated).toContain('.mcp.json');
+      expect(result.savedAside).toHaveLength(0);
     });
   });
 
@@ -333,10 +336,10 @@ describe('applyLocalUpdate', () => {
   describe('interactive prompts', () => {
     it('calls prompter for save-aside files when interactive', async () => {
       const dir = makeTempDir();
-      setupLocalWorkspace(dir, 'ghcp');
+      setupLocalWorkspace(dir, 'codex');
 
       const prompter: FilePrompter = vi.fn().mockResolvedValue('skip');
-      await applyLocalUpdate(dir, { agents: ['ghcp'], prompter });
+      await applyLocalUpdate(dir, { agents: ['codex'], prompter });
 
       // prompter should be called for each save-aside candidate
       expect(prompter).toHaveBeenCalled();
@@ -349,42 +352,42 @@ describe('applyLocalUpdate', () => {
 
     it('overwrites file when prompter returns overwrite', async () => {
       const dir = makeTempDir();
-      setupLocalWorkspace(dir, 'ghcp');
+      setupLocalWorkspace(dir, 'codex');
 
       const prompter: FilePrompter = vi.fn().mockResolvedValue('overwrite');
-      const result = await applyLocalUpdate(dir, { agents: ['ghcp'], prompter });
+      const result = await applyLocalUpdate(dir, { agents: ['codex'], prompter });
 
       // No save-aside files — all overwritten
       expect(result.savedAside).toHaveLength(0);
       // The files that would have been save-aside are now in overwritten
       expect(result.overwritten.length).toBeGreaterThan(0);
-      // .mcp.json should be overwritten (user's custom server gone)
-      const mcp = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf-8'));
-      expect(mcp.mcpServers?.['my-custom-server']).toBeUndefined();
+      // .codex/config.toml should be overwritten (user's custom config gone)
+      const config = readFileSync(join(dir, '.codex', 'config.toml'), 'utf-8');
+      expect(config).not.toContain('# Custom Codex config');
       // No save-aside file
-      expect(existsSync(join(dir, '.mcp.azure-functions-skills-new.json'))).toBe(false);
+      expect(existsSync(join(dir, '.codex', 'config.azure-functions-skills-new.toml'))).toBe(false);
     });
 
     it('saves aside file when prompter returns skip', async () => {
       const dir = makeTempDir();
-      setupLocalWorkspace(dir, 'ghcp');
+      setupLocalWorkspace(dir, 'codex');
 
       const prompter: FilePrompter = vi.fn().mockResolvedValue('skip');
-      const result = await applyLocalUpdate(dir, { agents: ['ghcp'], prompter });
+      const result = await applyLocalUpdate(dir, { agents: ['codex'], prompter });
 
       // Save-aside files created
       expect(result.savedAside.length).toBeGreaterThan(0);
-      // User's custom MCP server preserved
-      const mcp = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf-8'));
-      expect(mcp.mcpServers['my-custom-server']).toBeDefined();
+      // User's custom Codex config preserved
+      const config = readFileSync(join(dir, '.codex', 'config.toml'), 'utf-8');
+      expect(config).toContain('# Custom Codex config');
     });
 
     it('does not call prompter when not provided (non-interactive)', async () => {
       const dir = makeTempDir();
-      setupLocalWorkspace(dir, 'ghcp');
+      setupLocalWorkspace(dir, 'codex');
 
       // No prompter — should default to save-aside
-      const result = await applyLocalUpdate(dir, { agents: ['ghcp'] });
+      const result = await applyLocalUpdate(dir, { agents: ['codex'] });
 
       expect(result.savedAside.length).toBeGreaterThan(0);
     });
@@ -401,10 +404,10 @@ describe('applyLocalUpdate', () => {
 
     it('does not call prompter when --yes is set', async () => {
       const dir = makeTempDir();
-      setupLocalWorkspace(dir, 'ghcp');
+      setupLocalWorkspace(dir, 'codex');
 
       const prompter: FilePrompter = vi.fn().mockResolvedValue('overwrite');
-      const result = await applyLocalUpdate(dir, { agents: ['ghcp'], yes: true, prompter });
+      const result = await applyLocalUpdate(dir, { agents: ['codex'], yes: true, prompter });
 
       expect(prompter).not.toHaveBeenCalled();
       // --yes defaults to save-aside for shared files
