@@ -1,6 +1,6 @@
 {
   "name": "@azure/functions-skills",
-  "version": "0.0.3-preview",
+  "version": "0.0.5-preview",
   "description": "AI assistant plugins for Azure Functions — one-command setup for GitHub Copilot, Claude Code, and Codex",
   "type": "module",
   "bin": {
