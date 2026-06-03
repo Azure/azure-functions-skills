@@ -101,8 +101,8 @@ node bin/azure-functions-skills.js chat --agent codex --dir ../tmp-functions-app
 Use the local release helper from a clean `main` branch that matches `origin/main`:
 
 ```bash
-npm run release:local -- 0.0.3-preview --dry-run
-npm run release:local -- 0.0.3-preview --yes
+npm run release:local -- 0.0.5-preview --dry-run
+npm run release:local -- 0.0.5-preview --yes
 ```
 
 The helper:
@@ -122,9 +122,9 @@ The tag push triggers two independent downstream processes:
 Useful release options:
 
 ```bash
-npm run release:local -- 0.0.3-preview --dry-run
-npm run release:local -- 0.0.3-preview --yes --skip-check
-npm run release:local -- 0.0.3-preview --yes --no-push-main
+npm run release:local -- 0.0.5-preview --dry-run
+npm run release:local -- 0.0.5-preview --yes --skip-check
+npm run release:local -- 0.0.5-preview --yes --no-push-main
 ```
 
 Before tagging, confirm that:

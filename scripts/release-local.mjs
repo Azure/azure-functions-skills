@@ -34,8 +34,8 @@ Usage:
   npm run release:local -- <version> [options]
 
 Examples:
-  npm run release:local -- 0.0.3-preview --yes
-  npm run release:local -- 0.0.3-preview --dry-run
+  npm run release:local -- 0.0.5-preview --yes
+  npm run release:local -- 0.0.5-preview --dry-run
 
 What it does:
   1. Verifies main is clean and matches origin/main.
@@ -86,7 +86,7 @@ function parseArgs(argv) {
 }
 
 function normalizeVersion(input) {
-  if (!input) throw new Error('Version is required. Example: npm run release:local -- 0.0.3-preview --yes');
+  if (!input) throw new Error('Version is required. Example: npm run release:local -- 0.0.5-preview --yes');
   const version = input.replace(/^v/, '');
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`Invalid version: ${input}`);
