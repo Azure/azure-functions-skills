@@ -84,25 +84,25 @@ jobs:
           ls -la dist/plugin/azure-functions-skills/skills/
 
       - name: Upload GHCP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: workspace-ghcp
           path: dist/workspace/ghcp/
 
       - name: Upload Claude artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: workspace-claude
           path: dist/workspace/claude/
 
       - name: Upload Codex artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: workspace-codex
           path: dist/workspace/codex/
 
       - name: Upload plugin payload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: plugin-azure-functions-skills
           path: dist/plugin/azure-functions-skills/
