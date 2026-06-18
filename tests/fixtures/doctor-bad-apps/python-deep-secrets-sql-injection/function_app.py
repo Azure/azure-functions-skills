@@ -14,7 +14,7 @@ BLOB_SAS_URL = (
 )
 
 # BAD: SC-001 — Database connection string with credentials in source
-DB_CONNECTION = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:myserver.database.windows.net,1433;Database=mydb;Uid=adminuser;Pwd=SuperSecret123!;Encrypt=yes;TrustServerCertificate=no;"
+DB_CONNECTION = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:myserver.database.windows.net,1433;Database=mydb;Uid=adminuser;Pwd=PLACEHOLDER;Encrypt=yes;TrustServerCertificate=no;"
 
 
 @app.route(route="users/{userId}")
