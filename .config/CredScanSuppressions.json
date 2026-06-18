@@ -1,0 +1,9 @@
+{
+  "tool": "Credential Scanner",
+  "suppressions": [
+    {
+      "placeholder": "Driver={ODBC Driver 18 for SQL Server};Server=tcp:myserver.database.windows.net,1433;Database=mydb;Uid=adminuser;Pwd=SuperSecret123!;Encrypt=yes;TrustServerCertificate=no;",
+      "_justification": "False positive: non-live SQL connection string fixture used by doctor tests to verify secret detection behavior."
+    }
+  ]
+}
