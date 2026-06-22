@@ -1,21 +1,36 @@
+parameters:
+    - name: npmRegistry
+      type: string
+      default: 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/npm/registry/'
+
 jobs:
     - job: UnitTests
 
       strategy:
           matrix:
-              Node18:
-                  NODE_VERSION: '18.x'
               Node20:
                   NODE_VERSION: '20.x'
               Node22:
                   NODE_VERSION: '22.x'
+              Node24:
+                  NODE_VERSION: '24.x'
 
       steps:
           - task: NodeTool@0
             inputs:
                 versionSpec: $(NODE_VERSION)
             displayName: 'Install Node.js'
-          - script: npm ci
+          - pwsh: |
+                @(
+                  'registry=${{ parameters.npmRegistry }}'
+                  'always-auth=true'
+                ) | Set-Content .npmrc
+            displayName: 'Configure npm registry'
+          - task: npmAuthenticate@0
+            inputs:
+                workingFile: .npmrc
+            displayName: 'Authenticate npm feed'
+          - script: npm ci --include=optional
             displayName: 'npm ci'
           - script: npm run lint
             displayName: 'npm run lint'

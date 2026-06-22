@@ -44,11 +44,15 @@ extends:
               dependsOn: []
               jobs:
                   - template: /azure-pipelines/templates/test.yml@self
+                    parameters:
+                        npmRegistry: 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/npm/registry/'
 
             - stage: LinuxUnitTests
               dependsOn: []
               jobs:
                   - template: /azure-pipelines/templates/test.yml@self
+                    parameters:
+                        npmRegistry: 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/npm/registry/'
               pool:
                   name: 1es-pool-azfunc
                   image: 1es-ubuntu-22.04
@@ -60,3 +64,4 @@ extends:
                   - template: /azure-pipelines/templates/build.yml@self
                     parameters:
                         IsPrerelease: ${{ parameters.IsPrerelease }}
+                        npmRegistry: 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/npm/registry/'

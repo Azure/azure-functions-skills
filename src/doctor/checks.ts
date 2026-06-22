@@ -585,7 +585,7 @@ function readJsonFile(filePath: string): Record<string, unknown> | null {
 
 // ── Check 14: lifecycle-scripts (supply-chain) ──
 
-const FORBIDDEN_LIFECYCLE_SCRIPTS = ['preinstall', 'postinstall', 'postpack', 'prepublish', 'prepublishOnly'];
+const FORBIDDEN_LIFECYCLE_SCRIPTS = ['preinstall', 'install', 'postinstall', 'postpack', 'prepublish', 'prepublishOnly'];
 
 export const lifecycleScriptsCheck: DoctorCheck = {
   id: 'lifecycle-scripts',
@@ -599,7 +599,7 @@ export const lifecycleScriptsCheck: DoctorCheck = {
       return [result(lifecycleScriptsCheck, {
         status: 'pass',
         title: 'No risky lifecycle scripts',
-        message: 'package.json does not define preinstall/postinstall/postpack/prepublish/prepublishOnly',
+        message: 'package.json does not define preinstall/install/postinstall/postpack/prepublish/prepublishOnly',
       })];
     }
     return [result(lifecycleScriptsCheck, {

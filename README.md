@@ -15,7 +15,11 @@ It is **focused on Azure Functions**. For deployment of *any* Azure resource (Fu
 
 ## Prerequisites
 
-**Node.js 18+** is the only thing you need to install yourself. Everything else (Azure CLI, Core Tools, language runtimes) is checked and guided by the `azure-functions-setup` skill the first time you run `chat`.
+**Node.js 20+** is the only thing you need to install yourself for the Azure Functions Skills CLI.
+Use **Node.js 24+** when installing or testing GitHub Copilot CLI (`--agent ghcp`) because the
+Copilot CLI runtime requires Node 24 or later. Claude Code and Codex do not currently require Node
+24. Everything else (Azure CLI, Core Tools, language runtimes) is checked and guided by the
+`azure-functions-setup` skill the first time you run `chat`.
 
 ## Quick Start
 
