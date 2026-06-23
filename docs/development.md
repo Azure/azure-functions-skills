@@ -8,11 +8,11 @@ This repository keeps canonical agent, skill, hook, prompt, and MCP content unde
 
 | Tool | Required for | Install |
 | --- | --- | --- |
-| Node.js 18 or later | TypeScript build, tests, and CLI scripts | [nodejs.org](https://nodejs.org/) |
+| Node.js 20 or later | TypeScript build, tests, and CLI scripts | [nodejs.org](https://nodejs.org/) |
 | npm | Dependency install, package scripts, and release publishing | Included with Node.js; see [npm docs](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) |
 | Git | Source control and release checks | [git-scm.com/downloads](https://git-scm.com/downloads) |
 | GitHub CLI | Optional GitHub Release creation in `release:local` | [cli.github.com](https://cli.github.com/) |
-| GitHub Copilot CLI, Claude Code, or Codex CLI | Optional real-agent smoke tests | [gh-copilot](https://github.com/github/gh-copilot), [Claude Code](https://claude.ai/download), [Codex package](https://www.npmjs.com/package/@openai/codex) |
+| GitHub Copilot CLI, Claude Code, or Codex CLI | Optional real-agent smoke tests. GitHub Copilot CLI requires Node.js 24+; Claude Code requires Node.js 18+; Codex requires Node.js 16+. | [gh-copilot](https://github.com/github/gh-copilot), [Claude Code](https://claude.ai/download), [Codex package](https://www.npmjs.com/package/@openai/codex) |
 
 Install dependencies:
 

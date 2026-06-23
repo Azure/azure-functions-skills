@@ -40,6 +40,7 @@ extends:
                     parameters:
                         # Version to be published is specified in branch
                         IsPrerelease: false
+                        npmRegistry: 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/npm/registry/'
             - stage: Release
               dependsOn: Build
               jobs:
