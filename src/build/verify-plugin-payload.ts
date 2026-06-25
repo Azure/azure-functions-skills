@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildPluginMarketplaces, buildPluginPayload } from './build-target.js';
+import { buildPluginMarketplaces, buildPluginPayload, buildTarget } from './build-target.js';
 import { loadAgents, loadHooks, loadMcpServers, loadSkills } from './loader.js';
 import type { BuildData } from '../types.js';
 
@@ -12,6 +12,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const TEMPLATES_DIR = join(ROOT, 'templates');
 const COMMITTED_PLUGIN_DIR = join(ROOT, '.github', 'plugins', 'azure-functions-skills');
+const COMMITTED_WORKSPACE_DIR = join(ROOT, '.github', 'generated', 'workspace');
+const TARGETS = ['ghcp', 'claude', 'codex'] as const;
 
 function readPackageVersion(): string {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')) as { version: string };
@@ -78,6 +80,14 @@ function main(): void {
   try {
     const data = loadBuildData();
     buildPluginPayload(data, join(tempRoot, '.github', 'plugins', 'azure-functions-skills'));
+    for (const target of TARGETS) buildTarget(target, data, join(tempRoot, '.github', 'generated', 'workspace'));
+    const generatedWorkspaceDir = join(tempRoot, '.github', 'generated', 'workspace');
+    writeFileSync(join(generatedWorkspaceDir, 'manifest.json'), JSON.stringify({
+      package: '@azure/functions-skills',
+      version: data.packageVersion || '0.0.0-dev',
+      generatedAt: new Date(0).toISOString(),
+      targets: TARGETS,
+    }, null, 2));
     buildPluginMarketplaces(tempRoot, {
       packageVersion: data.packageVersion || '0.0.0-dev',
       pluginSource: './.github/plugins/azure-functions-skills',
@@ -87,6 +97,12 @@ function main(): void {
       join(tempRoot, '.github', 'plugins', 'azure-functions-skills'),
       COMMITTED_PLUGIN_DIR,
       '.github/plugins/azure-functions-skills',
+      errors,
+    );
+    compareTrees(
+      generatedWorkspaceDir,
+      COMMITTED_WORKSPACE_DIR,
+      '.github/generated/workspace',
       errors,
     );
 

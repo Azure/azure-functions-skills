@@ -1,0 +1,8 @@
+# Global configuration for all agents in this function app.
+
+system_tools:
+  dynamic_sessions_code_interpreter:
+    endpoint: $ACA_SESSION_POOL_ENDPOINT
+
+model: $FOUNDRY_MODEL
+timeout: 900

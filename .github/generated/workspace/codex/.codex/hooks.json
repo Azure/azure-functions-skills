@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'echo \"⚡ Welcome to Azure Functions! Checking prerequisites...\"; az --version > /dev/null 2>&1 && echo \"✅ Azure CLI\" || echo \"❌ Azure CLI — install: https://aka.ms/installazurecli\"; func --version > /dev/null 2>&1 && echo \"✅ Core Tools\" || echo \"❌ Core Tools — install: npm i -g azure-functions-core-tools@4\"; node --version > /dev/null 2>&1 && echo \"✅ Node.js\" || echo \"❌ Node.js — install: https://nodejs.org\"'",
+            "statusMessage": "Checking Azure Functions prerequisites"
+          }
+        ]
+      }
+    ]
+  }
+}
