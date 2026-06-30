@@ -1,14 +1,15 @@
 ---
 name: azure-functions-agents
-description: "Build, scaffold, extend, deploy, and troubleshoot event-driven AI agents and scheduled serverless agent apps on Azure Functions using azurefunctions-agents-runtime. Use when the user wants a scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, event-driven AI automation, HTTP/chat agent, webhook-style agent, or Azure Functions hosted agent."
+description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions serverless agents and event-driven AI agents using the Azure Functions serverless agents runtime. Use when the user says serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, event-driven AI automation, HTTP/chat agent, webhook-style agent, or Azure Functions hosted agent."
 argument-hint: 'Describe the agent, trigger, tools, model needs, and deployment target'
 ---
 
 # Azure Functions Agents
 
-Use this skill to build event-driven AI agents on Azure Functions with the Azure Functions
-serverless agents runtime. This programming model is new, so prefer these patterns over older
-package README examples.
+Use this skill to build serverless agents on Azure Functions with the Azure Functions serverless
+agents runtime. Align terminology and flows with the Microsoft Learn quickstart "Build serverless
+agents using Azure Functions": agents are defined in markdown files, runtime defaults live in
+`agents.config.yaml`, remote MCP servers live in `mcp.json`, and deployment uses `azd`.
 
 ## Current Defaults
 
@@ -55,7 +56,7 @@ Load only the files needed for the task:
 | Bicep, azd, deployment, local development | [infra-and-deployment.md](./references/infra-and-deployment.md) |
 | Azure resource naming abbreviations used by the Bicep assets | [abbreviations.json](./references/abbreviations.json) |
 | Diagnostics and common failures | [troubleshooting.md](./references/troubleshooting.md) |
-| Full quickstart app copied into this skill | [quickstart-reference.md](./references/quickstart-reference.md) |
+| Official serverless agents quickstart template and Learn article | [quickstart-reference.md](./references/quickstart-reference.md) |
 
 ## Assess the Workspace
 
@@ -145,13 +146,15 @@ Use **manifest discovery + MCP primary retrieval** when Azure MCP tools are avai
    result after reading the complete response, fall back to the manifest `repositoryUrl`,
    `folderPath`, and `gitRef` using direct GitHub download first and `git clone --depth 1` only if
    downloads fail. Tell the user that MCP retrieval failed and GitHub fallback was used.
-5. If both MCP and GitHub retrieval fail, use the bundled
-   [assets/quickstart-sample](./assets/quickstart-sample) as the offline last resort.
 
-When Azure MCP tools are not available, skip directly to the manifest/GitHub fallback above, then
-to the bundled quickstart sample. Do not invent a project structure from memory.
+When Azure MCP tools are not available, skip directly to the manifest/GitHub fallback above. Do not
+invent a project structure from memory.
 
-After scaffolding from MCP, GitHub, or the bundled sample, tailor the app to the user's agent.
+Do not use bundled template files as a scaffold source. This skill intentionally does not include a
+full copy of the serverless agents template because the template evolves independently; always
+retrieve it from MCP first or from the manifest GitHub coordinates as fallback.
+
+After scaffolding from MCP or GitHub, tailor the app to the user's agent.
 
 Baseline structure:
 

@@ -1,12 +1,16 @@
-# Quickstart Reference App
+# Official Quickstart Template
 
-A full quickstart sample is copied into this skill at:
+The canonical serverless agents scaffold is the Azure MCP / Azure Functions template
+`ai-serverless-agents-python`, backed by:
 
-```text
-assets/quickstart-sample/
-```
+- Microsoft Learn: <https://learn.microsoft.com/azure/azure-functions/scenario-serverless-agents-runtime>
+- Template repository: <https://github.com/Azure-Samples/functions-quickstart-serverless-agents-azd>
 
-Use it as the canonical scaffold example when creating a new app. The copied sample includes:
+Do not use a bundled copy of the template. Retrieve the template through Azure MCP
+`functions_template_get` first, then fall back to the manifest `repositoryUrl`, `folderPath`, and
+`gitRef` if MCP retrieval fails.
+
+The official template includes:
 
 - `azure.yaml`
 - `infra/` with Foundry, Flex Consumption, dynamic sessions, and optional Connector Namespace MCP
@@ -17,12 +21,12 @@ Use it as the canonical scaffold example when creating a new app. The copied sam
 - `src/main.agent.md`
 - `src/daily_microsoft_blog_summary.agent.md` with a 30-minute timer-agent timeout
 - `src/mcp.json`
-- `src/local.settings.json`
+- `src/local.settings.json.sample`
 - `src/requirements.txt` with the official `azurefunctions-agents-runtime` PyPI package
 
 ## How to Use It
 
-For a new app, copy the directory contents into the project root, then tailor:
+For a new app, retrieve the template files into the project root, then tailor:
 
 1. Rename `azure.yaml` `name` to match the app.
 2. Replace sample agents with the user's agents.
@@ -30,14 +34,17 @@ For a new app, copy the directory contents into the project root, then tailor:
   API, or built-in MCP endpoint. Remove it for scheduled-only or background-only apps.
 4. Keep dynamic sessions when any agent needs web browsing or code execution.
 5. Keep the Office 365 connector path only when an agent needs email tools.
-6. Update app-specific env vars in `src/local.settings.json` and `infra/main.parameters.json`.
+6. Copy `src/local.settings.json.sample` to `src/local.settings.json` for local runs and update
+   app-specific env vars in `src/local.settings.json` and `infra/main.parameters.json`.
 7. Keep `gpt-4.1` default unless intentionally upgrading to a reasoning-capable model.
 
-## Important Difference From the Upstream Sample
+## Learn quickstart terminology
 
-This skill copy uses `src/local.settings.json` directly because generated apps should contain a
-ready-to-edit local settings file. It still excludes local settings from deployment through
-`.funcignore`.
+The Learn quickstart calls this programming model **serverless agents using Azure Functions** and
+describes:
 
-The upstream quickstart may continue to evolve. When refreshing this asset, do not copy `.git`,
-`.azure`, or other local state directories.
+- A chat agent with browser testing, sandboxed Python execution, and web browsing support.
+- A timer-triggered agent that gathers Microsoft blog posts, summarizes them, and can email the
+  digest through MCP tools from a managed MCP server for a Microsoft 365 Outlook connector.
+- Agent definitions in markdown files, app defaults in `agents.config.yaml`, remote MCP servers in
+  `mcp.json`, and Azure resources provisioned through `azd`.

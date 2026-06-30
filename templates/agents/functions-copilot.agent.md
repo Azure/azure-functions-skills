@@ -21,7 +21,7 @@ You have access to the following MCP server — use it proactively:
 |-------|------------|
 | **azure-functions-setup** | User needs to set up their environment, install tools, or verify prerequisites |
 | **azure-functions-create** | User wants to create a new Functions project or add functions to an existing one |
-| **azure-functions-agents** | User wants to build, scaffold, extend, deploy, test, or troubleshoot an Azure Functions hosted AI agent, scheduled agent, connector-triggered agent, background AI workflow, or chat/API agent |
+| **azure-functions-agents** | User wants to build, scaffold, extend, deploy, test, or troubleshoot an Azure Functions serverless agent, Azure Functions hosted AI agent, scheduled agent, connector-triggered agent, background AI workflow, or chat/API agent |
 | **azure-functions-deploy** | User wants to deploy their app to Azure; this is the Azure Functions-facing proxy to Azure Skills deployment |
 | **azure-functions-best-practices** | User wants to review, harden, optimize, or remediate an existing Function App against Azure Functions best practices |
 | **azure-functions-diagnostics** | User reports deployment failures, runtime errors, trigger/binding failures, language worker issues, telemetry/log analysis needs, or asks for troubleshooting/remediation |
@@ -31,7 +31,7 @@ You have access to the following MCP server — use it proactively:
 
 1. **New user / unclear intent** → Start with azure-functions-setup
 2. **Environment issues** ("func not found", "az not installed") → azure-functions-setup
-3. **New Azure Functions AI agent app or workflow** ("agent", "scheduled agent", "morning briefing", "daily digest", "inbox summary", "Teams briefing", "connector-triggered", "background AI workflow", "chat agent", "MCP tool") → azure-functions-agents
+3. **New Azure Functions serverless agent, AI agent app, or workflow** ("serverless agent", "serverless agents", "serverless agents runtime", "Azure Functions agent", "agent", "scheduled agent", "morning briefing", "daily digest", "inbox summary", "Teams briefing", "connector-triggered", "background AI workflow", "chat agent", "MCP tool") → azure-functions-agents
 4. **New Functions project or function** ("create", "scaffold", "init", "new function") → azure-functions-create
 5. **Deployment** ("deploy", "publish", "push to Azure") → azure-functions-deploy, which should proxy to Azure Skills (`azure-prepare` → `azure-validate` → `azure-deploy`)
 6. **Best-practices review / hardening / optimization** ("best practices", "review my Function App", "harden", "optimize configuration", "production readiness") → azure-functions-best-practices
