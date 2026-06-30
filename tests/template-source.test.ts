@@ -8,11 +8,13 @@ import { resolveTemplateSource } from '../src/setup/template-source.js';
 import { loadAgents, loadHooks, loadMcpServers, loadSkills } from '../src/build/loader.js';
 import { buildTarget } from '../src/build/build-target.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
+import type { CliAgentName } from '../src/types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = join(__dirname, '..');
 const TEMPLATES_DIR = join(ROOT_DIR, 'templates');
 const TEMP_DIRS: string[] = [];
+const ALL_AGENTS: readonly CliAgentName[] = ['ghcp', 'claude', 'codex'];
 
 function makeTempDir(prefix: string): string {
   const dir = createTempDir(prefix);
@@ -43,6 +45,40 @@ function createRepositoryWorkspaceArtifacts(marker: string): string {
 }
 
 describe('template source resolution', () => {
+  it.each(ALL_AGENTS)('applySetup can use cloned repository workspace artifacts for %s', async agent => {
+    const marker = `CLONED_APPLY_SETUP_MARKER_${agent}`;
+    const targetDir = makeTempDir(`af-skills-cloned-template-target-${agent}-`);
+    const cwd = process.cwd();
+    const emptyDir = makeTempDir(`af-skills-cloned-template-cwd-${agent}-`);
+    let result: Awaited<ReturnType<typeof applySetup>>;
+
+    process.chdir(emptyDir);
+    try {
+      result = await applySetup(targetDir, {
+        agents: [agent],
+        prerequisites: 'skip',
+        templateSource: {
+          mode: 'repository',
+          repositoryRef: 'feature/test-branch',
+          commandRunner: (_command, args) => {
+            createRepositoryWorkspaceArtifactsIn(args.at(-1) as string, marker);
+          },
+        },
+      });
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const installedSkill = readFileSync(installedSkillPath(targetDir, agent), 'utf-8');
+    expect(installedSkill).toContain(marker);
+    expect(result.templateSource.kind).toBe('repository');
+    expect(result.warnings).toEqual([]);
+    expect(result.welcomeMessage).toContain('azure-functions-setup');
+    const workspaceDir = result.templateSource.workspaceDir;
+    if (!workspaceDir) throw new Error('Expected cloned repository workspaceDir to be reported.');
+    expect(existsSync(workspaceDir)).toBe(false);
+  });
+
   it('applySetup can use repository templates for local installs', async () => {
     const marker = 'REPOSITORY_TEMPLATE_MARKER';
     const repoDir = createRepositoryWorkspaceArtifacts(marker);
@@ -137,6 +173,12 @@ describe('template source resolution', () => {
     ]);
   });
 });
+
+function installedSkillPath(targetDir: string, agent: CliAgentName): string {
+  if (agent === 'ghcp') return join(targetDir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md');
+  if (agent === 'claude') return join(targetDir, '.claude', 'skills', 'azure-functions-setup', 'SKILL.md');
+  return join(targetDir, '.agents', 'skills', 'azure-functions-setup', 'SKILL.md');
+}
 
 function createRepositoryWorkspaceArtifactsIn(repoDir: string, marker: string): void {
   const templatesDir = join(repoDir, 'templates');

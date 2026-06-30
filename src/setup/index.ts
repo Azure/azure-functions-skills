@@ -11,7 +11,7 @@ import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../build/load
 import { buildTarget } from '../build/build-target.js';
 import { ensurePrerequisites } from './prerequisites/index.js';
 import { cleanupTemplateSource, loadBuildDataFromTemplates, resolveTemplateSource } from './template-source.js';
-import type { BuildData, CliAgentName, SetupOptions, SetupResult } from '../types.js';
+import type { BuildData, CliAgentName, SetupOptions, SetupResult, TemplateSourceResult } from '../types.js';
 
 /**
  * Detect which coding agents are available in the environment.
@@ -75,6 +75,7 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     const hooks = loadHooks(templatePaths.hooksDir);
     data = { skills, mcpServers, agents: agentDefs, hooks };
   }
+  const setupSkills = loadSetupSkills(data, templateSource, agents);
 
   // Build each target to a temp location, then copy to targetDir
   const tmpDir = mkdtempSync(join(tmpdir(), 'af-skills-tmp-'));
@@ -106,8 +107,7 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     runner: options.prerequisiteRunner,
   });
 
-  const skills = data?.skills ?? loadSkills(join(templateSource.workspaceDir || '', 'ghcp', '.github', 'skills'));
-  const skillLines = skills.map(skill => `    • ${skill.id} — ${skill.title}`);
+  const skillLines = setupSkills.map(skill => `    • ${skill.id} — ${skill.title}`);
   const prerequisiteLines = formatPrerequisiteLines(prerequisiteResults);
   const welcomeMessage = [
     '',
@@ -145,6 +145,24 @@ function buildWorkspaceTarget(agent: CliAgentName, data: BuildData | null, tmpDi
   mkdirSync(tmpDir, { recursive: true });
   buildTarget(agent, data, tmpDir);
   return join(tmpDir, agent);
+}
+
+function loadSetupSkills(
+  data: BuildData | null,
+  templateSource: TemplateSourceResult,
+  agents: readonly CliAgentName[],
+): BuildData['skills'] {
+  if (data) return data.skills;
+  if (!templateSource.workspaceDir) {
+    throw new Error('Generated workspace artifacts are required when template build data is unavailable.');
+  }
+  return loadSkills(workspaceSkillsDir(templateSource.workspaceDir, agents[0] ?? 'ghcp'));
+}
+
+function workspaceSkillsDir(workspaceDir: string, agent: CliAgentName): string {
+  if (agent === 'ghcp') return join(workspaceDir, agent, '.github', 'skills');
+  if (agent === 'claude') return join(workspaceDir, agent, '.claude', 'skills');
+  return join(workspaceDir, agent, '.agents', 'skills');
 }
 
 function formatPrerequisiteLines(results: SetupResult['prerequisites']): string[] {
