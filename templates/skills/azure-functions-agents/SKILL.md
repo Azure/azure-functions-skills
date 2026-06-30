@@ -129,9 +129,29 @@ tested. If the user has already provided enough detail, make reasonable choices 
 
 ## Scaffold a New App
 
-Use the complete reference sample at [assets/quickstart-sample](./assets/quickstart-sample)
-as the safest starting point. Copy it into the target project, then tailor it to the user's
-agent instead of inventing a project structure from memory.
+Use **manifest discovery + MCP primary retrieval** when Azure MCP tools are available:
+
+1. Fetch the Azure Functions template manifest from
+   `https://cdn.functions.azure.com/public/templates-manifest/manifest.json` and find
+   `ai-serverless-agents-python`. Use its catalog metadata (`priority`, `categories`, `tags`,
+   `whatsIncluded`) to explain why this is the correct serverless agents scaffold. Keep
+   `repositoryUrl`, `folderPath`, and `gitRef` for fallback.
+2. Call Azure MCP `functions_template_get` with `language: python` and
+   `template: ai-serverless-agents-python`. This is the primary source for the complete project
+   files.
+3. Write the returned `files` array into the target project. If the output is truncated or saved to
+   a temporary file, read the complete JSON response before deciding retrieval failed.
+4. If MCP returns an actual tool error, cannot retrieve the template, or returns an empty/zero-file
+   result after reading the complete response, fall back to the manifest `repositoryUrl`,
+   `folderPath`, and `gitRef` using direct GitHub download first and `git clone --depth 1` only if
+   downloads fail. Tell the user that MCP retrieval failed and GitHub fallback was used.
+5. If both MCP and GitHub retrieval fail, use the bundled
+   [assets/quickstart-sample](./assets/quickstart-sample) as the offline last resort.
+
+When Azure MCP tools are not available, skip directly to the manifest/GitHub fallback above, then
+to the bundled quickstart sample. Do not invent a project structure from memory.
+
+After scaffolding from MCP, GitHub, or the bundled sample, tailor the app to the user's agent.
 
 Baseline structure:
 

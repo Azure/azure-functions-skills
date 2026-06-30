@@ -248,6 +248,25 @@ describe('buildTarget — ghcp', () => {
     expect(existsSync(assetPath)).toBe(true);
   });
 
+  it('azure-functions-agents skill uses MCP primary retrieval with bundled fallback', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
+
+    const skillPath = join(DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-agents', 'SKILL.md');
+    const body = readFileSync(skillPath, 'utf-8');
+    expect(body).toContain('manifest discovery');
+    expect(body).toContain('MCP primary retrieval');
+    expect(body).toContain('functions_template_get');
+    expect(body).toContain('ai-serverless-agents-python');
+    expect(body).toContain('repositoryUrl');
+    expect(body).toContain('folderPath');
+    expect(body).toContain('gitRef');
+    expect(body).toContain('assets/quickstart-sample');
+  });
+
   it('generates hooks in .github/hooks/', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
