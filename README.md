@@ -54,6 +54,34 @@ npx @azure/functions-skills install --agent codex
 
 > Installs at **user scope** (available to every project on this machine). Prefer to scope the skills to the current project only? Add `--local` to install them under the working directory instead.
 
+### Library usage with pinned package assets
+
+CLI local installs use the latest repository-generated workspace assets and fall back to the npm package assets when GitHub is unavailable. Library callers, such as VS Code extensions, can pin local installs to the assets bundled in the installed npm package:
+
+```ts
+import { applySetup } from '@azure/functions-skills/setup';
+
+await applySetup(workspaceDir, {
+  agents: ['ghcp'],
+  prerequisites: 'skip',
+  templateSource: { mode: 'package' },
+});
+```
+
+If your integration uses the workspace helper, pass the same source policy through `applyWorkspace`:
+
+```ts
+import { applyWorkspace } from '@azure/functions-skills/setup';
+
+await applyWorkspace(workspaceDir, {
+  agents: ['ghcp'],
+  mode: 'copy',
+  templateSource: { mode: 'package' },
+});
+```
+
+Omit `templateSource` or use `{ mode: 'auto' }` when a library integration should prefer the latest GitHub assets with package fallback.
+
 ### 2. Open the agent
 
 ```bash

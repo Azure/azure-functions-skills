@@ -11,14 +11,11 @@
 import { existsSync, cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { buildTarget } from '../build/build-target.js';
 import { loadAgents, loadHooks, loadMcpServers, loadSkills } from '../build/loader.js';
-import type { BuildData, CliAgentName, FilePrompter, FilePromptResult } from '../types.js';
+import { cleanupTemplateSource, loadBuildDataFromTemplates, resolveTemplateSource } from './template-source.js';
+import type { BuildData, CliAgentName, FilePrompter, FilePromptResult, TemplateSourceOptions, TemplateSourceResult } from '../types.js';
 export type { FilePrompter, FilePromptResult } from '../types.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 
 const BLOCK_PATTERN = /<!-- azure-functions-skills:start[^\n]* -->[\s\S]*?<!-- azure-functions-skills:end -->/;
 
@@ -27,8 +24,16 @@ export interface LocalUpdateOptions {
   force?: boolean;
   dryRun?: boolean;
   yes?: boolean;
+  templateSource?: TemplateSourceOptions;
   /** When provided, called for each save-aside candidate to let user choose. */
   prompter?: FilePrompter;
+}
+
+function buildWorkspaceTarget(agent: CliAgentName, data: BuildData | null, tmpDir: string): string {
+  if (!data) throw new Error('Template build data is required when generated workspace artifacts are unavailable.');
+  mkdirSync(tmpDir, { recursive: true });
+  buildTarget(agent, data, tmpDir);
+  return join(tmpDir, agent);
 }
 
 export interface LocalUpdateResult {
@@ -37,6 +42,8 @@ export interface LocalUpdateResult {
   managedBlockUpdated: string[];
   savedAside: Array<{ original: string; aside: string }>;
   dryRun: boolean;
+  templateSource: Omit<TemplateSourceResult, 'warnings'>;
+  warnings: string[];
 }
 
 type FileAction = 'overwrite' | 'managed-block' | 'save-aside' | 'deep-merge-json';
@@ -60,7 +67,8 @@ export async function applyLocalUpdate(targetDir: string, options: LocalUpdateOp
   const yes = options.yes === true;
   const prompter = (!force && !yes && !dryRun) ? options.prompter : undefined;
 
-  const data = loadBuildData();
+  const templateSource = resolveTemplateSource(options.templateSource);
+  const data = templateSource.templatesDir ? loadBuildData(templateSource.templatesDir) : null;
   const tmpDir = join(tmpdir(), `af-skills-update-${Date.now()}`);
 
   const result: LocalUpdateResult = {
@@ -69,14 +77,19 @@ export async function applyLocalUpdate(targetDir: string, options: LocalUpdateOp
     managedBlockUpdated: [],
     savedAside: [],
     dryRun,
+    templateSource: {
+      kind: templateSource.kind,
+      templatesDir: templateSource.templatesDir,
+      workspaceDir: templateSource.workspaceDir,
+    },
+    warnings: templateSource.warnings,
   };
 
   try {
     for (const agent of agents) {
-      mkdirSync(tmpDir, { recursive: true });
-      buildTarget(agent, data, tmpDir);
-
-      const agentDir = join(tmpDir, agent);
+      const agentDir = templateSource.workspaceDir
+        ? join(templateSource.workspaceDir, agent)
+        : buildWorkspaceTarget(agent, data, tmpDir);
       const files = classifyFiles(agentDir, targetDir, agent, force);
 
       for (const file of files) {
@@ -87,6 +100,7 @@ export async function applyLocalUpdate(targetDir: string, options: LocalUpdateOp
     try {
       if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
     } catch { /* best-effort cleanup */ }
+    cleanupTemplateSource(templateSource);
   }
 
   return result;
@@ -162,12 +176,13 @@ function showSimpleDiff(relativePath: string, existing: string, updated: string)
 
 // ── Internal helpers ──
 
-function loadBuildData(): BuildData {
+function loadBuildData(templatesDir: string): BuildData {
+  const templatePaths = loadBuildDataFromTemplates(templatesDir);
   return {
-    skills: loadSkills(join(TEMPLATES_DIR, 'skills')),
-    mcpServers: loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')),
-    agents: loadAgents(join(TEMPLATES_DIR, 'agents')),
-    hooks: loadHooks(join(TEMPLATES_DIR, 'hooks')),
+    skills: loadSkills(templatePaths.skillsDir),
+    mcpServers: loadMcpServers(templatePaths.mcpServersPath),
+    agents: loadAgents(templatePaths.agentsDir),
+    hooks: loadHooks(templatePaths.hooksDir),
   };
 }
 

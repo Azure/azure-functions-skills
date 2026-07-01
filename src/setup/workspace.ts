@@ -38,7 +38,11 @@ export async function applyWorkspace(targetDir: string, options: WorkspaceApplyO
         savedAside: [],
       };
     }
-    const setupResult = await applySetup(targetDir, { agents, prerequisites: 'skip' });
+    const setupResult = await applySetup(targetDir, {
+      agents,
+      prerequisites: 'skip',
+      templateSource: options.templateSource,
+    });
     return {
       agents,
       mode,
@@ -48,6 +52,8 @@ export async function applyWorkspace(targetDir: string, options: WorkspaceApplyO
       overwritten: [],
       managedBlockUpdated: [],
       savedAside: [],
+      templateSource: setupResult.templateSource,
+      warnings: setupResult.warnings,
     };
   }
 

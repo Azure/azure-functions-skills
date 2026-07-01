@@ -31,6 +31,7 @@ Options:
   --dry-run          Print planned install without writing files
   --yes              Approve safe file updates such as managed blocks and state .gitignore entry
   --source <name>    marketplace, github, or local (default: marketplace)
+  --source-ref <ref> Branch or tag to use with --source github
   --scope <name>     workspace or user (default: workspace)
   --no-mcp           Do not add workspace MCP files
   --no-hooks         Do not add workspace hook files
@@ -50,6 +51,7 @@ Options:
   --dry-run          Print planned update without writing files
   --yes              Approve safe file updates such as managed blocks and state .gitignore entry
   --source <name>    marketplace, github, or local (default: marketplace)
+  --source-ref <ref> Branch or tag to use with --source github
   --scope <name>     workspace or user (default: workspace)
   --no-mcp           Do not add workspace MCP files
   --no-hooks         Do not add workspace hook files
@@ -305,6 +307,17 @@ function printSavedAsideWarning(savedAside) {
   console.log('   Review these files and merge changes as needed.');
 }
 
+function printTemplateWarnings(result) {
+  if (!result?.warnings || result.warnings.length === 0) return;
+  for (const warning of result.warnings) console.log(`⚠️  ${warning}`);
+}
+
+function templateSourceOptions(source, sourceRef) {
+  if (source === 'local') return { mode: 'package' };
+  if (source === 'github') return { mode: 'repository', repositoryRef: sourceRef };
+  return { mode: 'auto', repositoryRef: sourceRef };
+}
+
 function chatPromptIncludedInArgs(result) {
   return Boolean(result.prompt && result.args.includes(result.prompt));
 }
@@ -523,6 +536,7 @@ if (command === 'install' || command === 'update') {
   let includeMcp = true;
   let includeHooks = true;
   let source = 'marketplace';
+  let sourceRef = undefined;
   let scope = 'workspace';
   let prerequisites = 'auto';
 
@@ -537,6 +551,7 @@ if (command === 'install' || command === 'update') {
     else if (commandArgs[i] === '--no-mcp') includeMcp = false;
     else if (commandArgs[i] === '--no-hooks') includeHooks = false;
     else if (commandArgs[i] === '--source' && commandArgs[i + 1]) source = commandArgs[++i];
+    else if (commandArgs[i] === '--source-ref' && commandArgs[i + 1]) sourceRef = commandArgs[++i];
     else if (commandArgs[i] === '--scope' && commandArgs[i + 1]) scope = commandArgs[++i];
     else if (commandArgs[i] === '--check-prerequisites') prerequisites = 'check-only';
     else if (commandArgs[i] === '--skip-prerequisites') prerequisites = 'skip';
@@ -598,7 +613,9 @@ if (command === 'install' || command === 'update') {
         dryRun,
         yes,
         prompter,
+        templateSource: templateSourceOptions(source, sourceRef),
       });
+      printTemplateWarnings(result);
       if (dryRun) {
         console.log(`Planned local update:`);
         if (result.overwritten.length > 0) {
@@ -640,7 +657,8 @@ if (command === 'install' || command === 'update') {
         console.log(`Planned local install:`);
         for (const agent of detectedAgents) console.log(`  - ${agent}: workspace setup files`);
       } else {
-        const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
+        const result = await applySetup(dir, { agents: detectedAgents, prerequisites, templateSource: templateSourceOptions(source, sourceRef) });
+        printTemplateWarnings(result);
         const state = recordInstallState(dir, {
           action: command,
           agents: detectedAgents,
@@ -783,7 +801,8 @@ if (command === 'install' || command === 'update') {
   } else {
     // File copy mode (original behavior)
     console.log(`\n📁 Installing to: ${dir}\n`);
-    const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
+    const result = await applySetup(dir, { agents: detectedAgents, prerequisites, templateSource: { mode: 'auto' } });
+    printTemplateWarnings(result);
     console.log(result.welcomeMessage);
   }
 } else if (command === 'state') {

@@ -46,10 +46,28 @@ export interface BuildData {
   packageVersion?: string;
 }
 
+export type TemplateSourceMode = 'auto' | 'repository' | 'package';
+
+export interface TemplateSourceOptions {
+  mode?: TemplateSourceMode;
+  repositoryPath?: string;
+  repositoryRef?: string;
+  commandRunner?: (command: string, args: string[]) => void;
+}
+
+export interface TemplateSourceResult {
+  kind: 'repository' | 'package';
+  templatesDir?: string;
+  workspaceDir?: string;
+  warnings: string[];
+  cleanupDir?: string;
+}
+
 export interface SetupOptions {
   agents?: CliAgentName[];
   prerequisites?: PrerequisiteMode;
   prerequisiteRunner?: CommandRunner;
+  templateSource?: TemplateSourceOptions;
 }
 
 export interface SetupResult {
@@ -57,6 +75,8 @@ export interface SetupResult {
   filesWritten: number;
   welcomeMessage: string;
   prerequisites?: PrerequisiteResult[];
+  templateSource: Omit<TemplateSourceResult, 'warnings'>;
+  warnings: string[];
 }
 
 export type FilePromptResult = 'overwrite' | 'skip';
@@ -75,6 +95,7 @@ export interface WorkspaceApplyOptions {
   includeMcp?: boolean;
   includeHooks?: boolean;
   includeAgent?: boolean;
+  templateSource?: TemplateSourceOptions;
 }
 
 export interface WorkspaceApplyResult {
@@ -86,6 +107,8 @@ export interface WorkspaceApplyResult {
   overwritten: string[];
   managedBlockUpdated: string[];
   savedAside: Array<{ original: string; aside: string }>;
+  templateSource?: Omit<TemplateSourceResult, 'warnings'>;
+  warnings?: string[];
 }
 
 export interface LauncherContext {

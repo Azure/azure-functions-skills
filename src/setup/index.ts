@@ -4,17 +4,14 @@
  */
 
 import { existsSync, mkdirSync, cpSync, readdirSync, rmSync, mkdtempSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../build/loader.js';
 import { buildTarget } from '../build/build-target.js';
 import { ensurePrerequisites } from './prerequisites/index.js';
-import type { BuildData, CliAgentName, SetupOptions, SetupResult } from '../types.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
+import { cleanupTemplateSource, loadBuildDataFromTemplates, resolveTemplateSource } from './template-source.js';
+import type { BuildData, CliAgentName, SetupOptions, SetupResult, TemplateSourceResult } from '../types.js';
 
 /**
  * Detect which coding agents are available in the environment.
@@ -68,12 +65,17 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
   const agents = options.agents || await detectAgents();
   const prerequisiteMode = options.prerequisites || 'auto';
 
-  // Load canonical sources
-  const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
-  const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-  const agentDefs = loadAgents(join(TEMPLATES_DIR, 'agents'));
-  const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-  const data: BuildData = { skills, mcpServers, agents: agentDefs, hooks };
+  const templateSource = resolveTemplateSource(options.templateSource);
+  let data: BuildData | null = null;
+  if (templateSource.templatesDir) {
+    const templatePaths = loadBuildDataFromTemplates(templateSource.templatesDir);
+    const skills = loadSkills(templatePaths.skillsDir);
+    const mcpServers = loadMcpServers(templatePaths.mcpServersPath);
+    const agentDefs = loadAgents(templatePaths.agentsDir);
+    const hooks = loadHooks(templatePaths.hooksDir);
+    data = { skills, mcpServers, agents: agentDefs, hooks };
+  }
+  const setupSkills = loadSetupSkills(data, templateSource, agents);
 
   // Build each target to a temp location, then copy to targetDir
   const tmpDir = mkdtempSync(join(tmpdir(), 'af-skills-tmp-'));
@@ -81,14 +83,9 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
 
   try {
     for (const agent of agents) {
-      mkdirSync(tmpDir, { recursive: true });
-      buildTarget(agent, data, tmpDir);
-
-      // Copy workspace files from tmpDir/<agent>/ to targetDir/.
-      // buildTarget also emits plugin package artifacts under the same target
-      // directory; those are useful for release packaging but would duplicate
-      // workspace skills/agents when installed directly into a project.
-      const agentDir = join(tmpDir, agent);
+      const agentDir = templateSource.workspaceDir
+        ? join(templateSource.workspaceDir, agent)
+        : buildWorkspaceTarget(agent, data, tmpDir);
       totalFiles += copyWorkspaceFiles(agentDir, targetDir, agent);
     }
   } finally {
@@ -100,6 +97,7 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     } catch {
       // Best-effort cleanup — OS temp dir will be cleaned eventually
     }
+    cleanupTemplateSource(templateSource);
   }
 
   const prerequisiteResults = await ensurePrerequisites({
@@ -109,7 +107,7 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     runner: options.prerequisiteRunner,
   });
 
-  const skillLines = skills.map(skill => `    • ${skill.id} — ${skill.title}`);
+  const skillLines = setupSkills.map(skill => `    • ${skill.id} — ${skill.title}`);
   const prerequisiteLines = formatPrerequisiteLines(prerequisiteResults);
   const welcomeMessage = [
     '',
@@ -133,7 +131,38 @@ export async function applySetup(targetDir: string, options: SetupOptions = {}):
     filesWritten: totalFiles,
     welcomeMessage,
     prerequisites: prerequisiteResults,
+    templateSource: {
+      kind: templateSource.kind,
+      templatesDir: templateSource.templatesDir,
+      workspaceDir: templateSource.workspaceDir,
+    },
+    warnings: templateSource.warnings,
   };
+}
+
+function buildWorkspaceTarget(agent: CliAgentName, data: BuildData | null, tmpDir: string): string {
+  if (!data) throw new Error('Template build data is required when generated workspace artifacts are unavailable.');
+  mkdirSync(tmpDir, { recursive: true });
+  buildTarget(agent, data, tmpDir);
+  return join(tmpDir, agent);
+}
+
+function loadSetupSkills(
+  data: BuildData | null,
+  templateSource: TemplateSourceResult,
+  agents: readonly CliAgentName[],
+): BuildData['skills'] {
+  if (data) return data.skills;
+  if (!templateSource.workspaceDir) {
+    throw new Error('Generated workspace artifacts are required when template build data is unavailable.');
+  }
+  return loadSkills(workspaceSkillsDir(templateSource.workspaceDir, agents[0] ?? 'ghcp'));
+}
+
+function workspaceSkillsDir(workspaceDir: string, agent: CliAgentName): string {
+  if (agent === 'ghcp') return join(workspaceDir, agent, '.github', 'skills');
+  if (agent === 'claude') return join(workspaceDir, agent, '.claude', 'skills');
+  return join(workspaceDir, agent, '.agents', 'skills');
 }
 
 function formatPrerequisiteLines(results: SetupResult['prerequisites']): string[] {

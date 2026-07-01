@@ -10,7 +10,7 @@
 
 import { isAbsolute, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, rmSync, mkdirSync } from 'node:fs';
+import { readFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from './loader.js';
 import { buildPluginMarketplaces, buildPluginPayload, buildTarget } from './build-target.js';
 import type { BuildData, BuildTargetName } from '../types.js';
@@ -45,6 +45,10 @@ const pluginProfileFlag = args.indexOf('--plugin-profile');
 const pluginProfile: PluginPayloadOptions['profile'] = pluginProfileFlag >= 0 && args[pluginProfileFlag + 1]
   ? parsePluginProfile(args[pluginProfileFlag + 1])
   : 'skills-only';
+const repoWorkspaceDirFlag = args.indexOf('--repo-workspace-dir');
+const repoWorkspaceDir = repoWorkspaceDirFlag >= 0 && args[repoWorkspaceDirFlag + 1]
+  ? args[repoWorkspaceDirFlag + 1]
+  : null;
 
 function parseTarget(value: string): BuildTargetName {
   if (value === 'ghcp' || value === 'claude' || value === 'codex') return value;
@@ -99,6 +103,24 @@ if (repoPluginDir) {
   console.log('\nBuilding repository plugin payload...');
   buildPluginPayload(data, outputDir, { profile: pluginProfile });
   console.log(`  ✅ repository plugin → ${outputDir}/`);
+}
+
+if (repoWorkspaceDir) {
+  const outputDir = resolveFromRoot(repoWorkspaceDir);
+  rmSync(outputDir, { recursive: true, force: true });
+  mkdirSync(outputDir, { recursive: true });
+  console.log('\nBuilding repository workspace artifacts...');
+  for (const target of TARGETS) {
+    buildTarget(target, data, outputDir);
+    console.log(`  ✅ ${target} → ${join(outputDir, target)}/`);
+  }
+  writeFileSync(join(outputDir, 'manifest.json'), JSON.stringify({
+    package: '@azure/functions-skills',
+    version: data.packageVersion || '0.0.0-dev',
+    generatedAt: new Date(0).toISOString(),
+    targets: TARGETS,
+  }, null, 2));
+  console.log(`  ✅ workspace manifest → ${join(outputDir, 'manifest.json')}`);
 }
 
 if (marketplaceRoot) {

@@ -23,6 +23,54 @@ afterEach(() => {
 });
 
 describe('applyWorkspace', () => {
+  it('copy mode forwards repository template source options to local setup', async () => {
+    const marker = 'WORKSPACE_APPLY_REPOSITORY_TEMPLATE_MARKER';
+    const repoDir = createGeneratedWorkspaceSource(marker);
+    const dir = makeTempDir();
+
+    const result = await applyWorkspace(dir, {
+      agents: ['ghcp'],
+      mode: 'copy',
+      templateSource: { mode: 'repository', repositoryPath: repoDir },
+    });
+
+    const installedSkill = readFileSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'), 'utf-8');
+    expect(installedSkill).toContain(marker);
+    expect(result.templateSource?.kind).toBe('repository');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('copy mode supports package-only template source for library callers', async () => {
+    const marker = 'WORKSPACE_APPLY_IGNORED_REPOSITORY_TEMPLATE_MARKER';
+    const repoDir = createGeneratedWorkspaceSource(marker);
+    const dir = makeTempDir();
+
+    const result = await applyWorkspace(dir, {
+      agents: ['ghcp'],
+      mode: 'copy',
+      templateSource: { mode: 'package', repositoryPath: repoDir },
+    });
+
+    const installedSkill = readFileSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'), 'utf-8');
+    expect(installedSkill).not.toContain(marker);
+    expect(result.templateSource?.kind).toBe('package');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('copy mode returns template source fallback warnings to library callers', async () => {
+    const dir = makeTempDir();
+
+    const result = await applyWorkspace(dir, {
+      agents: ['ghcp'],
+      mode: 'copy',
+      templateSource: { mode: 'auto', repositoryPath: join(dir, 'missing-repository') },
+    });
+
+    expect(existsSync(join(dir, '.github', 'skills', 'azure-functions-setup', 'SKILL.md'))).toBe(true);
+    expect(result.templateSource?.kind).toBe('package');
+    expect(result.warnings?.some(warning => warning.includes('Falling back'))).toBe(true);
+  });
+
   it('saves aside generated routing without modifying existing Claude instructions when not approved', async () => {
     const dir = makeTempDir();
     const claudePath = join(dir, 'CLAUDE.md');
@@ -320,3 +368,27 @@ describe('applyWorkspace', () => {
     expect(readFileSync(includeTarget, 'utf-8')).toContain('Azure Functions Skills');
   });
 });
+
+function createGeneratedWorkspaceSource(marker: string): string {
+  const repoDir = makeTempDir();
+  const workspaceDir = join(repoDir, '.github', 'generated', 'workspace');
+  for (const agent of ['ghcp', 'claude', 'codex']) {
+    mkdirSync(join(workspaceDir, agent), { recursive: true });
+  }
+
+  const skillDir = join(workspaceDir, 'ghcp', '.github', 'skills', 'azure-functions-setup');
+  mkdirSync(skillDir, { recursive: true });
+  writeFileSync(
+    join(skillDir, 'SKILL.md'),
+    [
+      '---',
+      'name: azure-functions-setup',
+      'description: Test setup skill',
+      '---',
+      '',
+      marker,
+    ].join('\n'),
+  );
+  writeFileSync(join(workspaceDir, 'manifest.json'), JSON.stringify({ targets: ['ghcp', 'claude', 'codex'] }));
+  return repoDir;
+}
