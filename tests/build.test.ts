@@ -126,6 +126,14 @@ describe('loadHooks', () => {
     expect(hooks.welcome).toBeTruthy();
     expect(hooks.welcome).toContain('Welcome');
   });
+
+  it('loads telemetry hook manifests and scripts', () => {
+    expect(hooks.copilotTelemetry).toContain('PostToolUse');
+    expect(hooks.claudeTelemetry).toContain('PostToolUse');
+    expect(hooks.telemetryConfig).toContain('__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__');
+    expect(hooks.trackTelemetryPowerShell).toContain('plugin-telemetry');
+    expect(hooks.trackTelemetryShell).toContain('plugin-telemetry');
+  });
 });
 
 // ─── Build target tests ───
@@ -529,7 +537,7 @@ describe('buildPluginPayload', () => {
     buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir, { profile: 'full' });
 
     expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
-    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'copilot-hooks.json'))).toBe(true);
     expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
     const mcpConfig = JSON.parse(readFileSync(join(payloadDir, '.mcp.json'), 'utf-8'));
     expect(mcpConfig.mcpServers.azure).toEqual({
@@ -540,13 +548,66 @@ describe('buildPluginPayload', () => {
     const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
     expect(manifest.skills).toBe('./skills/');
     expect(manifest.agents).toBe('./agents/');
-    expect(manifest.hooks).toBe('./hooks.json');
+    expect(manifest.hooks).toEqual({
+      paths: ['./hooks/copilot-hooks.json'],
+      exclusive: true,
+    });
     expect(manifest.mcpServers).toBe('./.mcp.json');
 
     const claudeManifest = JSON.parse(readFileSync(join(payloadDir, '.claude-plugin', 'plugin.json'), 'utf-8'));
     expect(claudeManifest.skills).toBe('./skills/');
-    expect(claudeManifest.hooks).toBe('./hooks.json');
+    expect(claudeManifest.hooks).toBe('./hooks/hooks.json');
     expect(claudeManifest.mcpServers).toBe('./.mcp.json');
+  });
+
+  it('generates a plugin payload with telemetry hooks but without agents or MCP', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir, { profile: 'hooks' });
+
+    expect(existsSync(join(payloadDir, 'hooks', 'copilot-hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'telemetry.config.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(false);
+    expect(existsSync(join(payloadDir, 'agents'))).toBe(false);
+    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(false);
+
+    const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
+    expect(manifest.hooks).toEqual({
+      paths: ['./hooks/copilot-hooks.json'],
+      exclusive: true,
+    });
+    expect(manifest).not.toHaveProperty('agents');
+    expect(manifest).not.toHaveProperty('mcpServers');
+  });
+
+  it('ships telemetry hooks and scripts in the full plugin payload', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir, { profile: 'full' });
+
+    expect(existsSync(join(payloadDir, 'hooks', 'copilot-hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'telemetry.config.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'scripts', 'track-telemetry.ps1'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'scripts', 'track-telemetry.sh'))).toBe(true);
+
+    const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
+    expect(manifest.hooks).toEqual({
+      paths: ['./hooks/copilot-hooks.json'],
+      exclusive: true,
+    });
+
+    const script = readFileSync(join(payloadDir, 'hooks', 'scripts', 'track-telemetry.ps1'), 'utf-8');
+    expect(script).toContain('azure-functions-');
+    expect(script).toContain('APPLICATIONINSIGHTS_INSTRUMENTATION_KEY');
   });
 });
 
@@ -574,11 +635,12 @@ describe('buildPluginMarketplaces', () => {
 });
 
 describe('npm package manifest', () => {
-  it('does not publish generated dist artifacts', () => {
+  it('publishes the local plugin payload but not workspace build output', () => {
     const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf-8'));
 
     expect(pkg.files).toContain('templates/');
-    expect(pkg.files).not.toContain('dist/');
+    expect(pkg.files).toContain('dist/plugin/');
+    expect(pkg.files).not.toContain('dist/workspace/');
   });
 });
 

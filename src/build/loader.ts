@@ -109,7 +109,21 @@ export function loadAgents(agentsDir: string): AgentDefinitions {
  */
 export function loadHooks(hooksDir: string): HookDefinitions {
   const welcome = readFileSync(join(hooksDir, 'welcome-setup.md'), 'utf-8');
-  return { welcome };
+  const copilotTelemetry = readFileSync(join(hooksDir, 'copilot-hooks.json'), 'utf-8');
+  const claudeTelemetry = readFileSync(join(hooksDir, 'hooks.json'), 'utf-8');
+  const cursorTelemetry = readFileSync(join(hooksDir, 'cursor-hooks.json'), 'utf-8');
+  const telemetryConfig = readFileSync(join(hooksDir, 'telemetry.config.json'), 'utf-8');
+  const trackTelemetryPowerShell = readFileSync(join(hooksDir, 'scripts', 'track-telemetry.ps1'), 'utf-8');
+  const trackTelemetryShell = readFileSync(join(hooksDir, 'scripts', 'track-telemetry.sh'), 'utf-8');
+  return {
+    welcome,
+    copilotTelemetry,
+    claudeTelemetry,
+    cursorTelemetry,
+    telemetryConfig,
+    trackTelemetryPowerShell,
+    trackTelemetryShell,
+  };
 }
 
 // ─── Minimal YAML helpers (no dependencies) ───

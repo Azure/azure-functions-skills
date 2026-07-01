@@ -110,6 +110,8 @@ function assertPluginLayout(root: string, target: BuildTargetName, expectedSkill
   expect(existsSync(join(root, '.mcp.json'))).toBe(false);
   expect(existsSync(join(root, 'hooks.json'))).toBe(false);
   expect(existsSync(join(root, 'agents'))).toBe(false);
+  expect(existsSync(join(root, 'hooks', 'copilot-hooks.json'))).toBe(true);
+  expect(existsSync(join(root, 'hooks', 'scripts', 'track-telemetry.sh'))).toBe(true);
   assertSkillDirectories(join(root, 'skills'), expectedSkillIds);
 }
 
@@ -119,8 +121,18 @@ function assertFullPluginLayout(root: string, expectedSkillIds: string[], expect
   expect(existsSync(join(root, '.claude-plugin', 'plugin.json'))).toBe(true);
   expect(existsSync(join(root, '.codex-plugin', 'plugin.json'))).toBe(true);
   expect(existsSync(join(root, '.mcp.json'))).toBe(true);
-  expect(existsSync(join(root, 'hooks.json'))).toBe(true);
+  expect(existsSync(join(root, 'hooks', 'copilot-hooks.json'))).toBe(true);
+  expect(existsSync(join(root, 'hooks', 'scripts', 'track-telemetry.sh'))).toBe(true);
   assertAgentFiles(join(root, 'agents'), expectedAgentFiles);
+  assertSkillDirectories(join(root, 'skills'), expectedSkillIds);
+}
+
+function assertHooksPluginLayout(root: string, expectedSkillIds: string[]): void {
+  expect(existsSync(join(root, '.plugin', 'plugin.json'))).toBe(true);
+  expect(existsSync(join(root, '.mcp.json'))).toBe(false);
+  expect(existsSync(join(root, 'agents'))).toBe(false);
+  expect(existsSync(join(root, 'hooks', 'copilot-hooks.json'))).toBe(true);
+  expect(existsSync(join(root, 'hooks', 'telemetry.config.json'))).toBe(true);
   assertSkillDirectories(join(root, 'skills'), expectedSkillIds);
 }
 
@@ -171,6 +183,15 @@ describe('CLI command integration', () => {
     }
 
     assertPluginLayout(join(distDir, 'plugin', 'azure-functions-skills'), 'ghcp', expectedSkillIds, expectedAgentFiles);
+  });
+
+  it('build can explicitly emit the plugin hooks profile without adding agents or MCP', () => {
+    const distDir = makeTempDir('af-skills-e2e-build-hooks-plugin-');
+    const expectedSkillIds = templateSkillIds();
+
+    runCli(['build', '--dist-dir', distDir, '--plugin-profile', 'hooks']);
+
+    assertHooksPluginLayout(join(distDir, 'plugin', 'azure-functions-skills'), expectedSkillIds);
   });
 
   it('build can opt into the full plugin payload profile', () => {

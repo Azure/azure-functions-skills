@@ -77,7 +77,7 @@ function main(): void {
 
   try {
     const data = loadBuildData();
-    buildPluginPayload(data, join(tempRoot, '.github', 'plugins', 'azure-functions-skills'));
+    buildPluginPayload(data, join(tempRoot, '.github', 'plugins', 'azure-functions-skills'), { profile: 'hooks' });
     buildPluginMarketplaces(tempRoot, {
       packageVersion: data.packageVersion || '0.0.0-dev',
       pluginSource: './.github/plugins/azure-functions-skills',

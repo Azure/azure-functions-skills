@@ -24,6 +24,7 @@
   "files": [
     "bin/",
     "lib/",
+    "dist/plugin/",
     "templates/",
     "README.md"
   ],
@@ -32,7 +33,7 @@
   },
   "scripts": {
     "build": "npm run compile && node lib/build/build.js",
-    "build:plugin-payload": "npm run compile && node lib/build/build.js --plugin-only --repo-plugin-dir .github/plugins/azure-functions-skills --marketplace-root .",
+    "build:plugin-payload": "npm run compile && node lib/build/build.js --plugin-only --repo-plugin-dir .github/plugins/azure-functions-skills --marketplace-root . --plugin-profile hooks",
     "check": "npm run lint && npm run typecheck && npm run lint:security && npm run validate:skills && npm run verify:plugin-payload && npm test && npm run build",
     "ci": "npm run check",
     "compile": "tsc",

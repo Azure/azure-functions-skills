@@ -44,7 +44,7 @@ const marketplaceRoot = marketplaceRootFlag >= 0 && args[marketplaceRootFlag + 1
 const pluginProfileFlag = args.indexOf('--plugin-profile');
 const pluginProfile: PluginPayloadOptions['profile'] = pluginProfileFlag >= 0 && args[pluginProfileFlag + 1]
   ? parsePluginProfile(args[pluginProfileFlag + 1])
-  : 'skills-only';
+  : 'hooks';
 
 function parseTarget(value: string): BuildTargetName {
   if (value === 'ghcp' || value === 'claude' || value === 'codex') return value;
@@ -56,7 +56,7 @@ function resolveFromRoot(path: string): string {
 }
 
 function parsePluginProfile(value: string): PluginPayloadOptions['profile'] {
-  if (value === 'skills-only' || value === 'full') return value;
+  if (value === 'skills-only' || value === 'hooks' || value === 'full') return value;
   throw new Error(`Unknown plugin profile: ${value}`);
 }
 
