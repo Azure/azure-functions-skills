@@ -129,7 +129,7 @@ function runCli(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv
 }
 
 function runCliOutput(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): string {
-  const env = { ...process.env, ...options.env };
+  const env = { ...process.env, AZURE_FUNCTIONS_SKILLS_SKIP_UPDATE_CHECK: '1', ...options.env };
   return execFileSync(process.execPath, [CLI_PATH, ...args], {
     cwd: options.cwd || ROOT_DIR,
     env,
@@ -154,6 +154,19 @@ function createFakeAgentCliDirectory(): string {
       writeFileSync(join(fakeBinDir, `${launcher.command}.ps1`), 'exit 0\r\n', { mode: 0o755 });
     }
   }
+  return fakeBinDir;
+}
+
+function createFakeNpmDirectory(latestVersion: string): string {
+  const fakeBinDir = makeTempDir('af-skills-e2e-npm-');
+  const commandPath = join(fakeBinDir, process.platform === 'win32' ? 'npm.cmd' : 'npm');
+  writeFileSync(
+    commandPath,
+    process.platform === 'win32'
+      ? `@echo off\r\nif "%1"=="view" echo ${latestVersion}\r\nexit /b 0\r\n`
+      : `#!/usr/bin/env sh\nif [ "$1" = "view" ]; then printf "%s\\n" "${latestVersion}"; fi\nexit 0\n`,
+    { mode: 0o755 },
+  );
   return fakeBinDir;
 }
 
@@ -336,6 +349,33 @@ describe('CLI command integration', () => {
     runCli(['install', '--local', '--agent', 'ghcp', '--dir', projectDir, '--skip-prerequisites']);
 
     assertWorkspaceLayout(projectDir, 'ghcp', expectedSkillIds, expectedAgentFiles);
+  });
+
+  it('install --local reports bundled assets and npm update guidance when the package is stale', () => {
+    const fakeNpmDir = createFakeNpmDirectory('9.9.9');
+    const projectDir = makeTempDir('af-skills-e2e-install-local-update-guidance-');
+    const pathValue = `${fakeNpmDir}${delimiter}${process.env.PATH || ''}`;
+
+    const output = runCliOutput([
+      'install',
+      '--local',
+      '--agent', 'claude',
+      '--dir', projectDir,
+      '--yes',
+      '--skip-prerequisites',
+    ], {
+      env: {
+        PATH: pathValue,
+        Path: pathValue,
+        AZURE_FUNCTIONS_SKILLS_SKIP_UPDATE_CHECK: '0',
+      },
+    });
+
+    expect(output).toContain('Local assets: bundled with @azure/functions-skills');
+    expect(output).toContain('@azure/functions-skills 9.9.9 is available');
+    expect(output).toContain('npm install -g @azure/functions-skills@latest');
+    expect(output).not.toContain('source-ref');
+    expect(output).not.toContain('Fetching templates from GitHub');
   });
 
   it('install passes host CLI arguments through for a single agent dry-run', () => {
@@ -829,6 +869,26 @@ describe('CLI command integration', () => {
 
     // Output describes planned actions
     expect(output).toContain('Planned local update');
+  });
+
+  it('local update reports bundled assets and npm update guidance when the package is stale', { timeout: 15_000 }, () => {
+    const fakeNpmDir = createFakeNpmDirectory('9.9.9');
+    const projectDir = makeTempDir('af-skills-e2e-local-update-guidance-');
+    const pathValue = `${fakeNpmDir}${delimiter}${process.env.PATH || ''}`;
+    const env = {
+      PATH: pathValue,
+      Path: pathValue,
+      AZURE_FUNCTIONS_SKILLS_SKIP_UPDATE_CHECK: '0',
+    };
+
+    runCli(['install', '--local', '--agent', 'codex', '--dir', projectDir, '--yes', '--skip-prerequisites'], { env });
+    const output = runCliOutput(['update', '--agent', 'codex', '--dir', projectDir, '--yes'], { env });
+
+    expect(output).toContain('Local assets: bundled with @azure/functions-skills');
+    expect(output).toContain('@azure/functions-skills 9.9.9 is available');
+    expect(output).toContain('npm install -g @azure/functions-skills@latest');
+    expect(output).not.toContain('source-ref');
+    expect(output).not.toContain('Fetching templates from GitHub');
   });
 
   it('update after plugin install saves aside customer-owned routing files', { timeout: 15_000 }, () => {

@@ -27,7 +27,7 @@ Options:
   --agent <name>     Agent: ghcp, claude, codex (repeatable)
   --all              Install all supported agents explicitly
   --dir <path>       Target directory (default: current directory)
-  --local            Full workspace-local setup, equivalent to setup
+  --local            Full workspace-local setup from bundled npm package assets
   --dry-run          Print planned install without writing files
   --yes              Approve safe file updates such as managed blocks and state .gitignore entry
   --source <name>    marketplace, github, or local (default: marketplace)
@@ -45,7 +45,7 @@ Options:
   --agent <name>     Agent: ghcp, claude, codex (repeatable)
   --all              Update all supported agents explicitly
   --dir <path>       Target directory (default: current directory)
-  --local            Force local update mode (auto-detected from state if omitted)
+  --local            Force local update mode using bundled npm package assets
   --force            Overwrite all files including user-customized files
   --dry-run          Print planned update without writing files
   --yes              Approve safe file updates such as managed blocks and state .gitignore entry
@@ -198,7 +198,7 @@ function printHelp() {
   Options (install/update):
     --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
     --dir <path>       Target directory (default: current directory)
-    --local            Full workspace-local setup, equivalent to setup
+    --local            Full workspace-local setup from bundled npm package assets
     --dry-run          Print planned install without writing files
     --yes              Approve modifying existing instruction files without prompting
     --source <name>    marketplace, github, or local (default: marketplace)
@@ -483,6 +483,11 @@ function printInstallSummary({ action, agents, dir, filesWritten, state, gitigno
   console.log(`  Next: azure-functions-skills chat --dir "${dir}"`);
 }
 
+function printPackageUpdateGuidance(packageUpdate) {
+  if (!packageUpdate || packageUpdate.status !== 'update-available') return;
+  console.log(`  Package update: ${packageUpdate.message}`);
+}
+
 if (command === '--version' || command === '-V') {
   const { readFileSync } = await import('node:fs');
   const { join: joinPath, dirname } = await import('node:path');
@@ -591,7 +596,9 @@ if (command === 'install' || command === 'update') {
     if (command === 'update') {
       // Use file-type-aware local update strategy
       const { applyLocalUpdate, createInteractivePrompter } = await import('../lib/setup/local-update.js');
+      const { checkPackageUpdate } = await import('../lib/setup/package-update.js');
       const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
+      const packageUpdate = await checkPackageUpdate();
       const result = await applyLocalUpdate(dir, {
         agents: detectedAgents,
         force,
@@ -601,6 +608,7 @@ if (command === 'install' || command === 'update') {
       });
       if (dryRun) {
         console.log(`Planned local update:`);
+        console.log('  Local assets: bundled with @azure/functions-skills');
         if (result.overwritten.length > 0) {
           console.log('  Overwrite:');
           for (const f of result.overwritten) console.log(`    - ${f}`);
@@ -613,6 +621,7 @@ if (command === 'install' || command === 'update') {
           console.log('  Save aside (review & merge manually):');
           for (const entry of result.savedAside) console.log(`    - ${entry.original} → ${entry.aside}`);
         }
+        printPackageUpdateGuidance(packageUpdate);
       } else {
         const state = recordInstallState(dir, {
           action: command,
@@ -626,6 +635,8 @@ if (command === 'install' || command === 'update') {
         });
         const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
         printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.overwritten.length + result.managedBlockUpdated.length + result.savedAside.length, state, gitignoreResult });
+        console.log('  Local assets: bundled with @azure/functions-skills');
+        printPackageUpdateGuidance(packageUpdate);
         if (result.savedAside.length > 0) {
           console.log('\n⚠️  Some files were saved aside for manual review:');
           for (const entry of result.savedAside) {
@@ -635,25 +646,34 @@ if (command === 'install' || command === 'update') {
         }
       }
     } else {
-      // install --local: use original applySetup()
+      const { installLocalSkills } = await import('../lib/setup/index.js');
+      const result = await installLocalSkills({
+        targetDir: dir,
+        agents: detectedAgents,
+        dryRun,
+        yes,
+        prerequisites,
+        scope,
+        approveStateGitignore: isInteractive() ? () => askYesNo(`Add ${STATE_IGNORE_ENTRY} to .gitignore so local state is not committed?`) : undefined,
+        approveGitInit: isInteractive() ? () => askYesNo('Initialize git repository? GitHub Copilot requires a git repo to discover agent definitions.') : undefined,
+      });
       if (dryRun) {
         console.log(`Planned local install:`);
-        for (const agent of detectedAgents) console.log(`  - ${agent}: workspace setup files`);
+        console.log('  Local assets: bundled with @azure/functions-skills');
+        for (const planned of result.plannedFiles) console.log(`  - ${planned}`);
+        printPackageUpdateGuidance(result.packageUpdate);
       } else {
-        const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
-        const state = recordInstallState(dir, {
+        printInstallSummary({
           action: command,
           agents: detectedAgents,
-          mode: 'local',
-          source: 'local',
-          scope,
-          includeMcp: true,
-          includeHooks: true,
-          includeAgent: detectedAgents.includes('ghcp'),
+          dir,
+          filesWritten: result.filesWritten,
+          state: result.state,
+          gitignoreResult: result.gitignoreResult,
+          gitRepoResult: result.gitRepoResult,
         });
-        const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
-        const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action: command });
-        printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.filesWritten, state, gitignoreResult, gitRepoResult });
+        console.log('  Local assets: bundled with @azure/functions-skills');
+        printPackageUpdateGuidance(result.packageUpdate);
       }
     }
   } else {

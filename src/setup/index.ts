@@ -187,3 +187,17 @@ function copyRecursive(src: string, dest: string, shouldCopy: (relativePath: str
   }
   return count;
 }
+
+export {
+  installLocalSkills,
+  type GitRepoResult,
+  type GitRepoResultStatus,
+  type LocalInstallOptions,
+  type LocalInstallResult,
+} from './local-install.js';
+export {
+  checkPackageUpdate,
+  type PackageUpdateInfo,
+  type PackageUpdateOptions,
+  type PackageUpdateStatus,
+} from './package-update.js';

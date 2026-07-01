@@ -64,6 +64,38 @@ The first time, the agent greets you with a welcome message, shows the available
 
 > **More options?** See [CLI Reference](docs/cli-reference.md) for every command, flag, and headless example.
 
+## Local installs and VS Code extension integration
+
+`install --local` copies skill bodies, agent definitions, hooks, and MCP settings from the assets bundled in the installed `@azure/functions-skills` npm package. It does not fetch templates from GitHub or use a source ref. When a newer npm package is available, the CLI prints an update command so users can refresh the bundled assets before reinstalling or updating.
+
+VS Code extensions can call the same local install flow from TypeScript:
+
+```ts
+import { installLocalSkills } from '@azure/functions-skills/setup';
+
+const result = await installLocalSkills({
+  targetDir: workspaceFolder.uri.fsPath,
+  agents: ['ghcp'],
+  yes: true,
+  prerequisites: 'skip',
+});
+```
+
+Common options:
+
+| Option | Description |
+| --- | --- |
+| `targetDir` | Required workspace root where local skills should be installed. |
+| `agents` | Optional agents: `ghcp`, `claude`, `codex`. Defaults to GHCP-compatible setup when omitted. |
+| `dryRun` | Return planned local files without writing. |
+| `yes` | Approve safe noninteractive changes such as local state `.gitignore` updates. |
+| `prerequisites` | `auto`, `check-only`, or `skip`, matching the CLI prerequisite behavior. |
+| `checkForUpdates` | Set `false` to skip npm package freshness guidance. |
+| `runner` | Optional command runner for tests or extension-host controlled npm checks. |
+| `initializeGitForGhcp` | Set `false` to skip GHCP git initialization. |
+
+The result includes installed agents, files written, local state, git setup status, `.gitignore` status, and `packageUpdate` guidance that extensions can surface in their own UI.
+
 ## Skills
 
 For contributor guidance on the product boundary between Azure Skills and Azure Functions Skills, see [Azure Skills and Azure Functions Skills Boundary](docs/azure-skills-boundary.md).
