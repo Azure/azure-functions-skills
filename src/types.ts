@@ -36,6 +36,12 @@ export interface AgentDefinitions {
 
 export interface HookDefinitions {
   welcome: string;
+  copilotTelemetry: string;
+  claudeTelemetry: string;
+  cursorTelemetry: string;
+  telemetryConfig: string;
+  trackTelemetryPowerShell: string;
+  trackTelemetryShell: string;
 }
 
 export interface BuildData {

@@ -14,7 +14,7 @@ interface PluginMarketplaceOptions {
 }
 
 export interface PluginPayloadOptions {
-  profile?: 'skills-only' | 'full';
+  profile?: 'skills-only' | 'hooks' | 'full';
 }
 
 /**
@@ -35,10 +35,11 @@ export function buildTarget(target: BuildTargetName, data: BuildData, distDir: s
 export function buildPluginPayload(data: BuildData, pluginDir: string, options: PluginPayloadOptions = {}): void {
   const profile = options.profile || 'skills-only';
   const fullPayload = profile === 'full';
+  const hookPayload = profile === 'hooks' || fullPayload;
   mkdirSync(pluginDir, { recursive: true });
 
-  const manifest = generatePluginManifest(data, { includeAgents: fullPayload, includeHooks: fullPayload, includeMcp: fullPayload });
-  const claudeManifest = generateClaudePluginManifest(data, { includeHooks: fullPayload, includeMcp: fullPayload });
+  const manifest = generatePluginManifest(data, { includeAgents: fullPayload, includeHooks: hookPayload, includeMcp: fullPayload });
+  const claudeManifest = generateClaudePluginManifest(data, { includeHooks: hookPayload, includeMcp: fullPayload });
   mkdirSync(join(pluginDir, '.plugin'), { recursive: true });
   writeFileSync(join(pluginDir, '.plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
   writeFileSync(join(pluginDir, 'plugin.json'), JSON.stringify(manifest, null, 2));
@@ -61,7 +62,10 @@ export function buildPluginPayload(data: BuildData, pluginDir: string, options: 
     writeFileSync(join(pluginDir, 'agents', 'functions-copilot.agent.md'), data.agents.copilot);
 
     writeFileSync(join(pluginDir, '.mcp.json'), JSON.stringify(generatePluginMcpJson(data.mcpServers), null, 2));
-    writeFileSync(join(pluginDir, 'hooks.json'), JSON.stringify(generateGhcpHooks(), null, 2));
+  }
+
+  if (hookPayload) {
+    writeTelemetryHookAssets(data, pluginDir);
   }
 }
 
@@ -117,6 +121,19 @@ function copySkillAssets(skill: Skill, skillDestDir: string): void {
   copySkillReferences(skill, skillDestDir);
   copySkillScripts(skill, skillDestDir);
   copyBundledAssets(skill, skillDestDir);
+}
+
+function writeTelemetryHookAssets(data: BuildData, pluginDir: string): void {
+  const hooksDir = join(pluginDir, 'hooks');
+  const scriptsDir = join(hooksDir, 'scripts');
+  mkdirSync(scriptsDir, { recursive: true });
+
+  writeFileSync(join(hooksDir, 'copilot-hooks.json'), data.hooks.copilotTelemetry);
+  writeFileSync(join(hooksDir, 'hooks.json'), data.hooks.claudeTelemetry);
+  writeFileSync(join(hooksDir, 'cursor-hooks.json'), data.hooks.cursorTelemetry);
+  writeFileSync(join(hooksDir, 'telemetry.config.json'), data.hooks.telemetryConfig);
+  writeFileSync(join(scriptsDir, 'track-telemetry.ps1'), data.hooks.trackTelemetryPowerShell);
+  writeFileSync(join(scriptsDir, 'track-telemetry.sh'), data.hooks.trackTelemetryShell);
 }
 
 // ─── GHCP ───
@@ -263,7 +280,7 @@ function generatePluginManifest(data: BuildData, options: PluginManifestOptions 
     description: 'Azure Functions skills for setup, create, and deploy workflows',
     skills: './skills/',
     ...(options.includeAgents ? { agents: './agents/' } : {}),
-    ...(options.includeHooks ? { hooks: './hooks.json' } : {}),
+    ...(options.includeHooks ? { hooks: { paths: ['./hooks/copilot-hooks.json'], exclusive: true } } : {}),
     ...(options.includeMcp ? { mcpServers: './.mcp.json' } : {}),
     interface: {
       displayName: 'Azure Functions Skills',
@@ -281,7 +298,7 @@ function generateClaudePluginManifest(data: BuildData, options: PluginManifestOp
     version: data.packageVersion || '0.0.0-dev',
     description: 'Azure Functions skills for setup, create, and deploy workflows',
     skills: './skills/',
-    ...(options.includeHooks ? { hooks: './hooks.json' } : {}),
+    ...(options.includeHooks ? { hooks: './hooks/hooks.json' } : {}),
     ...(options.includeMcp ? { mcpServers: './.mcp.json' } : {}),
   };
 }
