@@ -1,0 +1,73 @@
+trigger: none
+pr: none
+
+resources:
+    repositories:
+        - repository: 1es
+          type: git
+          name: 1ESPipelineTemplates/1ESPipelineTemplates
+          ref: refs/tags/release
+        - repository: eng
+          type: git
+          name: engineering
+          ref: refs/tags/release
+    pipelines:
+        - pipeline: officialBuild
+          project: internal
+          source: functions-skills.official
+          branch: main
+
+variables:
+    - group: azure-functions-skills-release
+
+extends:
+    template: v1/1ES.Official.PipelineTemplate.yml@1es
+    parameters:
+        pool:
+            name: 1es-pool-azfunc
+            image: 1es-ubuntu-22.04
+            os: linux
+        sdl:
+            sourceAnalysisPool:
+                name: 1es-pool-azfunc
+                image: 1es-windows-2022
+                os: windows
+            codeql:
+                runSourceLanguagesInSourceAnalysis: true
+
+        stages:
+            - stage: UploadPartnerDrop
+              displayName: 'Upload package to partner drops'
+              jobs:
+                  - job: UploadPartnerDrop
+                    displayName: 'Upload official build package'
+                    steps:
+                        - download: officialBuild
+                          artifact: drop
+                        - pwsh: |
+                              $ErrorActionPreference = 'Stop'
+
+                              $dropPath = '$(Pipeline.Workspace)/officialBuild/drop'
+                              $files = Get-ChildItem $dropPath -Filter '*.tgz'
+                              if ($files.Count -ne 1) {
+                                  throw "Expected one .tgz package in $dropPath, found $($files.Count)."
+                              }
+
+                              $package = $files[0]
+                              if ($package.Name -notmatch '^azure-functions-skills-(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\.tgz$') {
+                                  throw "Package name did not match the expected npm pack format: $($package.Name)"
+                              }
+
+                              $stagingRoot = '$(Agent.TempDirectory)/partner-package'
+                              $versionDir = Join-Path $stagingRoot $Matches.version
+                              New-Item -ItemType Directory -Force -Path $versionDir | Out-Null
+                              Copy-Item -Path $package.FullName -Destination (Join-Path $versionDir $package.Name)
+                              Write-Host "Staged $($package.Name) under $versionDir for partner upload."
+                          displayName: 'Stage package in versioned partner path'
+                        - template: /ci/internal/upload-partner-package.yml@eng
+                          parameters:
+                              displayName: 'Upload package to azuresdkpartnerdrops'
+                              serviceConnection: $(PartnerBlobAzureServiceConnection)
+                              sourceFolder: $(Agent.TempDirectory)/partner-package
+                              targetFolder: azure-functions/azure-functions-skills
+                              packages: "**/*.tgz"

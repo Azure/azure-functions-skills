@@ -3,6 +3,12 @@
   "version": "0.0.5-preview",
   "description": "Azure Functions skills for setup, create, and deploy workflows",
   "skills": "./skills/",
+  "hooks": {
+    "paths": [
+      "./hooks/copilot-hooks.json"
+    ],
+    "exclusive": true
+  },
   "interface": {
     "displayName": "Azure Functions Skills",
     "shortDescription": "Guided setup → create → deploy workflow for Azure Functions",
