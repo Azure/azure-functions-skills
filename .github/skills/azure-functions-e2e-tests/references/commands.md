@@ -62,7 +62,7 @@ The command IDs and their semantics are platform-independent. The exact shell sy
 
 | File | Required | Notes |
 |------|----------|-------|
-| `.github/copilot-instructions.md` | YES | Small routing block with managed markers |
+| `AGENTS.md` | YES | Small routing block with managed markers |
 | `.github/agents/functions-copilot.agent.md` | YES | — |
 | `.github/hooks/welcome-setup.json` | YES | — |
 | `.mcp.json` | YES | Copilot CLI workspace MCP config |
@@ -196,8 +196,8 @@ S1GP-3.  copilot plugin uninstall azure-functions-skills   (OK if "not installed
 S1GP-4.  $CLI install --agent ghcp --dir $WS --yes
 S1GP-5.  copilot plugin list   # verify azure-functions-skills appears
 S1GP-6.  ls -R $WS | head -50   # list workspace files; verify against "GHCP — plugin mode" table
-S1GP-7.  grep 'azure-functions-skills:start' $WS/.github/copilot-instructions.md   # verify managed block markers
-S1GP-8.  wc -c < $WS/.github/copilot-instructions.md   # must be < 3072 (3KB)
+S1GP-7.  grep 'azure-functions-skills:start' $WS/AGENTS.md   # verify managed block markers
+S1GP-8.  wc -c < $WS/AGENTS.md   # must be < 5120 (5KB)
 S1GP-9.  cat $WS/.azure-functions-skills/state.local.json
 S1GP-10. $CLI chat --agent github-copilot --dir $WS --skip-prerequisites -- -p "List all visible Azure Functions skills, MCP servers, hooks, and agents. Return a structured summary." --output-format json -s --allow-all --no-ask-user
 S1GP-11. cat $WS/.azure-functions-skills/state.local.json
@@ -207,7 +207,7 @@ S1GP-11. cat $WS/.azure-functions-skills/state.local.json
 - S1GP-4 exits 0
 - S1GP-5 shows azure-functions-skills installed
 - All files in the "GHCP — plugin mode" table exist
-- copilot-instructions.md has managed block markers and is small (< 3KB)
+- AGENTS.md has managed block markers and is small (< 5KB)
 - S1GP-10 output contains azure-functions-* skills (see aggregation note below)
 
 **Blocked criteria**:

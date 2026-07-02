@@ -372,6 +372,27 @@ describe('CLI command integration', () => {
     assertWorkspaceLayout(projectDir, 'ghcp', expectedSkillIds, expectedAgentFiles);
   });
 
+  it('install --local --no-telemetry records opt-out state and still installs telemetry hooks', () => {
+    const projectDir = makeTempDir('af-skills-e2e-install-local-no-telemetry-');
+
+    runCli([
+      'install',
+      '--local',
+      '--agent', 'ghcp',
+      '--dir', projectDir,
+      '--yes',
+      '--skip-prerequisites',
+      '--no-telemetry',
+    ]);
+
+    const state = JSON.parse(readFileSync(join(projectDir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      telemetry: { enabled: boolean; source: string };
+    };
+    expect(state.telemetry).toEqual({ enabled: false, source: 'install-flag' });
+    expect(existsSync(join(projectDir, '.github', 'hooks', 'azure-functions-telemetry.json'))).toBe(true);
+    expect(existsSync(join(projectDir, '.azure-functions-skills', 'hooks', 'scripts', 'track-telemetry.ps1'))).toBe(true);
+  });
+
   it('install --local reports bundled assets and npm update guidance when the package is stale', () => {
     const fakeNpmDir = createFakeNpmDirectory('9.9.9');
     const projectDir = makeTempDir('af-skills-e2e-install-local-update-guidance-');

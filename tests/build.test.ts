@@ -268,6 +268,8 @@ describe('buildTarget — ghcp', () => {
     const hooksJson = JSON.parse(readFileSync(hooksPath, 'utf-8'));
     expect(hooksJson.hooks).toBeTruthy();
     expect(hooksJson.hooks.SessionStart).toBeTruthy();
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.github', 'hooks', 'azure-functions-telemetry.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.azure-functions-skills', 'hooks', 'scripts', 'track-telemetry.sh'))).toBe(true);
   });
 
   it('does not mix plugin artifacts into the workspace layout', () => {
@@ -322,6 +324,8 @@ describe('buildTarget — claude', () => {
     expect(existsSync(settingsPath)).toBe(true);
     const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
     expect(settings.mcpServers).toBeTruthy();
+    expect(settings.hooks?.PostToolUse?.[0]?.hooks?.[0]?.command).toContain('.azure-functions-skills/hooks/scripts/track-telemetry.sh');
+    expect(existsSync(join(DIST_DIR, 'claude', '.azure-functions-skills', 'hooks', 'telemetry.config.json'))).toBe(true);
   });
 
   it('generates skill files in .claude/skills/<id>/SKILL.md', () => {
@@ -408,6 +412,8 @@ describe('buildTarget — codex', () => {
     expect(hooksJson.hooks).toBeTruthy();
     expect(hooksJson.hooks.SessionStart).toBeTruthy();
     expect(hooksJson.hooks.SessionStart).toHaveLength(1);
+    expect(hooksJson.hooks.PostToolUse).toBeTruthy();
+    expect(existsSync(join(DIST_DIR, 'codex', '.azure-functions-skills', 'hooks', 'scripts', 'track-telemetry.ps1'))).toBe(true);
   });
 });
 
@@ -608,6 +614,34 @@ describe('buildPluginPayload', () => {
     const script = readFileSync(join(payloadDir, 'hooks', 'scripts', 'track-telemetry.ps1'), 'utf-8');
     expect(script).toContain('azure-functions-');
     expect(script).toContain('APPLICATIONINSIGHTS_INSTRUMENTATION_KEY');
+  });
+
+  it('telemetry scripts honor workspace state opt-out and local skill paths', () => {
+    const shellScript = readFileSync(join(TEMPLATES_DIR, 'hooks', 'scripts', 'track-telemetry.sh'), 'utf-8');
+    const powershellScript = readFileSync(join(TEMPLATES_DIR, 'hooks', 'scripts', 'track-telemetry.ps1'), 'utf-8');
+
+    for (const script of [shellScript, powershellScript]) {
+      expect(script).toContain('state.local.json');
+      expect(script).toContain('telemetry');
+      expect(script).toContain('enabled');
+      expect(script).toContain('.github/skills/azure-functions-');
+      expect(script).toContain('.claude/skills/azure-functions-');
+      expect(script).toContain('--plugin-name');
+      expect(script).toContain('--plugin-version');
+    }
+  });
+});
+
+describe('partner drop pipeline', () => {
+  it('uses the shared engineering upload-partner-package template for partner blob upload', () => {
+    const pipeline = readFileSync(join(import.meta.dirname, '..', 'azure-pipelines', 'partner-drop-upload.yml'), 'utf-8');
+
+    expect(pipeline).toContain('repository: eng');
+    expect(pipeline).toContain('name: engineering');
+    expect(pipeline).toContain('/ci/internal/upload-partner-package.yml@eng');
+    expect(pipeline).toContain('packages: "**/*.tgz"');
+    expect(pipeline).toContain('targetFolder: azure-functions/azure-functions-skills');
+    expect(pipeline).not.toContain('az storage blob upload');
   });
 });
 

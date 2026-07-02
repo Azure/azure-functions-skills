@@ -41,9 +41,36 @@ describe('installLocalSkills', () => {
     expect(result.filesWritten).toBeGreaterThan(0);
     expect(existsSync(join(dir, '.github', 'skills'))).toBe(true);
     expect(existsSync(join(dir, '.github', 'agents', 'functions-copilot.agent.md'))).toBe(true);
+    expect(existsSync(join(dir, '.github', 'hooks', 'azure-functions-telemetry.json'))).toBe(true);
+    expect(existsSync(join(dir, '.azure-functions-skills', 'hooks', 'scripts', 'track-telemetry.ps1'))).toBe(true);
+    expect(existsSync(join(dir, '.azure-functions-skills', 'hooks', 'scripts', 'track-telemetry.sh'))).toBe(true);
+    expect(existsSync(join(dir, '.azure-functions-skills', 'hooks', 'telemetry.config.json'))).toBe(true);
     expect(result.state?.install.mode).toBe('local');
     expect(result.state?.install.source).toBe('local');
+    expect(result.state?.telemetry.enabled).toBe(true);
+    expect(result.state?.telemetry.source).toBe('default');
     expect(result.gitignoreResult.status).toBe('updated');
+  });
+
+  it('allows library local installs to opt out of telemetry in workspace state', async () => {
+    const dir = makeTempDir();
+
+    const result = await installLocalSkills({
+      targetDir: dir,
+      agents: ['codex'],
+      yes: true,
+      prerequisites: 'skip',
+      checkForUpdates: false,
+      telemetryEnabled: false,
+    });
+
+    expect(result.state?.telemetry.enabled).toBe(false);
+    expect(result.state?.telemetry.source).toBe('install-option');
+    expect(existsSync(join(dir, '.azure-functions-skills', 'hooks', 'scripts', 'track-telemetry.sh'))).toBe(true);
+    const state = JSON.parse(readFileSync(join(dir, '.azure-functions-skills', 'state.local.json'), 'utf-8')) as {
+      telemetry: { enabled: boolean; source: string };
+    };
+    expect(state.telemetry).toEqual({ enabled: false, source: 'install-option' });
   });
 
   it('supports dry-run without writing workspace files or state', async () => {

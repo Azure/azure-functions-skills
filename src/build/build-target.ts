@@ -136,9 +136,60 @@ function writeTelemetryHookAssets(data: BuildData, pluginDir: string): void {
   writeFileSync(join(scriptsDir, 'track-telemetry.sh'), data.hooks.trackTelemetryShell);
 }
 
+function writeWorkspaceTelemetryAssets(data: BuildData, base: string): void {
+  const hooksDir = join(base, '.azure-functions-skills', 'hooks');
+  const scriptsDir = join(hooksDir, 'scripts');
+  mkdirSync(scriptsDir, { recursive: true });
+
+  writeFileSync(join(hooksDir, 'telemetry.config.json'), data.hooks.telemetryConfig);
+  writeFileSync(join(scriptsDir, 'track-telemetry.ps1'), data.hooks.trackTelemetryPowerShell);
+  writeFileSync(join(scriptsDir, 'track-telemetry.sh'), data.hooks.trackTelemetryShell);
+}
+
+function generateWorkspaceCopilotTelemetryHooks() {
+  return {
+    hooks: {
+      PostToolUse: [
+        {
+          type: 'command',
+          bash: '.azure-functions-skills/hooks/scripts/track-telemetry.sh',
+          powershell: '.azure-functions-skills/hooks/scripts/track-telemetry.ps1',
+        },
+      ],
+    },
+  };
+}
+
+function generateWorkspaceClaudeTelemetryHooks() {
+  return {
+    PostToolUse: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'bash .azure-functions-skills/hooks/scripts/track-telemetry.sh',
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function generateWorkspaceCodexTelemetryHooks() {
+  return {
+    PostToolUse: [
+      {
+        type: 'command',
+        command: 'bash .azure-functions-skills/hooks/scripts/track-telemetry.sh',
+      },
+    ],
+  };
+}
+
 // ─── GHCP ───
 
-function buildGhcp({ skills, mcpServers, agents }: BuildData, distDir: string): void {
+function buildGhcp(data: BuildData, distDir: string): void {
+  const { skills, mcpServers, agents } = data;
   const base = join(distDir, 'ghcp');
   mkdirSync(join(base, '.github', 'agents'), { recursive: true });
   mkdirSync(join(base, '.github', 'hooks'), { recursive: true });
@@ -168,12 +219,18 @@ function buildGhcp({ skills, mcpServers, agents }: BuildData, distDir: string): 
     join(base, '.github', 'hooks', 'welcome-setup.json'),
     JSON.stringify(generateGhcpHooks(), null, 2),
   );
+  writeFileSync(
+    join(base, '.github', 'hooks', 'azure-functions-telemetry.json'),
+    JSON.stringify(generateWorkspaceCopilotTelemetryHooks(), null, 2),
+  );
+  writeWorkspaceTelemetryAssets(data, base);
 
 }
 
 // ─── Claude Code ───
 
-function buildClaude({ skills, mcpServers }: BuildData, distDir: string): void {
+function buildClaude(data: BuildData, distDir: string): void {
+  const { skills, mcpServers } = data;
   const base = join(distDir, 'claude');
   mkdirSync(join(base, '.claude', 'skills'), { recursive: true });
 
@@ -182,8 +239,12 @@ function buildClaude({ skills, mcpServers }: BuildData, distDir: string): void {
   writeFileSync(join(base, 'CLAUDE.md'), claudeMd);
 
   // .claude/settings.json (MCP servers)
-  const settings = generateClaudeSettings(mcpServers);
+  const settings = {
+    ...generateClaudeSettings(mcpServers),
+    hooks: generateWorkspaceClaudeTelemetryHooks(),
+  };
   writeFileSync(join(base, '.claude', 'settings.json'), JSON.stringify(settings, null, 2));
+  writeWorkspaceTelemetryAssets(data, base);
 
   // .claude/skills/<id>/SKILL.md — Agent Skills (agentskills.io standard, directory format)
   for (const skill of skills) {
@@ -196,7 +257,8 @@ function buildClaude({ skills, mcpServers }: BuildData, distDir: string): void {
 
 // ─── Codex ───
 
-function buildCodex({ skills, mcpServers, agents }: BuildData, distDir: string): void {
+function buildCodex(data: BuildData, distDir: string): void {
+  const { skills, mcpServers, agents } = data;
   const base = join(distDir, 'codex');
   mkdirSync(base, { recursive: true });
   mkdirSync(join(base, '.codex'), { recursive: true });
@@ -219,6 +281,7 @@ function buildCodex({ skills, mcpServers, agents }: BuildData, distDir: string):
 
   // .codex/hooks.json — SessionStart hook
   writeFileSync(join(base, '.codex', 'hooks.json'), JSON.stringify(generateCodexHooks(), null, 2));
+  writeWorkspaceTelemetryAssets(data, base);
 }
 
 // ─── Generators ───
@@ -408,6 +471,7 @@ function generateCodexHooks() {
           ],
         },
       ],
+      PostToolUse: generateWorkspaceCodexTelemetryHooks().PostToolUse,
     },
   };
 }

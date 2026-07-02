@@ -15,6 +15,50 @@ return_success() {
     exit 0
 }
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+packageVersion=""
+installMode="unknown"
+installScope="unknown"
+
+find_state_file() {
+    local candidate
+    candidate="${script_dir}/../../state.local.json"
+    if [ -f "$candidate" ]; then
+        echo "$candidate"
+        return
+    fi
+
+    candidate="${PWD}/.azure-functions-skills/state.local.json"
+    if [ -f "$candidate" ]; then
+        echo "$candidate"
+        return
+    fi
+}
+
+load_workspace_state() {
+    local state_path
+    local compact_state
+    local parsed
+    state_path=$(find_state_file)
+    if [ -z "$state_path" ]; then
+        return
+    fi
+
+    compact_state=$(tr -d '\r\n ' < "$state_path")
+    if echo "$compact_state" | grep -q '"telemetry":{"enabled":false'; then
+        return_success
+    fi
+
+    parsed=$(echo "$compact_state" | sed -n 's/.*"package":{[^}]*"version":"\([^"]*\)".*/\1/p')
+    [ -n "$parsed" ] && packageVersion="$parsed"
+
+    parsed=$(echo "$compact_state" | sed -n 's/.*"install":{[^}]*"mode":"\([^"]*\)".*/\1/p')
+    [ -n "$parsed" ] && installMode="$parsed"
+
+    parsed=$(echo "$compact_state" | sed -n 's/.*"install":{[^}]*"scope":"\([^"]*\)".*/\1/p')
+    [ -n "$parsed" ] && installScope="$parsed"
+}
+
 extract_json_field() {
     local json="$1"
     local field="$2"
@@ -54,10 +98,8 @@ extract_toolargs_path() {
 }
 
 configure_appinsights() {
-    local script_dir
     local config_path
     local instrumentation_key
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     config_path="${script_dir}/../telemetry.config.json"
 
     if [ ! -f "$config_path" ]; then
@@ -81,6 +123,8 @@ is_functions_skills_path() {
     [[ "$p" == *".claude/plugins/cache/azure-functions-skills/"* ]] && return 0
     [[ "$p" == *"agent-plugins/github.com/azure/azure-functions-skills/.github/plugins/azure-functions-skills/skills/"* ]] && return 0
     [[ "$p" == *"agent-plugins/github.com/microsoft/azure-functions-skills/.github/plugins/azure-functions-skills/skills/"* ]] && return 0
+    [[ "$p" == *".github/skills/azure-functions-"* ]] && return 0
+    [[ "$p" == *".claude/skills/azure-functions-"* ]] && return 0
     [[ "$p" == *".agents/skills/azure-functions-"* ]] && return 0
     return 1
 }
@@ -102,6 +146,14 @@ extract_functions_relative_path() {
         echo "${BASH_REMATCH[1]}"
         return
     fi
+    if [[ "$normalized" =~ \.github/skills/(azure-functions-.+)$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
+    if [[ "$normalized" =~ \.claude/skills/(azure-functions-.+)$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
 }
 
 if [ -t 0 ]; then
@@ -112,6 +164,8 @@ rawInput=$(cat)
 if [ -z "$rawInput" ]; then
     return_success
 fi
+
+load_workspace_state
 
 toolName=$(extract_json_field "$rawInput" "toolName")
 sessionId=$(extract_json_field "$rawInput" "sessionId")
@@ -207,12 +261,19 @@ fi
 if [ "$shouldTrack" = true ]; then
     configure_appinsights
 
+    pluginVersion="$packageVersion"
+    if [ -n "$pluginVersion" ] && [ "$installMode" != "unknown" ] && [ "$installScope" != "unknown" ]; then
+        pluginVersion="${pluginVersion}+${installMode}.${installScope}"
+    fi
+
     mcpArgs=(
         "server" "plugin-telemetry"
         "--timestamp" "$timestamp"
         "--client-name" "$clientName"
+        "--plugin-name" "azure-functions-skills"
     )
 
+    [ -n "$pluginVersion" ] && mcpArgs+=("--plugin-version" "$pluginVersion")
     [ -n "$eventType" ] && mcpArgs+=("--event-type" "$eventType")
     [ -n "$sessionId" ] && mcpArgs+=("--session-id" "$sessionId")
     [ -n "$skillName" ] && mcpArgs+=("--skill-name" "$skillName")
