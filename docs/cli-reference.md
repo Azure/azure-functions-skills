@@ -40,7 +40,7 @@ Options:
 | `--agent <name>` | (interactive prompt) | Repeatable. `ghcp`, `claude`, `codex`. CI must specify. |
 | `--all` | off | Install all supported agents. |
 | `--dir <path>` | `cwd` | Target directory. |
-| `--local` | off | Full workspace-local setup (skill bodies copied). Compatibility flow when the host has no plugin support. |
+| `--local` | off | Full workspace-local setup from bundled npm package assets. Compatibility flow when the host has no plugin support. |
 | `--dry-run` | off | Print planned actions without writing. |
 | `--yes` | off | Approve modifying existing instruction files and adding state to `.gitignore`. |
 | `--source <name>` | `marketplace` | `marketplace`, `github`, or `local`. |
@@ -51,6 +51,8 @@ Options:
 | `-- <args...>` | — | Pass-through to host plugin install (single agent only). |
 
 State: `install` writes `.azure-functions-skills/state.local.json` so future `chat`/`update` runs can use the same agent selection. With `--yes`, only this state file is appended to `.gitignore`; the directory itself is not ignored because workspace activation files may be useful to commit.
+
+Local installs use only the `templates/` assets bundled in the installed `@azure/functions-skills` npm package. They do not fetch templates from GitHub or accept a source ref. If a newer npm package is available, local install/update prints an actionable update command such as `npm install -g @azure/functions-skills@latest`.
 
 ---
 
@@ -63,7 +65,7 @@ npx @azure/functions-skills update
 npx @azure/functions-skills update --agent ghcp
 ```
 
-Same flags as `install`.
+Same flags as `install`. For workspaces installed with `install --local`, `update` auto-detects local mode from state and refreshes files from the currently installed npm package's bundled assets.
 
 ---
 
@@ -83,6 +85,36 @@ npx @azure/functions-skills setup --agent ghcp --dir ./my-app
 | `--as-plugin` | off | Register as native plugin instead of copying files. |
 | `--check-prerequisites` | off | Check external prerequisites without installing them. |
 | `--skip-prerequisites` | off | Skip prerequisite checks entirely. |
+
+---
+
+## Library API for local installs
+
+VS Code extensions can run the CLI `install --local` flow without spawning the CLI:
+
+```ts
+import { installLocalSkills } from '@azure/functions-skills/setup';
+
+const result = await installLocalSkills({
+  targetDir: workspaceFolder.uri.fsPath,
+  agents: ['ghcp'],
+  yes: true,
+  prerequisites: 'skip',
+});
+```
+
+| Option | Required | Description |
+| --- | --- | --- |
+| `targetDir` | yes | Workspace root where package-bundled local assets should be installed. |
+| `agents` | no | `ghcp`, `claude`, `codex`. Defaults to GHCP-compatible setup when omitted. |
+| `dryRun` | no | Return planned local files without writing. |
+| `yes` | no | Approve safe noninteractive changes such as state `.gitignore` updates and GHCP git initialization. |
+| `prerequisites` | no | `auto`, `check-only`, or `skip`, matching CLI behavior. |
+| `checkForUpdates` | no | Set `false` to skip npm package freshness guidance. |
+| `runner` | no | Injectable command runner for tests or extension-host controlled npm checks. |
+| `initializeGitForGhcp` | no | Set `false` to skip GHCP git initialization. |
+
+The result includes `agents`, `filesWritten`, `state`, `gitignoreResult`, `gitRepoResult`, and `packageUpdate` so an extension can present its own notifications.
 
 ---
 
