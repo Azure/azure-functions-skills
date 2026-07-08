@@ -49,8 +49,41 @@ jobs:
                     LICENSE
                     package.json
                     README.md
+                    dist/plugin/**
                 targetFolder: '$(Build.ArtifactStagingDirectory)/dropInput'
                 cleanTargetFolder: true
+          - pwsh: |
+                $ErrorActionPreference = 'Stop'
+
+                $instrumentationKey = $env:APPLICATIONINSIGHTS_INSTRUMENTATION_KEY
+                if ([string]::IsNullOrWhiteSpace($instrumentationKey) -or $instrumentationKey.StartsWith('$(')) {
+                    Write-Host 'ApplicationInsightsInstrumentationKey is not configured; telemetry package config will keep the placeholder.'
+                    exit 0
+                }
+
+                $placeholder = '__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__'
+                $configPaths = @(
+                    '$(Build.ArtifactStagingDirectory)/dropInput/templates/hooks/telemetry.config.json',
+                    '$(Build.ArtifactStagingDirectory)/dropInput/dist/plugin/azure-functions-skills/hooks/telemetry.config.json'
+                )
+
+                foreach ($configPath in $configPaths) {
+                    if (-not (Test-Path $configPath)) {
+                        throw "Telemetry config was not found at $configPath"
+                    }
+
+                    $content = Get-Content -Raw -Path $configPath
+                    if (-not $content.Contains($placeholder)) {
+                        throw "Telemetry config placeholder was not found in $configPath."
+                    }
+
+                    $content.Replace($placeholder, $instrumentationKey) |
+                        Set-Content -Path $configPath -Encoding utf8NoBOM
+                }
+                Write-Host 'Injected Application Insights instrumentation key into package telemetry config.'
+            displayName: 'Inject telemetry instrumentation key'
+            env:
+                APPLICATIONINSIGHTS_INSTRUMENTATION_KEY: $(ApplicationInsightsInstrumentationKey)
           - script: npm prune --production
             displayName: 'npm prune --production'
           - script: npm pack --ignore-scripts

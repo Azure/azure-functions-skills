@@ -47,6 +47,7 @@ Options:
 | `--scope <name>` | `workspace` | `workspace` or `user`. |
 | `--no-mcp` | off | Do not add workspace MCP files. |
 | `--no-hooks` | off | Do not add workspace hook files. |
+| `--no-telemetry` | off | Opt out of Azure Functions Skills telemetry for this workspace. |
 | `--skip-prerequisites` | off | Skip external prerequisite checks. |
 | `-- <args...>` | — | Pass-through to host plugin install (single agent only). |
 
@@ -113,6 +114,8 @@ const result = await installLocalSkills({
 | `checkForUpdates` | no | Set `false` to skip npm package freshness guidance. |
 | `runner` | no | Injectable command runner for tests or extension-host controlled npm checks. |
 | `initializeGitForGhcp` | no | Set `false` to skip GHCP git initialization. |
+| `telemetryEnabled` | no | Set `false` to opt the workspace out of Azure Functions Skills telemetry. |
+| `telemetrySource` | no | Optional state marker for the telemetry setting source; extension hosts normally omit this. |
 
 The result includes `agents`, `filesWritten`, `state`, `gitignoreResult`, `gitRepoResult`, and `packageUpdate` so an extension can present its own notifications.
 

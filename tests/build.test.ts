@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
-import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../src/build/loader.js';
 import { buildPluginMarketplaces, buildPluginPayload, buildTarget } from '../src/build/build-target.js';
 import { detectAgents, applySetup } from '../src/setup/index.js';
@@ -19,6 +20,69 @@ function expectedSkillIds(): string[] {
     .filter(entry => entry.isDirectory())
     .map(entry => entry.name)
     .sort();
+}
+
+function hasCommand(command: string, args: string[] = ['--version']): boolean {
+  try {
+    execFileSync(command, args, { stdio: 'ignore' });
+    return true;
+  } catch (_err) {
+    return false;
+  }
+}
+
+function findPowerShellCommand(): string | null {
+  if (hasCommand('pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'])) return 'pwsh';
+  if (hasCommand('powershell.exe', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'])) return 'powershell.exe';
+  return null;
+}
+
+function runTelemetryPowerShellHook(options: { stateTelemetryEnabled: boolean; input: string }): string[] | null {
+  const powershell = findPowerShellCommand();
+  if (!powershell) return null;
+
+  const workspace = createTempDir('af-skills-telemetry-hook-');
+  const hookDir = join(workspace, '.azure-functions-skills', 'hooks', 'scripts');
+  const fakeBin = join(workspace, 'fake-bin');
+  const fakeNpxScript = join(fakeBin, 'fake-npx.cjs');
+  const npxArgsPath = join(workspace, 'npx-args.json');
+  mkdirSync(hookDir, { recursive: true });
+  mkdirSync(fakeBin, { recursive: true });
+  writeFileSync(join(hookDir, 'track-telemetry.ps1'), readFileSync(join(TEMPLATES_DIR, 'hooks', 'scripts', 'track-telemetry.ps1'), 'utf-8'));
+  writeFileSync(join(workspace, '.azure-functions-skills', 'state.local.json'), `${JSON.stringify({
+    package: { version: '9.8.7' },
+    install: { mode: 'local', scope: 'workspace' },
+    telemetry: { enabled: options.stateTelemetryEnabled },
+  })}\n`);
+  writeFileSync(fakeNpxScript, [
+    "const { writeFileSync } = require('node:fs');",
+    "writeFileSync(process.env.NPX_ARGS_PATH || '', JSON.stringify(process.argv.slice(2)));",
+  ].join('\n'));
+  if (process.platform === 'win32') {
+    writeFileSync(join(fakeBin, 'npx.cmd'), `@"${process.execPath}" "${fakeNpxScript}" %*\r\n`);
+  } else {
+    const fakeNpx = join(fakeBin, 'npx');
+    writeFileSync(fakeNpx, `#!/usr/bin/env sh\n"${process.execPath}" "${fakeNpxScript}" "$@"\n`);
+    chmodSync(fakeNpx, 0o755);
+  }
+
+  try {
+    execFileSync(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(hookDir, 'track-telemetry.ps1')], {
+      cwd: workspace,
+      input: options.input,
+      encoding: 'utf-8',
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        PATH: `${fakeBin}${delimiter}${process.env.PATH || ''}`,
+        NPX_ARGS_PATH: npxArgsPath,
+      },
+    });
+    if (!existsSync(npxArgsPath)) return [];
+    return JSON.parse(readFileSync(npxArgsPath, 'utf-8')) as string[];
+  } finally {
+    removeDir(workspace);
+  }
 }
 
 afterEach(() => {
@@ -125,6 +189,14 @@ describe('loadHooks', () => {
   it('loads welcome-setup hook', () => {
     expect(hooks.welcome).toBeTruthy();
     expect(hooks.welcome).toContain('Welcome');
+  });
+
+  it('loads telemetry hook manifests and scripts', () => {
+    expect(hooks.copilotTelemetry).toContain('PostToolUse');
+    expect(hooks.claudeTelemetry).toContain('PostToolUse');
+    expect(hooks.telemetryConfig).toContain('__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__');
+    expect(hooks.trackTelemetryPowerShell).toContain('plugin-telemetry');
+    expect(hooks.trackTelemetryShell).toContain('plugin-telemetry');
   });
 });
 
@@ -260,6 +332,8 @@ describe('buildTarget — ghcp', () => {
     const hooksJson = JSON.parse(readFileSync(hooksPath, 'utf-8'));
     expect(hooksJson.hooks).toBeTruthy();
     expect(hooksJson.hooks.SessionStart).toBeTruthy();
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.github', 'hooks', 'azure-functions-telemetry.json'))).toBe(true);
+    expect(existsSync(join(DIST_DIR, 'ghcp', '.azure-functions-skills', 'hooks', 'scripts', 'track-telemetry.sh'))).toBe(true);
   });
 
   it('does not mix plugin artifacts into the workspace layout', () => {
@@ -314,6 +388,8 @@ describe('buildTarget — claude', () => {
     expect(existsSync(settingsPath)).toBe(true);
     const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
     expect(settings.mcpServers).toBeTruthy();
+    expect(settings.hooks?.PostToolUse?.[0]?.hooks?.[0]?.command).toContain('.azure-functions-skills/hooks/scripts/track-telemetry.sh');
+    expect(existsSync(join(DIST_DIR, 'claude', '.azure-functions-skills', 'hooks', 'telemetry.config.json'))).toBe(true);
   });
 
   it('generates skill files in .claude/skills/<id>/SKILL.md', () => {
@@ -400,6 +476,8 @@ describe('buildTarget — codex', () => {
     expect(hooksJson.hooks).toBeTruthy();
     expect(hooksJson.hooks.SessionStart).toBeTruthy();
     expect(hooksJson.hooks.SessionStart).toHaveLength(1);
+    expect(hooksJson.hooks.PostToolUse).toBeTruthy();
+    expect(existsSync(join(DIST_DIR, 'codex', '.azure-functions-skills', 'hooks', 'scripts', 'track-telemetry.ps1'))).toBe(true);
   });
 });
 
@@ -529,7 +607,7 @@ describe('buildPluginPayload', () => {
     buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir, { profile: 'full' });
 
     expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(true);
-    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'copilot-hooks.json'))).toBe(true);
     expect(existsSync(join(payloadDir, 'agents', 'functions-copilot.agent.md'))).toBe(true);
     const mcpConfig = JSON.parse(readFileSync(join(payloadDir, '.mcp.json'), 'utf-8'));
     expect(mcpConfig.mcpServers.azure).toEqual({
@@ -540,13 +618,146 @@ describe('buildPluginPayload', () => {
     const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
     expect(manifest.skills).toBe('./skills/');
     expect(manifest.agents).toBe('./agents/');
-    expect(manifest.hooks).toBe('./hooks.json');
+    expect(manifest.hooks).toEqual({
+      paths: ['./hooks/copilot-hooks.json'],
+      exclusive: true,
+    });
     expect(manifest.mcpServers).toBe('./.mcp.json');
 
     const claudeManifest = JSON.parse(readFileSync(join(payloadDir, '.claude-plugin', 'plugin.json'), 'utf-8'));
     expect(claudeManifest.skills).toBe('./skills/');
-    expect(claudeManifest.hooks).toBe('./hooks.json');
+    expect(claudeManifest.hooks).toBe('./hooks/hooks.json');
     expect(claudeManifest.mcpServers).toBe('./.mcp.json');
+  });
+
+  it('generates a plugin payload with telemetry hooks but without agents or MCP', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir, { profile: 'hooks' });
+
+    expect(existsSync(join(payloadDir, 'hooks', 'copilot-hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'telemetry.config.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, '.mcp.json'))).toBe(false);
+    expect(existsSync(join(payloadDir, 'agents'))).toBe(false);
+    expect(existsSync(join(payloadDir, 'hooks.json'))).toBe(false);
+
+    const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
+    expect(manifest.hooks).toEqual({
+      paths: ['./hooks/copilot-hooks.json'],
+      exclusive: true,
+    });
+    expect(manifest).not.toHaveProperty('agents');
+    expect(manifest).not.toHaveProperty('mcpServers');
+  });
+
+  it('ships telemetry hooks and scripts in the full plugin payload', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    const payloadDir = join(DIST_DIR, 'plugin', 'azure-functions-skills');
+
+    buildPluginPayload({ skills, mcpServers, agents, hooks, packageVersion: '9.8.7' }, payloadDir, { profile: 'full' });
+
+    expect(existsSync(join(payloadDir, 'hooks', 'copilot-hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'hooks.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'telemetry.config.json'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'scripts', 'track-telemetry.ps1'))).toBe(true);
+    expect(existsSync(join(payloadDir, 'hooks', 'scripts', 'track-telemetry.sh'))).toBe(true);
+
+    const manifest = JSON.parse(readFileSync(join(payloadDir, '.plugin', 'plugin.json'), 'utf-8'));
+    expect(manifest.hooks).toEqual({
+      paths: ['./hooks/copilot-hooks.json'],
+      exclusive: true,
+    });
+
+    const script = readFileSync(join(payloadDir, 'hooks', 'scripts', 'track-telemetry.ps1'), 'utf-8');
+    expect(script).toContain('azure-functions-');
+    expect(script).toContain('APPLICATIONINSIGHTS_INSTRUMENTATION_KEY');
+  });
+
+  it('telemetry scripts honor workspace state opt-out and local skill paths', () => {
+    const shellScript = readFileSync(join(TEMPLATES_DIR, 'hooks', 'scripts', 'track-telemetry.sh'), 'utf-8');
+    const powershellScript = readFileSync(join(TEMPLATES_DIR, 'hooks', 'scripts', 'track-telemetry.ps1'), 'utf-8');
+
+    for (const script of [shellScript, powershellScript]) {
+      expect(script).toContain('state.local.json');
+      expect(script).toContain('telemetry');
+      expect(script).toContain('enabled');
+      expect(script).toContain('.github/skills/azure-functions-');
+      expect(script).toContain('.claude/skills/azure-functions-');
+      expect(script).toContain('--plugin-name');
+      expect(script).toContain('--plugin-version');
+    }
+  });
+
+  it('does not invoke telemetry when workspace state disables collection', () => {
+    const args = runTelemetryPowerShellHook({
+      stateTelemetryEnabled: false,
+      input: JSON.stringify({
+        toolName: 'Read',
+        sessionId: 'session-123',
+        toolArgs: {
+          path: '.github/skills/azure-functions-create/SKILL.md',
+          content: 'SECRET_FILE_CONTENT',
+        },
+      }),
+    });
+
+    if (args === null) return;
+    expect(args).toEqual([]);
+  }, 15_000);
+
+  it('emits only telemetry metadata for enabled hook events', () => {
+    const args = runTelemetryPowerShellHook({
+      stateTelemetryEnabled: true,
+      input: JSON.stringify({
+        toolName: 'Read',
+        sessionId: 'session-123',
+        toolArgs: {
+          path: '.github/skills/azure-functions-create/references/node.md',
+          content: 'SECRET_FILE_CONTENT',
+          arguments: 'SECRET_TOOL_ARGUMENTS',
+        },
+      }),
+    });
+
+    if (args === null) return;
+    expect(args).toContain('server');
+    expect(args).toContain('plugin-telemetry');
+    expect(args).toContain('--plugin-name');
+    expect(args).toContain('azure-functions-skills');
+    expect(args).toContain('--plugin-version');
+    expect(args).toContain('9.8.7+local.workspace');
+    expect(args).toContain('--event-type');
+    expect(args).toContain('reference_file_read');
+    expect(args).toContain('--session-id');
+    expect(args).toContain('session-123');
+    expect(args).toContain('--file-reference');
+    expect(args).toContain('azure-functions-create\\references\\node.md');
+    expect(args.join(' ')).not.toContain('SECRET_FILE_CONTENT');
+    expect(args.join(' ')).not.toContain('SECRET_TOOL_ARGUMENTS');
+  }, 15_000);
+});
+
+describe('partner drop pipeline', () => {
+  it('uses the shared engineering npm release template for partner blob upload', () => {
+    const pipeline = readFileSync(join(import.meta.dirname, '..', 'azure-pipelines', 'partner-drop-upload.yml'), 'utf-8');
+
+    expect(pipeline).toContain('repository: eng');
+    expect(pipeline).toContain('name: engineering');
+    expect(pipeline).toContain('ref: refs/heads/main');
+    expect(pipeline).toContain('/ci/release-npm-package.yml@eng');
+    expect(pipeline).toContain('pipeline: officialBuild');
+    expect(pipeline).toContain('targetFolder: azure-functions/azure-functions-skills/{version}');
+    expect(pipeline).toContain('runPipeline: false');
+    expect(pipeline).not.toContain('/ci/internal/upload-partner-package.yml@eng');
+    expect(pipeline).not.toContain('Stage package in versioned partner path');
+    expect(pipeline).not.toContain('az storage blob upload');
   });
 });
 
@@ -574,11 +785,12 @@ describe('buildPluginMarketplaces', () => {
 });
 
 describe('npm package manifest', () => {
-  it('does not publish generated dist artifacts', () => {
+  it('publishes the local plugin payload but not workspace build output', () => {
     const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf-8'));
 
     expect(pkg.files).toContain('templates/');
-    expect(pkg.files).not.toContain('dist/');
+    expect(pkg.files).toContain('dist/plugin/');
+    expect(pkg.files).not.toContain('dist/workspace/');
   });
 });
 

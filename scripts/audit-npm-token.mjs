@@ -32,6 +32,7 @@ const IGNORE_DIRS = new Set([
   'coverage',
   'reports',
   'docs', // policy docs may discuss the patterns — not a real risk surface
+  'azure-pipelines', // internal AzDO mirror pipelines intentionally publish packages
 ]);
 
 const SCAN_EXTENSIONS = new Set([
@@ -126,4 +127,3 @@ console.error('     If it exists, remove it (this repo does not publish).');
 console.error('  2. Remove the offending lines, or document why they are intentional.');
 console.error('  3. Re-run this audit until it reports clean.');
 process.exit(1);
-
