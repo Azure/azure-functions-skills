@@ -93,8 +93,15 @@ Common options:
 | `checkForUpdates` | Set `false` to skip npm package freshness guidance. |
 | `runner` | Optional command runner for tests or extension-host controlled npm checks. |
 | `initializeGitForGhcp` | Set `false` to skip GHCP git initialization. |
+| `telemetryEnabled` | Set `false` to opt this workspace out of Azure Functions Skills telemetry. |
 
 The result includes installed agents, files written, local state, git setup status, `.gitignore` status, and `packageUpdate` guidance that extensions can surface in their own UI.
+
+## Telemetry
+
+Azure Functions Skills collects usage telemetry to understand which skills, hooks, and Azure Functions MCP tools are used. Events include skill/tool names, relative Azure Functions skill-file paths, client name, session id, and plugin version. Telemetry does **not** include file contents, prompts, or tool arguments.
+
+To opt out for a workspace, install with `--no-telemetry`, set `telemetry.enabled` to `false` in `.azure-functions-skills/state.local.json`, or set either `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or `AZURE_MCP_COLLECT_TELEMETRY=false` in the environment.
 
 ## Skills
 

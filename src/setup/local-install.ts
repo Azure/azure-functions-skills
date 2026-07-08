@@ -5,6 +5,7 @@ import {
   recordInstallState,
   type AzureFunctionsSkillsState,
   type GitignoreResult,
+  type TelemetryStateSource,
 } from './state.js';
 import { checkPackageUpdate, type PackageUpdateInfo } from './package-update.js';
 import type { CliAgentName, SetupResult } from '../types.js';
@@ -26,6 +27,8 @@ export interface LocalInstallOptions {
   readonly runner?: CommandRunner;
   readonly checkForUpdates?: boolean;
   readonly initializeGitForGhcp?: boolean;
+  readonly telemetryEnabled?: boolean;
+  readonly telemetrySource?: TelemetryStateSource;
   readonly approveStateGitignore?: () => Promise<boolean>;
   readonly approveGitInit?: () => Promise<boolean>;
 }
@@ -79,6 +82,8 @@ export async function installLocalSkills(options: LocalInstallOptions): Promise<
     includeMcp: true,
     includeHooks: true,
     includeAgent: agents.includes('ghcp'),
+    telemetryEnabled: options.telemetryEnabled,
+    telemetrySource: options.telemetrySource || (options.telemetryEnabled === false ? 'install-option' : undefined),
   });
   const gitignoreResult = await updateStateGitignore(options);
   const gitRepoResult = await ensureGhcpGitRepo(options, agents);

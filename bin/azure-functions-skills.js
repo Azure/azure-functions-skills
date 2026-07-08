@@ -34,6 +34,7 @@ Options:
   --scope <name>     workspace or user (default: workspace)
   --no-mcp           Do not add workspace MCP files
   --no-hooks         Do not add workspace hook files
+  --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
   -- <args...>       Pass remaining arguments to the host plugin install command for a single agent
 `,
   update: `Usage: azure-functions-skills update [options]
@@ -53,6 +54,7 @@ Options:
   --scope <name>     workspace or user (default: workspace)
   --no-mcp           Do not add workspace MCP files
   --no-hooks         Do not add workspace hook files
+  --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
 `,
   chat: `Usage: azure-functions-skills chat [options] [-- <agent args...>]
 
@@ -79,6 +81,7 @@ Options:
   --source <name>    marketplace, github, or local (default: marketplace)
   --workspace        Apply workspace plugin-reference activation (default)
   --no-workspace     Skip workspace activation
+  --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
   --dry-run          Print planned changes without writing files
   --force            Overwrite customer-owned workspace activation files
   --yes              Approve workspace activation changes to existing instruction files
@@ -94,6 +97,7 @@ Options:
   --source <name>    marketplace, github, or local (default: marketplace)
   --workspace        Apply workspace plugin-reference activation (default)
   --no-workspace     Skip workspace activation
+  --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
   --dry-run          Print planned changes without writing files
   --force            Overwrite customer-owned workspace activation files
   --yes              Approve workspace activation changes to existing instruction files
@@ -205,6 +209,7 @@ function printHelp() {
     --scope <name>     workspace or user (default: workspace)
     --no-mcp           Do not add workspace MCP files
     --no-hooks         Do not add workspace hook files
+    --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
     -- <args...>       Pass remaining arguments to the host plugin install command for a single agent
 
   Options (workspace apply/update):
@@ -228,6 +233,7 @@ function printHelp() {
     --version <value>  Plugin version/ref to plan (default: package version)
     --workspace        Apply workspace plugin-reference activation (default)
     --no-workspace     Skip workspace activation
+    --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
     --dry-run          Print planned changes without writing files
     --yes              Approve workspace activation changes to existing instruction files
 
@@ -525,6 +531,7 @@ if (command === 'install' || command === 'update') {
   let dryRun = false;
   let yes = false;
   let force = false;
+  let noTelemetry = false;
   let includeMcp = true;
   let includeHooks = true;
   let source = 'marketplace';
@@ -541,6 +548,7 @@ if (command === 'install' || command === 'update') {
     else if (commandArgs[i] === '--force') force = true;
     else if (commandArgs[i] === '--no-mcp') includeMcp = false;
     else if (commandArgs[i] === '--no-hooks') includeHooks = false;
+    else if (commandArgs[i] === '--no-telemetry') noTelemetry = true;
     else if (commandArgs[i] === '--source' && commandArgs[i + 1]) source = commandArgs[++i];
     else if (commandArgs[i] === '--scope' && commandArgs[i + 1]) scope = commandArgs[++i];
     else if (commandArgs[i] === '--check-prerequisites') prerequisites = 'check-only';
@@ -632,6 +640,8 @@ if (command === 'install' || command === 'update') {
           includeMcp: true,
           includeHooks: true,
           includeAgent: detectedAgents.includes('ghcp'),
+          telemetryEnabled: noTelemetry ? false : undefined,
+          telemetrySource: noTelemetry ? 'install-flag' : undefined,
         });
         const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
         printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.overwritten.length + result.managedBlockUpdated.length + result.savedAside.length, state, gitignoreResult });
@@ -654,6 +664,8 @@ if (command === 'install' || command === 'update') {
         yes,
         prerequisites,
         scope,
+        telemetryEnabled: noTelemetry ? false : undefined,
+        telemetrySource: noTelemetry ? 'install-flag' : undefined,
         approveStateGitignore: isInteractive() ? () => askYesNo(`Add ${STATE_IGNORE_ENTRY} to .gitignore so local state is not committed?`) : undefined,
         approveGitInit: isInteractive() ? () => askYesNo('Initialize git repository? GitHub Copilot requires a git repo to discover agent definitions.') : undefined,
       });
@@ -704,6 +716,8 @@ if (command === 'install' || command === 'update') {
       includeMcp,
       includeHooks,
       includeAgent: true,
+      telemetryEnabled: noTelemetry ? false : undefined,
+      telemetrySource: noTelemetry ? 'install-flag' : undefined,
     });
 
     if (dryRun) {
@@ -725,6 +739,8 @@ if (command === 'install' || command === 'update') {
         includeMcp,
         includeHooks,
         includeAgent: true,
+        telemetryEnabled: noTelemetry ? false : undefined,
+        telemetrySource: noTelemetry ? 'install-flag' : undefined,
       });
       const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
       const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action });
@@ -1023,6 +1039,7 @@ if (command === 'install' || command === 'update') {
   let dryRun = false;
   let yes = false;
   let force = false;
+  let noTelemetry = false;
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
@@ -1035,6 +1052,7 @@ if (command === 'install' || command === 'update') {
     else if (args[i] === '--dry-run') dryRun = true;
     else if (args[i] === '--yes') yes = true;
     else if (args[i] === '--force') force = true;
+    else if (args[i] === '--no-telemetry') noTelemetry = true;
   }
 
   const detectedAgents = agents.length > 0 ? agents : await detectAgents();
@@ -1066,6 +1084,22 @@ if (command === 'install' || command === 'update') {
       for (const command of step.commands || []) console.log(`      $ ${command}`);
     }
   } else {
+    if (!dryRun) {
+      const { recordInstallState, ensureStateIgnored } = await import('../lib/setup/state.js');
+      recordInstallState(dir, {
+        action,
+        agents: detectedAgents,
+        mode: 'plugin',
+        source,
+        scope,
+        includeMcp: false,
+        includeHooks: false,
+        includeAgent: workspace,
+        telemetryEnabled: noTelemetry ? false : undefined,
+        telemetrySource: noTelemetry ? 'install-flag' : undefined,
+      });
+      ensureStateIgnored(dir, { yes });
+    }
     console.log(`Plugin ${action} complete.`);
     console.log(`  Agents configured: ${result.agents.join(', ')}`);
     console.log(`  Files written: ${result.filesWritten}`);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { checkPackageUpdate } from '../src/setup/package-update.js';
 import type { CommandRunner } from '../src/setup/prerequisites/types.js';
 
@@ -7,6 +7,16 @@ function runnerWith(stdout: string, exitCode = 0, stderr = ''): CommandRunner {
 }
 
 describe('checkPackageUpdate', () => {
+  const originalSkipUpdateCheck = process.env.AZURE_FUNCTIONS_SKILLS_SKIP_UPDATE_CHECK;
+
+  afterEach(() => {
+    if (originalSkipUpdateCheck === undefined) {
+      delete process.env.AZURE_FUNCTIONS_SKILLS_SKIP_UPDATE_CHECK;
+    } else {
+      process.env.AZURE_FUNCTIONS_SKILLS_SKIP_UPDATE_CHECK = originalSkipUpdateCheck;
+    }
+  });
+
   it('returns current when the installed package is up to date', async () => {
     const result = await checkPackageUpdate({
       currentVersion: '1.2.3',
@@ -38,6 +48,39 @@ describe('checkPackageUpdate', () => {
 
     expect(result.status).toBe('update-available');
     expect(result.latestVersion).toBe('0.0.6-preview');
+  });
+
+  it('treats a stable package as newer than the matching prerelease', async () => {
+    const result = await checkPackageUpdate({
+      currentVersion: '1.2.3-preview',
+      runner: runnerWith('"1.2.3"\n'),
+    });
+
+    expect(result.status).toBe('update-available');
+    expect(result.latestVersion).toBe('1.2.3');
+  });
+
+  it('returns disabled when update checks are explicitly disabled', async () => {
+    const result = await checkPackageUpdate({
+      currentVersion: '1.2.3',
+      enabled: false,
+      runner: runnerWith('"9.9.9"\n'),
+    });
+
+    expect(result.status).toBe('disabled');
+    expect(result.latestVersion).toBeUndefined();
+  });
+
+  it('returns disabled when the skip-update environment variable is set', async () => {
+    process.env.AZURE_FUNCTIONS_SKILLS_SKIP_UPDATE_CHECK = '1';
+
+    const result = await checkPackageUpdate({
+      currentVersion: '1.2.3',
+      runner: runnerWith('"9.9.9"\n'),
+    });
+
+    expect(result.status).toBe('disabled');
+    expect(result.latestVersion).toBeUndefined();
   });
 
   it('returns a non-blocking check-failed result when npm metadata lookup fails', async () => {

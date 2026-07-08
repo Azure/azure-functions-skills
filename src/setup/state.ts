@@ -9,6 +9,7 @@ export const STATE_IGNORE_ENTRY = `${STATE_DIR_NAME}/${STATE_FILE_NAME}`;
 
 export type StateSetupStatus = 'not-run' | 'prompted' | 'completed';
 export type StateInstallAction = 'install' | 'update';
+export type TelemetryStateSource = 'default' | 'install-flag' | 'install-option';
 
 export interface AgentState {
   installed: boolean;
@@ -42,6 +43,10 @@ export interface AzureFunctionsSkillsState {
     lastAction: StateInstallAction;
     lastRunAt: string;
   };
+  telemetry: {
+    enabled: boolean;
+    source: TelemetryStateSource;
+  };
   agents: Record<BuildTargetName, AgentState>;
   chat: {
     defaultAgent: LauncherId | null;
@@ -65,6 +70,8 @@ export interface RecordInstallStateOptions {
   includeMcp: boolean;
   includeHooks: boolean;
   includeAgent: boolean;
+  telemetryEnabled?: boolean;
+  telemetrySource?: TelemetryStateSource;
 }
 
 export interface GitignoreOptions {
@@ -133,6 +140,12 @@ export function recordInstallState(projectDir: string, options: RecordInstallSta
     lastAction: options.action,
     lastRunAt: now,
   };
+  if (options.telemetryEnabled !== undefined) {
+    state.telemetry = {
+      enabled: options.telemetryEnabled,
+      source: options.telemetrySource || 'install-option',
+    };
+  }
 
   for (const target of options.agents) {
     const previous = state.agents[target] || INITIAL_AGENTS[target];
@@ -252,6 +265,10 @@ function createDefaultState(projectDir: string, now: string): AzureFunctionsSkil
       lastAction: 'install',
       lastRunAt: now,
     },
+    telemetry: {
+      enabled: true,
+      source: 'default',
+    },
     agents: structuredClone(INITIAL_AGENTS),
     chat: {
       defaultAgent: null,
@@ -277,6 +294,7 @@ function normalizeState(raw: Partial<AzureFunctionsSkillsState>, projectDir: str
     package: raw.package || defaults.package,
     workspace: { ...defaults.workspace, ...(raw.workspace || {}) },
     install: { ...defaults.install, ...(raw.install || {}) },
+    telemetry: { ...defaults.telemetry, ...(raw.telemetry || {}) },
     agents: { ...structuredClone(INITIAL_AGENTS), ...(raw.agents || {}) },
     chat: { ...defaults.chat, ...(raw.chat || {}) },
     setupSkill: { ...defaults.setupSkill, ...(raw.setupSkill || {}) },
