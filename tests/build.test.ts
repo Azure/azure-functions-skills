@@ -306,18 +306,49 @@ describe('buildTarget — ghcp', () => {
     expect(existsSync(refsPath)).toBe(true);
   });
 
-  it('ships bundled skill assets when generating skill files', () => {
+  it('does not bundle the serverless agents quickstart template', () => {
     const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
     const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
     const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
     const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
     buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
 
-    const assetPath = join(
+    const generatedQuickstartPath = join(
       DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-agents',
       'assets', 'quickstart-sample', 'src', 'function_app.py',
     );
-    expect(existsSync(assetPath)).toBe(true);
+    const sourceQuickstartPath = join(
+      TEMPLATES_DIR, 'skills', 'azure-functions-agents',
+      'assets', 'quickstart-sample', 'src', 'function_app.py',
+    );
+    expect(existsSync(generatedQuickstartPath)).toBe(false);
+    expect(existsSync(sourceQuickstartPath)).toBe(false);
+  });
+
+  it('azure-functions-agents skill uses MCP primary retrieval with GitHub fallback', () => {
+    const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
+    const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+    buildTarget('ghcp', { skills, mcpServers, agents, hooks }, DIST_DIR);
+
+    const skillPath = join(DIST_DIR, 'ghcp', '.github', 'skills', 'azure-functions-agents', 'SKILL.md');
+    const body = readFileSync(skillPath, 'utf-8');
+    expect(body).toContain('manifest discovery');
+    expect(body).toContain('MCP primary retrieval');
+    expect(body).toContain('functions_template_get');
+    expect(body).toContain('ai-serverless-agents-python');
+    expect(body).toContain('repositoryUrl');
+    expect(body).toContain('folderPath');
+    expect(body).toContain('gitRef');
+    expect(body).toContain('Do not use bundled template files as a scaffold source');
+  });
+
+  it('routes serverless agent terminology to azure-functions-agents', () => {
+    const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
+    expect(agents.copilot).toContain('serverless agent');
+    expect(agents.copilot).toContain('serverless agents runtime');
+    expect(agents.copilot).toContain('azure-functions-agents');
   });
 
   it('generates hooks in .github/hooks/', () => {
