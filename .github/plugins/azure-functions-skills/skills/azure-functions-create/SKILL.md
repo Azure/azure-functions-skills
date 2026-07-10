@@ -1,14 +1,14 @@
 ---
 name: azure-functions-create
-description: "Scaffold a new Azure Functions project with language and template selection"
+description: "Scaffold a new Azure Functions project, or add a new function/trigger to an existing project without re-initializing it"
 ---
 
 
 > **Language**: Always respond in the same language the user is using.
 
-# azure-functions-create — Create Azure Functions App
+# azure-functions-create — Create or Extend Azure Functions App
 
-Guide the user through creating a new Azure Functions project.
+Guide the user through creating a new Azure Functions project or adding a function to an existing Azure Functions project.
 
 ## Prerequisites
 
