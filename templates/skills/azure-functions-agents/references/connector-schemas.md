@@ -1,9 +1,33 @@
 # Connector Operation Schemas
 
-Use this reference to discover connector operation IDs, action parameters, and dynamic schemas.
-This is the source of truth before writing `mcpserverconfigs` operations. For Microsoft Teams
-targets, links, posting body shapes, and direct runtime smoke tests, use
-[connector-teams.md](./connector-teams.md) after reading the generic discovery flow here.
+Use this reference to discover connector operation IDs, action parameters, dynamic schemas, and
+connection authentication schemes. This is the source of truth before writing `mcpserverconfigs`
+operations or a connection resource. For Microsoft Teams targets, links, posting body shapes, and
+direct runtime smoke tests, use [connector-teams.md](./connector-teams.md) after reading the
+generic discovery flow here.
+
+## Discover Connection Authentication Schemes
+
+Before writing a connection resource for a connector other than Office 365 Outlook, check whether
+it exposes multiple named authentication schemes:
+
+```bash
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+LOCATION="westcentralus"
+CONNECTOR_NAME="visualstudioteamservices"
+
+az rest --method get \
+  --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/providers/Microsoft.Web/locations/$LOCATION/managedApis/$CONNECTOR_NAME?api-version=2016-06-01" \
+  --query "properties.connectionParameterSets.values[].{name:name,displayName:uiDefinition.displayName}" \
+  --output table
+```
+
+If this returns any rows, the connection resource must set `properties.parameterValueSet.name` to
+one of those exact names, or it silently falls back to a default scheme that may not work for the
+target organization or tenant. See
+[connectors.md](./connectors.md#connection-authentication-schemes) for the Bicep shape, why this
+can fail with an opaque `500` during OAuth sign-in instead of a clear error, and why fixing it on
+an already-created connection requires deleting and recreating it.
 
 ## Validate Operation IDs
 

@@ -130,6 +130,66 @@ Check connection status:
 az resource show --ids "$(azd env get-value O365_CONNECTION_ID)" --query properties.overallStatus -o tsv
 ```
 
+### Connection Never Reaches `Connected` / OAuth Sign-In Fails With a Generic 500
+
+If a connection stays `Unauthenticated` no matter how many times the user signs in at
+`connectors.azure.com`, and the sign-in page itself shows a generic `500 - Something went wrong!`
+error with a correlation ID rather than a clear permission or consent error, suspect a missing or
+wrong `parameterValueSet` before anything else. It is easy to mis-diagnose this as an organization
+policy problem (such as Azure DevOps's "Third-party application access via OAuth") or a service
+outage, when the real cause is that the connection was never told which authentication scheme to
+use.
+
+1. Check whether the connector exposes multiple authentication schemes:
+   ```bash
+   SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+   LOCATION="westcentralus"
+   CONNECTOR_NAME="visualstudioteamservices"
+
+   az rest --method get \
+     --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/providers/Microsoft.Web/locations/$LOCATION/managedApis/$CONNECTOR_NAME?api-version=2016-06-01" \
+     --query "properties.connectionParameterSets.values[].{name:name,displayName:uiDefinition.displayName}" \
+     --output table
+   ```
+2. If that returns rows, inspect the deployed connection for a `parameterValueSet`:
+   ```bash
+   RESOURCE_GROUP="rg-$(azd env get-value AZURE_ENV_NAME)"
+   CONNECTOR_GATEWAY="$(azd env get-value CONNECTOR_GATEWAY_NAME 2>/dev/null || azd env get-value O365_CONNECTOR_GATEWAY_NAME)"
+   CONNECTION_NAME="<connection-name>"
+
+   az rest --method get \
+     --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Web/connectorGateways/$CONNECTOR_GATEWAY/connections/$CONNECTION_NAME?api-version=2026-05-01-preview" \
+     --query "properties.parameterValueSet" \
+     --output jsonc
+   ```
+   If this is empty or `null`, the connection was created without selecting a scheme and is
+   falling back to the connector's default (often a legacy identity provider), which can 500 on
+   Microsoft Entra-backed organizations. If a working connection to the same connector already
+   exists elsewhere, reading its `parameterValueSet` is the fastest way to get the exact name to
+   use instead of guessing from the managed API metadata alone.
+3. Add `parameterValueSet: { name: '<scheme-name>', values: {} }` to the connection's Bicep
+   properties — see [connectors.md](./connectors.md#connection-authentication-schemes). For
+   `visualstudioteamservices` (Azure DevOps) against a Microsoft Entra-backed organization, this
+   is normally `EntraOAuth`.
+4. Delete the existing connection and redeploy; changing `parameterValueSet` on an already-created
+   connection and redeploying does not update the live resource:
+   ```bash
+   az rest --method delete \
+     --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Web/connectorGateways/$CONNECTOR_GATEWAY/connections/$CONNECTION_NAME?api-version=2026-05-01-preview"
+
+   azd provision --no-state
+   ```
+   Plain `azd provision` can report "no changes to provision" here because it diffs the template
+   against its own recorded deployment state, not live Azure state, after an out-of-band delete
+   like this.
+5. Retry sign-in at `connectors.azure.com`. It should now present the scheme named in
+   `parameterValueSet` (for example, "Log in with Microsoft Entra ID" instead of a legacy
+   Azure DevOps credentials prompt).
+
+Only investigate organization-level or tenant-level policies after ruling this out — they can
+produce the exact same generic failure and are easy to chase first, wasting time on a policy that
+was never the problem.
+
 ### Expected Connector Action Did Not Happen
 
 Sometimes a connector action fails as a missing side effect rather than a clear exception. For

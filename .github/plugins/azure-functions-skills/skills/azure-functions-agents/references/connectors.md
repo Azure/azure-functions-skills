@@ -55,6 +55,74 @@ See [connector-mcp.md](./connector-mcp.md#inspect-existing-connector-namespaces)
 that inspect connections, MCP server configs, and trigger configs without printing endpoint or
 callback URLs.
 
+## Connection Authentication Schemes
+
+Do not assume every connector uses one implicit authentication flow the way Office 365 Outlook
+does in the quickstart. Some connectors expose multiple named authentication schemes
+(`connectionParameterSets`), and the connection resource must select one explicitly or it silently
+falls back to a default that may not work for the target organization or tenant.
+
+Check before creating a new connection type:
+
+```bash
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+LOCATION="westcentralus"
+CONNECTOR_NAME="visualstudioteamservices"
+
+az rest --method get \
+  --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/providers/Microsoft.Web/locations/$LOCATION/managedApis/$CONNECTOR_NAME?api-version=2016-06-01" \
+  --query "properties.connectionParameterSets.values[].{name:name,displayName:uiDefinition.displayName}" \
+  --output table
+```
+
+If this returns any rows, select one explicitly with `properties.parameterValueSet` on the
+connection resource:
+
+```bicep
+resource connection 'Microsoft.Web/connectorGateways/connections@2026-05-01-preview' = {
+  parent: connectorGateway
+  name: connectionName
+  properties: {
+    connectorName: connectorName
+    displayName: displayName
+    parameterValueSet: {
+      name: 'EntraOAuth'
+      values: {}
+    }
+  }
+}
+```
+
+Do not guess the parameter set name; read it from `connectionParameterSets.values[].name` for the
+target connector and region, since names and defaults vary by connector. As one concrete example,
+the `visualstudioteamservices` (Azure DevOps) connector exposes `EntraOAuth`, `OauthSP`, and
+`CertOauth` in addition to its default legacy native OAuth identity provider. Signing in against
+the wrong (default) scheme on a Microsoft Entra-backed organization typically fails with an opaque
+`500` during the OAuth redirect rather than a clear permission error, and the connection stays
+`Unauthenticated` no matter how many times the user retries sign-in. If a working connection
+already exists elsewhere (created through the Azure portal or `connectors.azure.com`, for
+example), reading its `properties.parameterValueSet` is the fastest way to confirm the correct
+scheme name instead of guessing from the managed API metadata alone.
+
+`parameterValueSet` only takes effect when the connection is created for this preview resource
+type. Changing it on an already-created connection and redeploying does not update the live
+resource. If a connection was created without it, or with the wrong scheme, delete the connection
+and redeploy so Bicep recreates it correctly:
+
+```bash
+az rest --method delete \
+  --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/<resource-group>/providers/Microsoft.Web/connectorGateways/<gateway>/connections/<connection>?api-version=2026-05-01-preview"
+```
+
+`azd provision` compares the template against its own recorded deployment state, not live Azure
+state, so it can report "no changes to provision" after a manual out-of-band delete like this. Use
+`azd provision --no-state` (or `az deployment group create` directly against the resource group)
+to force Bicep to reconcile against what is actually deployed.
+
+See [troubleshooting.md](./troubleshooting.md#connection-never-reaches-connected--oauth-sign-in-fails-with-a-generic-500)
+for the full diagnostic flow, including how this is easy to mis-diagnose as an organization policy
+or service outage.
+
 ## Bicep Files
 
 Use [../assets/infra/app/connector-gateway.bicep](../assets/infra/app/connector-gateway.bicep)
@@ -71,6 +139,11 @@ MCP server config names, and trigger config names should use short lowercase app
 `office365-outlook`, `teams-channel-post`, or `o365-outlook-send-email-only`. Avoid reserved or
 product-owner words such as `microsoft` in resource names. Display names and descriptions can use
 friendly product names like Microsoft Teams or Office 365 Outlook.
+
+The asset's connection resource works as-is for Office 365 Outlook, which does not need an
+explicit `parameterValueSet`. When adapting it to a different connector, check
+[Connection Authentication Schemes](#connection-authentication-schemes) above first — do not
+assume every connector behaves like Office 365 Outlook.
 
 ## Safety Boundary
 
@@ -94,6 +167,9 @@ business apps. That is powerful, but unsafe if overexposed. For user-delegated c
 
 ## Common Next Steps
 
+- Before creating a connection for a new connector, check whether it needs an explicit
+  [`parameterValueSet`](#connection-authentication-schemes) — do not assume it behaves like
+  Office 365 Outlook.
 - Before deploying MCP server configs, validate operation IDs and parameter schemas with
   [connector-schemas.md](./connector-schemas.md).
 - For Teams posts, parse Teams links and choose the correct Teams target shape with
