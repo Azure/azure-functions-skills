@@ -32,6 +32,7 @@ The key differentiator is **Skill Graph** — skills are not a flat catalog but 
 | F18 | [azure-functions-audit — Project Audit](./f18-azure-functions-audit.md) | 📋 Proposed | Static analysis for security, SKU compatibility, and best practices |
 | F19 | [MCP Integration](./f19-mcp-integration.md) | 📋 Proposed | Templates MCP server integration for AI-assisted function creation |
 | F20 | [CLI & Library](./f20-cli-library.md) | ✅ Implemented | `setup` + `chat` + `build` commands, library exports for VS Code extensions |
+| F21 | [Template Apply CLI & Library](./f21-template-apply-cli-library.md) | 📋 Proposed | Manifest-primary template listing and application to reduce MCP token usage |
 
 ## Skill Lifecycle Model
 
