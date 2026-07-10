@@ -10,7 +10,6 @@
  *   npx @azure/functions-skills build               # Build plugin artifacts
  */
 
-import { detectAgents, applySetup } from '../lib/setup/index.js';
 import { join } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -788,6 +787,7 @@ if (command === 'install' || command === 'update') {
     }
   }
 } else if (command === 'setup') {
+  const { detectAgents, applySetup } = await import('../lib/setup/index.js');
   const agents = [];
   let dir = process.cwd();
   let asPlugin = false;
