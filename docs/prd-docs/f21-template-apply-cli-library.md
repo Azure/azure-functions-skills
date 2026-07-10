@@ -1,7 +1,7 @@
 # F21: Template Apply CLI & Library
 
-**Status:** 📋 Proposed  
-**Draft Spec Section:** N/A (follow-up to F5, F19, F20)  
+**Status:** ✅ Implemented
+**Draft Spec Section:** N/A (follow-up to F5, F19, F20)
 **Depends on:** F5 (azure-functions-create), F19 (MCP Integration), F20 (CLI & Library)
 
 ## Problem

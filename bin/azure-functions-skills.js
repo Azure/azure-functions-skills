@@ -70,6 +70,32 @@ Options:
   --skip-prerequisites   Skip external prerequisite checks
   -- <args...>       Pass remaining arguments through to the selected agent CLI
 `,
+  'template list': `Usage: azure-functions-skills template list [options]
+
+List Azure Functions templates from the public templates manifest.
+
+Options:
+  --language <name>      Filter by language: python, typescript, javascript, java, csharp, powershell
+  --resource <name>      Filter by resource/trigger type, e.g. http, timer, servicebus
+  --iac <type>           Filter by Infrastructure as Code type, e.g. bicep
+  --json                 Print JSON output
+  --manifest-url <url>   Override manifest URL (advanced/testing)
+`,
+  'template apply': `Usage: azure-functions-skills template apply [options]
+
+Apply an Azure Functions template from the public templates manifest.
+
+Options:
+  --dir <path>           Target directory (default: current directory)
+  --language <name>      Template language (required)
+  --template <id>        Template ID from 'template list' (required)
+  --runtime-version <v>  Runtime version for placeholders, e.g. 22 or 3.13
+  --mode <name>          auto, new, add (default: auto)
+  --dry-run              Print planned files without writing
+  --force                Overwrite existing files in new mode
+  --json                 Print JSON output
+  --manifest-url <url>   Override manifest URL (advanced/testing)
+`,
   'plugin install': `Usage: azure-functions-skills plugin install [options]
 
 Register Azure Functions Skills with the selected host plugin system.
@@ -187,6 +213,8 @@ function printHelp() {
     plugin update    Refresh plugin registration and workspace activation
     workspace apply   Apply Azure Functions routing/activation files to a workspace
     workspace update  Update existing Azure Functions managed workspace routing blocks
+    template list    List Azure Functions templates from the manifest
+    template apply   Apply an Azure Functions template from the manifest
     chat     Launch a CLI coding agent with Azure Functions Welcome prompt
     state setup-complete  Mark first-run setup skill complete in local state
     build    Build plugin artifacts for all targets (ghcp, claude, codex)
@@ -248,6 +276,15 @@ function printHelp() {
     -- <args...>       Pass remaining arguments through to the selected agent CLI
     Other unrecognized chat arguments are also passed through to the agent CLI
 
+  Options (template):
+    --language <name>      Template language
+    --template <id>        Template ID from 'template list'
+    --resource <name>      Filter by resource/trigger type
+    --iac <type>           Filter by Infrastructure as Code type, e.g. bicep
+    --runtime-version <v>  Runtime version for placeholders
+    --mode <name>          auto, new, add (default: auto)
+    --json                 Print JSON output
+
   Options (build):
     --target <name>    Build target: ghcp, claude, codex
     --dist-dir <path>  Output directory (default: dist)
@@ -258,6 +295,8 @@ function printHelp() {
     npx @azure/functions-skills setup --as-plugin
     npx @azure/functions-skills plugin install --agent ghcp --dry-run
     npx @azure/functions-skills workspace apply --agent codex --mode plugin-reference --dry-run
+    npx @azure/functions-skills template list --language typescript --resource http --iac bicep
+    npx @azure/functions-skills template apply --dir ./app --language typescript --template http-trigger-typescript-azd
     npx @azure/functions-skills chat
     npx @azure/functions-skills chat --as-plugin --agent claude-code
   `);
@@ -1104,6 +1143,70 @@ if (command === 'install' || command === 'update') {
     console.log(`  Agents configured: ${result.agents.join(', ')}`);
     console.log(`  Files written: ${result.filesWritten}`);
   }
+} else if (command === 'template') {
+  const action = args[1];
+  if ((action === 'list' || action === 'apply') && (args.includes('--help') || args.includes('-h'))) {
+    printCommandHelp(`template ${action}`);
+    process.exit(0);
+  }
+  if (action !== 'list' && action !== 'apply') {
+    console.error(`Unknown template command: ${action || ''}`.trim());
+    console.error('Usage: azure-functions-skills template list|apply [options]');
+    process.exit(1);
+  }
+
+  const { listFunctionTemplates, applyFunctionTemplate } = await import('../lib/templates/index.js');
+  const options = parseTemplateOptions(args.slice(2));
+  try {
+    if (action === 'list') {
+      const result = await listFunctionTemplates({
+        manifestUrl: options.manifestUrl,
+        language: options.language,
+        resource: options.resource,
+        iac: options.iac,
+      });
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        printTemplateList(result.templates);
+      }
+    } else {
+      if (!options.language) {
+        console.error('Missing required option: --language <name>');
+        process.exit(1);
+      }
+      if (!options.template) {
+        console.error('Missing required option: --template <id>');
+        process.exit(1);
+      }
+      const result = await applyFunctionTemplate(options.dir, {
+        manifestUrl: options.manifestUrl,
+        language: options.language,
+        template: options.template,
+        runtimeVersion: options.runtimeVersion,
+        mode: options.mode,
+        dryRun: options.dryRun,
+        force: options.force,
+      });
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else if (result.dryRun) {
+        console.log('Planned template apply:');
+        console.log(`  Template: ${result.template.id}`);
+        console.log(`  Mode: ${result.mode}`);
+        for (const file of result.plannedFiles) console.log(`  - ${file}`);
+      } else {
+        console.log('Template applied.');
+        console.log(`  Template: ${result.template.id}`);
+        console.log(`  Mode: ${result.mode}`);
+        console.log(`  Files written: ${result.filesWritten.length}`);
+        if (result.skippedFiles.length > 0) console.log(`  Files skipped: ${result.skippedFiles.length}`);
+      }
+    }
+  } catch (err) {
+    console.error(`Template ${action} failed: ${err.message}`);
+    process.exit(1);
+  }
 } else if (command === 'build') {
   // Delegate to build script
   const { execFileSync } = await import('node:child_process');
@@ -1171,5 +1274,54 @@ function printPrerequisiteResults(results) {
     for (const command of result.commands || []) {
       console.log(`     → ${command}`);
     }
+  }
+}
+
+function parseTemplateOptions(commandArgs) {
+  const options = {
+    dir: process.cwd(),
+    mode: 'auto',
+    dryRun: false,
+    force: false,
+    json: false,
+  };
+
+  for (let i = 0; i < commandArgs.length; i++) {
+    if (commandArgs[i] === '--dir' && commandArgs[i + 1]) options.dir = commandArgs[++i];
+    else if (commandArgs[i] === '--language' && commandArgs[i + 1]) options.language = commandArgs[++i];
+    else if (commandArgs[i] === '--template' && commandArgs[i + 1]) options.template = commandArgs[++i];
+    else if (commandArgs[i] === '--resource' && commandArgs[i + 1]) options.resource = commandArgs[++i];
+    else if (commandArgs[i] === '--iac' && commandArgs[i + 1]) options.iac = commandArgs[++i];
+    else if (commandArgs[i] === '--runtime-version' && commandArgs[i + 1]) options.runtimeVersion = commandArgs[++i];
+    else if (commandArgs[i] === '--mode' && commandArgs[i + 1]) options.mode = commandArgs[++i];
+    else if (commandArgs[i] === '--manifest-url' && commandArgs[i + 1]) options.manifestUrl = commandArgs[++i];
+    else if (commandArgs[i] === '--dry-run') options.dryRun = true;
+    else if (commandArgs[i] === '--force') options.force = true;
+    else if (commandArgs[i] === '--json') options.json = true;
+  }
+
+  if (!['auto', 'new', 'add'].includes(options.mode)) {
+    console.error(`Unknown template apply mode: ${options.mode}. Available: auto, new, add`);
+    process.exit(1);
+  }
+
+  return options;
+}
+
+function printTemplateList(templates) {
+  if (templates.length === 0) {
+    console.log('No templates found.');
+    return;
+  }
+
+  for (const template of templates) {
+    const details = [
+      template.language,
+      template.resource,
+      template.iac ? `iac:${template.iac}` : undefined,
+    ].filter(Boolean).join(', ');
+    console.log(`${template.id} — ${template.displayName}`);
+    if (details) console.log(`  ${details}`);
+    if (template.shortDescription) console.log(`  ${template.shortDescription}`);
   }
 }
