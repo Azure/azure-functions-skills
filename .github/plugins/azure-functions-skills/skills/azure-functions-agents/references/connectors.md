@@ -93,6 +93,17 @@ resource connection 'Microsoft.Web/connectorGateways/connections@2026-05-01-prev
 }
 ```
 
+`values: {}` is only valid for a parameter set whose own schema has no required fields, such as
+the interactive `EntraOAuth` set shown above. Read each candidate set's `parameters` from the same
+`connectionParameterSets.values[]` response before assuming empty `values` is correct — some sets
+require real, non-empty values before the OAuth handshake even starts. For example,
+`visualstudioteamservices` also exposes `OauthSP` (service principal auth, requiring
+`token:TenantId`, `token:clientId`, and a `token:clientSecret`) and `CertOauth` (certificate auth,
+requiring `token:TenantId`, `token:clientId`, and a `token:clientCertificateSecret`). If the user's
+organization requires one of those instead of `EntraOAuth`, populate `values` with the
+corresponding keys, and source any secret values from Key Vault rather than literal Bicep
+parameters.
+
 Do not guess the parameter set name; read it from `connectionParameterSets.values[].name` for the
 target connector and region, since names and defaults vary by connector. As one concrete example,
 the `visualstudioteamservices` (Azure DevOps) connector exposes `EntraOAuth`, `OauthSP`, and
@@ -118,6 +129,18 @@ az rest --method delete \
 state, so it can report "no changes to provision" after a manual out-of-band delete like this. Use
 `azd provision --no-state` (or `az deployment group create` directly against the resource group)
 to force Bicep to reconcile against what is actually deployed.
+
+`connectionParameterSets` is not the only way a connector can need more than `connectorName` and
+`displayName`. Some connectors (database and file-transfer connectors such as `sql` are one
+example) have no `connectionParameterSets` at all, but instead have several required top-level
+`connectionParameters` that are plain `string`/`securestring` values, not an `oauthSetting` —
+there is no interactive sign-in step, and the connection needs real values (such as a server name,
+username, and password) supplied some other way at creation time. The general rule is: always
+read `properties.connectionParameters` and `properties.connectionParameterSets` for the specific
+connector before writing its connection resource, rather than assuming it behaves like a
+previously-integrated connector. This skill does not yet have a verified Bicep pattern for that
+non-OAuth, value-based case — treat it as unsupported until someone validates the correct
+connection property shape against a real deployment, rather than guessing at one.
 
 See [troubleshooting.md](./troubleshooting.md#connection-never-reaches-connected--oauth-sign-in-fails-with-a-generic-500)
 for the full diagnostic flow, including how this is easy to mis-diagnose as an organization policy

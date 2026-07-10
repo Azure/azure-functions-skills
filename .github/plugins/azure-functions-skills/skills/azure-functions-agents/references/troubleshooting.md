@@ -170,7 +170,10 @@ use.
 3. Add `parameterValueSet: { name: '<scheme-name>', values: {} }` to the connection's Bicep
    properties — see [connectors.md](./connectors.md#connection-authentication-schemes). For
    `visualstudioteamservices` (Azure DevOps) against a Microsoft Entra-backed organization, this
-   is normally `EntraOAuth`.
+   is normally `EntraOAuth`, which needs no other values. Other schemes on the same connector,
+   such as `OauthSP` or `CertOauth`, require real (non-empty) `values` for fields like
+   `token:TenantId`, `token:clientId`, and a secret — check that scheme's own `parameters` in the
+   step 1 response before assuming `values: {}` is enough.
 4. Delete the existing connection and redeploy; changing `parameterValueSet` on an already-created
    connection and redeploying does not update the live resource:
    ```bash
