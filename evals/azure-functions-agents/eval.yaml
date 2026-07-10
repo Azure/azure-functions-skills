@@ -21,6 +21,8 @@ scoring:
   threshold: 0.8
   weights:
     skill-invocation: 2.0
+    file-exists: 1.0
+    file-matches: 1.0
     output-matches: 1.0
     output-not-matches: 1.5
     completed: 1.0
@@ -122,12 +124,19 @@ stimuli:
       - type: output-matches
         config:
           pattern: "(?i)Connector Namespace|connectorGateways|Microsoft.Web/connectorGateways"
-      - type: output-matches
+      # Validate the generated connector-triggered agent file instead of relying on
+      # the final assistant summary to repeat implementation-specific trigger names.
+      - type: file-matches
         config:
-          pattern: "(?i)generic_trigger|connectorTrigger|trigger.args"
-      - type: output-matches
+          path: "**/*.agent.md"
+          pattern: "(?s)trigger:\\s*\\n\\s*type:\\s*generic_trigger\\s*\\n\\s*args:\\s*\\n\\s*type:\\s*connectorTrigger"
+      - type: file-exists
         config:
-          pattern: "(?i)mcp.json|connection MCP|draft"
+          path: "**/mcp.json"
+      - type: file-matches
+        config:
+          path: "**/*.agent.md"
+          pattern: "(?i)draft|draft reply|CreateDraftReply"
       - type: output-matches
         config:
           pattern: "(?i)trigger-config|connector_extension|second-step"
@@ -268,7 +277,7 @@ stimuli:
           pattern: 'service\.flow\.microsoft\.com//\.default'
       - type: output-matches
         config:
-          pattern: 'apihub\.azure\.com/\.default'
+          pattern: "(?i)connectionRuntimeUrl|connection runtime|az rest"
       - type: completed
       - type: output-not-matches
         config:
@@ -302,9 +311,6 @@ stimuli:
       - type: output-matches
         config:
           pattern: "(?i)body.*contentType.*html|body.*content"
-      - type: output-matches
-        config:
-          pattern: 'apihub\.azure\.com/\.default'
       - type: completed
       - type: output-not-matches
         config:
