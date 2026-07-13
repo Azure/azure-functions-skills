@@ -1194,7 +1194,8 @@ if (command === 'install' || command === 'update') {
         console.log('Planned template apply:');
         console.log(`  Template: ${result.template.id}`);
         console.log(`  Mode: ${result.mode}`);
-        for (const file of result.plannedFiles) console.log(`  - ${file}`);
+        for (const file of result.filesWritten) console.log(`  + ${file}`);
+        for (const file of result.skippedFiles) console.log(`  - ${file} (skipped)`);
       } else {
         console.log('Template applied.');
         console.log(`  Template: ${result.template.id}`);
