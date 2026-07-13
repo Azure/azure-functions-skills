@@ -58,6 +58,24 @@ system_tools:
     client_id: $SESSION_POOL_CLIENT_ID
 ```
 
+## Endpoint Validation
+
+The runtime validates the session pool endpoint before creating the `execute_python` tool. The
+endpoint must be an HTTPS URL whose host is a subdomain of `dynamicsessions.io`
+(`*.dynamicsessions.io`). Endpoints that use a non-HTTPS scheme, embed userinfo (`user@host`), or
+target any other host are rejected and the `execute_python` tool will not be available to agents.
+A warning is logged in that state.
+
+Correct endpoint format:
+
+```
+https://<region>.dynamicsessions.io/subscriptions/.../sessionPools/<pool>
+```
+
+If `execute_python` is missing at runtime after setting the endpoint, check that
+`ACA_SESSION_POOL_ENDPOINT` resolves to a valid `https://<region>.dynamicsessions.io/...` URL and
+look for a "failed validation" warning in startup logs.
+
 ## Local Development
 
 Local execution still calls the real Azure session pool. The developer's `az login` identity
