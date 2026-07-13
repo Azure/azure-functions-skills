@@ -22,7 +22,9 @@ The official template includes:
 - `src/daily_microsoft_blog_summary.agent.md` with a 30-minute timer-agent timeout
 - `src/mcp.json`
 - `src/local.settings.json.sample`
-- `src/requirements.txt` with the official `azurefunctions-agents-runtime` PyPI package
+- `src/requirements.txt` with `azurefunctions-agents-runtime[monitor]` so Application Insights
+  observability is enabled by default (add the `[monitor]` extra if the retrieved copy ships the
+  base `azurefunctions-agents-runtime` package)
 
 ## How to Use It
 

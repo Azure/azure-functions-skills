@@ -86,6 +86,7 @@ agent run.
 | --- | --- | --- |
 | `execute_python` missing | `agents.config.yaml` lacks dynamic session config | Add `system_tools.dynamic_sessions_code_interpreter.endpoint`. |
 | Session endpoint unresolved | `ACA_SESSION_POOL_ENDPOINT` missing | Set it in app settings or `local.settings.json`. |
+| `execute_python` missing after endpoint is set | Endpoint URL failed validation | Ensure `ACA_SESSION_POOL_ENDPOINT` is an `https://<region>.dynamicsessions.io/...` URL. The runtime silently skips endpoints that are not on `*.dynamicsessions.io` or use non-HTTPS. Check startup logs for "failed validation". |
 | 403 from session pool | Identity lacks role | Assign `Azure ContainerApps Session Executor` to app identity and local user. |
 | Browser/code work unavailable | Agent instructions do not mention using Python/Playwright | Tell the agent when to use `execute_python`. |
 
@@ -355,3 +356,18 @@ traces
 | order by timestamp desc
 | project timestamp, message, severityLevel
 ```
+
+## Observability
+
+The runtime emits `agent.run {name}` and `dynamic_session.execute` spans to Application Insights.
+These are spans (not logs) — look in **Transaction Search** and the end-to-end transaction view,
+not the Logs blade.
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| No `agent.run` spans in Application Insights | `[monitor]` extra not installed | Use `azurefunctions-agents-runtime[monitor]` in `requirements.txt`. |
+| Runtime logs "install azurefunctions-agents-runtime[monitor]" warning | Connection string present but `[monitor]` extra missing | Install `azurefunctions-agents-runtime[monitor]`. |
+| Spans missing even with `[monitor]` installed | `APPLICATIONINSIGHTS_CONNECTION_STRING` not set | Set the connection string in app settings or (for local runs) `local.settings.json`. |
+| No content in span attributes, only byte counts | `ENABLE_SENSITIVE_DATA` is off (default) | Set `ENABLE_SENSITIVE_DATA=true` to capture input/response/code content. Keep off in production. |
+| Sandbox failure shows `Success` in telemetry | `[monitor]` extra not installed or old runtime version | Install `azurefunctions-agents-runtime[monitor]`. Stderr/exceptions mark the `dynamic_session.execute` span ERROR with `af.fault_domain=sandbox`. |
+| Can't find runtime spans in the Logs (`AppTraces`) list | Runtime telemetry is emitted as spans (dependencies), not trace logs | Query `AppDependencies` — both `agent.run {name}` and `dynamic_session.execute` are `INTERNAL` spans and land there (not `AppRequests`). Use Transaction Search for the full end-to-end view. |

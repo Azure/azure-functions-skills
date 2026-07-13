@@ -28,13 +28,29 @@ app = create_function_app()
 
 ## requirements.txt
 
-Use the official PyPI package:
+Use `azurefunctions-agents-runtime[monitor]` whenever the app includes
+`APPLICATIONINSIGHTS_CONNECTION_STRING` — which the scaffolded Bicep always provisions. With the
+extra installed, the runtime's `agent.run` and `dynamic_session.execute` spans are exported to
+Application Insights automatically and no extra code is needed.
+
+```text
+azurefunctions-agents-runtime[monitor]
+```
+
+Without the `[monitor]` extra the runtime cannot export spans even when
+`APPLICATIONINSIGHTS_CONNECTION_STRING` is set, and it logs a one-time warning directing the user
+to install the extra.
+
+When the app does **not** include Application Insights, use the base package:
 
 ```text
 azurefunctions-agents-runtime
 ```
 
-Add app-specific dependencies below it.
+In that case, either prompt the user about adding Application Insights (so they get the full
+observability stack) or proceed without telemetry if the user has explicitly opted out.
+
+Add app-specific dependencies below the runtime line.
 
 ## host.json
 

@@ -30,7 +30,12 @@ agents using Azure Functions": agents are defined in markdown files, runtime def
   needed actions into Python custom tools or use a hosted remote MCP endpoint.
 - Use Connector Namespaces, represented as `Microsoft.Web/connectorGateways` resources in Bicep.
 - Generated apps should include a ready-to-edit `src/local.settings.json`, not only a template.
-- Generated `requirements.txt` must use the official PyPI package: `azurefunctions-agents-runtime`.
+- Generated `requirements.txt` should use `azurefunctions-agents-runtime[monitor]` whenever the app
+  includes `APPLICATIONINSIGHTS_CONNECTION_STRING` (the scaffolded infra provisions it by default),
+  so the runtime auto-exports `agent.run` and `dynamic_session.execute` spans to Application Insights
+  with no extra code. If the retrieved template ships the base `azurefunctions-agents-runtime`, add
+  the `[monitor]` extra. When the app has no Application Insights, use the base package and either
+  prompt the user to add it or omit telemetry.
 
 ## Progressive References
 

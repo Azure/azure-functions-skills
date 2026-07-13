@@ -237,6 +237,90 @@ within available quota.
 
 If the model deployment fails, revert to `gpt-4.1` values and provision again.
 
+## Observability
+
+The runtime emits OpenTelemetry traces and metrics to Application Insights for every agent run —
+without any telemetry code in `function_app.py`.
+
+**Enable in two steps:**
+
+1. Use the `[monitor]` extra in `requirements.txt`:
+
+   ```text
+   azurefunctions-agents-runtime[monitor]
+   ```
+
+2. Ensure `APPLICATIONINSIGHTS_CONNECTION_STRING` is set (already provisioned and injected by the
+   scaffolded Bicep).
+
+When both are present, `create_function_app()` automatically configures Azure Monitor export and
+Microsoft Agent Framework (MAF) `gen_ai` instrumentation.
+
+**Spans emitted:**
+
+| Span | What it covers |
+| --- | --- |
+| `agent.run {name}` | Full agent invocation: trigger type, model, session ID, tool call count, outcome |
+| `dynamic_session.execute` | Each `execute_python` call: session ID, stderr presence, ACA operation correlation |
+
+Runtime-added attributes use the `af.` prefix (standard OpenTelemetry attributes such as
+`server.address` are reused as-is). Failures are tagged with `af.fault_domain` (values:
+`app`, `runtime`, `platform`, `model`, `connector`, `sandbox`, `unknown`) for fast triage.
+
+**Sandbox failure visibility:** previously, a `dynamic_session.execute` call that returned
+non-empty stderr still looked like a success in telemetry. With observability enabled, the
+`dynamic_session.execute` span is marked ERROR and `af.fault_domain=sandbox` whenever stderr is
+present or an exception occurs, even though the tool still returns its string to the model.
+
+**Sensitive content (off by default):**
+
+Content attributes (`af.agent.input`, `af.agent.response`, `af.dynamic_session.code`,
+`af.dynamic_session.stdout`, `af.dynamic_session.stderr`) are gated behind
+`ENABLE_SENSITIVE_DATA=true`. Without it, only metadata (byte counts, call counts, outcome) is
+recorded. Keep this off in production to protect PII.
+
+**Optional host+worker correlation:**
+
+Add `"telemetryMode": "OpenTelemetry"` to `host.json` to align the Functions host's request
+telemetry with the runtime's worker spans under the same end-to-end operation ID. This is
+additive — runtime spans work without it.
+
+**Reduce log noise:**
+
+The runtime automatically quiets known-noisy loggers (Azure SDK HTTP, `azure.identity`, `httpx`,
+OpenTelemetry internals). To also quiet host-side startup noise, add log-level overrides in
+`host.json`:
+
+```json
+{
+  "logging": {
+    "logLevel": {
+      "default": "Warning",
+      "Host.Startup": "Warning",
+      "Host.Function.Console": "Warning",
+      "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService": "Warning"
+    }
+  }
+}
+```
+
+**Useful KQL (Transaction Search covers a full run):**
+
+```kql
+// Everything from one run, in order
+union AppRequests, AppDependencies, AppTraces, AppExceptions
+| where OperationId == "<operation-id>"
+| project TimeGenerated, itemType, Name, Message, Success, DurationMs
+| order by TimeGenerated asc
+
+// Sandbox calls that actually failed (stderr or exception)
+AppDependencies
+| where Name == "dynamic_session.execute"
+| extend stderr_present = tostring(Properties["af.dynamic_session.stderr_present"])
+| where Success == false or stderr_present == "true"
+| project TimeGenerated, OperationId, DurationMs, Properties
+```
+
 ## Deployed Function Keys
 
 Built-in chat endpoints use the default function key:
