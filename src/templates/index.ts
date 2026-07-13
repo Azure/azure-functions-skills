@@ -124,9 +124,10 @@ export async function applyFunctionTemplate(targetDir: string, options: Template
   const template = findTemplate(manifest, options.language, options.template);
   const mode = resolveApplyMode(targetDir, options.mode ?? 'auto');
   const downloadedFiles = await downloadTemplateFiles(template, manifestUrl);
+  const runtimeVersion = options.runtimeVersion ?? manifest.runtimeVersions?.[template.language]?.default;
   const templateFiles = downloadedFiles.map(file => ({
     relativePath: normalizeTemplatePath(file.relativePath),
-    content: applyRuntimePlaceholders(file.content, options.runtimeVersion),
+    content: applyRuntimePlaceholders(file.content, runtimeVersion),
   }));
   if (mode === 'add') assertAddModeSafe(template, templateFiles);
   const plannedFiles = templateFiles.map(file => file.relativePath).sort();
