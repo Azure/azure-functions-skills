@@ -44,7 +44,7 @@ This keeps large template contents out of the agent transcript while preserving 
 
 In `add` mode, project scaffolding files such as `host.json`, `package.json`, `.github/`, and `infra/` are skipped by default so an existing app is not reinitialized. `--force` is the explicit opt-in to overwrite those files, including `local.settings.json`.
 
-`--manifest-url` is an advanced escape hatch for trusted custom manifests only. A manifest controls template repository URLs and file contents that may be written into the target directory. GitHub API downloads first run unauthenticated; if GitHub reports a rate limit or private repository response, the CLI retries the `api.github.com` contents request with `GH_TOKEN` or `GITHUB_TOKEN`. Tokens are never attached to the manifest URL, template repository URL, or file `download_url`.
+`--manifest-url` is an advanced escape hatch for trusted custom manifests only. A manifest controls template repository URLs and file contents that may be written into the target directory. GitHub API downloads first run unauthenticated; if GitHub reports a rate limit or private repository response, the CLI retries the `api.github.com` contents request with `GH_TOKEN`, `GITHUB_TOKEN`, or the user's existing `gh auth token`. Tokens are never attached to the manifest URL, template repository URL, or file `download_url`.
 
 ### Examples
 

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -109,6 +110,8 @@ const ADD_MODE_PROJECT_PREFIXES = [
   '.vscode/',
   'infra/',
 ];
+
+let githubCliTokenWarningShown = false;
 
 export async function listFunctionTemplates(options: TemplateListOptions = {}): Promise<TemplateListResult> {
   const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
@@ -424,7 +427,26 @@ function githubHeaders(token?: string): Record<string, string> {
 }
 
 function resolveGitHubToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return env.GH_TOKEN || env.GITHUB_TOKEN || undefined;
+  return env.GH_TOKEN || env.GITHUB_TOKEN || resolveGitHubCliToken();
+}
+
+function resolveGitHubCliToken(): string | undefined {
+  if (!githubCliTokenWarningShown) {
+    process.stderr.write(
+      'GitHub API rate limit or private repository access requires authentication. Trying `gh auth token`...\n',
+    );
+    githubCliTokenWarningShown = true;
+  }
+
+  try {
+    const token = execFileSync('gh', ['auth', 'token'], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return token || undefined;
+  } catch (_err) {
+    return undefined;
+  }
 }
 
 function isGitHubAuthRetryable(response: Response): boolean {
@@ -439,7 +461,7 @@ function buildFetchErrorMessage(
   options: { readonly includeGitHubTokenHint?: boolean } = {},
 ): string {
   const suffix = options.includeGitHubTokenHint && isGitHubAuthRetryable(result.response)
-    ? ' Set GH_TOKEN or GITHUB_TOKEN to retry GitHub API requests authenticated.'
+    ? ' Set GH_TOKEN or GITHUB_TOKEN, or run gh auth login, to retry GitHub API requests authenticated.'
     : '';
   return `Failed to fetch ${url}: ${result.response.status} ${result.response.statusText}.${suffix}`;
 }
