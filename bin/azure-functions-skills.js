@@ -76,9 +76,13 @@ List Azure Functions templates from the public templates manifest.
 Options:
   --language <name>      Filter by language: python, typescript, javascript, java, csharp, powershell
   --resource <name>      Filter by resource/trigger type, e.g. http, timer, servicebus
-  --iac <type>           Filter by Infrastructure as Code type, e.g. bicep
+  --iac <type>           Filter by IaC type; '--iac bicep' shows Bicep-backed templates
   --json                 Print JSON output
-  --manifest-url <url>   Override manifest URL (advanced/testing)
+  --manifest-url <url>   Use a trusted custom manifest URL (advanced)
+
+Examples:
+  azure-functions-skills template list --language python --resource http --iac bicep
+  azure-functions-skills template list --resource timer --json
 `,
   'template apply': `Usage: azure-functions-skills template apply [options]
 
@@ -86,14 +90,18 @@ Apply an Azure Functions template from the public templates manifest.
 
 Options:
   --dir <path>           Target directory (default: current directory)
-  --language <name>      Template language (required)
   --template <id>        Template ID from 'template list' (required)
-  --runtime-version <v>  Runtime version for placeholders, e.g. 22 or 3.13
-  --mode <name>          auto, new, add (default: auto)
-  --dry-run              Print planned files without writing
-  --force                Overwrite existing files in new mode
+  --language <name>      Disambiguate if multiple templates share the same ID
+  --runtime-version <v>  Override runtime placeholder defaults, e.g. 22 or 3.13
+  --mode <name>          auto chooses add when host.json exists; otherwise new
+  --dry-run              Print files that would be written or skipped
+  --force                Overwrite existing files, including add-mode project files
   --json                 Print JSON output
-  --manifest-url <url>   Override manifest URL (advanced/testing)
+  --manifest-url <url>   Use a trusted custom manifest URL (advanced)
+
+Examples:
+  azure-functions-skills template apply --dir ./app --template http-trigger-python-azd
+  azure-functions-skills template apply --dir ./app --template timer-trigger-typescript --mode add --dry-run
 `,
   'plugin install': `Usage: azure-functions-skills plugin install [options]
 
@@ -1171,10 +1179,6 @@ if (command === 'install' || command === 'update') {
         printTemplateList(result.templates);
       }
     } else {
-      if (!options.language) {
-        console.error('Missing required option: --language <name>');
-        process.exit(1);
-      }
       if (!options.template) {
         console.error('Missing required option: --template <id>');
         process.exit(1);

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
@@ -23,15 +23,6 @@ function makeTempDir(prefix: string): string {
   TEMP_DIRS.push(dir);
   return dir;
 }
-
-beforeAll(() => {
-  const command = process.platform === 'win32' ? 'cmd.exe' : 'npm';
-  const args = process.platform === 'win32' ? ['/d', '/s', '/c', 'npm run compile'] : ['run', 'compile'];
-  execFileSync(command, args, {
-    cwd: ROOT_DIR,
-    stdio: 'pipe',
-  });
-});
 
 afterAll(() => {
   for (const dir of TEMP_DIRS) {

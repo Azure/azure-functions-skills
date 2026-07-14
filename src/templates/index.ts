@@ -15,7 +15,7 @@ export interface TemplateListOptions {
 
 export interface TemplateApplyOptions {
   readonly manifestUrl?: string;
-  readonly language: string;
+  readonly language?: string;
   readonly template: string;
   readonly runtimeVersion?: string;
   readonly mode?: TemplateApplyMode;
@@ -86,6 +86,11 @@ interface GitHubContentEntry {
   readonly download_url: string | null;
 }
 
+interface FetchResult {
+  readonly text: string;
+  readonly response: Response;
+}
+
 const ADD_MODE_PROJECT_PATHS = new Set([
   '.gitignore',
   'azure.yaml',
@@ -121,7 +126,7 @@ export async function listFunctionTemplates(options: TemplateListOptions = {}): 
 export async function applyFunctionTemplate(targetDir: string, options: TemplateApplyOptions): Promise<TemplateApplyResult> {
   const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
   const manifest = await loadTemplateManifest(manifestUrl);
-  const template = findTemplate(manifest, options.language, options.template);
+  const template = findTemplate(manifest, options.template, options.language);
   const mode = resolveApplyMode(targetDir, options.mode ?? 'auto');
   const downloadedFiles = await downloadTemplateFiles(template, manifestUrl);
   const runtimeVersion = options.runtimeVersion ?? manifest.runtimeVersions?.[template.language]?.default;
@@ -244,7 +249,7 @@ async function listGitHubContents(repo: GitHubRepo, path: string, ref: string): 
   const encodedPath = path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
   const url = new URL(`https://api.github.com/repos/${repo.owner}/${repo.repo}/contents/${encodedPath}`);
   url.searchParams.set('ref', ref);
-  const entries = await fetchJson(url.toString());
+  const entries = await fetchGitHubJson(url.toString());
   if (!Array.isArray(entries)) {
     throw new Error(`GitHub contents path is not a directory: ${path || '.'}`);
   }
@@ -298,13 +303,26 @@ function assertAddModeSafe(template: FunctionTemplate, files: readonly TemplateF
   }
 }
 
-function findTemplate(manifest: TemplateManifest, language: string, templateId: string): FunctionTemplate {
-  const template = manifest.templates.find(candidate =>
-    equalsIgnoreCase(candidate.id, templateId) && equalsIgnoreCase(candidate.language, language));
-  if (!template) {
-    throw new Error(`Template '${templateId}' for language '${language}' was not found in the manifest.`);
+function findTemplate(manifest: TemplateManifest, templateId: string, language?: string): FunctionTemplate {
+  const templates = manifest.templates.filter(candidate => equalsIgnoreCase(candidate.id, templateId));
+  if (templates.length === 0) {
+    throw new Error(`Template '${templateId}' was not found in the manifest.`);
   }
-  return template;
+
+  if (language) {
+    const template = templates.find(candidate => equalsIgnoreCase(candidate.language, language));
+    if (!template) {
+      throw new Error(`Template '${templateId}' was found, but not for language '${language}'.`);
+    }
+    return template;
+  }
+
+  if (templates.length > 1) {
+    const languages = templates.map(template => template.language).sort().join(', ');
+    throw new Error(`Template '${templateId}' matches multiple languages (${languages}); pass --language to disambiguate.`);
+  }
+
+  return templates[0];
 }
 
 function resolveApplyMode(targetDir: string, mode: TemplateApplyMode): Exclude<TemplateApplyMode, 'auto'> {
@@ -314,9 +332,9 @@ function resolveApplyMode(targetDir: string, mode: TemplateApplyMode): Exclude<T
 
 function shouldSkipFile(relativePath: string, mode: Exclude<TemplateApplyMode, 'auto'>, force: boolean): boolean {
   if (mode === 'new') return false;
+  if (force) return false;
   const normalized = normalizeTemplatePath(relativePath);
   if (ADD_MODE_PROJECT_PATHS.has(normalized)) return true;
-  if (!force && normalized === 'local.settings.json') return true;
   return ADD_MODE_PROJECT_PREFIXES.some(prefix => normalized.startsWith(prefix));
 }
 
@@ -357,11 +375,8 @@ function compareTemplates(left: FunctionTemplate, right: FunctionTemplate): numb
 }
 
 async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-  }
-  return response.text();
+  const { text } = await fetchTextResponse(url);
+  return text;
 }
 
 async function fetchBuffer(url: string): Promise<Buffer> {
@@ -372,9 +387,61 @@ async function fetchBuffer(url: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
-async function fetchJson(url: string): Promise<unknown> {
-  const text = await fetchText(url);
-  return JSON.parse(text) as unknown;
+async function fetchGitHubJson(url: string): Promise<unknown> {
+  const result = await fetchTextResponse(url, githubHeaders());
+  if (result.response.ok) {
+    return JSON.parse(result.text) as unknown;
+  }
+
+  const token = resolveGitHubToken();
+  if (!token || !isGitHubAuthRetryable(result.response)) {
+    throw new Error(buildFetchErrorMessage(url, result, { includeGitHubTokenHint: true }));
+  }
+
+  const retryResult = await fetchTextResponse(url, githubHeaders(token));
+  if (!retryResult.response.ok) {
+    throw new Error(buildFetchErrorMessage(url, retryResult));
+  }
+
+  return JSON.parse(retryResult.text) as unknown;
+}
+
+async function fetchTextResponse(url: string, headers?: Record<string, string>): Promise<FetchResult> {
+  const response = await fetch(url, headers ? { headers } : undefined);
+  const text = await response.text();
+  if (!response.ok && !headers) {
+    throw new Error(buildFetchErrorMessage(url, { text, response }));
+  }
+  return { text, response };
+}
+
+function githubHeaders(token?: string): Record<string, string> {
+  return {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'azure-functions-skills',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function resolveGitHubToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  return env.GH_TOKEN || env.GITHUB_TOKEN || undefined;
+}
+
+function isGitHubAuthRetryable(response: Response): boolean {
+  return response.status === 401
+    || response.status === 404
+    || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0');
+}
+
+function buildFetchErrorMessage(
+  url: string,
+  result: FetchResult,
+  options: { readonly includeGitHubTokenHint?: boolean } = {},
+): string {
+  const suffix = options.includeGitHubTokenHint && isGitHubAuthRetryable(result.response)
+    ? ' Set GH_TOKEN or GITHUB_TOKEN to retry GitHub API requests authenticated.'
+    : '';
+  return `Failed to fetch ${url}: ${result.response.status} ${result.response.statusText}.${suffix}`;
 }
 
 function isTemplateManifest(value: unknown): value is TemplateManifest {

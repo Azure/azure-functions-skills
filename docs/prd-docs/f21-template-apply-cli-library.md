@@ -17,7 +17,6 @@ azure-functions-skills template list --language typescript --resource http --jso
 
 azure-functions-skills template apply \
   --dir ./my-functions-app \
-  --language typescript \
   --template http-trigger-typescript-azd \
   --runtime-version 22
 ```
@@ -41,7 +40,27 @@ This keeps large template contents out of the agent transcript while preserving 
 | `template list` | List manifest templates with optional filters (`--language`, `--resource`, `--iac`, `--json`) |
 | `template apply` | Apply a selected template into `--dir` using `--mode auto\|new\|add` |
 
-`apply` defaults to `--mode auto`: use `add` when `host.json` exists, otherwise `new`. Existing secret-bearing files such as `local.settings.json` must not be overwritten unless the caller explicitly opts in.
+`apply` defaults to `--mode auto`: use `add` when `host.json` exists, otherwise `new`. Template IDs are expected to be unique, so `--template <id>` is enough for the common apply path. `--runtime-version` is an override; when omitted, runtime placeholders use the manifest default for the resolved template language.
+
+In `add` mode, project scaffolding files such as `host.json`, `package.json`, `.github/`, and `infra/` are skipped by default so an existing app is not reinitialized. `--force` is the explicit opt-in to overwrite those files, including `local.settings.json`.
+
+`--manifest-url` is an advanced escape hatch for trusted custom manifests only. A manifest controls template repository URLs and file contents that may be written into the target directory. GitHub API downloads first run unauthenticated; if GitHub reports a rate limit or private repository response, the CLI retries the `api.github.com` contents request with `GH_TOKEN` or `GITHUB_TOKEN`. Tokens are never attached to the manifest URL, template repository URL, or file `download_url`.
+
+### Examples
+
+```bash
+azure-functions-skills template list --language python --resource http --iac bicep
+
+azure-functions-skills template apply \
+  --dir ./my-functions-app \
+  --template http-trigger-python-azd
+
+azure-functions-skills template apply \
+  --dir ./my-functions-app \
+  --template timer-trigger-typescript \
+  --mode add \
+  --dry-run
+```
 
 ## Library API
 
