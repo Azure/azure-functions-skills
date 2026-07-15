@@ -19,6 +19,10 @@
     "./chat": {
       "types": "./lib/chat/index.d.ts",
       "default": "./lib/chat/index.js"
+    },
+    "./templates": {
+      "types": "./lib/templates/index.d.ts",
+      "default": "./lib/templates/index.js"
     }
   },
   "files": [
