@@ -16,49 +16,6 @@ return_success() {
 }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-packageVersion=""
-installMode="unknown"
-installScope="unknown"
-
-find_state_file() {
-    local candidate
-    candidate="${script_dir}/../../state.local.json"
-    if [ -f "$candidate" ]; then
-        echo "$candidate"
-        return
-    fi
-
-    candidate="${PWD}/.azure-functions-skills/state.local.json"
-    if [ -f "$candidate" ]; then
-        echo "$candidate"
-        return
-    fi
-}
-
-load_workspace_state() {
-    local state_path
-    local compact_state
-    local parsed
-    state_path=$(find_state_file)
-    if [ -z "$state_path" ]; then
-        return
-    fi
-
-    compact_state=$(tr -d '\r\n ' < "$state_path")
-    if echo "$compact_state" | grep -q '"telemetry":{"enabled":false'; then
-        return_success
-    fi
-
-    parsed=$(echo "$compact_state" | sed -n 's/.*"package":{[^}]*"version":"\([^"]*\)".*/\1/p')
-    [ -n "$parsed" ] && packageVersion="$parsed"
-
-    parsed=$(echo "$compact_state" | sed -n 's/.*"install":{[^}]*"mode":"\([^"]*\)".*/\1/p')
-    [ -n "$parsed" ] && installMode="$parsed"
-
-    parsed=$(echo "$compact_state" | sed -n 's/.*"install":{[^}]*"scope":"\([^"]*\)".*/\1/p')
-    [ -n "$parsed" ] && installScope="$parsed"
-}
-
 extract_json_field() {
     local json="$1"
     local field="$2"
@@ -165,8 +122,6 @@ if [ -z "$rawInput" ]; then
     return_success
 fi
 
-load_workspace_state
-
 toolName=$(extract_json_field "$rawInput" "toolName")
 sessionId=$(extract_json_field "$rawInput" "sessionId")
 
@@ -261,11 +216,6 @@ fi
 if [ "$shouldTrack" = true ]; then
     configure_appinsights
 
-    pluginVersion="$packageVersion"
-    if [ -n "$pluginVersion" ] && [ "$installMode" != "unknown" ] && [ "$installScope" != "unknown" ]; then
-        pluginVersion="${pluginVersion}+${installMode}.${installScope}"
-    fi
-
     mcpArgs=(
         "server" "plugin-telemetry"
         "--timestamp" "$timestamp"
@@ -273,7 +223,6 @@ if [ "$shouldTrack" = true ]; then
         "--plugin-name" "azure-functions-skills"
     )
 
-    [ -n "$pluginVersion" ] && mcpArgs+=("--plugin-version" "$pluginVersion")
     [ -n "$eventType" ] && mcpArgs+=("--event-type" "$eventType")
     [ -n "$sessionId" ] && mcpArgs+=("--session-id" "$sessionId")
     [ -n "$skillName" ] && mcpArgs+=("--skill-name" "$skillName")

@@ -245,7 +245,7 @@ export async function runAiAnalysis(
   }
 
   // Log agent output for diagnostics
-  const agentLog = join(dir, '.azure-functions-skills', 'doctor-ai-agent.log');
+  const agentLog = join(dir, '.azure-functions-doctor', 'doctor-ai-agent.log');
   try {
     mkdirSync(dirname(agentLog), { recursive: true });
     writeFileSync(agentLog, [

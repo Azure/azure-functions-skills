@@ -60,7 +60,7 @@ npx @azure/functions-skills doctor --dir . \
 | `markdown` | PR comments, GitHub Actions job summary | Drop into `$GITHUB_STEP_SUMMARY`. |
 | `html` | Local viewing, hosted artifacts | Self-contained — no external CSS or JS. Safe to host on GitHub Pages. |
 
-Files are written to `--output` (default `.azure-functions-skills/doctor-report.json`); stdout always shows the human-readable text form.
+Files are written to `--output` (default `.azure-functions-doctor/doctor-report.json`); stdout always shows the human-readable text form.
 
 ## GitHub Actions integration
 
@@ -180,12 +180,7 @@ The agent loads only the checklists relevant to the detected language/triggers.
 
 ## Auto-install behaviour for `--deep`
 
-If the workspace state file doesn't show the chosen agent as installed, doctor auto-installs the skill files first:
-
-- **Default (`--install-mode local`)**: Copies skill files into the workspace via `applySetup`. Safe for CI and ephemeral environments — no global state changes.
-- **`--install-mode plugin`**: Runs the host plugin install + workspace activation. For dev machines where you want skills available globally.
-
-State is recorded with `source: 'doctor-auto'` so future `doctor`/`chat` runs skip the install step.
+If the selected agent cannot see the local `azure-functions-doctor` skill, doctor copies the package-bundled local assets for that agent before deep analysis. Plugin installation remains the responsibility of the host coding agent.
 
 ## Testing with bad-app fixtures
 
@@ -204,12 +199,12 @@ cd Q:\temp\doctor-deep-test
 You ran `--deep` without acknowledging the elevated-permission requirement. Add `--accept-deep-risk` only on trusted workspaces.
 
 **"AI analysis skipped: no agent specified and none installed"**
-Pass `--agent <name>`, or run `install` first so workspace state knows which agent to use.
+Pass `--agent <name>` to select the coding-agent CLI used for deep analysis.
 
 **Tier 1 reports `dotnet-version: skip`**
 The Azure Stack API call failed (typical in offline CI). Set `AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE=1` to use the built-in fallback definitions.
 
-**`doctor-ai-agent.log` in `.azure-functions-skills/`**
+**`doctor-ai-agent.log` in `.azure-functions-doctor/`**
 This is the captured stdout/stderr from the Tier 2 agent run. Useful for diagnosing why `--deep` produced no findings or failed. Not committed by default.
 
 ## Related

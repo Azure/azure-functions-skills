@@ -7,7 +7,7 @@ lib/
 PLAN-*.md
 
 # Doctor local state from running CLI in this repo during development
-.azure-functions-skills/
+.azure-functions-doctor/
 
 # npm pack artifacts
 *.tgz

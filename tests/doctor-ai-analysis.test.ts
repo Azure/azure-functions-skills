@@ -9,7 +9,6 @@ import {
   readAiReport,
   mergeReports,
 } from '../src/doctor/ai-analysis.js';
-import { buildPluginFallbackWarning } from '../src/doctor/runner.js';
 import type { DoctorCheckResult, DoctorReport } from '../src/doctor/types.js';
 
 const TEMP_DIRS: string[] = [];
@@ -126,13 +125,6 @@ describe('buildDeepWarning', () => {
     expect(warning).toMatch(/^[\x09\x0a\x20-\x7e]+$/);
   });
 
-  it('plugin fallback warning is pure ASCII', () => {
-    const warning = buildPluginFallbackWarning('ENOENT: missing /etc/foo');
-    // eslint-disable-next-line no-control-regex
-    expect(warning).toMatch(/^[\x09\x0a\x20-\x7e]+$/);
-    expect(warning).toContain('[WARN]');
-    expect(warning).toContain('ENOENT');
-  });
 });
 
 // ── readAiReport ──

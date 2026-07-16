@@ -1,1219 +1,79 @@
 #!/usr/bin/env node
 
-/**
- * Azure Functions Skills CLI
- *
- * Usage:
- *   npx @azure/functions-skills setup              # Install skill files
- *   npx @azure/functions-skills chat               # Launch agent with Welcome prompt
- *   npx @azure/functions-skills chat --agent codex  # Specific agent
- *   npx @azure/functions-skills build               # Build plugin artifacts
- */
-
 import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 const command = args[0];
 const TARGETS = ['ghcp', 'claude', 'codex'];
-const LAUNCHER_IDS = ['github-copilot', 'claude-code', 'codex'];
 
-const HELP_TEXT = {
-  install: `Usage: azure-functions-skills install [options]
+const HELP = `
+@azure/functions-skills — Azure Functions skills for coding agents
 
-Install Azure Functions Skills plugin support and workspace activation.
+Commands:
+  install --local   Copy skills, MCP, and telemetry hooks into a workspace
+  update --local    Replace workspace-local Azure Functions assets
+  doctor            Analyze an Azure Functions project
+  template list     List Azure Functions templates
+  template apply    Apply an Azure Functions template
+  build             Build local and plugin artifacts
 
-Options:
-  --agent <name>     Agent: ghcp, claude, codex (repeatable)
-  --all              Install all supported agents explicitly
-  --dir <path>       Target directory (default: current directory)
-  --local            Full workspace-local setup from bundled npm package assets
-  --dry-run          Print planned install without writing files
-  --yes              Approve safe file updates such as managed blocks and state .gitignore entry
-  --source <name>    marketplace, github, or local (default: marketplace)
-  --scope <name>     workspace or user (default: workspace)
-  --no-mcp           Do not add workspace MCP files
-  --no-hooks         Do not add workspace hook files
-  --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
-  -- <args...>       Pass remaining arguments to the host plugin install command for a single agent
-`,
-  update: `Usage: azure-functions-skills update [options]
+Plugin installation is managed by the host coding agent, not this package.
+`;
 
-Update Azure Functions Skills; uses existing state by default.
-Install mode (local/plugin) is auto-detected from state.
+const DOCTOR_HELP = `
+Usage: azure-functions-skills doctor [options]
 
 Options:
-  --agent <name>     Agent: ghcp, claude, codex (repeatable)
-  --all              Update all supported agents explicitly
-  --dir <path>       Target directory (default: current directory)
-  --local            Force local update mode using bundled npm package assets
-  --force            Overwrite all files including user-customized files
-  --dry-run          Print planned update without writing files
-  --yes              Approve safe file updates such as managed blocks and state .gitignore entry
-  --source <name>    marketplace, github, or local (default: marketplace)
-  --scope <name>     workspace or user (default: workspace)
-  --no-mcp           Do not add workspace MCP files
-  --no-hooks         Do not add workspace hook files
-  --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
-`,
-  chat: `Usage: azure-functions-skills chat [options] [-- <agent args...>]
+  --dir <path>              Project directory (default: current directory)
+  --checks <ids>            Comma-separated check IDs
+  --severity <level>        Failure threshold (default: high)
+  --format <text|json|sarif>
+  --output <path>           Report output path
+  --deep                    Run AI-assisted analysis
+  --accept-deep-risk        Acknowledge elevated agent permissions
+  --agent <name>            github-copilot, claude-code, or codex
+  --timeout <seconds>       AI analysis timeout (default: 300)
+`;
 
-Launch a CLI coding agent with Azure Functions context. When --agent is omitted,
-chat uses .azure-functions-skills state to select the previously installed agent.
+const TEMPLATE_APPLY_HELP = `
+Usage: azure-functions-skills template apply --template <id> [options]
 
 Options:
-  --agent <name>     Agent: github-copilot, claude-code, codex
-  --prompt <text>    Custom prompt (overrides startup template)
-  --dir <path>       Working directory (default: current directory)
-  --dry-run          Print planned launch without starting the agent or updating state
-  --check-prerequisites  Check external prerequisites without installing them
-  --skip-prerequisites   Skip external prerequisite checks
-  -- <args...>       Pass remaining arguments through to the selected agent CLI
-`,
-  'template list': `Usage: azure-functions-skills template list [options]
-
-List Azure Functions templates from the public templates manifest.
-
-Options:
-  --language <name>      Filter by language: python, typescript, javascript, java, csharp, powershell
-  --resource <name>      Filter by resource/trigger type, e.g. http, timer, servicebus
-  --iac <type>           Filter by IaC type; '--iac bicep' shows Bicep-backed templates
-  --json                 Print JSON output
-  --manifest-url <url>   Use a trusted custom manifest URL (advanced)
-
-Examples:
-  azure-functions-skills template list --language python --resource http --iac bicep
-  azure-functions-skills template list --resource timer --json
-`,
-  'template apply': `Usage: azure-functions-skills template apply [options]
-
-Apply an Azure Functions template from the public templates manifest.
-
-Options:
-  --dir <path>           Target directory (default: current directory)
-  --template <id>        Template ID from 'template list' (required)
-  --language <name>      Disambiguate if multiple templates share the same ID
-  --runtime-version <v>  Override runtime placeholder defaults, e.g. 22 or 3.13
-  --mode <name>          auto chooses add when host.json exists; otherwise new
-  --dry-run              Print files that would be written or skipped
-  --force                Overwrite existing files, including add-mode project files
-  --json                 Print JSON output
-  --manifest-url <url>   Use a trusted custom manifest URL (advanced)
-
-Examples:
-  azure-functions-skills template apply --dir ./app --template http-trigger-python-azd
-  azure-functions-skills template apply --dir ./app --template timer-trigger-typescript --mode add --dry-run
-`,
-  'plugin install': `Usage: azure-functions-skills plugin install [options]
-
-Register Azure Functions Skills with the selected host plugin system.
-
-Options:
-  --agent <name>     Agent: ghcp, claude, codex (repeatable)
-  --dir <path>       Target directory (default: current directory)
-  --scope <name>     workspace or user (default: workspace)
-  --source <name>    marketplace, github, or local (default: marketplace)
-  --workspace        Apply workspace plugin-reference activation (default)
-  --no-workspace     Skip workspace activation
-  --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
-  --dry-run          Print planned changes without writing files
-  --force            Overwrite customer-owned workspace activation files
-  --yes              Approve workspace activation changes to existing instruction files
-`,
-  'plugin update': `Usage: azure-functions-skills plugin update [options]
-
-Update Azure Functions Skills host plugin registration.
-
-Options:
-  --agent <name>     Agent: ghcp, claude, codex (repeatable)
-  --dir <path>       Target directory (default: current directory)
-  --scope <name>     workspace or user (default: workspace)
-  --source <name>    marketplace, github, or local (default: marketplace)
-  --workspace        Apply workspace plugin-reference activation (default)
-  --no-workspace     Skip workspace activation
-  --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
-  --dry-run          Print planned changes without writing files
-  --force            Overwrite customer-owned workspace activation files
-  --yes              Approve workspace activation changes to existing instruction files
-`,
-  'workspace apply': `Usage: azure-functions-skills workspace apply [options]
-
-Apply Azure Functions routing and optional activation files to a workspace.
-
-Options:
-  --agent <name>     Agent: ghcp, claude, codex (repeatable)
-  --dir <path>       Target directory (default: current directory)
-  --mode <name>      minimal, copy, plugin-reference (default: copy)
-  --merge-strategy <name> managed-block, include-file, fail-if-exists, append
-  --dry-run          Print planned changes without writing files
-  --force            Overwrite customer-owned workspace activation files
-  --yes              Approve modifying existing instruction files without prompting
-  --include-agent    Add the GHCP functions-copilot workspace agent definition
-  --include-mcp      Add workspace MCP configuration files
-  --include-hooks    Add supported workspace hook files
-`,
-  'workspace update': `Usage: azure-functions-skills workspace update [options]
-
-Update existing Azure Functions managed workspace routing blocks.
-
-Options:
-  --agent <name>     Agent: ghcp, claude, codex (repeatable)
-  --dir <path>       Target directory (default: current directory)
-  --mode <name>      minimal, copy, plugin-reference (default: copy)
-  --merge-strategy <name> managed-block, include-file, fail-if-exists, append
-  --dry-run          Print planned changes without writing files
-  --force            Overwrite customer-owned workspace activation files
-  --yes              Approve modifying existing instruction files without prompting
-  --include-agent    Add the GHCP functions-copilot workspace agent definition
-  --include-mcp      Add workspace MCP configuration files
-  --include-hooks    Add supported workspace hook files
-`,
-  'state setup-complete': `Usage: azure-functions-skills state setup-complete [options]
-
-Mark the first-run azure-functions-setup skill as completed in local workspace state.
-
-Options:
-  --dir <path>       Target directory (default: current directory)
-  --agent <name>     Agent that completed setup: github-copilot, claude-code, codex
-`,
-  doctor: `Usage: azure-functions-skills doctor [options]
-
-Analyze workspace code and configuration for common Azure Functions issues.
-Runs built-in checks by default; add --deep for AI-powered analysis.
-
-Exit codes:
-  0  All checks passed
-  1  Problems found at or above --severity threshold
-  2  Doctor command itself failed (not a code/config problem)
-
-Options:
-  --dir <path>        Target workspace (default: cwd)
-  --deep              Enable AI agent analysis (Tier 2). Requires --accept-deep-risk.
-  --no-deep           Skip AI analysis, run built-in checks only
-  --accept-deep-risk  Acknowledge that --deep runs the agent with elevated permissions
-                      (file write, shell execution). Required on trusted workspaces only.
-  --agent <name>      Agent for AI analysis: github-copilot, claude-code, codex
-  --install-mode <m>  How to auto-install skills: local (default, CI-safe), plugin
-  --timeout <seconds> Timeout for AI analysis (default: 300)
-  --format <type>     Output format: text, json, markdown, html (default: text)
-  --output <path>     Report file path (default: .azure-functions-skills/doctor-report.json)
-  --checks <names>    Comma-separated check names to run
-  --severity <level>  Minimum severity to fail: critical, high, medium, low (default: high)
-
-Examples:
-  azure-functions-skills doctor                      # Built-in checks
-  azure-functions-skills doctor --deep --accept-deep-risk               # AI analysis included
-  azure-functions-skills doctor --no-deep --format json  # CI mode
-  azure-functions-skills doctor --deep --accept-deep-risk --install-mode plugin  # Plugin install on dev machine
-`,
-};
-
-function printHelp() {
-  console.log(`
-  @azure/functions-skills — AI assistant plugins for Azure Functions
-
-  Commands:
-    doctor   Analyze project code and configuration for common issues
-    install  Install plugin and workspace activation in one step
-    update   Update plugin and workspace activation in one step
-    setup    Detect coding agents and install skill files into your project
-    plugin install   Register Azure Functions Skills as a native plugin
-    plugin update    Refresh plugin registration and workspace activation
-    workspace apply   Apply Azure Functions routing/activation files to a workspace
-    workspace update  Update existing Azure Functions managed workspace routing blocks
-    template list    List Azure Functions templates from the manifest
-    template apply   Apply an Azure Functions template from the manifest
-    chat     Launch a CLI coding agent with Azure Functions Welcome prompt
-    state setup-complete  Mark first-run setup skill complete in local state
-    build    Build plugin artifacts for all targets (ghcp, claude, codex)
-
-  Options (setup):
-    --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
-    --all              Install/update all supported agents explicitly
-    --dir <path>       Target directory (default: current directory)
-    --as-plugin        Register as a native platform plugin (instead of copying files)
-    --check-prerequisites  Check external prerequisites without installing them
-    --skip-prerequisites   Skip external prerequisite checks
-
-  Options (install/update):
-    --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
-    --dir <path>       Target directory (default: current directory)
-    --local            Full workspace-local setup from bundled npm package assets
-    --dry-run          Print planned install without writing files
-    --yes              Approve modifying existing instruction files without prompting
-    --source <name>    marketplace, github, or local (default: marketplace)
-    --scope <name>     workspace or user (default: workspace)
-    --no-mcp           Do not add workspace MCP files
-    --no-hooks         Do not add workspace hook files
-    --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
-    -- <args...>       Pass remaining arguments to the host plugin install command for a single agent
-
-  Options (workspace apply/update):
-    --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
-    --dir <path>       Target directory (default: current directory)
-    --mode <name>      minimal, copy, plugin-reference (default: copy)
-    --merge-strategy <name> managed-block, include-file, fail-if-exists, append
-    --update           Replace existing Azure Functions managed blocks
-    --dry-run          Print planned changes without writing files
-    --force            Overwrite customer-owned workspace activation files
-    --yes              Approve modifying existing instruction files without prompting
-    --include-agent    Add the GHCP functions-copilot workspace agent definition
-    --include-mcp      Add workspace MCP configuration files
-    --include-hooks    Add supported workspace hook files
-
-  Options (plugin install/update):
-    --agent <name>     Specify agent: ghcp, claude, codex (repeatable)
-    --dir <path>       Target directory (default: current directory)
-    --scope <name>     workspace or user (default: workspace)
-    --source <name>    marketplace, github, or local (default: marketplace)
-    --version <value>  Plugin version/ref to plan (default: package version)
-    --workspace        Apply workspace plugin-reference activation (default)
-    --no-workspace     Skip workspace activation
-    --no-telemetry     Opt out of Azure Functions Skills telemetry for this workspace
-    --dry-run          Print planned changes without writing files
-    --yes              Approve workspace activation changes to existing instruction files
-
-  Options (chat):
-    --agent <name>     Agent: github-copilot, claude-code, codex (state-selected if omitted)
-    --prompt <text>    Custom prompt (overrides startup template)
-    --dir <path>       Working directory (default: current directory)
-    --as-plugin        Ensure plugin is registered before launching agent
-    --dry-run          Print planned launch without starting the agent or updating state
-    --check-prerequisites  Check external prerequisites without installing them
-    --skip-prerequisites   Skip external prerequisite checks
-    -- <args...>       Pass remaining arguments through to the selected agent CLI
-    Other unrecognized chat arguments are also passed through to the agent CLI
-
-  Options (template):
-    --language <name>      Template language
-    --template <id>        Template ID from 'template list'
-    --resource <name>      Filter by resource/trigger type
-    --iac <type>           Filter by Infrastructure as Code type, e.g. bicep
-    --runtime-version <v>  Runtime version for placeholders
-    --mode <name>          auto, new, add (default: auto)
-    --json                 Print JSON output
-
-  Options (build):
-    --target <name>    Build target: ghcp, claude, codex
-    --dist-dir <path>  Output directory (default: dist)
-
-  Examples:
-    npx @azure/functions-skills setup
-    npx @azure/functions-skills install --agent ghcp --dry-run
-    npx @azure/functions-skills setup --as-plugin
-    npx @azure/functions-skills plugin install --agent ghcp --dry-run
-    npx @azure/functions-skills workspace apply --agent codex --mode plugin-reference --dry-run
-    npx @azure/functions-skills template list --language typescript --resource http --iac bicep
-    npx @azure/functions-skills template apply --dir ./app --language typescript --template http-trigger-typescript-azd
-    npx @azure/functions-skills chat
-    npx @azure/functions-skills chat --as-plugin --agent claude-code
-  `);
-}
-
-function printCommandHelp(topic) {
-  const text = HELP_TEXT[topic];
-  if (!text) {
-    console.error(`Unknown help topic: ${topic}`);
-    process.exit(1);
-  }
-  console.log(text);
-}
-
-function printChatDryRun(result, setupSkillPending) {
-  const startupPromptIncluded = chatPromptIncludedInArgs(result);
-  console.log('Planned chat launch:');
-  console.log(`  Agent: ${result.agent}`);
-  console.log(`  Working directory: ${result.cwd}`);
-  console.log(`  Command: ${result.command}`);
-  console.log(`  Arguments: ${formatChatArgs(result.args, result.prompt)}`);
-  console.log(`  Startup prompt: ${startupPromptIncluded ? 'included' : 'not included'}`);
-  console.log(`  Setup instruction: ${setupSkillPending && startupPromptIncluded ? 'included' : 'not included'}`);
-  if (startupPromptIncluded) console.log(`  Prompt preview: ${previewPrompt(result.prompt)}`);
-}
-
-function printWorkspaceResultDetails(result, indent = '  ') {
-  if (result.overwritten.length > 0) {
-    console.log(`${indent}Overwrite:`);
-    for (const file of result.overwritten) console.log(`${indent}  - ${file}`);
-  }
-  if (result.managedBlockUpdated.length > 0) {
-    console.log(`${indent}Managed update:`);
-    for (const file of result.managedBlockUpdated) console.log(`${indent}  - ${file}`);
-  }
-  if (result.savedAside.length > 0) {
-    console.log(`${indent}Save aside (review & merge manually):`);
-    for (const entry of result.savedAside) console.log(`${indent}  - ${entry.original} → ${entry.aside}`);
-  }
-  if (result.overwritten.length === 0 && result.managedBlockUpdated.length === 0 && result.savedAside.length === 0) {
-    for (const file of result.plannedFiles) console.log(`${indent}- ${file}`);
-  }
-}
-
-function printSavedAsideWarning(savedAside) {
-  if (savedAside.length === 0) return;
-  console.log('\n⚠️  Some files were saved aside for manual review:');
-  for (const entry of savedAside) {
-    console.log(`   ${entry.original} → ${entry.aside}`);
-  }
-  console.log('   Review these files and merge changes as needed.');
-}
-
-function chatPromptIncludedInArgs(result) {
-  return Boolean(result.prompt && result.args.includes(result.prompt));
-}
-
-function formatChatArgs(args, prompt) {
-  return args
-    .map(arg => (prompt && arg === prompt ? '<startup prompt>' : formatShellArg(arg)))
-    .join(' ');
-}
-
-function formatShellArg(arg) {
-  if (/^[A-Za-z0-9_@%+=:,./\\-]+$/.test(arg)) return arg;
-  return JSON.stringify(arg);
-}
-
-function previewPrompt(prompt) {
-  const normalized = prompt.replace(/\s+/g, ' ').trim();
-  return normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
-}
-
-/** Extract the value following a flag from args, e.g. getFlag('--dir') → '/path'. */
-function getFlag(flag) {
-  const idx = args.indexOf(flag);
-  if (idx === -1 || idx + 1 >= args.length) return undefined;
-  return args[idx + 1];
-}
-
-async function resolveInstallTargets({ action, agents, all, dir, readState, getInstalledTargets }) {
-  if (agents.length > 0 && all) {
-    console.error('Use either --agent <name> or --all, not both.');
-    process.exit(1);
-  }
-
-  if (agents.length > 0) return validateTargets(agents);
-  if (all) return TARGETS;
-
-  if (action === 'update') {
-    const state = readState(dir);
-    const installedTargets = state ? getInstalledTargets(state) : [];
-    if (installedTargets.length > 0) return installedTargets;
-  }
-
-  if (isInteractive()) return askTargetSelection(action);
-
-  const verb = action === 'install' ? 'install' : 'update';
-  console.error(`Choose an agent with --agent <name> or use --all to ${verb} every supported agent.`);
-  if (action === 'update') console.error('If this workspace was installed before, make sure .azure-functions-skills/state.local.json exists.');
-  process.exit(1);
-}
-
-function validateTargets(values) {
-  const invalid = values.filter(value => !TARGETS.includes(value));
-  if (invalid.length > 0) {
-    console.error(`Unknown agent: ${invalid.join(', ')}. Available: ${TARGETS.join(', ')}`);
-    process.exit(1);
-  }
-  return [...new Set(values)];
-}
-
-async function askTargetSelection(action) {
-  const { createInterface } = await import('node:readline/promises');
-  const readline = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    console.log(`Select agents to ${action}:`);
-    TARGETS.forEach((target, index) => console.log(`  ${index + 1}. ${target}`));
-    console.log(`  ${TARGETS.length + 1}. all`);
-    const answer = (await readline.question('Enter number(s), comma-separated: ')).trim();
-    if (answer === String(TARGETS.length + 1) || answer.toLowerCase() === 'all') return TARGETS;
-    const selected = answer
-      .split(',')
-      .map(value => value.trim())
-      .filter(Boolean)
-      .map(value => TARGETS[Number(value) - 1] || value);
-    return validateTargets(selected);
-  } finally {
-    readline.close();
-  }
-}
-
-async function askLauncherSelection(reason) {
-  const { createInterface } = await import('node:readline/promises');
-  const readline = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    if (reason) console.log(reason);
-    console.log('Select chat agent:');
-    LAUNCHER_IDS.forEach((launcher, index) => console.log(`  ${index + 1}. ${launcher}`));
-    const answer = (await readline.question('Enter number: ')).trim();
-    const selected = LAUNCHER_IDS[Number(answer) - 1] || answer;
-    if (!LAUNCHER_IDS.includes(selected)) {
-      console.error(`Unknown chat agent: ${selected}. Available: ${LAUNCHER_IDS.join(', ')}`);
-      process.exit(1);
-    }
-    return selected;
-  } finally {
-    readline.close();
-  }
-}
-
-async function updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry }) {
-  let result = ensureStateIgnored(dir, { yes, interactive: false });
-  if (result.status === 'needs-approval' && isInteractive()) {
-    const approved = await askYesNo(`Add ${stateIgnoreEntry} to .gitignore so local state is not committed?`);
-    if (approved) result = ensureStateIgnored(dir, { yes: true, interactive: false });
-  }
-  return result;
-}
-
-async function ensureGitRepo({ dir, yes, agents, action }) {
-  // Only relevant for GHCP installs — Copilot needs a git repo to discover agent definitions
-  if (!agents.includes('ghcp') || action === 'update') {
-    return { status: 'skipped' };
-  }
-  try {
-    const { execFileSync } = await import('node:child_process');
-    const { resolve, normalize } = await import('node:path');
-    try {
-      const toplevel = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: dir, stdio: 'pipe', encoding: 'utf-8' }).trim();
-      const resolvedDir = resolve(dir);
-      const resolvedToplevel = resolve(toplevel);
-      // Only "detected" if this workspace IS the git root — not a subdirectory of another repo
-      if (normalize(resolvedDir).toLowerCase() === normalize(resolvedToplevel).toLowerCase()) {
-        return { status: 'detected' };
-      }
-      // Inside a parent git repo but not the root — Copilot needs .git at workspace root
-    } catch {
-      // Not inside any git repo
-    }
-    // Need to init — either not in any repo, or in a parent repo's subdirectory
-    if (yes) {
-      execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
-      return { status: 'initialized' };
-    }
-    if (isInteractive()) {
-      const approved = await askYesNo('Initialize git repository? GitHub Copilot requires a git repo to discover agent definitions.');
-      if (approved) {
-        execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
-        return { status: 'initialized' };
-      }
-    }
-    return { status: 'not-initialized' };
-  } catch {
-    return { status: 'git-unavailable' };
-  }
-}
-
-async function askYesNo(question) {
-  const { createInterface } = await import('node:readline/promises');
-  const readline = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const answer = (await readline.question(`${question} [y/N] `)).trim().toLowerCase();
-    return answer === 'y' || answer === 'yes';
-  } finally {
-    readline.close();
-  }
-}
-
-function isInteractive() {
-  return process.stdin.isTTY === true && process.stdout.isTTY === true;
-}
-
-function printInstallSummary({ action, agents, dir, filesWritten, state, gitignoreResult, gitRepoResult }) {
-  const noun = action === 'install' ? 'installed' : 'updated';
-  const label = action === 'install' ? 'Installed' : 'Updated';
-  console.log(`Azure Functions Skills ${noun}.`);
-  console.log(`  ${label} agents: ${agents.join(', ')}`);
-  console.log(`  Workspace files written: ${filesWritten}`);
-  console.log('  State: .azure-functions-skills/state.local.json');
-  if (state.chat.defaultAgent) console.log(`  Default chat agent: ${state.chat.defaultAgent}`);
-  else console.log('  Default chat agent: not set; chat will ask when multiple agents are installed');
-  if (gitignoreResult.status === 'updated') console.log(`  Git ignore: added ${gitignoreResult.entry}`);
-  else if (gitignoreResult.status === 'already-ignored') console.log(`  Git ignore: ${gitignoreResult.entry} already configured`);
-  else console.log(`  Git ignore: add ${gitignoreResult.entry} to keep local state out of Git`);
-  if (gitRepoResult && gitRepoResult.status === 'initialized') console.log('  Git repo: initialized');
-  else if (gitRepoResult && gitRepoResult.status === 'not-initialized') console.log('  Git repo: not initialized — Copilot requires a git repo to discover agent definitions');
-  else if (gitRepoResult && gitRepoResult.status === 'git-unavailable') console.log('  Git repo: not checked — git executable not found');
-  console.log(`  Next: azure-functions-skills chat --dir "${dir}"`);
-}
-
-function printPackageUpdateGuidance(packageUpdate) {
-  if (!packageUpdate || packageUpdate.status !== 'update-available') return;
-  console.log(`  Package update: ${packageUpdate.message}`);
-}
+  --template <id>           Template identifier
+  --dir <path>              Target directory (default: current directory)
+  --language <name>         Disambiguate templates by language
+  --resource <name>         Filter by resource type
+  --iac <name>              Filter by infrastructure-as-code type
+  --runtime-version <value> Replace runtime version tokens
+  --mode <auto|new|add>     Apply mode (default: auto)
+  --manifest-url <url>      Override the template manifest
+  --dry-run                 Preview file changes
+  --force                   Overwrite conflicting files
+  --json                    Print JSON output
+`;
 
 if (command === '--version' || command === '-V') {
   const { readFileSync } = await import('node:fs');
-  const { join: joinPath, dirname } = await import('node:path');
-  const { fileURLToPath } = await import('node:url');
-  const pkgDir = dirname(dirname(fileURLToPath(import.meta.url)));
-  const pkg = JSON.parse(readFileSync(joinPath(pkgDir, 'package.json'), 'utf-8'));
-  console.log(pkg.version);
+  const packageJson = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf-8'));
+  console.log(packageJson.version);
   process.exit(0);
 }
 
-if (!command || command === '--help' || command === '-h') {
-  printHelp();
+if (command === 'help' && args[1] === 'doctor') {
+  console.log(DOCTOR_HELP.trim());
   process.exit(0);
 }
 
-if (command === 'help') {
-  const topic = args.slice(1).join(' ');
-  if (!topic) printHelp();
-  else printCommandHelp(topic);
+if (!command || command === '--help' || command === '-h' || command === 'help') {
+  console.log(HELP.trim());
   process.exit(0);
 }
 
 if (command === 'install' || command === 'update') {
-  const separatorIndex = args.indexOf('--', 1);
-  const commandArgs = separatorIndex === -1 ? args.slice(1) : args.slice(1, separatorIndex);
-  if (commandArgs.includes('--help') || commandArgs.includes('-h')) {
-    printCommandHelp(command);
-    process.exit(0);
-  }
-  const passthroughArgs = separatorIndex === -1 ? [] : args.slice(separatorIndex + 1);
-  const agents = [];
-  let dir = process.cwd();
-  let local = false;
-  let all = false;
-  let dryRun = false;
-  let yes = false;
-  let force = false;
-  let noTelemetry = false;
-  let includeMcp = true;
-  let includeHooks = true;
-  let source = 'marketplace';
-  let scope = 'workspace';
-  let prerequisites = 'auto';
-
-  for (let i = 0; i < commandArgs.length; i++) {
-    if (commandArgs[i] === '--agent' && commandArgs[i + 1]) agents.push(commandArgs[++i]);
-    else if (commandArgs[i] === '--all') all = true;
-    else if (commandArgs[i] === '--dir' && commandArgs[i + 1]) dir = commandArgs[++i];
-    else if (commandArgs[i] === '--local') local = true;
-    else if (commandArgs[i] === '--dry-run') dryRun = true;
-    else if (commandArgs[i] === '--yes') yes = true;
-    else if (commandArgs[i] === '--force') force = true;
-    else if (commandArgs[i] === '--no-mcp') includeMcp = false;
-    else if (commandArgs[i] === '--no-hooks') includeHooks = false;
-    else if (commandArgs[i] === '--no-telemetry') noTelemetry = true;
-    else if (commandArgs[i] === '--source' && commandArgs[i + 1]) source = commandArgs[++i];
-    else if (commandArgs[i] === '--scope' && commandArgs[i + 1]) scope = commandArgs[++i];
-    else if (commandArgs[i] === '--check-prerequisites') prerequisites = 'check-only';
-    else if (commandArgs[i] === '--skip-prerequisites') prerequisites = 'skip';
-  }
-
-  const { readState, getInstalledTargets, recordInstallState, ensureStateIgnored, STATE_IGNORE_ENTRY, resolveInstallMode } = await import('../lib/setup/state.js');
-  const detectedAgents = await resolveInstallTargets({
-    action: command,
-    agents,
-    all,
-    dir,
-    readState,
-    getInstalledTargets,
-  });
-  if (passthroughArgs.length > 0 && detectedAgents.length !== 1) {
-    console.error('Cannot use passthrough arguments with multiple agents. Run one agent at a time.');
-    process.exit(1);
-  }
-
-  // Auto-detect install mode from state when running 'update' without explicit --local
-  if (command === 'update' && !local) {
-    const state = readState(dir);
-    if (state) {
-      const mode = resolveInstallMode(state, detectedAgents);
-      if (mode === 'local') local = true;
-      if (mode === 'mixed') {
-        console.error('Mixed install modes detected: some agents were installed locally, others as plugins.');
-        console.error('Run update separately per agent with --agent <name>.');
-        process.exit(1);
-      }
-    }
-  }
-
-  // Prevent mixed-mode installs: block if existing agents use a different mode
-  if (command === 'install') {
-    const state = readState(dir);
-    if (state) {
-      const existingTargets = getInstalledTargets(state);
-      if (existingTargets.length > 0) {
-        const existingMode = resolveInstallMode(state, existingTargets);
-        const requestedMode = local ? 'local' : 'plugin';
-        if (existingMode !== 'mixed' && existingMode !== requestedMode) {
-          console.error(`Cannot mix install modes: existing agents use '${existingMode}' mode, but '${requestedMode}' was requested.`);
-          console.error(`Use --local to match, or reinstall all agents with the same mode.`);
-          process.exit(1);
-        }
-      }
-    }
-  }
-
-  if (local) {
-    if (command === 'update') {
-      // Use file-type-aware local update strategy
-      const { applyLocalUpdate, createInteractivePrompter } = await import('../lib/setup/local-update.js');
-      const { checkPackageUpdate } = await import('../lib/setup/package-update.js');
-      const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
-      const packageUpdate = await checkPackageUpdate();
-      const result = await applyLocalUpdate(dir, {
-        agents: detectedAgents,
-        force,
-        dryRun,
-        yes,
-        prompter,
-      });
-      if (dryRun) {
-        console.log(`Planned local update:`);
-        console.log('  Local assets: bundled with @azure/functions-skills');
-        if (result.overwritten.length > 0) {
-          console.log('  Overwrite:');
-          for (const f of result.overwritten) console.log(`    - ${f}`);
-        }
-        if (result.managedBlockUpdated.length > 0) {
-          console.log('  Managed-block update:');
-          for (const f of result.managedBlockUpdated) console.log(`    - ${f}`);
-        }
-        if (result.savedAside.length > 0) {
-          console.log('  Save aside (review & merge manually):');
-          for (const entry of result.savedAside) console.log(`    - ${entry.original} → ${entry.aside}`);
-        }
-        printPackageUpdateGuidance(packageUpdate);
-      } else {
-        const state = recordInstallState(dir, {
-          action: command,
-          agents: detectedAgents,
-          mode: 'local',
-          source: 'local',
-          scope,
-          includeMcp: true,
-          includeHooks: true,
-          includeAgent: detectedAgents.includes('ghcp'),
-          telemetryEnabled: noTelemetry ? false : undefined,
-          telemetrySource: noTelemetry ? 'install-flag' : undefined,
-        });
-        const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
-        printInstallSummary({ action: command, agents: detectedAgents, dir, filesWritten: result.overwritten.length + result.managedBlockUpdated.length + result.savedAside.length, state, gitignoreResult });
-        console.log('  Local assets: bundled with @azure/functions-skills');
-        printPackageUpdateGuidance(packageUpdate);
-        if (result.savedAside.length > 0) {
-          console.log('\n⚠️  Some files were saved aside for manual review:');
-          for (const entry of result.savedAside) {
-            console.log(`   ${entry.original} → ${entry.aside}`);
-          }
-          console.log('   Review these files and merge changes as needed.');
-        }
-      }
-    } else {
-      const { installLocalSkills } = await import('../lib/setup/index.js');
-      const result = await installLocalSkills({
-        targetDir: dir,
-        agents: detectedAgents,
-        dryRun,
-        yes,
-        prerequisites,
-        scope,
-        telemetryEnabled: noTelemetry ? false : undefined,
-        telemetrySource: noTelemetry ? 'install-flag' : undefined,
-        approveStateGitignore: isInteractive() ? () => askYesNo(`Add ${STATE_IGNORE_ENTRY} to .gitignore so local state is not committed?`) : undefined,
-        approveGitInit: isInteractive() ? () => askYesNo('Initialize git repository? GitHub Copilot requires a git repo to discover agent definitions.') : undefined,
-      });
-      if (dryRun) {
-        console.log(`Planned local install:`);
-        console.log('  Local assets: bundled with @azure/functions-skills');
-        for (const planned of result.plannedFiles) console.log(`  - ${planned}`);
-        printPackageUpdateGuidance(result.packageUpdate);
-      } else {
-        printInstallSummary({
-          action: command,
-          agents: detectedAgents,
-          dir,
-          filesWritten: result.filesWritten,
-          state: result.state,
-          gitignoreResult: result.gitignoreResult,
-          gitRepoResult: result.gitRepoResult,
-        });
-        console.log('  Local assets: bundled with @azure/functions-skills');
-        printPackageUpdateGuidance(result.packageUpdate);
-      }
-    }
-  } else {
-    const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
-    const { applyWorkspace } = await import('../lib/setup/workspace.js');
-    const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
-    const action = command;
-    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
-    const pluginResult = await runPluginOperation({
-      action,
-      agents: detectedAgents,
-      projectDir: dir,
-      dryRun,
-      source,
-      scope,
-      workspace: false,
-      yes,
-      passthroughArgs,
-    });
-    const workspaceResult = await applyWorkspace(dir, {
-      agents: detectedAgents,
-      mode: 'plugin-reference',
-      update: action === 'update',
-      dryRun,
-      yes,
-      force,
-      prompter,
-      includeMcp,
-      includeHooks,
-      includeAgent: true,
-      telemetryEnabled: noTelemetry ? false : undefined,
-      telemetrySource: noTelemetry ? 'install-flag' : undefined,
-    });
-
-    if (dryRun) {
-      console.log(`Planned ${action}:`);
-      console.log('  Plugin:');
-      for (const step of pluginResult.steps) {
-        console.log(`    - ${step.target}: ${step.description}`);
-        for (const pluginCommand of step.commands || []) console.log(`        $ ${pluginCommand}`);
-      }
-      console.log('  Workspace:');
-      printWorkspaceResultDetails(workspaceResult, '    ');
-    } else {
-      const state = recordInstallState(dir, {
-        action,
-        agents: detectedAgents,
-        mode: 'plugin',
-        source,
-        scope,
-        includeMcp,
-        includeHooks,
-        includeAgent: true,
-        telemetryEnabled: noTelemetry ? false : undefined,
-        telemetrySource: noTelemetry ? 'install-flag' : undefined,
-      });
-      const gitignoreResult = await updateStateGitignore({ dir, yes, ensureStateIgnored, stateIgnoreEntry: STATE_IGNORE_ENTRY });
-      const gitRepoResult = await ensureGitRepo({ dir, yes, agents: detectedAgents, action });
-      printInstallSummary({ action, agents: detectedAgents, dir, filesWritten: workspaceResult.filesWritten, state, gitignoreResult, gitRepoResult });
-      printSavedAsideWarning(workspaceResult.savedAside);
-    }
-  }
-} else if (command === 'setup') {
-  const { detectAgents, applySetup } = await import('../lib/setup/index.js');
-  const agents = [];
-  let dir = process.cwd();
-  let asPlugin = false;
-  let prerequisites = 'auto';
-
-  for (let i = 1; i < args.length; i++) {
-    if (args[i] === '--agent' && args[i + 1]) {
-      agents.push(args[++i]);
-    } else if (args[i] === '--dir' && args[i + 1]) {
-      dir = args[++i];
-    } else if (args[i] === '--as-plugin') {
-      asPlugin = true;
-    } else if (args[i] === '--check-prerequisites') {
-      prerequisites = 'check-only';
-    } else if (args[i] === '--skip-prerequisites') {
-      prerequisites = 'skip';
-    }
-  }
-
-  console.log('🔍 Detecting coding agents...');
-  const detectedAgents = agents.length > 0 ? agents : await detectAgents();
-  console.log(`  Found: ${detectedAgents.join(', ')}`);
-
-  if (asPlugin) {
-    // Native plugin install — register with each platform
-    const { installPlugin, getPluginDir } = await import('../lib/setup/plugin-install.js');
-
-    // Ensure plugins are built first
-    const { existsSync } = await import('node:fs');
-    if (!existsSync(getPluginDir('ghcp'))) {
-      console.log('\n📦 Building plugins first...');
-      const { execSync } = await import('node:child_process');
-      execSync('node lib/build/build.js', { stdio: 'inherit', cwd: join(import.meta.dirname, '..') });
-    }
-
-    console.log(`\n🔌 Installing as native plugins to: ${dir}\n`);
-
-    const agentToTarget = { ghcp: 'ghcp', claude: 'claude', codex: 'codex' };
-    const results = [];
-    for (const agent of detectedAgents) {
-      const target = agentToTarget[agent];
-      if (!target) {
-        console.log(`  ⚠️  Unknown agent: ${agent}, skipping`);
-        continue;
-      }
-      try {
-        const result = installPlugin(target, dir);
-        results.push(result);
-        console.log(`  ✅ ${target}: registered via ${result.method}`);
-        console.log(`     Plugin path: ${result.path}`);
-        if (result.instructions) {
-          console.log(`     → ${result.instructions}`);
-        }
-      } catch (err) {
-        console.error(`  ❌ ${target}: ${err.message}`);
-      }
-    }
-
-    console.log('\n⚡ Plugins registered! Updates will be picked up automatically when you update the npm package.');
-
-    const { ensurePrerequisites } = await import('../lib/setup/prerequisites/index.js');
-    const prerequisiteResults = await ensurePrerequisites({
-      targets: detectedAgents,
-      projectDir: dir,
-      mode: prerequisites,
-    });
-    printPrerequisiteResults(prerequisiteResults);
-  } else {
-    // File copy mode (original behavior)
-    console.log(`\n📁 Installing to: ${dir}\n`);
-    const result = await applySetup(dir, { agents: detectedAgents, prerequisites });
-    console.log(result.welcomeMessage);
-  }
-} else if (command === 'state') {
-  const action = args[1];
-  if (action === 'setup-complete' && (args.includes('--help') || args.includes('-h'))) {
-    printCommandHelp('state setup-complete');
-    process.exit(0);
-  }
-  if (action !== 'setup-complete') {
-    console.error(`Unknown state command: ${action || ''}`.trim());
-    console.error('Usage: azure-functions-skills state setup-complete [options]');
-    process.exit(1);
-  }
-
-  const { markSetupComplete } = await import('../lib/setup/state.js');
-  let dir = process.cwd();
-  let agent = null;
-  for (let i = 2; i < args.length; i++) {
-    if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
-    else if (args[i] === '--agent' && args[i + 1]) agent = args[++i];
-  }
-  if (agent && !LAUNCHER_IDS.includes(agent)) {
-    console.error(`Unknown chat agent: ${agent}. Available: ${LAUNCHER_IDS.join(', ')}`);
-    process.exit(1);
-  }
-  markSetupComplete(dir, agent);
-  console.log('Setup skill marked complete.');
-  console.log('  State: .azure-functions-skills/state.local.json');
-} else if (command === 'chat') {
-  const { chat } = await import('../lib/chat/index.js');
-
-  const separatorIndex = args.indexOf('--', 1);
-  const commandArgs = separatorIndex === -1 ? args.slice(1) : args.slice(1, separatorIndex);
-  if (commandArgs.includes('--help') || commandArgs.includes('-h')) {
-    printHelp();
-    process.exit(0);
-  }
-
-  let agent = null;
-  let prompt = null;
-  let dir = process.cwd();
-  let asPlugin = false;
-  let dryRun = false;
-  let prerequisites = 'auto';
-  const passthroughArgs = [];
-
-  for (let i = 1; i < args.length; i++) {
-    if (args[i] === '--agent' && args[i + 1]) agent = args[++i];
-    else if (args[i] === '--prompt' && args[i + 1]) prompt = args[++i];
-    else if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
-    else if (args[i] === '--as-plugin') asPlugin = true;
-    else if (args[i] === '--dry-run') dryRun = true;
-    else if (args[i] === '--check-prerequisites') prerequisites = 'check-only';
-    else if (args[i] === '--skip-prerequisites') prerequisites = 'skip';
-    else if (args[i] === '--') {
-      passthroughArgs.push(...args.slice(i + 1));
-      break;
-    } else {
-      passthroughArgs.push(args[i]);
-    }
-  }
-
-  // If --as-plugin, ensure plugin is registered first
-  if (asPlugin && !dryRun) {
-    const { installPlugin, getPluginDir } = await import('../lib/setup/plugin-install.js');
-    const { existsSync } = await import('node:fs');
-
-    if (!existsSync(getPluginDir('ghcp'))) {
-      console.log('📦 Building plugins first...');
-      const { execSync } = await import('node:child_process');
-      execSync('node lib/build/build.js', { stdio: 'inherit', cwd: join(import.meta.dirname, '..') });
-    }
-
-    // Map CLI agent names to targets
-    const agentToTarget = { 'github-copilot': 'ghcp', 'claude-code': 'claude', 'codex': 'codex' };
-
-    if (agent && agentToTarget[agent]) {
-      try {
-        const result = installPlugin(agentToTarget[agent], dir);
-        console.log(`🔌 Plugin registered: ${result.method}`);
-        if (result.instructions) console.log(`   → ${result.instructions}`);
-      } catch (err) {
-        console.warn(`⚠️  Plugin install: ${err.message}`);
-      }
-    }
-  }
-
-  const { readState, resolveStateLauncher, markSetupPrompted } = await import('../lib/setup/state.js');
-  const state = readState(dir);
-
-  if (!agent) {
-    const resolution = resolveStateLauncher(state);
-    if (resolution.kind === 'resolved') {
-      agent = resolution.agent;
-      console.log(`Using chat agent from .azure-functions-skills state: ${agent}`);
-    } else if (resolution.kind === 'ambiguous') {
-      if (isInteractive()) agent = await askLauncherSelection(`Multiple agents are installed: ${resolution.agents.join(', ')}`);
-      else {
-        console.error(`Multiple agents are installed: ${resolution.agents.join(', ')}. Choose one with --agent <name>.`);
-        process.exit(1);
-      }
-    } else if (isInteractive()) {
-      agent = await askLauncherSelection('No .azure-functions-skills state was found for chat agent selection.');
-    } else {
-      console.error('No .azure-functions-skills state was found. Run install first or choose an agent with --agent <name>.');
-      process.exit(1);
-    }
-  }
-
-  if (!dryRun) console.log(`\n🚀 Launching ${agent} with Azure Functions context...\n`);
-
-  const options = { agent, dir };
-  if (prompt) options.prompt = prompt;
-  if (passthroughArgs.length > 0) options.passthroughArgs = passthroughArgs;
-  options.prerequisites = prerequisites;
-  options.dryRun = dryRun;
-  const setupSkillPending = Boolean(state && state.setupSkill.status !== 'completed');
-  if (setupSkillPending) {
-    options.setupSkillPending = true;
-    options.setupCompleteCommand = `azure-functions-skills state setup-complete --dir "${dir}" --agent ${agent}`;
-  }
-  const result = await chat(options);
-  if (dryRun) printChatDryRun(result, setupSkillPending);
-  else if (setupSkillPending && chatPromptIncludedInArgs(result)) markSetupPrompted(dir, agent);
-} else if (command === 'workspace') {
-  const action = args[1];
-  if ((action === 'apply' || action === 'update') && (args.includes('--help') || args.includes('-h'))) {
-    printCommandHelp(`workspace ${action}`);
-    process.exit(0);
-  }
-  if (action !== 'apply' && action !== 'update') {
-    console.error(`Unknown workspace command: ${action || ''}`.trim());
-    console.error('Usage: azure-functions-skills workspace apply|update [options]');
-    process.exit(1);
-  }
-
-  const { applyWorkspace } = await import('../lib/setup/workspace.js');
-  const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
-  const agents = [];
-  let dir = process.cwd();
-  let mode = 'copy';
-  let mergeStrategy = 'managed-block';
-  let dryRun = false;
-  let update = action === 'update';
-  let yes = false;
-  let force = false;
-  let includeMcp = false;
-  let includeHooks = false;
-  let includeAgent = false;
-
-  for (let i = 2; i < args.length; i++) {
-    if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
-    else if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
-    else if (args[i] === '--mode' && args[i + 1]) mode = args[++i];
-    else if (args[i] === '--merge-strategy' && args[i + 1]) mergeStrategy = args[++i];
-    else if (args[i] === '--dry-run') dryRun = true;
-    else if (args[i] === '--update') update = true;
-    else if (args[i] === '--yes') yes = true;
-    else if (args[i] === '--force') force = true;
-    else if (args[i] === '--include-mcp') includeMcp = true;
-    else if (args[i] === '--include-hooks') includeHooks = true;
-    else if (args[i] === '--include-agent') includeAgent = true;
-  }
-
-  let result;
-  try {
-    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
-    result = await applyWorkspace(dir, {
-      agents: agents.length > 0 ? agents : undefined,
-      mode,
-      mergeStrategy,
-      update,
-      dryRun,
-      yes,
-      force,
-      prompter,
-      includeMcp,
-      includeHooks,
-      includeAgent,
-    });
-  } catch (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-
-  if (dryRun) {
-    console.log('Planned workspace changes:');
-    printWorkspaceResultDetails(result, '  ');
-  } else {
-    console.log(`Workspace ${action} complete.`);
-    console.log(`  Agents configured: ${result.agents.join(', ')}`);
-    console.log(`  Mode: ${result.mode}`);
-    console.log(`  Files written: ${result.filesWritten}`);
-    printSavedAsideWarning(result.savedAside);
-  }
-} else if (command === 'plugin') {
-  const action = args[1];
-  if ((action === 'install' || action === 'update') && (args.includes('--help') || args.includes('-h'))) {
-    printCommandHelp(`plugin ${action}`);
-    process.exit(0);
-  }
-  if (action !== 'install' && action !== 'update') {
-    console.error(`Unknown plugin command: ${action || ''}`.trim());
-    console.error('Usage: azure-functions-skills plugin install|update [options]');
-    process.exit(1);
-  }
-
-  const { detectAgents } = await import('../lib/setup/index.js');
-  const { runPluginOperation } = await import('../lib/setup/plugin-install.js');
-  const { createInteractivePrompter } = await import('../lib/setup/local-update.js');
-  const agents = [];
-  let dir = process.cwd();
-  let scope = 'workspace';
-  let source = 'marketplace';
-  let version = undefined;
-  let workspace = true;
-  let dryRun = false;
-  let yes = false;
-  let force = false;
-  let noTelemetry = false;
-
-  for (let i = 2; i < args.length; i++) {
-    if (args[i] === '--agent' && args[i + 1]) agents.push(args[++i]);
-    else if (args[i] === '--dir' && args[i + 1]) dir = args[++i];
-    else if (args[i] === '--scope' && args[i + 1]) scope = args[++i];
-    else if (args[i] === '--source' && args[i + 1]) source = args[++i];
-    else if (args[i] === '--version' && args[i + 1]) version = args[++i];
-    else if (args[i] === '--workspace') workspace = true;
-    else if (args[i] === '--no-workspace') workspace = false;
-    else if (args[i] === '--dry-run') dryRun = true;
-    else if (args[i] === '--yes') yes = true;
-    else if (args[i] === '--force') force = true;
-    else if (args[i] === '--no-telemetry') noTelemetry = true;
-  }
-
-  const detectedAgents = agents.length > 0 ? agents : await detectAgents();
-  let result;
-  try {
-    const prompter = isInteractive() && !force && !yes && !dryRun ? createInteractivePrompter() : undefined;
-    result = await runPluginOperation({
-      action,
-      agents: detectedAgents,
-      projectDir: dir,
-      dryRun,
-      scope,
-      source,
-      version,
-      workspace,
-      yes,
-      force,
-      prompter,
-    });
-  } catch (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-
-  if (dryRun) {
-    console.log(`Planned plugin ${action}:`);
-    for (const step of result.steps) {
-      console.log(`  - ${step.target}: ${step.description}`);
-      for (const command of step.commands || []) console.log(`      $ ${command}`);
-    }
-  } else {
-    if (!dryRun) {
-      const { recordInstallState, ensureStateIgnored } = await import('../lib/setup/state.js');
-      recordInstallState(dir, {
-        action,
-        agents: detectedAgents,
-        mode: 'plugin',
-        source,
-        scope,
-        includeMcp: false,
-        includeHooks: false,
-        includeAgent: workspace,
-        telemetryEnabled: noTelemetry ? false : undefined,
-        telemetrySource: noTelemetry ? 'install-flag' : undefined,
-      });
-      ensureStateIgnored(dir, { yes });
-    }
-    console.log(`Plugin ${action} complete.`);
-    console.log(`  Agents configured: ${result.agents.join(', ')}`);
-    console.log(`  Files written: ${result.filesWritten}`);
-  }
+  await runLocalInstall(command);
 } else if (command === 'template') {
-  const action = args[1];
-  if ((action === 'list' || action === 'apply') && (args.includes('--help') || args.includes('-h'))) {
-    printCommandHelp(`template ${action}`);
-    process.exit(0);
-  }
-  if (action !== 'list' && action !== 'apply') {
-    console.error(`Unknown template command: ${action || ''}`.trim());
-    console.error('Usage: azure-functions-skills template list|apply [options]');
-    process.exit(1);
-  }
-
-  const { listFunctionTemplates, applyFunctionTemplate } = await import('../lib/templates/index.js');
-  const options = parseTemplateOptions(args.slice(2));
-  try {
-    if (action === 'list') {
-      const result = await listFunctionTemplates({
-        manifestUrl: options.manifestUrl,
-        language: options.language,
-        resource: options.resource,
-        iac: options.iac,
-      });
-      if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        printTemplateList(result.templates);
-      }
-    } else {
-      if (!options.template) {
-        console.error('Missing required option: --template <id>');
-        process.exit(1);
-      }
-      const result = await applyFunctionTemplate(options.dir, {
-        manifestUrl: options.manifestUrl,
-        language: options.language,
-        template: options.template,
-        runtimeVersion: options.runtimeVersion,
-        mode: options.mode,
-        dryRun: options.dryRun,
-        force: options.force,
-      });
-      if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else if (result.dryRun) {
-        console.log('Planned template apply:');
-        console.log(`  Template: ${result.template.id}`);
-        console.log(`  Mode: ${result.mode}`);
-        for (const file of result.filesWritten) console.log(`  + ${file}`);
-        for (const file of result.skippedFiles) console.log(`  - ${file} (skipped)`);
-      } else {
-        console.log('Template applied.');
-        console.log(`  Template: ${result.template.id}`);
-        console.log(`  Mode: ${result.mode}`);
-        console.log(`  Files written: ${result.filesWritten.length}`);
-        if (result.skippedFiles.length > 0) console.log(`  Files skipped: ${result.skippedFiles.length}`);
-      }
-    }
-  } catch (err) {
-    console.error(`Template ${action} failed: ${err.message}`);
-    process.exit(1);
-  }
+  await runTemplateCommand();
 } else if (command === 'build') {
-  // Delegate to build script
   const { execFileSync } = await import('node:child_process');
   execFileSync(
     process.execPath,
@@ -1221,64 +81,140 @@ if (command === 'install' || command === 'update') {
     { stdio: 'inherit' },
   );
 } else if (command === 'doctor') {
-  const { runDoctor, formatReport } = await import('../lib/doctor/index.js');
-  const { writeFileSync, mkdirSync } = await import('node:fs');
-  const { dirname } = await import('node:path');
-
-  const dir = getFlag('--dir') || process.cwd();
-  const deep = args.includes('--deep');
-  const noDeep = args.includes('--no-deep');
-  const acceptDeepRisk = args.includes('--accept-deep-risk');
-  const agent = getFlag('--agent');
-  const timeout = parseInt(getFlag('--timeout') || '300', 10);
-  const format = getFlag('--format') || 'text';
-  const output = getFlag('--output') || join(dir, '.azure-functions-skills', 'doctor-report.json');
-  const checksArg = getFlag('--checks');
-  const checks = checksArg ? checksArg.split(',').map(s => s.trim()) : undefined;
-  const severity = getFlag('--severity') || 'high';
-  const installMode = getFlag('--install-mode') || 'local';
-
-  try {
-    const { report, exitCode } = await runDoctor({
-      dir,
-      deep: deep && !noDeep,
-      acceptDeepRisk,
-      agent,
-      timeout,
-      format,
-      output,
-      checks,
-      severity,
-      installMode,
-    });
-
-    console.log(formatReport(report, 'text'));
-
-    // Write report file in the requested format
-    const reportDir = dirname(output);
-    mkdirSync(reportDir, { recursive: true });
-    writeFileSync(output, formatReport(report, format));
-
-    process.exit(exitCode);
-  } catch (err) {
-    console.error(`Doctor failed: ${err.message}`);
-    process.exit(2);
-  }
+  await runDoctorCommand();
 } else {
   console.error(`Unknown command: ${command}`);
+  console.error(HELP.trim());
   process.exit(1);
 }
 
-function printPrerequisiteResults(results) {
-  const actionable = results.filter(result => result.status !== 'present' && result.status !== 'skipped');
-  if (actionable.length === 0) return;
+async function runLocalInstall(action) {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+Usage: azure-functions-skills ${action} --local [options]
 
-  console.log('\nExternal prerequisites:');
-  for (const result of actionable) {
-    console.log(`  ⚠️  ${result.id} (${result.target}): ${result.message}`);
-    for (const command of result.commands || []) {
-      console.log(`     → ${command}`);
+Options:
+  --local            Required; install package-bundled assets into the workspace
+  --agent <name>     ghcp, claude, or codex (repeatable)
+  --all              Install for all supported agents
+  --dir <path>       Target directory (default: current directory)
+  --dry-run          List files without writing them
+`.trim());
+    process.exit(0);
+  }
+
+  if (!args.includes('--local')) {
+    console.error('This package no longer installs plugins. Use your coding agent to install the plugin, or pass --local for a workspace-local copy.');
+    process.exit(1);
+  }
+
+  const selectedAgents = flagValues('--agent');
+  const invalidAgent = selectedAgents.find(agent => !TARGETS.includes(agent));
+  if (invalidAgent) {
+    console.error(`Unknown agent: ${invalidAgent}. Available: ${TARGETS.join(', ')}`);
+    process.exit(1);
+  }
+
+  const { detectAgents, installLocalSkills } = await import('../lib/setup/index.js');
+  const agents = args.includes('--all')
+    ? TARGETS
+    : selectedAgents.length > 0
+      ? selectedAgents
+      : await detectAgents();
+  const dir = getFlag('--dir') || process.cwd();
+  const result = await installLocalSkills({
+    targetDir: dir,
+    agents,
+    dryRun: args.includes('--dry-run'),
+  });
+
+  if (result.dryRun) {
+    console.log(`Planned local ${action}:`);
+    for (const file of result.plannedFiles) console.log(`  - ${file}`);
+  } else {
+    console.log(`Azure Functions Skills locally ${action === 'install' ? 'installed' : 'updated'}.`);
+    console.log(`  Agents: ${result.agents.join(', ')}`);
+    console.log(`  Files written: ${result.filesWritten}`);
+  }
+  if (result.packageUpdate.status === 'update-available') {
+    console.log(`  Package update: ${result.packageUpdate.message}`);
+  }
+}
+
+async function runTemplateCommand() {
+  const action = args[1];
+  if (action !== 'list' && action !== 'apply') {
+    console.error('Usage: azure-functions-skills template list|apply [options]');
+    process.exit(1);
+  }
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(action === 'apply'
+      ? TEMPLATE_APPLY_HELP.trim()
+      : 'Usage: azure-functions-skills template list [options]');
+    return;
+  }
+  const { listFunctionTemplates, applyFunctionTemplate } = await import('../lib/templates/index.js');
+  const options = parseTemplateOptions(args.slice(2));
+  try {
+    if (action === 'list') {
+      const result = await listFunctionTemplates(options);
+      if (options.json) console.log(JSON.stringify(result, null, 2));
+      else printTemplateList(result.templates);
+      return;
     }
+
+    if (!options.template) {
+      console.error('Missing required option: --template <id>');
+      process.exit(1);
+    }
+    const result = await applyFunctionTemplate(options.dir, options);
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log(result.dryRun ? 'Planned template apply:' : 'Template applied.');
+    console.log(`  Template: ${result.template.id}`);
+    console.log(`  Mode: ${result.mode}`);
+    for (const file of result.filesWritten) console.log(`  + ${file}`);
+    for (const file of result.skippedFiles) console.log(`  - ${file} (skipped)`);
+    console.log(`  Files written: ${result.filesWritten.length}`);
+    if (result.skippedFiles.length > 0) console.log(`  Files skipped: ${result.skippedFiles.length}`);
+  } catch (error) {
+    console.error(`Template ${action} failed: ${errorMessage(error)}`);
+    process.exit(1);
+  }
+}
+
+async function runDoctorCommand() {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(DOCTOR_HELP.trim());
+    return;
+  }
+  const { runDoctor, formatReport } = await import('../lib/doctor/index.js');
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { dirname } = await import('node:path');
+  const dir = getFlag('--dir') || process.cwd();
+  const output = getFlag('--output') || join(dir, '.azure-functions-doctor', 'doctor-report.json');
+  const checksFlag = getFlag('--checks');
+  try {
+    const { report, exitCode } = await runDoctor({
+      dir,
+      deep: args.includes('--deep') && !args.includes('--no-deep'),
+      acceptDeepRisk: args.includes('--accept-deep-risk'),
+      agent: getFlag('--agent'),
+      timeout: Number.parseInt(getFlag('--timeout') || '300', 10),
+      format: getFlag('--format') || 'text',
+      output,
+      checks: checksFlag ? checksFlag.split(',').map(value => value.trim()) : undefined,
+      severity: getFlag('--severity') || 'high',
+    });
+    console.log(formatReport(report, 'text'));
+    mkdirSync(dirname(output), { recursive: true });
+    writeFileSync(output, formatReport(report, getFlag('--format') || 'text'));
+    process.exit(exitCode);
+  } catch (error) {
+    console.error(`Doctor failed: ${errorMessage(error)}`);
+    process.exit(2);
   }
 }
 
@@ -1290,26 +226,24 @@ function parseTemplateOptions(commandArgs) {
     force: false,
     json: false,
   };
-
-  for (let i = 0; i < commandArgs.length; i++) {
-    if (commandArgs[i] === '--dir' && commandArgs[i + 1]) options.dir = commandArgs[++i];
-    else if (commandArgs[i] === '--language' && commandArgs[i + 1]) options.language = commandArgs[++i];
-    else if (commandArgs[i] === '--template' && commandArgs[i + 1]) options.template = commandArgs[++i];
-    else if (commandArgs[i] === '--resource' && commandArgs[i + 1]) options.resource = commandArgs[++i];
-    else if (commandArgs[i] === '--iac' && commandArgs[i + 1]) options.iac = commandArgs[++i];
-    else if (commandArgs[i] === '--runtime-version' && commandArgs[i + 1]) options.runtimeVersion = commandArgs[++i];
-    else if (commandArgs[i] === '--mode' && commandArgs[i + 1]) options.mode = commandArgs[++i];
-    else if (commandArgs[i] === '--manifest-url' && commandArgs[i + 1]) options.manifestUrl = commandArgs[++i];
-    else if (commandArgs[i] === '--dry-run') options.dryRun = true;
-    else if (commandArgs[i] === '--force') options.force = true;
-    else if (commandArgs[i] === '--json') options.json = true;
+  for (let index = 0; index < commandArgs.length; index++) {
+    const argument = commandArgs[index];
+    if (argument === '--dir' && commandArgs[index + 1]) options.dir = commandArgs[++index];
+    else if (argument === '--language' && commandArgs[index + 1]) options.language = commandArgs[++index];
+    else if (argument === '--template' && commandArgs[index + 1]) options.template = commandArgs[++index];
+    else if (argument === '--resource' && commandArgs[index + 1]) options.resource = commandArgs[++index];
+    else if (argument === '--iac' && commandArgs[index + 1]) options.iac = commandArgs[++index];
+    else if (argument === '--runtime-version' && commandArgs[index + 1]) options.runtimeVersion = commandArgs[++index];
+    else if (argument === '--mode' && commandArgs[index + 1]) options.mode = commandArgs[++index];
+    else if (argument === '--manifest-url' && commandArgs[index + 1]) options.manifestUrl = commandArgs[++index];
+    else if (argument === '--dry-run') options.dryRun = true;
+    else if (argument === '--force') options.force = true;
+    else if (argument === '--json') options.json = true;
   }
-
   if (!['auto', 'new', 'add'].includes(options.mode)) {
     console.error(`Unknown template apply mode: ${options.mode}. Available: auto, new, add`);
     process.exit(1);
   }
-
   return options;
 }
 
@@ -1318,15 +252,25 @@ function printTemplateList(templates) {
     console.log('No templates found.');
     return;
   }
-
   for (const template of templates) {
-    const details = [
-      template.language,
-      template.resource,
-      template.iac ? `iac:${template.iac}` : undefined,
-    ].filter(Boolean).join(', ');
     console.log(`${template.id} — ${template.displayName}`);
-    if (details) console.log(`  ${details}`);
     if (template.shortDescription) console.log(`  ${template.shortDescription}`);
   }
+}
+
+function flagValues(flag) {
+  const values = [];
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] === flag && args[index + 1]) values.push(args[++index]);
+  }
+  return values;
+}
+
+function getFlag(flag) {
+  const index = args.indexOf(flag);
+  return index >= 0 ? args[index + 1] : undefined;
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }

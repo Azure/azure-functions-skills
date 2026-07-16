@@ -13,49 +13,6 @@ function Write-Success {
     exit 0
 }
 
-$PackageVersion = $null
-$InstallMode = "unknown"
-$InstallScope = "unknown"
-
-function Get-StatePath {
-    $scriptRelative = Join-Path $PSScriptRoot "..\..\state.local.json"
-    if (Test-Path $scriptRelative) {
-        return $scriptRelative
-    }
-
-    $cwdRelative = Join-Path (Get-Location) ".azure-functions-skills\state.local.json"
-    if (Test-Path $cwdRelative) {
-        return $cwdRelative
-    }
-
-    return $null
-}
-
-function Initialize-WorkspaceTelemetryState {
-    $statePath = Get-StatePath
-    if (-not $statePath) {
-        return
-    }
-
-    try {
-        $state = Get-Content -Raw -Path $statePath | ConvertFrom-Json
-        if ($state.telemetry -and $state.telemetry.enabled -eq $false) {
-            Write-Success
-        }
-        if ($state.package -and $state.package.version) {
-            $script:PackageVersion = $state.package.version
-        }
-        if ($state.install -and $state.install.mode) {
-            $script:InstallMode = $state.install.mode
-        }
-        if ($state.install -and $state.install.scope) {
-            $script:InstallScope = $state.install.scope
-        }
-    } catch {
-        return
-    }
-}
-
 function Set-AppInsightsEnvironment {
     $configPath = Join-Path $PSScriptRoot "..\telemetry.config.json"
     if (-not (Test-Path $configPath)) {
@@ -83,8 +40,6 @@ try {
 if ([string]::IsNullOrWhiteSpace($rawInput)) {
     Write-Success
 }
-
-Initialize-WorkspaceTelemetryState
 
 try {
     $inputData = $rawInput | ConvertFrom-Json
@@ -242,11 +197,6 @@ if (-not $filePath -and -not $skillName) {
 if ($shouldTrack) {
     Set-AppInsightsEnvironment
 
-    $pluginVersion = $PackageVersion
-    if ($pluginVersion -and $InstallMode -ne "unknown" -and $InstallScope -ne "unknown") {
-        $pluginVersion = "$pluginVersion+$InstallMode.$InstallScope"
-    }
-
     $mcpArgs = @(
         "server", "plugin-telemetry",
         "--timestamp", $timestamp,
@@ -254,7 +204,6 @@ if ($shouldTrack) {
         "--plugin-name", "azure-functions-skills"
     )
 
-    if ($pluginVersion) { $mcpArgs += "--plugin-version"; $mcpArgs += $pluginVersion }
     if ($eventType) { $mcpArgs += "--event-type"; $mcpArgs += $eventType }
     if ($sessionId) { $mcpArgs += "--session-id"; $mcpArgs += $sessionId }
     if ($skillName) { $mcpArgs += "--skill-name"; $mcpArgs += $skillName }

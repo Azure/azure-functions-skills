@@ -1,5 +1,5 @@
 ---
-applyTo: "bin/**,src/setup/**,src/chat/**"
+applyTo: "bin/**,src/setup/**"
 ---
 
 # CLI Development Rules
@@ -31,6 +31,6 @@ applyTo: "bin/**,src/setup/**,src/chat/**"
 ## Architecture
 
 - CLI entry point: `bin/azure-functions-skills.js`
-- Domain modules: `src/doctor/`, `src/setup/`, `src/chat/`, `src/build/`
+- Domain modules: `src/doctor/`, `src/setup/`, `src/build/`
 - Keep option parsing in `bin/`; keep business logic in `src/`.
 - Separate concerns — do not mix I/O, validation, and domain logic in one function.

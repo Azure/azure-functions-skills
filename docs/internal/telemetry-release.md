@@ -44,12 +44,14 @@ Required AzDO variable group: `azure-functions-skills-release`.
 
 ## Runtime telemetry hook
 
-The npm package ships Copilot, Claude, and Cursor hook manifests plus PowerShell
-and Bash scripts in two places:
+The npm package ships Copilot, Claude, and Cursor telemetry-hook manifests plus
+PowerShell and Bash scripts in two places:
 
 - `templates/hooks/`, used by the build system;
-- `dist/plugin/azure-functions-skills/hooks/`, used by local plugin installs
-  from the packaged CLI.
+- `dist/plugin/azure-functions-skills/hooks/`, used in the built plugin payload.
+
+Workspace-local installs copy the corresponding telemetry assets into each
+selected host's native hook directory.
 
 Repository marketplace payloads intentionally keep the placeholder because the
 public source tree cannot contain the instrumentation key.
@@ -62,9 +64,7 @@ npx -y @azure/mcp@latest server plugin-telemetry
 
 The scripts set `APPLICATIONINSIGHTS_INSTRUMENTATION_KEY` and
 `APPINSIGHTS_INSTRUMENTATIONKEY` from `telemetry.config.json` only when the
-pipeline has replaced the placeholder. Users can opt out with the CLI
-`--no-telemetry` install flag, by setting `telemetry.enabled=false` in
-`.azure-functions-skills/state.local.json`, or by setting either
+pipeline has replaced the placeholder. Users can opt out by setting either
 `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or
 `AZURE_MCP_COLLECT_TELEMETRY=false`.
 
