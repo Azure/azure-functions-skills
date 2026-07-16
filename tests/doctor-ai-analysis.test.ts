@@ -94,7 +94,13 @@ describe('buildAgentCommand', () => {
     const cmd = buildAgentCommand('codex', 'analyze this', '/tmp/report.json');
     const validCommands = ['codex', process.execPath];
     expect(validCommands).toContain(cmd.command);
-    expect(cmd.args).toContain('--approval-mode');
+    expect(cmd.args).toContain('exec');
+    expect(cmd.args).toContain('--sandbox');
+    expect(cmd.args).toContain('workspace-write');
+    expect(cmd.args).toContain('--skip-git-repo-check');
+    expect(cmd.args).toContain('--ephemeral');
+    expect(cmd.args).not.toContain('--approval-mode');
+    expect(cmd.args).not.toContain('-q');
   });
 
   it('throws for unknown agent', () => {

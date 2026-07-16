@@ -173,7 +173,13 @@ export function buildAgentCommand(
 
     case 'codex': {
       const resolved = resolveCliCommand('codex');
-      const baseArgs = ['--approval-mode', 'full-auto', '-q', prompt];
+      const baseArgs = [
+        'exec',
+        '--sandbox', 'workspace-write',
+        '--skip-git-repo-check',
+        '--ephemeral',
+        prompt,
+      ];
       return { command: resolved.command, args: [...resolved.argsPrefix, ...baseArgs] };
     }
 
@@ -286,7 +292,7 @@ function spawnAgent(cmd: AgentCommand, dir: string, timeoutMs: number): Promise<
   return new Promise((resolve, reject) => {
     const child = spawn(cmd.command, cmd.args, {
       cwd: dir,
-      stdio: 'pipe',
+      stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
     });
 
