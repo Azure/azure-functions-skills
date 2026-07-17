@@ -39,6 +39,13 @@ describe('simplified distribution', () => {
     expect(existsSync(join(root, '.mcp.json'))).toBe(true);
     expect(existsSync(join(root, 'hooks', 'copilot-hooks.json'))).toBe(true);
     expect(existsSync(join(root, 'hooks', 'hooks.json'))).toBe(true);
+    const telemetryScript = readFileSync(
+      join(root, 'hooks', 'scripts', 'track-telemetry.sh'),
+      'utf-8',
+    );
+    expect(telemetryScript).toContain('@azure/functions-skills@latest');
+    expect(telemetryScript).toContain(' telemetry');
+    expect(telemetryScript).not.toContain('@azure/mcp');
     expect(existsSync(join(root, 'agents'))).toBe(false);
     expect(existsSync(join(root, 'prompts'))).toBe(false);
 
@@ -65,6 +72,13 @@ describe('simplified distribution', () => {
       expect(existsSync(join(targetRoot, skillsPath, 'azure-functions-help', 'SKILL.md'))).toBe(true);
       expect(existsSync(join(targetRoot, mcpPath))).toBe(true);
       expect(existsSync(join(targetRoot, hookPath))).toBe(true);
+      const hookRoot = target === 'ghcp' ? '.github' : target === 'claude' ? '.claude' : '.codex';
+      const telemetryScript = readFileSync(
+        join(targetRoot, hookRoot, 'hooks', 'scripts', 'track-telemetry.sh'),
+        'utf-8',
+      );
+      expect(telemetryScript).toContain('@azure/functions-skills@latest');
+      expect(telemetryScript).not.toContain('@azure/mcp');
       expect(existsSync(join(targetRoot, 'AGENTS.md'))).toBe(false);
       expect(existsSync(join(targetRoot, 'CLAUDE.md'))).toBe(false);
       expect(existsSync(join(targetRoot, '.github', 'agents'))).toBe(false);

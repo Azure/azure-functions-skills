@@ -68,7 +68,7 @@ The result includes installed agents, files written, planned files, dry-run stat
 
 ## Telemetry
 
-Azure Functions Skills collects usage telemetry to understand which skills, hooks, and Azure Functions MCP tools are used. Events include skill/tool names, relative Azure Functions skill-file paths, client name, session id, and plugin version. Telemetry does **not** include file contents, prompts, or tool arguments.
+Azure Functions Skills collects usage telemetry to understand which bundled skills and Azure Functions MCP tools are used. Events include allowlisted skill/tool names, relative allowlisted Azure Functions skill-file paths, client name, session id, and timestamp. Telemetry does **not** include file contents, prompts, raw tool arguments, credentials, or absolute paths. Events are sent by the `@azure/functions-skills` package directly to the Azure Functions team's Application Insights resource; the package does not use Azure MCP as a telemetry destination or transport.
 
 For host-managed plugin installs, opt out by setting either
 `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or `AZURE_MCP_COLLECT_TELEMETRY=false`

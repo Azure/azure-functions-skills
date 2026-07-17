@@ -1,5 +1,5 @@
 # Telemetry tracking hook for Azure Functions Skills
-# Reads hook JSON from stdin, tracks Azure Functions skill usage, and publishes via Azure MCP plugin telemetry.
+# Reads hook JSON from stdin and publishes sanitized Azure Functions skill usage.
 
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -24,23 +24,6 @@ if (Test-Path $telemetryConfigPath) {
 function Write-Success {
     Write-Output '{"continue":true}'
     exit 0
-}
-
-function Set-AppInsightsEnvironment {
-    if (-not (Test-Path $telemetryConfigPath)) {
-        return
-    }
-
-    try {
-        $config = Get-Content -Raw -Path $telemetryConfigPath | ConvertFrom-Json
-        $instrumentationKey = $config.applicationInsightsInstrumentationKey
-        if ($instrumentationKey -and $instrumentationKey -ne "__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__") {
-            $env:APPLICATIONINSIGHTS_INSTRUMENTATION_KEY = $instrumentationKey
-            $env:APPINSIGHTS_INSTRUMENTATIONKEY = $instrumentationKey
-        }
-    } catch {
-        return
-    }
 }
 
 try {
@@ -207,23 +190,21 @@ if (-not $filePath -and -not $skillName) {
 }
 
 if ($shouldTrack) {
-    Set-AppInsightsEnvironment
-
-    $mcpArgs = @(
-        "server", "plugin-telemetry",
-        "--timestamp", $timestamp,
-        "--client-name", $clientName,
-        "--plugin-name", "azure-functions-skills"
-    )
-
-    if ($eventType) { $mcpArgs += "--event-type"; $mcpArgs += $eventType }
-    if ($sessionId) { $mcpArgs += "--session-id"; $mcpArgs += $sessionId }
-    if ($skillName) { $mcpArgs += "--skill-name"; $mcpArgs += $skillName }
-    if ($azureToolName) { $mcpArgs += "--tool-name"; $mcpArgs += $azureToolName }
-    if ($filePath) { $mcpArgs += "--file-reference"; $mcpArgs += ($filePath -replace '/', '\') }
+    $event = [ordered]@{
+        timestamp = $timestamp
+        eventType = $eventType
+        clientName = $clientName
+        pluginName = "azure-functions-skills"
+    }
+    if ($sessionId) { $event.sessionId = $sessionId }
+    if ($skillName) { $event.skillName = $skillName }
+    if ($azureToolName) { $event.toolName = $azureToolName }
+    if ($filePath) { $event.fileReference = ($filePath -replace '/', '\') }
 
     try {
-        & npx -y @azure/mcp@latest @mcpArgs 2>&1 | Out-Null
+        $event | ConvertTo-Json -Compress |
+            & npx -y "@azure/functions-skills@latest" telemetry 2>&1 |
+            Out-Null
     } catch { }
 }
 

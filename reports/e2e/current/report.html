@@ -1,22 +1,62 @@
-<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>Azure Functions Skills E2E — 20260717-1354-review-fixes</title>
-<style>body{font:14px system-ui;max-width:1200px;margin:auto;padding:2rem;color:#182230}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #ccd5df;padding:.5rem;text-align:left;vertical-align:top}pre{white-space:pre-wrap;background:#f4f6f8;padding:.75rem;max-height:24rem;overflow:auto}.cards{display:flex;gap:1rem;flex-wrap:wrap}.card{border:1px solid #ccd5df;border-radius:.5rem;padding:1rem;min-width:9rem}.pass{color:#08783e;font-weight:700}.fail{color:#b42318;font-weight:700}details{margin:1rem 0}summary{font-weight:700;cursor:pointer}@media print{details{display:block}details>*{display:block}}</style>
-</head><body><h1>Azure Functions Skills E2E Report</h1>
-<p>Run <code>20260717-1354-review-fixes</code> · 2026-07-17T20:54:10.3903643Z — 2026-07-17T20:58:42.8114635Z<br>
-Package 0.0.5-preview · win32 · commit <code>5eb1b47e42870003fe91b8ad429a93639d7668fe</code></p>
-<div class="cards"><div class="card"><strong>Pass</strong><br>6/6</div>
-<div class="card"><strong>Commands</strong><br>38/38</div>
-<div class="card"><strong>Missing</strong><br>0</div></div>
-<h2>Test matrix</h2><table><thead><tr><th>Case</th><th>Agent</th><th>Scenario</th><th>Status</th></tr></thead><tbody><tr><td>TC-S1-GHCP-LOCAL</td><td>ghcp</td><td>fresh-install</td><td class="pass">PASS</td></tr><tr><td>TC-S1-CLAUDE-LOCAL</td><td>claude</td><td>fresh-install</td><td class="pass">PASS</td></tr><tr><td>TC-S1-CODEX-LOCAL</td><td>codex</td><td>fresh-install</td><td class="pass">PASS</td></tr><tr><td>TC-S2-GHCP-LOCAL</td><td>ghcp</td><td>ownership-aware-update</td><td class="pass">PASS</td></tr><tr><td>TC-S2-CLAUDE-LOCAL</td><td>claude</td><td>ownership-aware-update</td><td class="pass">PASS</td></tr><tr><td>TC-S2-CODEX-LOCAL</td><td>codex</td><td>ownership-aware-update</td><td class="pass">PASS</td></tr></tbody></table>
-<h2>Preflight evidence</h2><table><thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th></tr></thead><tbody>
-  <tr><td><code>PF-1</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; --version</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>0.0.5-preview</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>PF-2</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; --help</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>@azure/functions-skills — Azure Functions skills for coding agents
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Azure Functions Skills E2E — 20260717-1550-telemetry-transport-rerun</title>
+<style>
+  :root { color-scheme: light dark; --pass:#15803d; --fail:#b91c1c; --border:#94a3b8; }
+  body { max-width: 1500px; margin: 0 auto; padding: 24px; font: 14px/1.5 system-ui,sans-serif; }
+  h1,h2 { line-height:1.2; } .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+  .card,details { border:1px solid var(--border); border-radius:8px; padding:12px; margin:12px 0; }
+  .card strong { display:block; font-size:1.5rem; } .pass { color:var(--pass); font-weight:700; }
+  .fail { color:var(--fail); font-weight:700; } table { border-collapse:collapse; width:100%; }
+  th,td { border:1px solid var(--border); padding:8px; vertical-align:top; text-align:left; }
+  pre { max-width:520px; max-height:280px; overflow:auto; white-space:pre-wrap; margin:0; }
+  .scroll { overflow:auto; } summary { cursor:pointer; } code { overflow-wrap:anywhere; }
+  @media print { details { break-inside:avoid; } details > * { display:block !important; } }
+</style>
+</head>
+<body>
+<h1>Azure Functions Skills E2E Report</h1>
+<p><strong>Run:</strong> 20260717-1550-telemetry-transport-rerun<br>
+<strong>Package:</strong> 0.0.5-preview<br>
+<strong>Platform:</strong> Windows / Node.js v24.16.0<br>
+<strong>Commit:</strong> <code>1908461886756b55696a480bfba40ea91b548aa0</code><br>
+<strong>Started:</strong> 2026-07-17T22:42:21.0067864Z<br>
+<strong>Completed:</strong> 2026-07-17T22:43:16.1501961Z</p>
+
+<div class="cards">
+  <div class="card"><span>Test cases passed</span><strong class="pass">6/6</strong></div>
+  <div class="card"><span>Test cases failed</span><strong class="pass">0</strong></div>
+  <div class="card"><span>Commands</span><strong class="pass">38/38</strong></div>
+  <div class="card"><span>Missing commands</span><strong class="pass">0</strong></div>
+</div>
+
+<h2>Test matrix</h2>
+<table><thead><tr><th>Test case</th><th>Agent</th><th>Scenario</th><th>Status</th></tr></thead>
+<tbody><tr><td>TC-S1-GHCP-LOCAL</td><td>GHCP</td><td>Fresh install</td><td class="pass">PASS</td></tr><tr><td>TC-S1-CLAUDE-LOCAL</td><td>Claude</td><td>Fresh install</td><td class="pass">PASS</td></tr><tr><td>TC-S1-CODEX-LOCAL</td><td>Codex</td><td>Fresh install</td><td class="pass">PASS</td></tr><tr><td>TC-S2-GHCP-LOCAL</td><td>GHCP</td><td>Ownership-aware update</td><td class="pass">PASS</td></tr><tr><td>TC-S2-CLAUDE-LOCAL</td><td>Claude</td><td>Ownership-aware update</td><td class="pass">PASS</td></tr><tr><td>TC-S2-CODEX-LOCAL</td><td>Codex</td><td>Ownership-aware update</td><td class="pass">PASS</td></tr></tbody></table>
+
+<h2>Preflight evidence</h2>
+<div class="scroll"><table>
+<thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout</th><th>stderr</th><th>Timestamp</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code>PF-1</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' --version</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>0.0.5-preview
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:21.0067864Z</time></td>
+  </tr>
+  <tr>
+    <td><code>PF-2</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' --help</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>@azure/functions-skills — Azure Functions skills for coding agents
 
 Commands:
   install --local   Copy skills, MCP, and telemetry hooks into a workspace
@@ -26,25 +66,53 @@ Commands:
   template apply    Apply an Azure Functions template
   build             Build local and plugin artifacts
 
-Plugin installation is managed by the host coding agent, not this package.</pre>
-  <strong>stderr</strong><pre></pre></td></tr></tbody></table>
-<h2>Case evidence</h2>
-<details><summary>TC-S1-GHCP-LOCAL — PASS</summary>
-<p>File verification: All required paths, preservation checks, ownership checks, and telemetry migration checks passed.</p>
-<table><thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th></tr></thead><tbody>
-  <tr><td><code>S1GL-1</code></td><td><code>New-Item -ItemType Directory -Path $env:E2E_WS -Force | Out-Null</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1GL-2</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; install --local --agent ghcp --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally installed.
+Plugin installation is managed by the host coding agent, not this package.
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:21.6078007Z</time></td>
+  </tr></tbody>
+</table></div>
+
+<h2>Per-case evidence</h2>
+
+<details>
+  <summary><strong>TC-S1-GHCP-LOCAL</strong> — GHCP /
+    Fresh install <span class="pass">PASS</span>
+  </summary>
+  <p><strong>Analysis:</strong> The generated workspace contains the expected skill, MCP/settings, and telemetry hook surfaces, with obsolete managed assets absent.</p>
+  <p><strong>File verification:</strong> command
+    <code>S1GL-5</code> exited 0 and covers all required existence,
+    absence, preservation, replacement, and migration assertions for this case.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
+    <tbody>
+  <tr>
+    <td><code>S1GL-1</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' | Out-Null</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:22.1518196Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1GL-2</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent ghcp --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally installed.
   Agents: ghcp
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1GL-3</code></td><td><code>Get-ChildItem -Path $env:E2E_WS -File -Recurse | ForEach-Object { $_.FullName.Substring($env:E2E_WS.Length + 1) } | Sort-Object</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>.github\hooks\azure-functions-telemetry.json
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:22.6719119Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1GL-3</code></td>
+    <td><code>Get-ChildItem -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' -Recurse -File | ForEach-Object { $_.FullName.Substring('Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL'.Length + 1) } | Sort-Object</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>.github\hooks\azure-functions-telemetry.json
 .github\hooks\scripts\track-telemetry.ps1
 .github\hooks\scripts\track-telemetry.sh
 .github\hooks\telemetry.config.json
@@ -129,33 +197,79 @@ Plugin installation is managed by the host coding agent, not this package.</pre>
 .github\skills\azure-functions-inventory\scripts\get-functionapp-inventory.sh
 .github\skills\azure-functions-inventory\SKILL.md
 .github\skills\azure-functions-setup\SKILL.md
-.mcp.json</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1GL-4</code></td><td><code>if (-not ((Test-Path &quot;$env:E2E_WS\.github\skills\azure-functions-help\SKILL.md&quot;) -and (Test-Path &quot;$env:E2E_WS\.mcp.json&quot;) -and (Test-Path &quot;$env:E2E_WS\.github\hooks\azure-functions-telemetry.json&quot;) -and (Test-Path &quot;$env:E2E_WS\.github\hooks\scripts\track-telemetry.sh&quot;))) { exit 1 }</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1GL-5</code></td><td><code>if ((Test-Path &quot;$env:E2E_WS\.azure-functions-skills&quot;) -or (Test-Path &quot;$env:E2E_WS\AGENTS.md&quot;) -or (Test-Path &quot;$env:E2E_WS\.github\agents&quot;) -or (Test-Path &quot;$env:E2E_WS\.github\hooks\welcome-setup.json&quot;)) { exit 1 }</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr></tbody></table>
+.mcp.json
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:40.7949400Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1GL-4</code></td>
+    <td><code>if (-not (
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' '.github\skills\azure-functions-help\SKILL.md')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' '.mcp.json')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' '.github\hooks\azure-functions-telemetry.json')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' '.github\hooks\scripts\track-telemetry.sh'))
+)) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:41.4444307Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1GL-5</code></td>
+    <td><code>if (
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' '.azure-functions-skills')) -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' 'AGENTS.md')) -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' '.github\agents')) -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-GHCP-LOCAL' '.github\hooks\welcome-setup.json'))
+) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:41.9661549Z</time></td>
+  </tr></tbody>
+  </table></div>
 </details>
-<details><summary>TC-S1-CLAUDE-LOCAL — PASS</summary>
-<p>File verification: All required paths, preservation checks, ownership checks, and telemetry migration checks passed.</p>
-<table><thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th></tr></thead><tbody>
-  <tr><td><code>S1CL-1</code></td><td><code>New-Item -ItemType Directory -Path $env:E2E_WS -Force | Out-Null</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1CL-2</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; install --local --agent claude --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally installed.
+<details>
+  <summary><strong>TC-S1-CLAUDE-LOCAL</strong> — Claude /
+    Fresh install <span class="pass">PASS</span>
+  </summary>
+  <p><strong>Analysis:</strong> The generated workspace contains the expected skill, MCP/settings, and telemetry hook surfaces, with obsolete managed assets absent.</p>
+  <p><strong>File verification:</strong> command
+    <code>S1CL-5</code> exited 0 and covers all required existence,
+    absence, preservation, replacement, and migration assertions for this case.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
+    <tbody>
+  <tr>
+    <td><code>S1CL-1</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' | Out-Null</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:42.4849404Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1CL-2</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent claude --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally installed.
   Agents: claude
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1CL-3</code></td><td><code>Get-ChildItem -Path $env:E2E_WS -File -Recurse | ForEach-Object { $_.FullName.Substring($env:E2E_WS.Length + 1) } | Sort-Object</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>.claude\hooks\hooks.json
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:42.9984038Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1CL-3</code></td>
+    <td><code>Get-ChildItem -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' -Recurse -File | ForEach-Object { $_.FullName.Substring('Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL'.Length + 1) } | Sort-Object</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>.claude\hooks\hooks.json
 .claude\hooks\scripts\track-telemetry.ps1
 .claude\hooks\scripts\track-telemetry.sh
 .claude\hooks\telemetry.config.json
@@ -240,33 +354,78 @@ Plugin installation is managed by the host coding agent, not this package.</pre>
 .claude\skills\azure-functions-inventory\scripts\get-functionapp-inventory.ps1
 .claude\skills\azure-functions-inventory\scripts\get-functionapp-inventory.sh
 .claude\skills\azure-functions-inventory\SKILL.md
-.claude\skills\azure-functions-setup\SKILL.md</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1CL-4</code></td><td><code>if (-not ((Test-Path &quot;$env:E2E_WS\.claude\skills\azure-functions-help\SKILL.md&quot;) -and (Test-Path &quot;$env:E2E_WS\.claude\settings.json&quot;) -and (Test-Path &quot;$env:E2E_WS\.claude\hooks\hooks.json&quot;) -and (Test-Path &quot;$env:E2E_WS\.claude\hooks\scripts\track-telemetry.sh&quot;))) { exit 1 }</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1CL-5</code></td><td><code>if ((Test-Path &quot;$env:E2E_WS\.azure-functions-skills&quot;) -or (Test-Path &quot;$env:E2E_WS\CLAUDE.md&quot;) -or (Test-Path &quot;$env:E2E_WS\.claude\agents&quot;)) { exit 1 }</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr></tbody></table>
+.claude\skills\azure-functions-setup\SKILL.md
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:45.5879267Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1CL-4</code></td>
+    <td><code>if (-not (
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\skills\azure-functions-help\SKILL.md')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\settings.json')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\hooks\hooks.json')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\hooks\scripts\track-telemetry.sh'))
+)) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:46.2210133Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1CL-5</code></td>
+    <td><code>if (
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' '.azure-functions-skills')) -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' 'CLAUDE.md')) -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\agents'))
+) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:46.7407032Z</time></td>
+  </tr></tbody>
+  </table></div>
 </details>
-<details><summary>TC-S1-CODEX-LOCAL — PASS</summary>
-<p>File verification: All required paths, preservation checks, ownership checks, and telemetry migration checks passed.</p>
-<table><thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th></tr></thead><tbody>
-  <tr><td><code>S1XL-1</code></td><td><code>New-Item -ItemType Directory -Path $env:E2E_WS -Force | Out-Null</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1XL-2</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; install --local --agent codex --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally installed.
+<details>
+  <summary><strong>TC-S1-CODEX-LOCAL</strong> — Codex /
+    Fresh install <span class="pass">PASS</span>
+  </summary>
+  <p><strong>Analysis:</strong> The generated workspace contains the expected skill, MCP/settings, and telemetry hook surfaces, with obsolete managed assets absent.</p>
+  <p><strong>File verification:</strong> command
+    <code>S1XL-5</code> exited 0 and covers all required existence,
+    absence, preservation, replacement, and migration assertions for this case.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
+    <tbody>
+  <tr>
+    <td><code>S1XL-1</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' | Out-Null</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:47.2492674Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1XL-2</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent codex --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally installed.
   Agents: codex
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1XL-3</code></td><td><code>Get-ChildItem -Path $env:E2E_WS -File -Recurse | ForEach-Object { $_.FullName.Substring($env:E2E_WS.Length + 1) } | Sort-Object</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>.agents\skills\azure-functions-agents\assets\infra\app\trigger-config.bicep
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:47.7457356Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1XL-3</code></td>
+    <td><code>Get-ChildItem -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' -Recurse -File | ForEach-Object { $_.FullName.Substring('Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL'.Length + 1) } | Sort-Object</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>.agents\skills\azure-functions-agents\assets\infra\app\trigger-config.bicep
 .agents\skills\azure-functions-agents\references\abbreviations.json
 .agents\skills\azure-functions-agents\references\agent-authoring.md
 .agents\skills\azure-functions-agents\references\agent-files.md
@@ -351,130 +510,362 @@ Plugin installation is managed by the host coding agent, not this package.</pre>
 .codex\hooks.json
 .codex\hooks\scripts\track-telemetry.ps1
 .codex\hooks\scripts\track-telemetry.sh
-.codex\hooks\telemetry.config.json</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1XL-4</code></td><td><code>if (-not ((Test-Path &quot;$env:E2E_WS\.agents\skills\azure-functions-help\SKILL.md&quot;) -and (Test-Path &quot;$env:E2E_WS\.codex\config.toml&quot;) -and (Test-Path &quot;$env:E2E_WS\.codex\hooks.json&quot;) -and (Test-Path &quot;$env:E2E_WS\.codex\hooks\scripts\track-telemetry.sh&quot;))) { exit 1 }</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S1XL-5</code></td><td><code>if ((Test-Path &quot;$env:E2E_WS\.azure-functions-skills&quot;) -or (Test-Path &quot;$env:E2E_WS\AGENTS.md&quot;) -or (Test-Path &quot;$env:E2E_WS\.agents\agents&quot;)) { exit 1 }</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr></tbody></table>
+.codex\hooks\telemetry.config.json
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:50.2785623Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1XL-4</code></td>
+    <td><code>if (-not (
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' '.agents\skills\azure-functions-help\SKILL.md')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' '.codex\config.toml')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' '.codex\hooks.json')) -and
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' '.codex\hooks\scripts\track-telemetry.sh'))
+)) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:50.9378615Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S1XL-5</code></td>
+    <td><code>if (
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' '.azure-functions-skills')) -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' 'AGENTS.md')) -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S1-CODEX-LOCAL' '.agents\agents'))
+) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:51.4599354Z</time></td>
+  </tr></tbody>
+  </table></div>
 </details>
-<details><summary>TC-S2-GHCP-LOCAL — PASS</summary>
-<p>File verification: All required paths, preservation checks, ownership checks, and telemetry migration checks passed.</p>
-<table><thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th></tr></thead><tbody>
-  <tr><td><code>S2GL-1</code></td><td><code>New-Item -ItemType Directory -Path $env:E2E_WS -Force | Out-Null</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2GL-2</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; install --local --agent ghcp --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally installed.
+<details>
+  <summary><strong>TC-S2-GHCP-LOCAL</strong> — GHCP /
+    Ownership-aware update <span class="pass">PASS</span>
+  </summary>
+  <p><strong>Analysis:</strong> Bundled assets were replaced, user-owned skills/settings/hooks were preserved, legacy state was removed, and telemetry opt-out was migrated.</p>
+  <p><strong>File verification:</strong> command
+    <code>S2GL-7</code> exited 0 and covers all required existence,
+    absence, preservation, replacement, and migration assertions for this case.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
+    <tbody>
+  <tr>
+    <td><code>S2GL-1</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' | Out-Null</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:51.9753005Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2GL-2</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent ghcp --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally installed.
   Agents: ghcp
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2GL-3</code></td><td><code>$userSkill=Join-Path $env:E2E_WS &quot;.github\skills\azure-functions-internal-runbook&quot;; New-Item -ItemType Directory -Path $userSkill -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $env:E2E_WS &quot;.github\skills\azure-functions-help\SKILL.md&quot;), &quot;stale bundled`n&quot;); [IO.File]::WriteAllText((Join-Path $userSkill &quot;SKILL.md&quot;), &quot;user-owned`n&quot;)</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2GL-4</code></td><td><code>$hooks=Join-Path $env:E2E_WS &quot;.github\hooks\scripts&quot;; New-Item -ItemType Directory -Path $hooks -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $hooks &quot;custom-hook.sh&quot;), &quot;user-owned`n&quot;); $mcp=@{inputs=@(@{id=&quot;subscription&quot;});mcpServers=@{custom=@{command=&quot;custom-server&quot;;args=@()}}}; $mcp | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $env:E2E_WS &quot;.mcp.json&quot;) -Encoding utf8</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2GL-5</code></td><td><code>$state=Join-Path $env:E2E_WS &quot;.azure-functions-skills&quot;; $agents=Join-Path $env:E2E_WS &quot;.github\agents&quot;; New-Item -ItemType Directory -Path $state,$agents -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $state &quot;state.local.json&quot;), &quot;{`&quot;telemetry`&quot;:{`&quot;enabled`&quot;:false}}`n&quot;); [IO.File]::WriteAllText((Join-Path $agents &quot;functions-copilot.agent.md&quot;), &quot;legacy`n&quot;); [IO.File]::WriteAllText((Join-Path $env:E2E_WS &quot;AGENTS.md&quot;), &quot;customer`n&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;`nlegacy routing`n&lt;!-- azure-functions-skills:end --&gt;`n&quot;)</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2GL-6</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; update --local --agent ghcp --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally updated.
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:52.4879840Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2GL-3</code></td>
+    <td><code>Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-help\SKILL.md') -Value 'stale bundled'
+New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-internal-runbook') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-internal-runbook\SKILL.md') -Value 'user-owned'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:55.0725660Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2GL-4</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\hooks\scripts') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\hooks\scripts\custom-hook.sh') -Value 'user-owned'
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.mcp.json') -Value '{&quot;inputs&quot;:[{&quot;id&quot;:&quot;subscription&quot;}],&quot;mcpServers&quot;:{&quot;custom&quot;:{&quot;command&quot;:&quot;custom-server&quot;,&quot;args&quot;:[]}}}'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:55.6331906Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2GL-5</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.azure-functions-skills'), (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\agents') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.azure-functions-skills\state.local.json') -Value '{&quot;telemetry&quot;:{&quot;enabled&quot;:false}}'
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\agents\functions-copilot.agent.md') -Value 'legacy'
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' 'AGENTS.md') -Value @('customer','&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;','legacy routing','&lt;!-- azure-functions-skills:end --&gt;')</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:56.1800028Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2GL-6</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' update --local --agent ghcp --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally updated.
   Agents: ghcp
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2GL-7</code></td><td><code>$help=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.github\skills\azure-functions-help\SKILL.md&quot;); $user=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;.github\skills\azure-functions-internal-runbook\SKILL.md&quot;)).Trim(); $instructions=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;AGENTS.md&quot;)).Trim(); $custom=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;.github\hooks\scripts\custom-hook.sh&quot;)).Trim(); $mcp=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.mcp.json&quot;) | ConvertFrom-Json; $telemetry=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.github\hooks\telemetry.config.json&quot;) | ConvertFrom-Json; if($help -match &quot;stale bundled&quot; -or $user -ne &quot;user-owned&quot; -or (Test-Path (Join-Path $env:E2E_WS &quot;.azure-functions-skills&quot;)) -or (Test-Path (Join-Path $env:E2E_WS &quot;.github\agents\functions-copilot.agent.md&quot;)) -or $instructions -ne &quot;customer&quot; -or $custom -ne &quot;user-owned&quot; -or $mcp.mcpServers.custom.command -ne &quot;custom-server&quot; -or $mcp.mcpServers.azure.command -ne &quot;npx&quot; -or $telemetry.enabled -ne $false){exit 1}</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr></tbody></table>
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:56.7183605Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2GL-7</code></td>
+    <td><code>$mcp = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.mcp.json') | ConvertFrom-Json
+$telemetry = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\hooks\telemetry.config.json') | ConvertFrom-Json
+if (
+    -not (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-help\SKILL.md')) -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-help\SKILL.md')).Contains('stale bundled') -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-internal-runbook\SKILL.md')).Trim() -ne 'user-owned' -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.azure-functions-skills')) -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\agents\functions-copilot.agent.md')) -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' 'AGENTS.md')).Trim() -ne 'customer' -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-GHCP-LOCAL' '.github\hooks\scripts\custom-hook.sh')).Trim() -ne 'user-owned' -or
+    $mcp.mcpServers.custom.command -ne 'custom-server' -or
+    $mcp.mcpServers.azure.command -ne 'npx' -or
+    $telemetry.enabled -ne $false
+) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:59.1860986Z</time></td>
+  </tr></tbody>
+  </table></div>
 </details>
-<details><summary>TC-S2-CLAUDE-LOCAL — PASS</summary>
-<p>File verification: All required paths, preservation checks, ownership checks, and telemetry migration checks passed.</p>
-<table><thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th></tr></thead><tbody>
-  <tr><td><code>S2CL-1</code></td><td><code>New-Item -ItemType Directory -Path $env:E2E_WS -Force | Out-Null</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2CL-2</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; install --local --agent claude --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally installed.
+<details>
+  <summary><strong>TC-S2-CLAUDE-LOCAL</strong> — Claude /
+    Ownership-aware update <span class="pass">PASS</span>
+  </summary>
+  <p><strong>Analysis:</strong> Bundled assets were replaced, user-owned skills/settings/hooks were preserved, legacy state was removed, and telemetry opt-out was migrated.</p>
+  <p><strong>File verification:</strong> command
+    <code>S2CL-7</code> exited 0 and covers all required existence,
+    absence, preservation, replacement, and migration assertions for this case.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
+    <tbody>
+  <tr>
+    <td><code>S2CL-1</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' | Out-Null</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:42:59.8117436Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2CL-2</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent claude --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally installed.
   Agents: claude
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2CL-3</code></td><td><code>$userSkill=Join-Path $env:E2E_WS &quot;.claude\skills\azure-functions-internal-runbook&quot;; New-Item -ItemType Directory -Path $userSkill -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $env:E2E_WS &quot;.claude\skills\azure-functions-help\SKILL.md&quot;), &quot;stale bundled`n&quot;); [IO.File]::WriteAllText((Join-Path $userSkill &quot;SKILL.md&quot;), &quot;user-owned`n&quot;)</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2CL-4</code></td><td><code>$hooks=Join-Path $env:E2E_WS &quot;.claude\hooks&quot;; New-Item -ItemType Directory -Path $hooks -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $hooks &quot;custom-hook.json&quot;), &quot;user-owned`n&quot;); $settings=@{permissions=@{allow=@(&quot;Read&quot;)};mcpServers=@{custom=@{command=&quot;custom-server&quot;;args=@()}};hooks=@{PostToolUse=@(@{hooks=@(@{type=&quot;command&quot;;command=&quot;custom-hook&quot;})})}}; $settings | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $env:E2E_WS &quot;.claude\settings.json&quot;) -Encoding utf8</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2CL-5</code></td><td><code>$state=Join-Path $env:E2E_WS &quot;.azure-functions-skills&quot;; New-Item -ItemType Directory -Path $state -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $state &quot;state.local.json&quot;), &quot;{`&quot;telemetry`&quot;:{`&quot;enabled`&quot;:false}}`n&quot;); [IO.File]::WriteAllText((Join-Path $env:E2E_WS &quot;CLAUDE.md&quot;), &quot;customer`n&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;`nlegacy routing`n&lt;!-- azure-functions-skills:end --&gt;`n&quot;)</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2CL-6</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; update --local --agent claude --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally updated.
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:00.3245341Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2CL-3</code></td>
+    <td><code>Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-help\SKILL.md') -Value 'stale bundled'
+New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-internal-runbook') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-internal-runbook\SKILL.md') -Value 'user-owned'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:02.8728559Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2CL-4</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\hooks') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\hooks\custom-hook.json') -Value 'user-owned'
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\settings.json') -Value '{&quot;permissions&quot;:{&quot;allow&quot;:[&quot;Read&quot;]},&quot;mcpServers&quot;:{&quot;custom&quot;:{&quot;command&quot;:&quot;custom-server&quot;,&quot;args&quot;:[]}},&quot;hooks&quot;:{&quot;PostToolUse&quot;:[{&quot;hooks&quot;:[{&quot;type&quot;:&quot;command&quot;,&quot;command&quot;:&quot;custom-hook&quot;}]}]}}'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:03.4220339Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2CL-5</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.azure-functions-skills') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.azure-functions-skills\state.local.json') -Value '{&quot;telemetry&quot;:{&quot;enabled&quot;:false}}'
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' 'CLAUDE.md') -Value @('customer','&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;','legacy routing','&lt;!-- azure-functions-skills:end --&gt;')</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:03.9541296Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2CL-6</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' update --local --agent claude --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally updated.
   Agents: claude
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2CL-7</code></td><td><code>$help=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.claude\skills\azure-functions-help\SKILL.md&quot;); $user=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;.claude\skills\azure-functions-internal-runbook\SKILL.md&quot;)).Trim(); $instructions=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;CLAUDE.md&quot;)).Trim(); $custom=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;.claude\hooks\custom-hook.json&quot;)).Trim(); $settings=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.claude\settings.json&quot;) | ConvertFrom-Json; $serialized=$settings.hooks | ConvertTo-Json -Depth 10; $telemetry=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.claude\hooks\telemetry.config.json&quot;) | ConvertFrom-Json; if($help -match &quot;stale bundled&quot; -or $user -ne &quot;user-owned&quot; -or (Test-Path (Join-Path $env:E2E_WS &quot;.azure-functions-skills&quot;)) -or $instructions -ne &quot;customer&quot; -or $custom -ne &quot;user-owned&quot; -or $settings.permissions.allow[0] -ne &quot;Read&quot; -or $settings.mcpServers.custom.command -ne &quot;custom-server&quot; -or $settings.mcpServers.azure.command -ne &quot;npx&quot; -or $serialized -notmatch &quot;custom-hook&quot; -or $serialized -notmatch &quot;track-telemetry.sh&quot; -or $telemetry.enabled -ne $false){exit 1}</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr></tbody></table>
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:04.5178561Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2CL-7</code></td>
+    <td><code>$settings = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\settings.json') | ConvertFrom-Json
+$telemetry = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\hooks\telemetry.config.json') | ConvertFrom-Json
+$hooks = $settings.hooks | ConvertTo-Json -Depth 10 -Compress
+if (
+    -not (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-help\SKILL.md')) -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-help\SKILL.md')).Contains('stale bundled') -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-internal-runbook\SKILL.md')).Trim() -ne 'user-owned' -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.azure-functions-skills')) -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' 'CLAUDE.md')).Trim() -ne 'customer' -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\hooks\custom-hook.json')).Trim() -ne 'user-owned' -or
+    $settings.permissions.allow[0] -ne 'Read' -or
+    $settings.mcpServers.custom.command -ne 'custom-server' -or
+    $settings.mcpServers.azure.command -ne 'npx' -or
+    -not $hooks.Contains('custom-hook') -or
+    -not $hooks.Contains('track-telemetry.sh') -or
+    $telemetry.enabled -ne $false
+) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:07.5760060Z</time></td>
+  </tr></tbody>
+  </table></div>
 </details>
-<details><summary>TC-S2-CODEX-LOCAL — PASS</summary>
-<p>File verification: All required paths, preservation checks, ownership checks, and telemetry migration checks passed.</p>
-<table><thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th></tr></thead><tbody>
-  <tr><td><code>S2XL-1</code></td><td><code>New-Item -ItemType Directory -Path $env:E2E_WS -Force | Out-Null</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2XL-2</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; install --local --agent codex --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally installed.
+<details>
+  <summary><strong>TC-S2-CODEX-LOCAL</strong> — Codex /
+    Ownership-aware update <span class="pass">PASS</span>
+  </summary>
+  <p><strong>Analysis:</strong> Bundled assets were replaced, user-owned skills/settings/hooks were preserved, legacy state was removed, and telemetry opt-out was migrated.</p>
+  <p><strong>File verification:</strong> command
+    <code>S2XL-7</code> exited 0 and covers all required existence,
+    absence, preservation, replacement, and migration assertions for this case.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
+    <tbody>
+  <tr>
+    <td><code>S2XL-1</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' | Out-Null</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:08.2190572Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2XL-2</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent codex --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally installed.
   Agents: codex
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2XL-3</code></td><td><code>$userSkill=Join-Path $env:E2E_WS &quot;.agents\skills\azure-functions-internal-runbook&quot;; New-Item -ItemType Directory -Path $userSkill -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $env:E2E_WS &quot;.agents\skills\azure-functions-help\SKILL.md&quot;), &quot;stale bundled`n&quot;); [IO.File]::WriteAllText((Join-Path $userSkill &quot;SKILL.md&quot;), &quot;user-owned`n&quot;)</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2XL-4</code></td><td><code>$hooks=Join-Path $env:E2E_WS &quot;.codex\hooks&quot;; New-Item -ItemType Directory -Path $hooks -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $hooks &quot;custom-hook.json&quot;), &quot;user-owned`n&quot;); $hookSettings=@{hooks=@{PostToolUse=@(@{type=&quot;command&quot;;command=&quot;custom-hook&quot;})}}; $hookSettings | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $env:E2E_WS &quot;.codex\hooks.json&quot;) -Encoding utf8; [IO.File]::WriteAllText((Join-Path $env:E2E_WS &quot;.codex\config.toml&quot;), &quot;model = `&quot;gpt-test`&quot;`n`n[mcp_servers.custom]`ncommand = `&quot;custom-server`&quot;`n`n[mcp_servers.azure]`ncommand = `&quot;old-azure`&quot;`n&quot;)</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2XL-5</code></td><td><code>$state=Join-Path $env:E2E_WS &quot;.azure-functions-skills&quot;; New-Item -ItemType Directory -Path $state -Force | Out-Null; [IO.File]::WriteAllText((Join-Path $state &quot;state.local.json&quot;), &quot;{`&quot;telemetry`&quot;:{`&quot;enabled`&quot;:false}}`n&quot;); [IO.File]::WriteAllText((Join-Path $env:E2E_WS &quot;AGENTS.md&quot;), &quot;customer`n&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;`nlegacy routing`n&lt;!-- azure-functions-skills:end --&gt;`n&quot;)</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2XL-6</code></td><td><code>node &quot;$env:E2E_REPO\bin\azure-functions-skills.js&quot; update --local --agent codex --dir $env:E2E_WS</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre>Azure Functions Skills locally updated.
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:08.7324793Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2XL-3</code></td>
+    <td><code>Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-help\SKILL.md') -Value 'stale bundled'
+New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-internal-runbook') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-internal-runbook\SKILL.md') -Value 'user-owned'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:11.2686932Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2XL-4</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks\custom-hook.json') -Value 'user-owned'
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks.json') -Value '{&quot;hooks&quot;:{&quot;PostToolUse&quot;:[{&quot;type&quot;:&quot;command&quot;,&quot;command&quot;:&quot;custom-hook&quot;}]}}'
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.codex\config.toml') -Value @('model = &quot;gpt-test&quot;','','[mcp_servers.custom]','command = &quot;custom-server&quot;','','[mcp_servers.azure]','command = &quot;old-azure&quot;')</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:11.8151754Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2XL-5</code></td>
+    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.azure-functions-skills') | Out-Null
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.azure-functions-skills\state.local.json') -Value '{&quot;telemetry&quot;:{&quot;enabled&quot;:false}}'
+Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' 'AGENTS.md') -Value @('customer','&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;','legacy routing','&lt;!-- azure-functions-skills:end --&gt;')</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:12.3499677Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2XL-6</code></td>
+    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' update --local --agent codex --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL'</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre>Azure Functions Skills locally updated.
   Agents: codex
-  Files written: 86</pre>
-  <strong>stderr</strong><pre></pre></td></tr>
-  <tr><td><code>S2XL-7</code></td><td><code>$help=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.agents\skills\azure-functions-help\SKILL.md&quot;); $user=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;.agents\skills\azure-functions-internal-runbook\SKILL.md&quot;)).Trim(); $instructions=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;AGENTS.md&quot;)).Trim(); $custom=(Get-Content -Raw (Join-Path $env:E2E_WS &quot;.codex\hooks\custom-hook.json&quot;)).Trim(); $config=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.codex\config.toml&quot;); $hooks=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.codex\hooks.json&quot;) | ConvertFrom-Json; $serialized=$hooks.hooks | ConvertTo-Json -Depth 10; $telemetry=Get-Content -Raw (Join-Path $env:E2E_WS &quot;.codex\hooks\telemetry.config.json&quot;) | ConvertFrom-Json; if($help -match &quot;stale bundled&quot; -or $user -ne &quot;user-owned&quot; -or (Test-Path (Join-Path $env:E2E_WS &quot;.azure-functions-skills&quot;)) -or $instructions -ne &quot;customer&quot; -or $custom -ne &quot;user-owned&quot; -or $config -notmatch 'model = &quot;gpt-test&quot;' -or $config -notmatch '\[mcp_servers.custom\]' -or $config -notmatch 'command = &quot;npx&quot;' -or $config -match &quot;old-azure&quot; -or $serialized -notmatch &quot;custom-hook&quot; -or $serialized -notmatch &quot;track-telemetry.sh&quot; -or $telemetry.enabled -ne $false){exit 1}</code></td>
-  <td>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</td><td class="pass">0</td></tr>
-  <tr><td colspan="4"><strong>stdout</strong><pre></pre>
-  <strong>stderr</strong><pre></pre></td></tr></tbody></table>
+  Files written: 86
+</pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:12.8979399Z</time></td>
+  </tr>
+  <tr>
+    <td><code>S2XL-7</code></td>
+    <td><code>$toml = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.codex\config.toml')
+$hooks = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks.json') | ConvertFrom-Json
+$telemetry = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks\telemetry.config.json') | ConvertFrom-Json
+$hooksJson = $hooks.hooks | ConvertTo-Json -Depth 10 -Compress
+if (
+    -not (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-help\SKILL.md')) -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-help\SKILL.md')).Contains('stale bundled') -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-internal-runbook\SKILL.md')).Trim() -ne 'user-owned' -or
+    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.azure-functions-skills')) -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' 'AGENTS.md')).Trim() -ne 'customer' -or
+    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260717-1550-telemetry-transport-rerun\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks\custom-hook.json')).Trim() -ne 'user-owned' -or
+    -not $toml.Contains('model = &quot;gpt-test&quot;') -or
+    -not $toml.Contains('[mcp_servers.custom]') -or
+    -not $toml.Contains('command = &quot;npx&quot;') -or
+    $toml.Contains('old-azure') -or
+    -not $hooksJson.Contains('custom-hook') -or
+    -not $hooksJson.Contains('track-telemetry.sh') -or
+    $telemetry.enabled -ne $false
+) { exit 1 }</code></td>
+    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
+    <td class="pass">0</td>
+    <td><pre></pre></td>
+    <td><pre></pre></td>
+    <td><time>2026-07-17T22:43:15.5078061Z</time></td>
+  </tr></tbody>
+  </table></div>
 </details>
-<h2>Issues</h2><p>No product issues found.</p>
-<h2>Machine-checkable counters</h2><pre id="run-summary">{
-  &quot;runId&quot;: &quot;20260717-1354-review-fixes&quot;,
+
+<h2>Actionable issues</h2>
+<p>None. Every required command exited 0 and all case-level assertions passed.</p>
+
+<h2>Machine-checkable counters</h2>
+<pre id="run-summary">{
+  &quot;runId&quot;: &quot;20260717-1550-telemetry-transport-rerun&quot;,
   &quot;packageVersion&quot;: &quot;0.0.5-preview&quot;,
-  &quot;platform&quot;: &quot;win32&quot;,
+  &quot;platform&quot;: &quot;windows&quot;,
   &quot;expectedCommandCount&quot;: 38,
   &quot;actualCommandCount&quot;: 38,
   &quot;missingCommandIds&quot;: [],
@@ -486,13 +877,19 @@ Plugin installation is managed by the host coding agent, not this package.</pre>
     &quot;unsupported&quot;: 0
   }
 }</pre>
-<h2>Cross-Check Results</h2><div id="cross-check">
-<p><strong>Reviewer model:</strong> Claude Opus 4.8</p>
-<p><strong>Verified:</strong> 38/38 commands · <strong>Missing:</strong> none ·
-<strong>Workarounds:</strong> none · <strong>Verdict overrides:</strong> none</p>
-<p>The reviewer confirmed faithful Windows translations, complete command evidence, matching exit codes,
-and valid pass criteria for all six cases. A stale checklist annotation for S2GL-4 was corrected to match
-its authoritative exit-0 evidence.</p>
-<p class="pass"><strong>Overall: VALID</strong></p>
+
+<h2>Cross-Check Results</h2>
+<div id="cross-check">
+  <p><strong>Reviewer model:</strong> Claude Opus 4.8 (independent rubber-duck reviewer)</p>
+  <p><strong>Verified commands:</strong> 38 / 38<br>
+  <strong>Missing command IDs:</strong> none<br>
+  <strong>Duplicate, skipped, batched, or simplified commands:</strong> none<br>
+  <strong>Workaround commands:</strong> none<br>
+  <strong>Verdict overrides:</strong> none</p>
+  <p>The reviewer independently re-executed the recorded GHCP, Claude, and Codex
+  assertions and verified every Scenario 2 conjunct, the PF-2 help contract,
+  all evidence fields, and the machine-checkable counters.</p>
+  <p class="pass"><strong>Overall: VALID</strong></p>
 </div>
-</body></html>
+</body>
+</html>

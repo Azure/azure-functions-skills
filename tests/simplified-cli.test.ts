@@ -72,6 +72,52 @@ describe('simplified CLI', () => {
     expect(existsSync(join(dir, '.azure-functions-skills'))).toBe(false);
   });
 
+  it('keeps the internal telemetry command out of general help', () => {
+    const result = spawnSync(process.execPath, [CLI_PATH, '--help'], {
+      cwd: ROOT_DIR,
+      encoding: 'utf-8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).not.toMatch(/^\s+telemetry(?:\s|$)/m);
+  });
+
+  it('accepts one sanitized telemetry event over stdin', () => {
+    const result = spawnSync(process.execPath, [CLI_PATH, 'telemetry'], {
+      cwd: ROOT_DIR,
+      encoding: 'utf-8',
+      input: JSON.stringify({
+        timestamp: '2026-07-17T20:00:00Z',
+        eventType: 'skill_invocation',
+        clientName: 'copilot-cli',
+        pluginName: 'azure-functions-skills',
+        skillName: 'azure-functions-help',
+      }),
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('');
+  });
+
+  it('rejects unsanitized telemetry input', () => {
+    const result = spawnSync(process.execPath, [CLI_PATH, 'telemetry'], {
+      cwd: ROOT_DIR,
+      encoding: 'utf-8',
+      input: JSON.stringify({
+        timestamp: '2026-07-17T20:00:00Z',
+        eventType: 'skill_invocation',
+        clientName: 'copilot-cli',
+        pluginName: 'azure-functions-skills',
+        skillName: 'azure-functions-help',
+        toolInput: { path: 'customer-secret.txt' },
+      }),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Telemetry failed: Unsupported telemetry property: toolInput');
+  });
+
   it.each(['chat', 'setup', 'plugin', 'workspace', 'state'])('removes the %s command', removedCommand => {
     const result = spawnSync(process.execPath, [CLI_PATH, removedCommand], {
       cwd: ROOT_DIR,

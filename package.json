@@ -19,6 +19,10 @@
     "./templates": {
       "types": "./lib/templates/index.d.ts",
       "default": "./lib/templates/index.js"
+    },
+    "./telemetry": {
+      "types": "./lib/telemetry/index.d.ts",
+      "default": "./lib/telemetry/index.js"
     }
   },
   "files": [
@@ -73,5 +77,8 @@
     "ai-skills",
     "coding-agent"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "applicationinsights": "1.8.10"
+  }
 }

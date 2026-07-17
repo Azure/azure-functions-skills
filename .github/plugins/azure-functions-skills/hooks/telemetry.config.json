@@ -1,4 +1,3 @@
 {
-  "enabled": true,
-  "applicationInsightsInstrumentationKey": "__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__"
+  "enabled": true
 }

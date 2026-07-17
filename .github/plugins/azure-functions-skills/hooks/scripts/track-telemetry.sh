@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Telemetry tracking hook for Azure Functions Skills
-# Reads hook JSON from stdin, tracks Azure Functions skill usage, and publishes via Azure MCP plugin telemetry.
+# Reads hook JSON from stdin and publishes sanitized Azure Functions skill usage.
 
 set +e
 
@@ -60,20 +60,6 @@ extract_toolargs_path() {
     echo "$path_value"
 }
 
-configure_appinsights() {
-    local config_path
-    local instrumentation_key
-    if [ ! -f "$config_path" ]; then
-        return
-    fi
-
-    instrumentation_key=$(sed -n 's/.*"applicationInsightsInstrumentationKey":[[:space:]]*"\([^"]*\)".*/\1/p' "$config_path")
-    if [ -n "$instrumentation_key" ] && [ "$instrumentation_key" != "__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__" ]; then
-        export APPLICATIONINSIGHTS_INSTRUMENTATION_KEY="$instrumentation_key"
-        export APPINSIGHTS_INSTRUMENTATIONKEY="$instrumentation_key"
-    fi
-}
-
 is_functions_skill_name() {
     [[ "$1" == azure-functions-* ]]
 }
@@ -115,6 +101,10 @@ extract_functions_relative_path() {
         echo "${BASH_REMATCH[1]}"
         return
     fi
+}
+
+json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 if [ -t 0 ]; then
@@ -218,22 +208,27 @@ if [ -z "$filePath" ] && [ -z "$skillName" ]; then
 fi
 
 if [ "$shouldTrack" = true ]; then
-    configure_appinsights
+    payload=$(printf \
+        '{"timestamp":"%s","eventType":"%s","clientName":"%s","pluginName":"azure-functions-skills"}' \
+        "$(json_escape "$timestamp")" \
+        "$(json_escape "$eventType")" \
+        "$(json_escape "$clientName")")
+    if [ -n "$sessionId" ]; then
+        payload="${payload%?},\"sessionId\":\"$(json_escape "$sessionId")\"}"
+    fi
+    if [ -n "$skillName" ]; then
+        payload="${payload%?},\"skillName\":\"$(json_escape "$skillName")\"}"
+    fi
+    if [ -n "$azureToolName" ]; then
+        payload="${payload%?},\"toolName\":\"$(json_escape "$azureToolName")\"}"
+    fi
+    if [ -n "$filePath" ]; then
+        payload="${payload%?},\"fileReference\":\"$(json_escape "$(echo "$filePath" | tr '/' '\\')")\"}"
+    fi
 
-    mcpArgs=(
-        "server" "plugin-telemetry"
-        "--timestamp" "$timestamp"
-        "--client-name" "$clientName"
-        "--plugin-name" "azure-functions-skills"
-    )
-
-    [ -n "$eventType" ] && mcpArgs+=("--event-type" "$eventType")
-    [ -n "$sessionId" ] && mcpArgs+=("--session-id" "$sessionId")
-    [ -n "$skillName" ] && mcpArgs+=("--skill-name" "$skillName")
-    [ -n "$azureToolName" ] && mcpArgs+=("--tool-name" "$azureToolName")
-    [ -n "$filePath" ] && mcpArgs+=("--file-reference" "$(echo "$filePath" | tr '/' '\\')")
-
-    npx -y @azure/mcp@latest "${mcpArgs[@]}" >/dev/null 2>&1 || true
+    printf '%s' "$payload" |
+        npx -y @azure/functions-skills@latest telemetry >/dev/null 2>&1 ||
+        true
 fi
 
 return_success

@@ -83,10 +83,42 @@ if (command === 'install' || command === 'update') {
   );
 } else if (command === 'doctor') {
   await runDoctorCommand();
+} else if (command === 'telemetry') {
+  await runTelemetryCommand();
 } else {
   console.error(`Unknown command: ${command}`);
   console.error(HELP.trim());
   process.exit(1);
+}
+
+async function runTelemetryCommand() {
+  try {
+    const rawInput = await readStdin(16 * 1024);
+    if (rawInput.trim().length === 0) {
+      throw new Error('Telemetry input is required on stdin.');
+    }
+    const { parseTelemetryEvent, sendTelemetryEvent } = await import('../lib/telemetry/index.js');
+    const event = parseTelemetryEvent(JSON.parse(rawInput));
+    await sendTelemetryEvent(event);
+    process.exit(0);
+  } catch (error) {
+    console.error(`Telemetry failed: ${errorMessage(error)}`);
+    process.exit(1);
+  }
+}
+
+async function readStdin(maxBytes) {
+  const chunks = [];
+  let bytes = 0;
+  for await (const chunk of process.stdin) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    bytes += buffer.length;
+    if (bytes > maxBytes) {
+      throw new Error(`Telemetry input exceeds ${maxBytes} bytes.`);
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks).toString('utf-8');
 }
 
 async function runLocalInstall(action) {
