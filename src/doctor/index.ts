@@ -19,5 +19,7 @@ export type {
   OutputFormat,
   ProjectContext,
   ProjectLanguage,
+  PythonProgrammingModel,
+  PythonProjectInfo,
   ReportSummary,
 } from './types.js';

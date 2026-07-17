@@ -8,7 +8,7 @@ The goal is to prevent the most common incident classes from reaching production
 
 | Tier | Engine | Speed | Trust model | What it catches |
 | --- | --- | --- | --- | --- |
-| **Tier 1** (built-in) | Deterministic Node.js checks | < 1s | No external execution | Missing `host.json`, deprecated app settings, unsupported runtime versions, missing `FUNCTIONS_WORKER_RUNTIME`, extension bundle drift, function entry point errors, TypeScript build mismatches, **supply-chain risks (lifecycle scripts, unpinned prod deps, missing lockfile, tracked `.env` files, install-script deps)** |
+| **Tier 1** (built-in) | Deterministic Node.js checks | < 1s | No external execution | Missing `host.json`, deprecated app settings, unsupported runtime versions, missing `FUNCTIONS_WORKER_RUNTIME`, extension bundle drift, function entry point errors, TypeScript build mismatches, **Python v1/v2 discovery, Blueprint registration, Python dependency/deployment compatibility**, and **supply-chain risks (lifecycle scripts, unpinned prod deps, missing lockfile, tracked local secret files, install-script deps)** |
 | **Tier 2** (`--deep`) | Headless LLM agent (Copilot / Claude / Codex) | ~60–120s | Agent runs with elevated permissions (write, shell) | Async/await anti-patterns, missing exception handling, hardcoded secrets, output-binding error gaps, durable non-determinism, service bus autoComplete conflicts, idempotency gaps, **semantic supply-chain attack patterns (import-time side effects, fetch-then-eval, anti-analysis, credential exfiltration)** |
 
 Tier 1 always runs. Tier 2 is opt-in.

@@ -42,6 +42,17 @@ Use `expected-results.md` for expected findings. Tier 1 findings are strict; Tie
 | `08-deprecated-settings` | Deprecated app settings |
 | `09-unknown-trigger-type` | Function metadata has no recognized trigger |
 | `10-entrypoint-tsconfig-errors` | Missing Node entry point and invalid `tsconfig.json` |
+| `python-mixed-model` | Python v1 and v2 programming models used together |
+| `python-missing-dependency-manifest` | External Python import without requirements.txt or pyproject.toml |
+| `python-missing-azure-functions` | Dependency manifest omits azure-functions |
+| `python-outdated-azure-functions` | Python v2 project uses azure-functions below 1.17 |
+| `python-worker-dependency` | Application declares the platform-managed azure-functions-worker |
+| `python-blueprint-unregistered` | Decorated Blueprint is not registered with the FunctionApp |
+| `python-native-dependencies` | Native dependency requires deployment-platform compatibility review |
+| `python-deploy-artifacts` | Test directory is not excluded from deployment |
+| `python-durable-defaults` | Durable Functions project relies on implicit host defaults |
+| `python-missing-application-insights` | Local settings contain no Application Insights configuration |
+| `python-v2-missing-storage` | Python v2 queue trigger has no AzureWebJobsStorage setting |
 
 ### Clean / negative fixtures (one per language — should produce 0 findings)
 
@@ -104,4 +115,3 @@ Start-Process .\ai-validation-report.html
 The script uses a curated keyword map for each fixture and reports overall recall (%), per-fixture matched / missed / extra findings, and AI durations. Self-contained HTML, no external dependencies.
 
 > **Why not delegate this to an LLM agent?** An earlier version of this README contained a "let a coding agent produce the report" prompt. That pattern was withdrawn because every fixture under this directory is intentionally adversarial test content (some files are designed to look like real prompt-injection / supply-chain payloads). Pointing a general-purpose agent at the fixtures directory and asking it to *read* and *interpret* their JSON output is itself a prompt-injection surface. Use the deterministic Node.js script above instead.
-

@@ -28,6 +28,9 @@ These checks can run without LLM semantics and without Azure resource access. Th
 | `DP-005` | Dependency size | - | Large dependency tree or dev dependencies likely included |
 | `DP-006` | Python dependency consistency | Confirmed missing package | Probable missing package |
 | `DP-008` | Retry configuration | Invalid retry config | Retry-capable trigger without explicit retry strategy |
+| `PY-008` | Python Blueprint registration | Decorated Blueprint is not registered | Registration is dynamic or unresolved |
+| `PY-009` | Python worker dependency | - | Application declares the platform-managed `azure-functions-worker` |
+| `PY-010` | Python native dependencies | - | Verify deployment-compatible wheels or remote build |
 
 ## Security and packaging
 
@@ -43,3 +46,5 @@ These checks can run without LLM semantics and without Azure resource access. Th
 - `host.json.version` is the schema version, not the Functions runtime version.
 - Use Azure CLI runtime metadata for language version checks; do not call internal stack endpoints directly.
 - Prefer Fail only for startup blockers, unsupported configurations, parse errors, and confirmed secrets.
+- Treat native Python dependency detection as compatibility information, not
+  evidence of a vulnerable or malicious package.

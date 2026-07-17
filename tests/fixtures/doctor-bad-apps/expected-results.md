@@ -31,6 +31,22 @@ These findings are produced by built-in checks (`--no-deep`) and can be validate
 | `java-clean` | Java | pass | None (all checks pass) |
 | `powershell-clean` | PowerShell | pass | None (all checks pass) |
 
+### Python deterministic fixtures
+
+| Fixture | Expected status | Minimum expected findings |
+|---------|-----------------|---------------------------|
+| `python-mixed-model` | fail | `python-programming-model:warn` |
+| `python-missing-dependency-manifest` | fail | `python-dependency-manifest:fail` |
+| `python-missing-azure-functions` | fail | `python-azure-functions:fail` |
+| `python-outdated-azure-functions` | fail | `python-azure-functions:fail` |
+| `python-worker-dependency` | pass (medium) | `python-worker-dependency:warn` |
+| `python-blueprint-unregistered` | fail | `python-blueprint-registration:warn` |
+| `python-native-dependencies` | pass (info) | `python-native-dependencies:warn` |
+| `python-deploy-artifacts` | pass (low) | `python-deploy-artifacts:warn` |
+| `python-durable-defaults` | pass (low) | `python-durable-configuration:warn` |
+| `python-missing-application-insights` | pass (info) | `application-insights:warn` |
+| `python-v2-missing-storage` | fail | `connection-strings:fail` |
+
 ### Deep fixtures — Tier 1 component
 
 These fixtures also have deterministic issues detectable by `--no-deep`:

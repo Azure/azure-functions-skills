@@ -288,6 +288,18 @@ Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=Enable
 | `entry-point` | `DP-003`, `JS-004` | Node.js entry point file |
 | `typescript-build` | `JS-004` | `tsconfig.json` parsing / `outDir` |
 | `package-dependencies` | `DP-005`, `DP-007` | Currently a stub; effectively not supported |
+| `tracked-secret-files` | `SC-005` | Git tracking and ignore status for `.env` files and `local.settings.json` |
+| `python-programming-model` | `PY-001` | Python v1, v2, and mixed model layouts |
+| `python-dependency-manifest` | `PY-003` | Missing requirements/pyproject when external imports exist |
+| `python-azure-functions` | `PY-007` | Missing or incompatible `azure-functions` package |
+| `python-worker-dependency` | `PY-009` | Explicit platform-managed worker dependency |
+| `python-blueprint-registration` | `PY-008` | Unregistered statically resolvable Blueprints |
+| `python-native-dependencies` | `PY-010` | Informational native-wheel compatibility risk |
+| `python-deploy-artifacts` | `PF-006` | Tests, environments, and caches not excluded by `.funcignore` |
+| `python-durable-configuration` | `PF-007` | Durable triggers relying on implicit host defaults |
+| `application-insights` | `AS-006` | Local-only observability setting presence |
+| `python-unpinned-requirements` | Supply chain | Floating direct Python dependencies |
+| `python-missing-lockfile` | Supply chain | Missing lockfile or dependency hashes |
 
 #### Easy additions for `--no-deep`
 
@@ -295,13 +307,11 @@ Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=Enable
 |-----------|--------|
 | `RT-002` | Deterministic when `FUNCTIONS_EXTENSION_VERSION` exists in app settings / IaC |
 | `SC-001` | Can use built-in secret patterns or external scanner invocation |
-| `SC-005` | Can inspect `.gitignore` and tracked files |
-| `AS-006` | Monitoring setting presence is key-based |
 | `AS-007` | Identity-based connection key groups can be statically validated |
 | `CF-005` | Deterministic when plan is known; warning-only when plan is unknown |
 | `DP-004` | Cross-reference binding connection setting names and settings |
-| `PF-008` | File size / deploy artifact simulation |
-| `JS-004`, `PY-003`, `PY-007`, `CS-002`, `CS-005` | Can be determined from language manifests / package files |
+| `PF-008` | File size / full deploy artifact simulation |
+| `JS-004`, `CS-002`, `CS-005` | Can be determined from language manifests / package files |
 
 #### Not normally supported by `--no-deep`
 
@@ -448,21 +458,21 @@ jobs:
 | `function-bindings` | `DP-002` | Also check extension presence |
 | `entry-point` | `DP-003`, `JS-004` | OK |
 | `typescript-build` | `JS-004` | OK |
+| `tracked-secret-files` | `SC-005` | Covers `.env` files and `local.settings.json` |
+| `application-insights` | `AS-006` | Local evidence only; does not infer deployed settings |
+| `python-*` deterministic checks | `PY-001`, `PY-003`, `PY-007`–`PY-010`, `PF-006`, `PF-007` | Python model, dependency, Blueprint, native-wheel, packaging, and Durable checks |
 
 ### Priority additions
 
 1. `SC-001` - source secret detection
-2. `SC-005` - `local.settings.json` tracked / `.gitignore`
-3. `RT-003` - replace direct Stacks API dependency with Azure CLI runtime metadata (`az functionapp list-runtimes`)
-4. `AS-006` - Application Insights / observability setting presence
-5. `AS-007` - identity-based connection shape
-6. `CQ-006` - obvious blocking call patterns
-7. `CQ-001` / language-specific client reuse
-8. `CF-005` - plan-aware `functionTimeout`
-9. `DP-004` - binding connection setting reference validation
-10. `PF-008` - large deploy artifact / missing `.funcignore`
-11. `JS-004` - stricter TypeScript output validation
-12. `PY-003` / `PY-007` - Python dependencies
+2. `RT-003` - replace direct Stacks API dependency with Azure CLI runtime metadata (`az functionapp list-runtimes`)
+3. `AS-007` - identity-based connection shape
+4. `CQ-006` - obvious blocking call patterns
+5. `CQ-001` / language-specific client reuse
+6. `CF-005` - plan-aware `functionTimeout`
+7. `DP-004` - binding connection setting reference validation
+8. `PF-008` - large deploy artifact simulation
+9. `JS-004` - stricter TypeScript output validation
 13. `CS-002` / `CS-005` - .NET model and SDK compatibility
 
 ### Later checks

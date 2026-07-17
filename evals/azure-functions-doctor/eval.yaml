@@ -1,0 +1,108 @@
+name: azure-functions-doctor-eval
+description: |
+  Evaluation suite for Python-aware deep doctor behavior. Deterministic Python
+  findings are supplied as Tier 1 context so the skill must focus on semantic
+  issues and avoid duplicate findings.
+
+tags:
+  type: integration
+  skill: azure-functions-doctor
+
+defaults:
+  runs: 3
+  timeout: "5m"
+  executor: copilot-sdk
+  model: claude-sonnet-4.6
+
+scoring:
+  threshold: 0.8
+  weights:
+    skill-invocation: 0.35
+    output-matches: 0.20
+    output-not-matches: 0.30
+    completed: 0.15
+
+stimuli:
+  - name: "Routing — deep analysis of Python Functions"
+    prompt: |
+      Run a deep, read-only doctor analysis of this local Python Azure Functions
+      project. Focus on semantic code problems that deterministic checks cannot
+      prove, and summarize the findings.
+    tags:
+      type: integration
+      skill: azure-functions-doctor
+      tier: smoke
+      cost: llm
+      area: routing
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-doctor
+      files:
+        - src: fixtures/python-semantic/function_app.py
+          dest: function_app.py
+        - src: fixtures/python-semantic/host.json
+          dest: host.json
+        - src: fixtures/python-semantic/requirements.txt
+          dest: requirements.txt
+    constraints:
+      max_turns: 12
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-doctor
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Quality — semantic findings do not duplicate Python Tier 1"
+    prompt: |
+      Perform the Tier 2 review for this Python Functions workspace. Tier 1
+      already reported that the Blueprint is unregistered, azure-functions-worker
+      is explicitly declared, and numpy may require a platform-compatible wheel.
+      Do not repeat those deterministic findings. Identify only semantic code
+      problems and summarize the actionable result.
+    tags:
+      type: integration
+      skill: azure-functions-doctor
+      tier: full
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-doctor
+      files:
+        - src: fixtures/python-semantic/function_app.py
+          dest: function_app.py
+        - src: fixtures/python-semantic/host.json
+          dest: host.json
+        - src: fixtures/python-semantic/requirements.txt
+          dest: requirements.txt
+    constraints:
+      max_turns: 12
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-doctor
+      - name: reports_blocking_http_in_async_handler
+        type: output-matches
+        config:
+          pattern: "(?i)(requests\\.get|synchronous|blocking).{0,80}(async|event loop)|(?:async|event loop).{0,80}(requests\\.get|synchronous|blocking)"
+      - name: avoids_duplicate_blueprint_finding
+        type: output-not-matches
+        config:
+          pattern: "(?i)blueprint.{0,80}(unregistered|not registered|register_functions)"
+      - name: avoids_duplicate_worker_finding
+        type: output-not-matches
+        config:
+          pattern: "(?i)azure-functions-worker.{0,80}(remove|managed|conflict|pin)"
+      - name: does_not_call_native_packages_malicious
+        type: output-not-matches
+        config:
+          pattern: "(?i)(numpy|native (dependency|package)).{0,80}(malicious|malware|compromised)"
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"

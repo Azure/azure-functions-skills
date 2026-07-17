@@ -288,6 +288,18 @@ Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=Enable
 | `entry-point` | `DP-003`, `JS-004` | Node.js entry point file |
 | `typescript-build` | `JS-004` | `tsconfig.json` parse / `outDir` |
 | `package-dependencies` | `DP-005`, `DP-007` | 現状 stub。実質未対応 |
+| `tracked-secret-files` | `SC-005` | `.env` と `local.settings.json` の Git tracking / ignore 状態 |
+| `python-programming-model` | `PY-001` | Python v1、v2、mixed model layout |
+| `python-dependency-manifest` | `PY-003` | external import がある場合の requirements / pyproject 欠如 |
+| `python-azure-functions` | `PY-007` | `azure-functions` package の欠如・非互換 |
+| `python-worker-dependency` | `PY-009` | platform-managed worker の明示依存 |
+| `python-blueprint-registration` | `PY-008` | 静的解決可能な未登録 Blueprint |
+| `python-native-dependencies` | `PY-010` | native wheel compatibility risk（Info） |
+| `python-deploy-artifacts` | `PF-006` | `.funcignore` で除外されない test / environment / cache |
+| `python-durable-configuration` | `PF-007` | implicit host default に依存する Durable trigger |
+| `application-insights` | `AS-006` | local observability setting の存在 |
+| `python-unpinned-requirements` | Supply chain | floating Python dependency |
+| `python-missing-lockfile` | Supply chain | lockfile / dependency hash の欠如 |
 
 #### `--no-deep` で追加実装しやすいもの
 
@@ -295,13 +307,11 @@ Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=Enable
 |---------|------|
 | `RT-002` | app settings / IaC に `FUNCTIONS_EXTENSION_VERSION` があれば決定的に判定可能 |
 | `SC-001` | built-in secret patterns または外部 scanner 呼び出しで判定可能 |
-| `SC-005` | `.gitignore` と git tracked files で判定可能 |
-| `AS-006` | monitoring setting presence はキー存在で判定可能 |
 | `AS-007` | identity-based connection key group の形は静的判定可能 |
 | `CF-005` | plan が分かる場合のみ決定的。plan 不明時は Warning |
 | `DP-004` | binding の connection setting name と settings の突合 |
-| `PF-008` | file size / deploy artifact simulation |
-| `JS-004`, `PY-003`, `PY-007`, `CS-002`, `CS-005` | language manifest / package file から静的判定可能 |
+| `PF-008` | file size / 完全な deploy artifact simulation |
+| `JS-004`, `CS-002`, `CS-005` | language manifest / package file から静的判定可能 |
 
 #### `--no-deep` では原則サポートしないもの
 
@@ -448,21 +458,21 @@ jobs:
 | `function-bindings` | `DP-002` | extension presence も見る |
 | `entry-point` | `DP-003`, `JS-004` | OK |
 | `typescript-build` | `JS-004` | OK |
+| `tracked-secret-files` | `SC-005` | `.env` と `local.settings.json` を対象にする |
+| `application-insights` | `AS-006` | local evidence のみ。deployed settings は推論しない |
+| Python deterministic checks | `PY-001`, `PY-003`, `PY-007`–`PY-010`, `PF-006`, `PF-007` | model、dependency、Blueprint、native wheel、packaging、Durable |
 
 ### 優先追加チェック
 
 1. `SC-001` — source secret detection
-2. `SC-005` — `local.settings.json` tracked / `.gitignore`
-3. `RT-003` — direct Stacks API 依存をやめ、Azure CLI runtime metadata (`az functionapp list-runtimes`) へ移行
-4. `AS-006` — Application Insights / observability setting presence
-5. `AS-007` — identity-based connection shape
-6. `CQ-006` — obvious blocking call patterns
-7. `CQ-001` / language-specific client reuse
-8. `CF-005` — plan-aware `functionTimeout`
-9. `DP-004` — binding connection setting reference validation
-10. `PF-008` — large deploy artifact / missing `.funcignore`
-11. `JS-004` — stricter TypeScript output validation
-12. `PY-003` / `PY-007` — Python dependencies
+2. `RT-003` — direct Stacks API 依存をやめ、Azure CLI runtime metadata (`az functionapp list-runtimes`) へ移行
+3. `AS-007` — identity-based connection shape
+4. `CQ-006` — obvious blocking call patterns
+5. `CQ-001` / language-specific client reuse
+6. `CF-005` — plan-aware `functionTimeout`
+7. `DP-004` — binding connection setting reference validation
+8. `PF-008` — large deploy artifact simulation
+9. `JS-004` — stricter TypeScript output validation
 13. `CS-002` / `CS-005` — .NET model and SDK compatibility
 
 ### 後続で扱うチェック

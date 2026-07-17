@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import type { FunctionInfo, ProjectContext, ProjectLanguage } from './types.js';
+import { discoverPythonV2Functions } from './python-source.js';
 
 function readJson(filePath: string): Record<string, unknown> | null {
   try {
@@ -14,9 +15,48 @@ function readJson(filePath: string): Record<string, unknown> | null {
   }
 }
 
-function detectLanguage(dir: string): ProjectLanguage {
+function localWorkerRuntime(localSettings: Record<string, unknown> | null): string | undefined {
+  const values = localSettings?.Values;
+  if (typeof values !== 'object' || values === null) return undefined;
+  const runtime = (values as Record<string, unknown>).FUNCTIONS_WORKER_RUNTIME;
+  return typeof runtime === 'string' ? runtime.toLowerCase() : undefined;
+}
+
+function hasPythonV1Layout(dir: string): boolean {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).some(entry => {
+      if (!entry.isDirectory()) return false;
+      const functionDir = join(dir, entry.name);
+      const functionJson = readJson(join(functionDir, 'function.json'));
+      if (!functionJson) return false;
+      const scriptFile = functionJson.scriptFile;
+      return existsSync(join(functionDir, '__init__.py'))
+        || (typeof scriptFile === 'string' && scriptFile.endsWith('.py'));
+    });
+  } catch {
+    return false;
+  }
+}
+
+function detectLanguage(
+  dir: string,
+  localSettings: Record<string, unknown> | null,
+  hasPythonV2: boolean,
+): ProjectLanguage {
+  const explicitRuntime = localWorkerRuntime(localSettings);
+  const knownRuntimes: ReadonlySet<ProjectLanguage> = new Set([
+    'node', 'python', 'dotnet', 'java', 'powershell',
+  ]);
+  if (explicitRuntime && knownRuntimes.has(explicitRuntime as ProjectLanguage)) {
+    return explicitRuntime as ProjectLanguage;
+  }
+  if (
+    hasPythonV2
+    || hasPythonV1Layout(dir)
+    || existsSync(join(dir, 'requirements.txt'))
+    || existsSync(join(dir, 'pyproject.toml'))
+  ) return 'python';
   if (existsSync(join(dir, 'package.json'))) return 'node';
-  if (existsSync(join(dir, 'requirements.txt'))) return 'python';
   // Check for .csproj or .fsproj
   try {
     const files = readdirSync(dir);
@@ -90,13 +130,27 @@ export async function loadProjectContext(dir: string): Promise<ProjectContext> {
   const hostJson = readJson(join(dir, 'host.json'));
   const localSettings = readJson(join(dir, 'local.settings.json'));
   const packageJson = readJson(join(dir, 'package.json'));
-  const language = detectLanguage(dir);
+  const pythonV2 = discoverPythonV2Functions(dir);
+  const language = detectLanguage(dir, localSettings, pythonV2.hasV2Application);
 
-  // Try v4 first, fall back to v3
-  let functions = discoverV4Functions(dir);
-  if (functions.length === 0) {
-    functions = discoverV3Functions(dir);
-  }
+  const v1Functions = discoverV3Functions(dir);
+  const nodeV4Functions = language === 'node' ? discoverV4Functions(dir) : [];
+  const functions = language === 'python'
+    ? [...v1Functions, ...pythonV2.functions]
+    : nodeV4Functions.length > 0
+      ? nodeV4Functions
+      : v1Functions;
+  const python = language === 'python'
+    ? {
+        programmingModel: v1Functions.length > 0 && pythonV2.hasV2Application
+          ? 'mixed' as const
+          : pythonV2.hasV2Application
+            ? 'v2' as const
+            : v1Functions.length > 0
+              ? 'v1' as const
+              : 'unknown' as const,
+      }
+    : undefined;
 
   return {
     dir,
@@ -105,6 +159,7 @@ export async function loadProjectContext(dir: string): Promise<ProjectContext> {
     localSettings,
     packageJson,
     functions,
+    ...(python ? { python } : {}),
     stacks: [],  // Resolved later by runner
   };
 }

@@ -102,6 +102,52 @@ describe('doctor CLI', () => {
     expect(exitCode).toBe(0);
   });
 
+  it.each([
+    ['python-mixed-model', 'python-programming-model', 'warn', 1],
+    ['python-missing-dependency-manifest', 'python-dependency-manifest', 'fail', 1],
+    ['python-missing-azure-functions', 'python-azure-functions', 'fail', 1],
+    ['python-outdated-azure-functions', 'python-azure-functions', 'fail', 1],
+    ['python-worker-dependency', 'python-worker-dependency', 'warn', 0],
+    ['python-blueprint-unregistered', 'python-blueprint-registration', 'warn', 1],
+    ['python-native-dependencies', 'python-native-dependencies', 'warn', 0],
+    ['python-deploy-artifacts', 'python-deploy-artifacts', 'warn', 0],
+    ['python-durable-defaults', 'python-durable-configuration', 'warn', 0],
+    ['python-missing-application-insights', 'application-insights', 'warn', 0],
+    ['python-v2-missing-storage', 'connection-strings', 'fail', 1],
+  ] as const)(
+    'reports %s from its Python bad-app fixture',
+    (fixtureName, checkId, status, expectedExitCode) => {
+    const fixture = join(
+      import.meta.dirname,
+      'fixtures',
+      'doctor-bad-apps',
+      fixtureName,
+    );
+    const reportPath = join(makeTmp('cli-doc-python-report-'), 'report.json');
+
+    const { exitCode, stdout } = runDoctor([
+      '--dir',
+      fixture,
+      '--no-deep',
+      '--format',
+      'json',
+      '--output',
+      reportPath,
+    ]);
+
+    expect(exitCode).toBe(expectedExitCode);
+    if (checkId === 'python-programming-model') {
+      expect(stdout).toContain('python-programming-model ');
+      expect(stdout).not.toContain('python-programming-modelThe');
+    }
+    const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
+    expect(report.tiers.builtin.checks).toContainEqual(expect.objectContaining({
+      id: checkId,
+      status,
+    }));
+    },
+  );
+
   it('writes report file in requested format', () => {
     const dir = makeTmp('cli-doc-report-');
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
