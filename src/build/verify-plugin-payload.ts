@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildPluginMarketplaces, buildPluginPayload } from './build-target.js';
-import { loadAgents, loadHooks, loadMcpServers, loadSkills } from './loader.js';
+import { loadHooks, loadMcpServers, loadSkills } from './loader.js';
 import type { BuildData } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -22,7 +22,6 @@ function loadBuildData(): BuildData {
   return {
     skills: loadSkills(join(TEMPLATES_DIR, 'skills')),
     mcpServers: loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')),
-    agents: loadAgents(join(TEMPLATES_DIR, 'agents')),
     hooks: loadHooks(join(TEMPLATES_DIR, 'hooks')),
     packageVersion: readPackageVersion(),
   };
@@ -77,7 +76,7 @@ function main(): void {
 
   try {
     const data = loadBuildData();
-    buildPluginPayload(data, join(tempRoot, '.github', 'plugins', 'azure-functions-skills'), { profile: 'hooks' });
+    buildPluginPayload(data, join(tempRoot, '.github', 'plugins', 'azure-functions-skills'));
     buildPluginMarketplaces(tempRoot, {
       packageVersion: data.packageVersion || '0.0.0-dev',
       pluginSource: './.github/plugins/azure-functions-skills',

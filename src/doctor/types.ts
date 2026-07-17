@@ -105,8 +105,6 @@ export interface DoctorOptions {
   output: string;
   checks?: string[];
   severity: CheckSeverity;
-  /** How to auto-install skills when not yet installed. Default: 'local' (CI-safe). */
-  installMode?: 'local' | 'plugin';
   /**
    * Acknowledge that --deep runs the agent with elevated permissions (write/shell)
    * and that the workspace is trusted. Required to enable Tier 2 analysis.

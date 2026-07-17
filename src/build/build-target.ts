@@ -1,10 +1,6 @@
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { BuildData, BuildTargetName, McpServer, Skill } from '../types.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 
 type TargetBuilder = (data: BuildData, distDir: string) => void;
 
@@ -13,341 +9,182 @@ interface PluginMarketplaceOptions {
   pluginSource: string;
 }
 
-export interface PluginPayloadOptions {
-  profile?: 'skills-only' | 'hooks' | 'full';
-}
-
-/**
- * Build output for a specific target (ghcp, claude, codex).
- */
 export function buildTarget(target: BuildTargetName, data: BuildData, distDir: string): void {
-  const builders: Record<BuildTargetName, TargetBuilder> = { ghcp: buildGhcp, claude: buildClaude, codex: buildCodex };
-  const builder = builders[target];
-  if (!builder) throw new Error(`Unknown target: ${target}`);
-  builder(data, distDir);
+  const builders: Record<BuildTargetName, TargetBuilder> = {
+    ghcp: buildGhcp,
+    claude: buildClaude,
+    codex: buildCodex,
+  };
+  builders[target](data, distDir);
 }
 
-/**
- * Build the self-contained plugin payload used for GitHub repository based
- * plugin installation and release bundles. Unlike `buildTarget`, this does not
- * emit workspace-specific files such as `.github/skills` or `.agents/skills`.
- */
-export function buildPluginPayload(data: BuildData, pluginDir: string, options: PluginPayloadOptions = {}): void {
-  const profile = options.profile || 'skills-only';
-  const fullPayload = profile === 'full';
-  const hookPayload = profile === 'hooks' || fullPayload;
+export function buildPluginPayload(data: BuildData, pluginDir: string): void {
   mkdirSync(pluginDir, { recursive: true });
+  const manifest = generatePluginManifest(data);
+  const claudeManifest = generateClaudePluginManifest(data);
 
-  const manifest = generatePluginManifest(data, { includeAgents: fullPayload, includeHooks: hookPayload, includeMcp: fullPayload });
-  const claudeManifest = generateClaudePluginManifest(data, { includeHooks: hookPayload, includeMcp: fullPayload });
   mkdirSync(join(pluginDir, '.plugin'), { recursive: true });
-  writeFileSync(join(pluginDir, '.plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
-  writeFileSync(join(pluginDir, 'plugin.json'), JSON.stringify(manifest, null, 2));
-
+  writeJson(join(pluginDir, '.plugin', 'plugin.json'), manifest);
+  writeJson(join(pluginDir, 'plugin.json'), manifest);
   mkdirSync(join(pluginDir, '.claude-plugin'), { recursive: true });
-  writeFileSync(join(pluginDir, '.claude-plugin', 'plugin.json'), JSON.stringify(claudeManifest, null, 2));
-
+  writeJson(join(pluginDir, '.claude-plugin', 'plugin.json'), claudeManifest);
   mkdirSync(join(pluginDir, '.codex-plugin'), { recursive: true });
-  writeFileSync(join(pluginDir, '.codex-plugin', 'plugin.json'), JSON.stringify(manifest, null, 2));
+  writeJson(join(pluginDir, '.codex-plugin', 'plugin.json'), manifest);
 
-  for (const skill of data.skills) {
-    const skillDir = join(pluginDir, 'skills', skill.id);
+  writeSkills(data.skills, join(pluginDir, 'skills'));
+  writeJson(join(pluginDir, '.mcp.json'), generatePluginMcpJson(data.mcpServers));
+  writePluginTelemetryAssets(data, pluginDir);
+}
+
+export function buildPluginMarketplaces(repoRoot: string, options: PluginMarketplaceOptions): void {
+  const marketplace = {
+    name: 'azure-functions-skills',
+    owner: { name: 'Azure Functions Team' },
+    metadata: {
+      description: 'Azure Functions coding agent skills, MCP, and telemetry hooks',
+      version: options.packageVersion,
+    },
+    plugins: [{
+      name: 'azure-functions-skills',
+      source: options.pluginSource,
+      description: 'Azure Functions skills, MCP, and telemetry hooks',
+      version: options.packageVersion,
+      category: 'Development',
+      tags: ['azure-functions', 'serverless', 'mcp', 'coding-agent'],
+    }],
+  };
+  mkdirSync(join(repoRoot, '.plugin'), { recursive: true });
+  writeJson(join(repoRoot, '.plugin', 'marketplace.json'), marketplace);
+  mkdirSync(join(repoRoot, '.claude-plugin'), { recursive: true });
+  writeJson(join(repoRoot, '.claude-plugin', 'marketplace.json'), marketplace);
+}
+
+function buildGhcp(data: BuildData, distDir: string): void {
+  const base = join(distDir, 'ghcp');
+  writeSkills(data.skills, join(base, '.github', 'skills'));
+  writeJson(join(base, '.mcp.json'), generateCopilotMcpJson(data.mcpServers));
+  writeWorkspaceTelemetryAssets(data, join(base, '.github', 'hooks'));
+  writeJson(
+    join(base, '.github', 'hooks', 'azure-functions-telemetry.json'),
+    workspaceCopilotHooks(),
+  );
+}
+
+function buildClaude(data: BuildData, distDir: string): void {
+  const base = join(distDir, 'claude');
+  writeSkills(data.skills, join(base, '.claude', 'skills'));
+  const hooks = workspaceClaudeHooks();
+  writeJson(join(base, '.claude', 'settings.json'), {
+    ...generateClaudeSettings(data.mcpServers),
+    hooks: hooks.hooks,
+  });
+  writeWorkspaceTelemetryAssets(data, join(base, '.claude', 'hooks'));
+  writeJson(join(base, '.claude', 'hooks', 'hooks.json'), hooks);
+}
+
+function buildCodex(data: BuildData, distDir: string): void {
+  const base = join(distDir, 'codex');
+  writeSkills(data.skills, join(base, '.agents', 'skills'));
+  mkdirSync(join(base, '.codex'), { recursive: true });
+  writeFileSync(join(base, '.codex', 'config.toml'), generateCodexConfigToml(data.mcpServers));
+  writeJson(join(base, '.codex', 'hooks.json'), workspaceCodexHooks());
+  writeWorkspaceTelemetryAssets(data, join(base, '.codex', 'hooks'));
+}
+
+function writeSkills(skills: Skill[], root: string): void {
+  for (const skill of skills) {
+    const skillDir = join(root, skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateSkillMd(skill));
     copySkillAssets(skill, skillDir);
   }
-
-  if (fullPayload) {
-    mkdirSync(join(pluginDir, 'agents'), { recursive: true });
-    writeFileSync(join(pluginDir, 'agents', 'functions-copilot.agent.md'), data.agents.copilot);
-
-    writeFileSync(join(pluginDir, '.mcp.json'), JSON.stringify(generatePluginMcpJson(data.mcpServers), null, 2));
-  }
-
-  if (hookPayload) {
-    writeTelemetryHookAssets(data, pluginDir);
-  }
 }
 
-/**
- * Build Git-backed marketplace manifests that point to the committed plugin
- * payload directory in this repository.
- */
-export function buildPluginMarketplaces(repoRoot: string, options: PluginMarketplaceOptions): void {
-  const marketplace = generatePluginMarketplace(options);
-
-  mkdirSync(join(repoRoot, '.plugin'), { recursive: true });
-  writeFileSync(join(repoRoot, '.plugin', 'marketplace.json'), JSON.stringify(marketplace, null, 2));
-
-  mkdirSync(join(repoRoot, '.claude-plugin'), { recursive: true });
-  writeFileSync(join(repoRoot, '.claude-plugin', 'marketplace.json'), JSON.stringify(marketplace, null, 2));
+function copySkillAssets(skill: Skill, skillDir: string): void {
+  if (skill.referencesDir) copyDirRecursive(skill.referencesDir, join(skillDir, 'references'));
+  if (skill.scriptsDir) copyDirRecursive(skill.scriptsDir, join(skillDir, 'scripts'));
+  if (skill.assetsDir) copyDirRecursive(skill.assetsDir, join(skillDir, 'assets'));
 }
 
-/**
- * Recursively copy a directory tree into destDir (created if missing).
- * Used for skill `references/` subdirs. Keeps implementation local to the
- * build module; `src/setup/index.js` has its own copyRecursive for install-time
- * use. Consolidating them is out of scope (see issue #8).
- */
-function copyDirRecursive(srcDir: string, destDir: string): void {
-  mkdirSync(destDir, { recursive: true });
-  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
-    const src = join(srcDir, entry.name);
-    const dest = join(destDir, entry.name);
-    if (entry.isDirectory()) {
-      copyDirRecursive(src, dest);
-    } else if (entry.isFile()) {
-      copyFileSync(src, dest);
-    }
+function copyDirRecursive(source: string, destination: string): void {
+  mkdirSync(destination, { recursive: true });
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const sourcePath = join(source, entry.name);
+    const destinationPath = join(destination, entry.name);
+    if (entry.isDirectory()) copyDirRecursive(sourcePath, destinationPath);
+    else if (entry.isFile()) copyFileSync(sourcePath, destinationPath);
   }
 }
 
-function copySkillReferences(skill: Skill, skillDestDir: string): void {
-  if (!skill.referencesDir) return;
-  copyDirRecursive(skill.referencesDir, join(skillDestDir, 'references'));
-}
-
-function copySkillScripts(skill: Skill, skillDestDir: string): void {
-  if (!skill.scriptsDir) return;
-  copyDirRecursive(skill.scriptsDir, join(skillDestDir, 'scripts'));
-}
-
-function copyBundledAssets(skill: Skill, skillDestDir: string): void {
-  if (!skill.assetsDir) return;
-  copyDirRecursive(skill.assetsDir, join(skillDestDir, 'assets'));
-}
-
-function copySkillAssets(skill: Skill, skillDestDir: string): void {
-  copySkillReferences(skill, skillDestDir);
-  copySkillScripts(skill, skillDestDir);
-  copyBundledAssets(skill, skillDestDir);
-}
-
-function writeTelemetryHookAssets(data: BuildData, pluginDir: string): void {
+function writePluginTelemetryAssets(data: BuildData, pluginDir: string): void {
   const hooksDir = join(pluginDir, 'hooks');
-  const scriptsDir = join(hooksDir, 'scripts');
-  mkdirSync(scriptsDir, { recursive: true });
-
+  writeTelemetryScripts(data, hooksDir);
   writeFileSync(join(hooksDir, 'copilot-hooks.json'), data.hooks.copilotTelemetry);
   writeFileSync(join(hooksDir, 'hooks.json'), data.hooks.claudeTelemetry);
   writeFileSync(join(hooksDir, 'cursor-hooks.json'), data.hooks.cursorTelemetry);
-  writeFileSync(join(hooksDir, 'telemetry.config.json'), data.hooks.telemetryConfig);
-  writeFileSync(join(scriptsDir, 'track-telemetry.ps1'), data.hooks.trackTelemetryPowerShell);
-  writeFileSync(join(scriptsDir, 'track-telemetry.sh'), data.hooks.trackTelemetryShell);
 }
 
-function writeWorkspaceTelemetryAssets(data: BuildData, base: string): void {
-  const hooksDir = join(base, '.azure-functions-skills', 'hooks');
+function writeWorkspaceTelemetryAssets(data: BuildData, hooksDir: string): void {
+  writeTelemetryScripts(data, hooksDir);
+}
+
+function writeTelemetryScripts(data: BuildData, hooksDir: string): void {
   const scriptsDir = join(hooksDir, 'scripts');
   mkdirSync(scriptsDir, { recursive: true });
-
   writeFileSync(join(hooksDir, 'telemetry.config.json'), data.hooks.telemetryConfig);
   writeFileSync(join(scriptsDir, 'track-telemetry.ps1'), data.hooks.trackTelemetryPowerShell);
   writeFileSync(join(scriptsDir, 'track-telemetry.sh'), data.hooks.trackTelemetryShell);
 }
 
-function generateWorkspaceCopilotTelemetryHooks() {
+function workspaceCopilotHooks() {
   return {
     hooks: {
-      PostToolUse: [
-        {
+      PostToolUse: [{
+        hooks: [{
           type: 'command',
-          bash: '.azure-functions-skills/hooks/scripts/track-telemetry.sh',
-          powershell: '.azure-functions-skills/hooks/scripts/track-telemetry.ps1',
-        },
-      ],
+          bash: '.github/hooks/scripts/track-telemetry.sh',
+          powershell: '.github/hooks/scripts/track-telemetry.ps1',
+        }],
+      }],
     },
   };
 }
 
-function generateWorkspaceClaudeTelemetryHooks() {
+function workspaceClaudeHooks() {
   return {
-    PostToolUse: [
-      {
-        hooks: [
-          {
-            type: 'command',
-            command: 'bash .azure-functions-skills/hooks/scripts/track-telemetry.sh',
-          },
-        ],
-      },
-    ],
+    hooks: {
+      PostToolUse: [{
+        hooks: [{
+          type: 'command',
+          command: 'bash .claude/hooks/scripts/track-telemetry.sh',
+        }],
+      }],
+    },
   };
 }
 
-function generateWorkspaceCodexTelemetryHooks() {
+function workspaceCodexHooks() {
   return {
-    PostToolUse: [
-      {
+    hooks: {
+      PostToolUse: [{
         type: 'command',
-        command: 'bash .azure-functions-skills/hooks/scripts/track-telemetry.sh',
-      },
-    ],
-  };
-}
-
-// ─── GHCP ───
-
-function buildGhcp(data: BuildData, distDir: string): void {
-  const { skills, mcpServers, agents } = data;
-  const base = join(distDir, 'ghcp');
-  mkdirSync(join(base, '.github', 'agents'), { recursive: true });
-  mkdirSync(join(base, '.github', 'hooks'), { recursive: true });
-
-  // No copilot-instructions.md — routing is handled by functions-copilot.agent.md
-  // and skills are in .github/skills/<id>/SKILL.md
-
-  // .mcp.json — Copilot CLI workspace MCP configuration
-  writeFileSync(join(base, '.mcp.json'), JSON.stringify(generateCopilotMcpJson(mcpServers), null, 2));
-
-  // Agent definition
-  writeFileSync(join(base, '.github', 'agents', 'functions-copilot.agent.md'), agents.copilot);
-
-  // AGENTS.md
-  writeFileSync(join(base, 'AGENTS.md'), agents.agentsMd);
-
-  // .github/skills/<id>/SKILL.md — Agent Skills (agentskills.io standard)
-  for (const skill of skills) {
-    const skillDir = join(base, '.github', 'skills', skill.id);
-    mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, 'SKILL.md'), generateGhcpSkillMd(skill));
-    copySkillAssets(skill, skillDir);
-  }
-
-  // .github/hooks/welcome-setup.json — SessionStart hook (workspace level)
-  writeFileSync(
-    join(base, '.github', 'hooks', 'welcome-setup.json'),
-    JSON.stringify(generateGhcpHooks(), null, 2),
-  );
-  writeFileSync(
-    join(base, '.github', 'hooks', 'azure-functions-telemetry.json'),
-    JSON.stringify(generateWorkspaceCopilotTelemetryHooks(), null, 2),
-  );
-  writeWorkspaceTelemetryAssets(data, base);
-
-}
-
-// ─── Claude Code ───
-
-function buildClaude(data: BuildData, distDir: string): void {
-  const { skills, mcpServers } = data;
-  const base = join(distDir, 'claude');
-  mkdirSync(join(base, '.claude', 'skills'), { recursive: true });
-
-  // CLAUDE.md — lightweight routing block (skills are in .claude/skills/)
-  const claudeMd = generateRoutingBlock('claude', skills);
-  writeFileSync(join(base, 'CLAUDE.md'), claudeMd);
-
-  // .claude/settings.json (MCP servers)
-  const settings = {
-    ...generateClaudeSettings(mcpServers),
-    hooks: generateWorkspaceClaudeTelemetryHooks(),
-  };
-  writeFileSync(join(base, '.claude', 'settings.json'), JSON.stringify(settings, null, 2));
-  writeWorkspaceTelemetryAssets(data, base);
-
-  // .claude/skills/<id>/SKILL.md — Agent Skills (agentskills.io standard, directory format)
-  for (const skill of skills) {
-    const skillDir = join(base, '.claude', 'skills', skill.id);
-    mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, 'SKILL.md'), generateClaudeSkillMd(skill));
-    copySkillAssets(skill, skillDir);
-  }
-}
-
-// ─── Codex ───
-
-function buildCodex(data: BuildData, distDir: string): void {
-  const { skills, mcpServers, agents } = data;
-  const base = join(distDir, 'codex');
-  mkdirSync(base, { recursive: true });
-  mkdirSync(join(base, '.codex'), { recursive: true });
-
-  // AGENTS.md — routing block + development standards (skills are in .agents/skills/)
-  const routingBlock = generateRoutingBlock('codex', skills);
-  const agentsMd = `${routingBlock}\n\n${agents.agentsMd}\n`;
-  writeFileSync(join(base, 'AGENTS.md'), agentsMd);
-
-  // .agents/skills/<id>/SKILL.md — workspace-level skills
-  for (const skill of skills) {
-    const skillDir = join(base, '.agents', 'skills', skill.id);
-    mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, 'SKILL.md'), generateCodexSkillMd(skill));
-    copySkillAssets(skill, skillDir);
-  }
-
-  // .codex/config.toml — MCP server configuration
-  writeFileSync(join(base, '.codex', 'config.toml'), generateCodexConfigToml(mcpServers));
-
-  // .codex/hooks.json — SessionStart hook
-  writeFileSync(join(base, '.codex', 'hooks.json'), JSON.stringify(generateCodexHooks(), null, 2));
-  writeWorkspaceTelemetryAssets(data, base);
-}
-
-// ─── Generators ───
-
-/**
- * Generate a lightweight routing block from a template.
- * The routing template uses {{skills}} as a placeholder for the skill list.
- */
-function generateRoutingBlock(agent: 'ghcp' | 'claude' | 'codex', skills: Skill[]): string {
-  const template = readFileSync(join(TEMPLATES_DIR, 'routing', `${agent}.md`), 'utf-8');
-  const skillList = skills
-    .filter(s => s.category !== 'reference')
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .map(s => `- ${s.id}: ${s.description || s.title}`)
-    .join('\n');
-  return template.replace('{{skills}}', skillList).trimEnd();
-}
-
-function generateCopilotMcpJson(mcpServers: McpServer[]) {
-  const servers: Record<string, { type: string; command: string; args: string[]; tools: string[] }> = {};
-  for (const s of mcpServers) {
-    servers[s.id] = {
-      type: s.type || 'stdio',
-      command: s.command,
-      args: s.args,
-      tools: ['*'],
-    };
-  }
-  return { mcpServers: servers };
-}
-
-function generateGhcpSkillMd(skill: Skill): string {
-  return generateSkillMd(skill);
-}
-
-function generateGhcpHooks() {
-  return {
-    hooks: {
-      SessionStart: [
-        {
-          type: 'command',
-          command: 'node -e "const r=require(\'child_process\').execSync;let o=\'⚡ Welcome to Azure Functions!\\n\';try{r(\'az --version\',{stdio:\'ignore\'});o+=\'✅ Azure CLI\\n\'}catch{o+=\'❌ Azure CLI — install: https://aka.ms/installazurecli\\n\'};try{r(\'func --version\',{stdio:\'ignore\'});o+=\'✅ Core Tools\\n\'}catch{o+=\'❌ Core Tools — install: npm i -g azure-functions-core-tools@4\\n\'};try{r(\'node --version\',{stdio:\'ignore\'});o+=\'✅ Node.js\\n\'}catch{o+=\'❌ Node.js\\n\'};console.log(JSON.stringify({hookSpecificOutput:{hookEventName:\'SessionStart\',additionalContext:o}}))"',
-          timeout: 15,
-        },
-      ],
+        command: 'bash .codex/hooks/scripts/track-telemetry.sh',
+      }],
     },
   };
 }
-interface PluginManifestOptions {
-  includeAgents?: boolean;
-  includeHooks?: boolean;
-  includeMcp?: boolean;
-}
 
-function generatePluginManifest(data: BuildData, options: PluginManifestOptions = {}) {
+function generatePluginManifest(data: BuildData) {
   return {
     name: 'azure-functions-skills',
     version: data.packageVersion || '0.0.0-dev',
-    description: 'Azure Functions skills for setup, create, and deploy workflows',
+    description: 'Azure Functions skills, MCP, and telemetry hooks',
     skills: './skills/',
-    ...(options.includeAgents ? { agents: './agents/' } : {}),
-    ...(options.includeHooks ? { hooks: { paths: ['./hooks/copilot-hooks.json'], exclusive: true } } : {}),
-    ...(options.includeMcp ? { mcpServers: './.mcp.json' } : {}),
+    hooks: { paths: ['./hooks/copilot-hooks.json'], exclusive: true },
+    mcpServers: './.mcp.json',
     interface: {
       displayName: 'Azure Functions Skills',
-      shortDescription: 'Guided setup → create → deploy workflow for Azure Functions',
+      shortDescription: 'Azure Functions guidance for coding agents',
       developerName: 'Azure Functions Team',
       category: 'Development',
       capabilities: ['Read', 'Write'],
@@ -355,123 +192,63 @@ function generatePluginManifest(data: BuildData, options: PluginManifestOptions 
   };
 }
 
-function generateClaudePluginManifest(data: BuildData, options: PluginManifestOptions = {}) {
+function generateClaudePluginManifest(data: BuildData) {
   return {
     name: 'azure-functions-skills',
     version: data.packageVersion || '0.0.0-dev',
-    description: 'Azure Functions skills for setup, create, and deploy workflows',
+    description: 'Azure Functions skills, MCP, and telemetry hooks',
     skills: './skills/',
-    ...(options.includeHooks ? { hooks: './hooks/hooks.json' } : {}),
-    ...(options.includeMcp ? { mcpServers: './.mcp.json' } : {}),
+    hooks: './hooks/hooks.json',
+    mcpServers: './.mcp.json',
   };
 }
 
-function generatePluginMarketplace({ packageVersion, pluginSource }: PluginMarketplaceOptions) {
-  return {
-    name: 'azure-functions-skills',
-    owner: {
-      name: 'Azure Functions Team',
-    },
-    metadata: {
-      description: 'Azure Functions coding agent skills and MCP guidance',
-      version: packageVersion,
-    },
-    plugins: [
-      {
-        name: 'azure-functions-skills',
-        source: pluginSource,
-        description: 'Azure Functions skills for setup, create, and deploy workflows',
-        version: packageVersion,
-        category: 'Development',
-        tags: ['azure-functions', 'serverless', 'mcp', 'coding-agent'],
-      },
-    ],
-  };
-}
-
-function generatePluginMcpJson(mcpServers: McpServer[]) {
-  const result: Record<string, { command: string; args: string[] }> = {};
-  for (const s of mcpServers) {
-    result[s.id] = {
-      command: s.command,
-      args: s.args,
+function generateCopilotMcpJson(servers: McpServer[]) {
+  const mcpServers: Record<string, { type: string; command: string; args: string[]; tools: string[] }> = {};
+  for (const server of servers) {
+    mcpServers[server.id] = {
+      type: server.type || 'stdio',
+      command: server.command,
+      args: server.args,
+      tools: ['*'],
     };
   }
-  return { mcpServers: result };
+  return { mcpServers };
 }
 
-function generateClaudeSettings(mcpServers: McpServer[]) {
-  const mcpEntries: Record<string, { command: string; args: string[] }> = {};
-  for (const s of mcpServers) {
-    mcpEntries[s.id] = {
-      command: s.command,
-      args: s.args,
-    };
+function generatePluginMcpJson(servers: McpServer[]) {
+  const mcpServers: Record<string, { command: string; args: string[] }> = {};
+  for (const server of servers) {
+    mcpServers[server.id] = { command: server.command, args: server.args };
   }
-  return { mcpServers: mcpEntries };
+  return { mcpServers };
 }
 
-function generateClaudeSkillMd(skill: Skill): string {
-  return generateSkillMd(skill);
+function generateClaudeSettings(servers: McpServer[]) {
+  return generatePluginMcpJson(servers);
 }
 
-function generateCodexSkillMd(skill: Skill): string {
-  return generateSkillMd(skill);
-}
-
-function generateSkillMd(skill: Skill): string {
-  const frontmatter = [
-    '---',
-    `name: ${skill.id}`,
-    `description: "${skill.description}"`,
-  ];
-  if (skill.argumentHint) {
-    frontmatter.push(`argument-hint: "${skill.argumentHint}"`);
-  }
-  frontmatter.push(
-    '---',
-    '',
-    skill.content.trimEnd(),
-  );
-  return frontmatter.join('\n');
-}
-
-function generateCodexConfigToml(mcpServers: McpServer[]): string {
-  const lines = [
-    '# Azure Functions MCP Servers',
-    '# Generated by azure-functions-skills build system',
-    '',
-  ];
-
-  for (const s of mcpServers) {
-    lines.push(`[mcp_servers.${s.id}]`);
-    lines.push(`command = "${s.command}"`);
-    if (s.args && s.args.length > 0) {
-      const argsStr = s.args.map(a => `"${a}"`).join(', ');
-      lines.push(`args = [${argsStr}]`);
+function generateCodexConfigToml(servers: McpServer[]): string {
+  const lines = ['# Azure Functions MCP Servers', ''];
+  for (const server of servers) {
+    lines.push(`[mcp_servers.${server.id}]`);
+    lines.push(`command = "${server.command}"`);
+    if (server.args.length > 0) {
+      lines.push(`args = [${server.args.map(argument => `"${argument}"`).join(', ')}]`);
     }
     lines.push('');
   }
-
   return lines.join('\n');
 }
 
-function generateCodexHooks() {
-  return {
-    hooks: {
-      SessionStart: [
-        {
-          matcher: 'startup',
-          hooks: [
-            {
-              type: 'command',
-              command: 'bash -c \'echo "⚡ Welcome to Azure Functions! Checking prerequisites..."; az --version > /dev/null 2>&1 && echo "✅ Azure CLI" || echo "❌ Azure CLI — install: https://aka.ms/installazurecli"; func --version > /dev/null 2>&1 && echo "✅ Core Tools" || echo "❌ Core Tools — install: npm i -g azure-functions-core-tools@4"; node --version > /dev/null 2>&1 && echo "✅ Node.js" || echo "❌ Node.js — install: https://nodejs.org"\'',
-              statusMessage: 'Checking Azure Functions prerequisites',
-            },
-          ],
-        },
-      ],
-      PostToolUse: generateWorkspaceCodexTelemetryHooks().PostToolUse,
-    },
-  };
+function generateSkillMd(skill: Skill): string {
+  const frontmatter = ['---', `name: ${skill.id}`, `description: "${skill.description}"`];
+  if (skill.argumentHint) frontmatter.push(`argument-hint: "${skill.argumentHint}"`);
+  frontmatter.push('---', '', skill.content.trimEnd());
+  return frontmatter.join('\n');
+}
+
+function writeJson(path: string, value: unknown): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }

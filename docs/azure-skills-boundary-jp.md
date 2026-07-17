@@ -8,7 +8,7 @@
 
 Azure Skills は **Azure platform workflow engine** です。Azure 全体に共通する準備、検証、デプロイ、IaC、Azure resource provisioning を担当します。
 
-Azure Functions Skills は **Azure Functions domain layer and router** です。Azure Functions 固有の作成、診断、運用レビュー、runtime / trigger / binding / language worker guidance、workspace-local setup、agent routing を担当します。
+Azure Functions Skills は **Azure Functions domain layer** です。各 skill が Azure Functions 固有の作成、診断、運用レビュー、runtime / trigger / binding / language worker guidance と軽量な skill discovery を担当します。
 
 つまり、Azure Functions Skills は Azure Skills の置き換えではありません。Functions 固有の文脈を集め、必要に応じて Azure Skills に委譲する facade / domain layer として設計します。
 
@@ -18,13 +18,13 @@ Azure Functions Skills は **Azure Functions domain layer and router** です。
 | --- | --- | --- |
 | Azure 全体の app deployment lifecycle | Azure Skills | `azure-prepare` -> `azure-validate` -> `azure-deploy` が共通 deployment engine であるため |
 | IaC、`azd`、Terraform、Bicep、Azure resource provisioning | Azure Skills | Functions 以外の App Service、Container Apps、DB、Storage、RBAC、region、subscription も扱うため |
-| Azure Functions のユーザー向け入口 | Azure Functions Skills | `functions-copilot` が setup / create / deploy / diagnostics / best-practices へ routing するため |
+| Azure Functions のユーザー向け入口 | Azure Functions Skills | `azure-functions-help` が setup / create / deploy / diagnostics / best-practices を discovery / routing するため |
 | Azure Functions project scaffolding / add function | Azure Functions Skills | runtime、language worker、trigger / binding、official Azure Functions MCP templates を扱うため |
 | Azure Functions deployment | Entry point は Azure Functions Skills、実行 engine は Azure Skills | `azure-functions-deploy` が Functions context を集め、`azure-prepare` / `azure-validate` / `azure-deploy` に委譲するため |
 | Functions runtime、trigger、binding、language、extension references | Azure Functions Skills | Functions 固有の domain knowledge であり、`azure-functions-common` の reference routing と相性がよいため |
 | Diagnostics、health、inventory、best practices、upgrade、Functions-specific migration、testing、performance tuning | Azure Functions Skills | Day 1+ の Functions 固有価値であり、runtime / trigger / binding evidence が必要なため |
 | Lambda to Functions などのクロスクラウド移行 | 主担当は Azure Skills | `azure-cloud-migrate` が cross-cloud scenario 全体を持つため。Functions 固有の target validation は Azure Functions Skills と連携する |
-| Agent / plugin / workspace setup and routing | Azure Functions Skills | `functions-copilot` agent、workspace-local setup、plugin payload がこの repo の責務であるため |
+| Plugin payload と任意の workspace-local copy | Azure Functions Skills | この repo は skills、MCP 設定、telemetry hooks を公開し、plugin install は各 host tool が担当するため |
 
 ## Contributor 判断基準
 
@@ -40,7 +40,7 @@ Azure Functions Skills は **Azure Functions domain layer and router** です。
 | HTTP / Timer / Blob / Queue / Service Bus / Event Hubs / Cosmos DB / Durable trigger behavior | Azure Functions Skills |
 | Official Azure Functions MCP template discovery or Functions project composition | Azure Functions Skills |
 | 複数 Azure サービスにまたがる汎用的な「この app を Azure に deploy したい」 | Azure Skills |
-| `functions-copilot` からの「この Azure Functions app を deploy したい」 | 入口は Azure Functions Skills。実行は Azure Skills に委譲する |
+| Azure Functions skill からの「この Azure Functions app を deploy したい」 | 入口は Azure Functions Skills。実行は Azure Skills に委譲する |
 | IaC、`azd`、RBAC、resource group、Azure provisioning が原因の deployment failure | 原則 Azure Skills |
 | Functions host、runtime setting、worker、trigger、binding、app settings、telemetry が原因の deployment failure | 原則 Azure Functions Skills |
 | 汎用 Azure compliance、governance、security、cost review | Azure Skills |
@@ -65,7 +65,7 @@ Azure Functions Skills は **Azure Functions domain layer and router** です。
 
 ### Azure Skills
 
-Azure Skills は、Azure compute target の 1 つとして Azure Functions を引き続き support します。ユーザーが Azure Skills だけを install している場合があるためです。ただし、Azure Functions Skills が install されている場合、またはユーザーが `functions-copilot` を使っている場合、Functions 固有の create / deploy / diagnose / review intent は、まず `azure-functions-*` skills から入るべきです。
+Azure Skills は、Azure compute target の 1 つとして Azure Functions を引き続き support します。ユーザーが Azure Skills だけを install している場合があるためです。ただし、Azure Functions Skills が install されている場合、Functions 固有の create / deploy / diagnose / review intent は、まず `azure-functions-*` skills から入るべきです。
 
 Azure Skills は共通 deployment contract を担当します。
 
@@ -76,12 +76,12 @@ azure-prepare -> azure-validate -> azure-deploy
 Azure Functions Skills は Functions-facing contract を担当します。
 
 ```text
-functions-copilot -> azure-functions-deploy -> azure-prepare -> azure-validate -> azure-deploy
+azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validate -> azure-deploy
 ```
 
-## `functions-copilot` の routing rules
+## Skill discovery rules
 
-`functions-copilot` は user intent を次のように route します。
+`azure-functions-help` は利用可能な `azure-functions-*` skills を discovery し、user intent を次のように route します。
 
 | User intent | Route |
 | --- | --- |
@@ -106,7 +106,7 @@ User intent が Functions 固有 context を含まない汎用 Azure deployment 
 - Functions runtime、host、language worker、programming model、trigger、binding、extension bundle、Function App settings に依存するもの。
 - Functions 固有の operational behavior を説明または修正するもの。
 - Deployed functions、trigger metadata、worker runtime、host health endpoints、Functions の App Insights traces、trigger-specific metrics など、Functions 固有の evidence を必要とするもの。
-- `functions-copilot` の route graph または workspace-local setup experience を改善するもの。
+- Azure Functions skill discovery または workspace-local copy experience を改善するもの。
 - Azure Functions team の知識を、agent が利用できる workflow、checklist、script、reference file に変換するもの。
 
 例:
@@ -152,7 +152,7 @@ User intent が Functions 固有 context を含まない汎用 Azure deployment 
 
 この boundary を保つために、次の files を整合させます。
 
-- `templates/agents/functions-copilot.agent.md`: routing と delegation rules を含める。
+- `templates/skills/azure-functions-help/SKILL.md`: runtime の skill list に基づく軽量な discovery を維持する。
 - `templates/skills/azure-functions-deploy/SKILL.md`: Azure Skills delegation model を明示し続ける。
 - `templates/skills/azure-functions-common/references/routing.md`: Functions-specific reference routing を focused and small に保つ。
 - Azure Skills `azure-prepare` specialized routing: Azure Functions Skills が install されている場合は `azure-functions-*` が preferred entry point であることを記載する。

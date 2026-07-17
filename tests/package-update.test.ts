@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { checkPackageUpdate } from '../src/setup/package-update.js';
-import type { CommandRunner } from '../src/setup/prerequisites/types.js';
+import type { CommandRunner } from '../src/setup/package-update.js';
 
 function runnerWith(stdout: string, exitCode = 0, stderr = ''): CommandRunner {
   return async () => ({ exitCode, stdout, stderr });

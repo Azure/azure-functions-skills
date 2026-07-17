@@ -35,7 +35,7 @@
 
 ## Architecture
 
-- Separate concerns by domain: `src/doctor/`, `src/setup/`, `src/chat/`, `src/build/`.
+- Separate concerns by domain: `src/doctor/`, `src/setup/`, `src/build/`.
 - Avoid duplicate code — extract shared logic into helpers.
 - `templates/` is the canonical source; generated payloads are derived.
 - Never hand-edit files under `.github/plugins/`, `.plugin/`, or `.claude-plugin/`. Change `templates/`, then regenerate with `npm run build:plugin-payload`.

@@ -1,7 +1,7 @@
 {
   "name": "@azure/functions-skills",
   "version": "0.0.5-preview",
-  "description": "AI assistant plugins for Azure Functions — one-command setup for GitHub Copilot, Claude Code, and Codex",
+  "description": "Azure Functions skills, MCP, and telemetry hooks for coding agents",
   "type": "module",
   "bin": {
     "azure-functions-skills": "bin/azure-functions-skills.js"
@@ -16,13 +16,13 @@
       "types": "./lib/setup/index.d.ts",
       "default": "./lib/setup/index.js"
     },
-    "./chat": {
-      "types": "./lib/chat/index.d.ts",
-      "default": "./lib/chat/index.js"
-    },
     "./templates": {
       "types": "./lib/templates/index.d.ts",
       "default": "./lib/templates/index.js"
+    },
+    "./telemetry": {
+      "types": "./lib/telemetry/index.d.ts",
+      "default": "./lib/telemetry/index.js"
     }
   },
   "files": [
@@ -37,7 +37,7 @@
   },
   "scripts": {
     "build": "npm run compile && node lib/build/build.js",
-    "build:plugin-payload": "npm run compile && node lib/build/build.js --plugin-only --repo-plugin-dir .github/plugins/azure-functions-skills --marketplace-root . --plugin-profile hooks",
+    "build:plugin-payload": "npm run compile && node lib/build/build.js --plugin-only --repo-plugin-dir .github/plugins/azure-functions-skills --marketplace-root .",
     "check": "npm run lint && npm run typecheck && npm run lint:security && npm run validate:skills && npm run verify:plugin-payload && npm test && npm run build",
     "ci": "npm run check",
     "compile": "tsc",
@@ -50,7 +50,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "validate:skills": "npm run compile && node lib/build/validate-skills.js",
     "verify:plugin-payload": "npm run compile && node lib/build/verify-plugin-payload.js",
-    "setup": "node bin/azure-functions-skills.js setup",
     "release:local": "node scripts/release-local.mjs",
     "eval:lint": "vally lint",
     "eval:smoke": "vally eval --suite smoke",
@@ -78,5 +77,8 @@
     "ai-skills",
     "coding-agent"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "applicationinsights": "1.8.10"
+  }
 }

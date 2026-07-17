@@ -1,7 +1,7 @@
 {
   "name": "azure-functions-skills",
   "version": "0.0.5-preview",
-  "description": "Azure Functions skills for setup, create, and deploy workflows",
+  "description": "Azure Functions skills, MCP, and telemetry hooks",
   "skills": "./skills/",
   "hooks": {
     "paths": [
@@ -9,9 +9,10 @@
     ],
     "exclusive": true
   },
+  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Azure Functions Skills",
-    "shortDescription": "Guided setup → create → deploy workflow for Azure Functions",
+    "shortDescription": "Azure Functions guidance for coding agents",
     "developerName": "Azure Functions Team",
     "category": "Development",
     "capabilities": [

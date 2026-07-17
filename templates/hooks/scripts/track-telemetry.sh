@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Telemetry tracking hook for Azure Functions Skills
-# Reads hook JSON from stdin, tracks Azure Functions skill usage, and publishes via Azure MCP plugin telemetry.
+# Reads hook JSON from stdin and publishes sanitized Azure Functions skill usage.
 
 set +e
 
@@ -16,48 +16,11 @@ return_success() {
 }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-packageVersion=""
-installMode="unknown"
-installScope="unknown"
-
-find_state_file() {
-    local candidate
-    candidate="${script_dir}/../../state.local.json"
-    if [ -f "$candidate" ]; then
-        echo "$candidate"
-        return
-    fi
-
-    candidate="${PWD}/.azure-functions-skills/state.local.json"
-    if [ -f "$candidate" ]; then
-        echo "$candidate"
-        return
-    fi
-}
-
-load_workspace_state() {
-    local state_path
-    local compact_state
-    local parsed
-    state_path=$(find_state_file)
-    if [ -z "$state_path" ]; then
-        return
-    fi
-
-    compact_state=$(tr -d '\r\n ' < "$state_path")
-    if echo "$compact_state" | grep -q '"telemetry":{"enabled":false'; then
-        return_success
-    fi
-
-    parsed=$(echo "$compact_state" | sed -n 's/.*"package":{[^}]*"version":"\([^"]*\)".*/\1/p')
-    [ -n "$parsed" ] && packageVersion="$parsed"
-
-    parsed=$(echo "$compact_state" | sed -n 's/.*"install":{[^}]*"mode":"\([^"]*\)".*/\1/p')
-    [ -n "$parsed" ] && installMode="$parsed"
-
-    parsed=$(echo "$compact_state" | sed -n 's/.*"install":{[^}]*"scope":"\([^"]*\)".*/\1/p')
-    [ -n "$parsed" ] && installScope="$parsed"
-}
+config_path="${script_dir}/../telemetry.config.json"
+if [ -f "$config_path" ] && grep -Eq '"enabled"[[:space:]]*:[[:space:]]*false' "$config_path"; then
+    echo '{"continue":true}'
+    exit 0
+fi
 
 extract_json_field() {
     local json="$1"
@@ -95,22 +58,6 @@ extract_toolargs_path() {
     fi
 
     echo "$path_value"
-}
-
-configure_appinsights() {
-    local config_path
-    local instrumentation_key
-    config_path="${script_dir}/../telemetry.config.json"
-
-    if [ ! -f "$config_path" ]; then
-        return
-    fi
-
-    instrumentation_key=$(sed -n 's/.*"applicationInsightsInstrumentationKey":[[:space:]]*"\([^"]*\)".*/\1/p' "$config_path")
-    if [ -n "$instrumentation_key" ] && [ "$instrumentation_key" != "__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__" ]; then
-        export APPLICATIONINSIGHTS_INSTRUMENTATION_KEY="$instrumentation_key"
-        export APPINSIGHTS_INSTRUMENTATIONKEY="$instrumentation_key"
-    fi
 }
 
 is_functions_skill_name() {
@@ -156,6 +103,10 @@ extract_functions_relative_path() {
     fi
 }
 
+json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
 if [ -t 0 ]; then
     return_success
 fi
@@ -164,8 +115,6 @@ rawInput=$(cat)
 if [ -z "$rawInput" ]; then
     return_success
 fi
-
-load_workspace_state
 
 toolName=$(extract_json_field "$rawInput" "toolName")
 sessionId=$(extract_json_field "$rawInput" "sessionId")
@@ -259,28 +208,27 @@ if [ -z "$filePath" ] && [ -z "$skillName" ]; then
 fi
 
 if [ "$shouldTrack" = true ]; then
-    configure_appinsights
-
-    pluginVersion="$packageVersion"
-    if [ -n "$pluginVersion" ] && [ "$installMode" != "unknown" ] && [ "$installScope" != "unknown" ]; then
-        pluginVersion="${pluginVersion}+${installMode}.${installScope}"
+    payload=$(printf \
+        '{"timestamp":"%s","eventType":"%s","clientName":"%s","pluginName":"azure-functions-skills"}' \
+        "$(json_escape "$timestamp")" \
+        "$(json_escape "$eventType")" \
+        "$(json_escape "$clientName")")
+    if [ -n "$sessionId" ]; then
+        payload="${payload%?},\"sessionId\":\"$(json_escape "$sessionId")\"}"
+    fi
+    if [ -n "$skillName" ]; then
+        payload="${payload%?},\"skillName\":\"$(json_escape "$skillName")\"}"
+    fi
+    if [ -n "$azureToolName" ]; then
+        payload="${payload%?},\"toolName\":\"$(json_escape "$azureToolName")\"}"
+    fi
+    if [ -n "$filePath" ]; then
+        payload="${payload%?},\"fileReference\":\"$(json_escape "$(echo "$filePath" | tr '/' '\\')")\"}"
     fi
 
-    mcpArgs=(
-        "server" "plugin-telemetry"
-        "--timestamp" "$timestamp"
-        "--client-name" "$clientName"
-        "--plugin-name" "azure-functions-skills"
-    )
-
-    [ -n "$pluginVersion" ] && mcpArgs+=("--plugin-version" "$pluginVersion")
-    [ -n "$eventType" ] && mcpArgs+=("--event-type" "$eventType")
-    [ -n "$sessionId" ] && mcpArgs+=("--session-id" "$sessionId")
-    [ -n "$skillName" ] && mcpArgs+=("--skill-name" "$skillName")
-    [ -n "$azureToolName" ] && mcpArgs+=("--tool-name" "$azureToolName")
-    [ -n "$filePath" ] && mcpArgs+=("--file-reference" "$(echo "$filePath" | tr '/' '\\')")
-
-    npx -y @azure/mcp@latest "${mcpArgs[@]}" >/dev/null 2>&1 || true
+    printf '%s' "$payload" |
+        npx -y @azure/functions-skills@latest telemetry >/dev/null 2>&1 ||
+        true
 fi
 
 return_success

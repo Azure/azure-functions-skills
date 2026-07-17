@@ -55,35 +55,30 @@ jobs:
           - pwsh: |
                 $ErrorActionPreference = 'Stop'
 
-                $instrumentationKey = $env:APPLICATIONINSIGHTS_INSTRUMENTATION_KEY
-                if ([string]::IsNullOrWhiteSpace($instrumentationKey) -or $instrumentationKey.StartsWith('$(')) {
-                    Write-Host 'ApplicationInsightsInstrumentationKey is not configured; telemetry package config will keep the placeholder.'
+                $connectionString = $env:APPLICATIONINSIGHTS_CONNECTION_STRING
+                if ([string]::IsNullOrWhiteSpace($connectionString) -or $connectionString.StartsWith('$(')) {
+                    Write-Host 'ApplicationInsightsConnectionString is not configured; package telemetry will remain disabled.'
                     exit 0
                 }
 
-                $placeholder = '__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__'
-                $configPaths = @(
-                    '$(Build.ArtifactStagingDirectory)/dropInput/templates/hooks/telemetry.config.json',
-                    '$(Build.ArtifactStagingDirectory)/dropInput/dist/plugin/azure-functions-skills/hooks/telemetry.config.json'
-                )
-
-                foreach ($configPath in $configPaths) {
-                    if (-not (Test-Path $configPath)) {
-                        throw "Telemetry config was not found at $configPath"
-                    }
-
-                    $content = Get-Content -Raw -Path $configPath
-                    if (-not $content.Contains($placeholder)) {
-                        throw "Telemetry config placeholder was not found in $configPath."
-                    }
-
-                    $content.Replace($placeholder, $instrumentationKey) |
-                        Set-Content -Path $configPath -Encoding utf8NoBOM
+                $placeholder = '__APPLICATIONINSIGHTS_CONNECTION_STRING__'
+                $configPath = '$(Build.ArtifactStagingDirectory)/dropInput/lib/telemetry/config.js'
+                if (-not (Test-Path $configPath)) {
+                    throw "Telemetry runtime config was not found at $configPath"
                 }
-                Write-Host 'Injected Application Insights instrumentation key into package telemetry config.'
-            displayName: 'Inject telemetry instrumentation key'
+
+                $content = Get-Content -Raw -Path $configPath
+                if (-not $content.Contains($placeholder)) {
+                    throw "Telemetry connection string placeholder was not found in $configPath."
+                }
+
+                $escapedConnectionString = $connectionString.Replace('\', '\\').Replace("'", "\'")
+                $content.Replace($placeholder, $escapedConnectionString) |
+                    Set-Content -Path $configPath -Encoding utf8NoBOM
+                Write-Host 'Injected the Application Insights connection string into package telemetry runtime.'
+            displayName: 'Inject telemetry connection string'
             env:
-                APPLICATIONINSIGHTS_INSTRUMENTATION_KEY: $(ApplicationInsightsInstrumentationKey)
+                APPLICATIONINSIGHTS_CONNECTION_STRING: $(ApplicationInsightsConnectionString)
           - script: npm prune --production
             displayName: 'npm prune --production'
           - script: npm pack --ignore-scripts

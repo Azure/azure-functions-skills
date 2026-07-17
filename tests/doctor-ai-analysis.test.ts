@@ -9,7 +9,6 @@ import {
   readAiReport,
   mergeReports,
 } from '../src/doctor/ai-analysis.js';
-import { buildPluginFallbackWarning } from '../src/doctor/runner.js';
 import type { DoctorCheckResult, DoctorReport } from '../src/doctor/types.js';
 
 const TEMP_DIRS: string[] = [];
@@ -95,7 +94,13 @@ describe('buildAgentCommand', () => {
     const cmd = buildAgentCommand('codex', 'analyze this', '/tmp/report.json');
     const validCommands = ['codex', process.execPath];
     expect(validCommands).toContain(cmd.command);
-    expect(cmd.args).toContain('--approval-mode');
+    expect(cmd.args).toContain('exec');
+    expect(cmd.args).toContain('--sandbox');
+    expect(cmd.args).toContain('workspace-write');
+    expect(cmd.args).toContain('--skip-git-repo-check');
+    expect(cmd.args).toContain('--ephemeral');
+    expect(cmd.args).not.toContain('--approval-mode');
+    expect(cmd.args).not.toContain('-q');
   });
 
   it('throws for unknown agent', () => {
@@ -126,13 +131,6 @@ describe('buildDeepWarning', () => {
     expect(warning).toMatch(/^[\x09\x0a\x20-\x7e]+$/);
   });
 
-  it('plugin fallback warning is pure ASCII', () => {
-    const warning = buildPluginFallbackWarning('ENOENT: missing /etc/foo');
-    // eslint-disable-next-line no-control-regex
-    expect(warning).toMatch(/^[\x09\x0a\x20-\x7e]+$/);
-    expect(warning).toContain('[WARN]');
-    expect(warning).toContain('ENOENT');
-  });
 });
 
 // ── readAiReport ──

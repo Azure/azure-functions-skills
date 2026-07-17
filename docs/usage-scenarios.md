@@ -2,11 +2,11 @@
 
 Use these scenario scripts to try the Azure Functions Skills plugin without relying on private subscriptions, prepared test apps, or customer-specific data.
 
-The examples focus on GitHub Copilot CLI. Claude Code and Codex can use the same prompts after installing the plugin with `install --agent claude` or `--agent codex`.
+The examples focus on GitHub Copilot. Claude Code and Codex can use the same prompts after their host plugin manager installs this repository.
 
 ## Prerequisites
 
-The only hard prerequisite is **Node.js 18+**. Everything else is checked (and installed where supported) by the `azure-functions-setup` skill the first time you run `chat`.
+The only hard prerequisite for the npm CLI is **Node.js 18+**. The `azure-functions-setup` skill checks the Azure Functions development environment.
 
 For scenarios that touch a real Azure subscription, sign in first:
 
@@ -15,29 +15,21 @@ az login
 az account show
 ```
 
-## Install the plugin once
+## Install locally when needed
 
 ```bash
-npx @azure/functions-skills install --agent ghcp --dir ./my-app
+npx @azure/functions-skills install --local --agent ghcp --dir ./my-app
 ```
 
-For Claude Code use `--agent claude`, for Codex use `--agent codex`. See [cli-reference.md](cli-reference.md#install) for the full option list.
+Normally, install the repository plugin with the coding agent's own plugin manager. Use `--local` only for workspace-local or VS Code integration scenarios.
 
-## Start the Functions agent
+## Start the Functions workflow
 
-```bash
-npx @azure/functions-skills chat --dir ./my-app
-```
-
-For a one-shot prompt:
-
-```bash
-npx @azure/functions-skills chat --dir ./my-app -- -p "Explain what Azure Functions Skills can do and which workflow I should start with."
-```
+Open the coding agent normally and ask: `Explain what Azure Functions Skills can do and which workflow I should start with.`
 
 Expected result:
 
-- Copilot uses the Azure Functions agent.
+- The agent invokes `azure-functions-help`.
 - It can explain setup, create, deploy, diagnostics, best-practices, health, inventory, and feedback workflows.
 - It suggests the next workflow based on the current directory.
 
@@ -77,13 +69,7 @@ Expected result:
 Start in an existing Azure Functions project, then install:
 
 ```bash
-npx @azure/functions-skills install --agent ghcp --check-prerequisites
-```
-
-Then start the agent:
-
-```bash
-npx @azure/functions-skills chat --dir .
+npx @azure/functions-skills install --local --agent ghcp
 ```
 
 Prompt:
@@ -94,7 +80,7 @@ Inspect this existing Azure Functions project and tell me which Azure Functions 
 
 Expected result:
 
-- Install adds the plugin and workspace activation files without modifying app source code.
+- Local install adds skills, MCP configuration, and telemetry hooks without modifying app source code.
 - The assistant detects that the directory already contains a Functions project.
 - It suggests relevant next actions such as adding a function, deploying, reviewing best practices, or running diagnostics.
 

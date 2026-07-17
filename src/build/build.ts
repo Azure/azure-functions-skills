@@ -11,10 +11,9 @@
 import { isAbsolute, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, rmSync, mkdirSync } from 'node:fs';
-import { loadSkills, loadMcpServers, loadAgents, loadHooks } from './loader.js';
+import { loadSkills, loadMcpServers, loadHooks } from './loader.js';
 import { buildPluginMarketplaces, buildPluginPayload, buildTarget } from './build-target.js';
 import type { BuildData, BuildTargetName } from '../types.js';
-import type { PluginPayloadOptions } from './build-target.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -41,10 +40,6 @@ const marketplaceRootFlag = args.indexOf('--marketplace-root');
 const marketplaceRoot = marketplaceRootFlag >= 0 && args[marketplaceRootFlag + 1]
   ? args[marketplaceRootFlag + 1]
   : null;
-const pluginProfileFlag = args.indexOf('--plugin-profile');
-const pluginProfile: PluginPayloadOptions['profile'] = pluginProfileFlag >= 0 && args[pluginProfileFlag + 1]
-  ? parsePluginProfile(args[pluginProfileFlag + 1])
-  : 'hooks';
 
 function parseTarget(value: string): BuildTargetName {
   if (value === 'ghcp' || value === 'claude' || value === 'codex') return value;
@@ -55,16 +50,10 @@ function resolveFromRoot(path: string): string {
   return isAbsolute(path) ? path : join(ROOT, path);
 }
 
-function parsePluginProfile(value: string): PluginPayloadOptions['profile'] {
-  if (value === 'skills-only' || value === 'hooks' || value === 'full') return value;
-  throw new Error(`Unknown plugin profile: ${value}`);
-}
-
 // Load canonical sources
 console.log('Loading canonical sources...');
 const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
 const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-const agents = loadAgents(join(TEMPLATES_DIR, 'agents'));
 const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')) as { version: string };
 
@@ -72,7 +61,7 @@ console.log(`  ${skills.length} skills loaded`);
 console.log(`  ${mcpServers.length} MCP servers loaded`);
 
 // Build each target
-const data: BuildData = { skills, mcpServers, agents, hooks, packageVersion: pkg.version };
+const data: BuildData = { skills, mcpServers, hooks, packageVersion: pkg.version };
 if (!pluginOnly) {
   for (const target of selectedTargets) {
     const targetDir = join(distDir, 'workspace', target);
@@ -89,7 +78,7 @@ if (!pluginOnly) {
   const pluginDir = join(distDir, 'plugin', 'azure-functions-skills');
   rmSync(pluginDir, { recursive: true, force: true });
   console.log('\nBuilding plugin payload...');
-  buildPluginPayload(data, pluginDir, { profile: pluginProfile });
+  buildPluginPayload(data, pluginDir);
   console.log(`  ✅ plugin → ${pluginDir}/`);
 }
 
@@ -97,7 +86,7 @@ if (repoPluginDir) {
   const outputDir = resolveFromRoot(repoPluginDir);
   rmSync(outputDir, { recursive: true, force: true });
   console.log('\nBuilding repository plugin payload...');
-  buildPluginPayload(data, outputDir, { profile: pluginProfile });
+  buildPluginPayload(data, outputDir);
   console.log(`  ✅ repository plugin → ${outputDir}/`);
 }
 

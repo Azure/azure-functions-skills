@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@azure/functions-skills)](https://www.npmjs.com/package/@azure/functions-skills)
 [![E2E report](https://github.com/Azure/azure-functions-skills/actions/workflows/publish-e2e-report.yml/badge.svg)](https://azure.github.io/azure-functions-skills/)
 
-**Azure Functions context for your coding agent.** One command sets up guided workflows (create, deploy, diagnose, review) for GitHub Copilot CLI, Claude Code, and Codex. The `doctor` command catches configuration and code issues *before* you deploy.
+**Azure Functions context for your coding agent.** The plugin provides skills, Azure MCP configuration, and telemetry hooks for GitHub Copilot, Claude Code, and Codex. The `doctor` command catches configuration and code issues *before* you deploy.
 
 Latest E2E status: [HTML report](https://azure.github.io/azure-functions-skills/)
 
@@ -19,54 +19,29 @@ It is **focused on Azure Functions**. For deployment of *any* Azure resource (Fu
 Use **Node.js 24+** when installing or testing GitHub Copilot CLI (`--agent ghcp`) because the
 Copilot CLI runtime requires Node 24 or later. Claude Code and Codex do not currently require Node
 24. Everything else (Azure CLI, Core Tools, language runtimes) is checked and guided by the
-`azure-functions-setup` skill the first time you run `chat`.
+`azure-functions-setup` skill when environment verification is needed.
 
 ## Quick Start
 
-### 1. Install the plugin
+### 1. Install the plugin with your coding agent
 
-<details open>
-<summary><strong>GitHub Copilot CLI</strong></summary>
+Use the plugin manager built into GitHub Copilot, Claude Code, or Codex to install the `Azure/azure-functions-skills` repository plugin. The npm package does not install or launch coding-agent plugins.
 
-```bash
-npx @azure/functions-skills install --agent ghcp
-```
+### 2. Ask for Azure Functions help
 
-</details>
-
-<details>
-<summary><strong>Claude Code</strong></summary>
-
-```bash
-npx @azure/functions-skills install --agent claude
-```
-
-</details>
-
-<details>
-<summary><strong>Codex CLI</strong></summary>
-
-```bash
-npx @azure/functions-skills install --agent codex
-```
-
-</details>
-
-> Installs at **user scope** (available to every project on this machine). Prefer to scope the skills to the current project only? Add `--local` to install them under the working directory instead.
-
-### 2. Open the agent
-
-```bash
-npx @azure/functions-skills chat
-```
-
-The first time, the agent greets you with a welcome message, shows the available skills, and suggests the next workflow based on your project state.
+Open your coding agent normally and ask which Azure Functions workflow to use. `azure-functions-help` discovers the installed `azure-functions-*` skills and routes to the best match.
 
 > **More options?** See [CLI Reference](docs/cli-reference.md) for every command, flag, and headless example.
 
 ## Local installs and VS Code extension integration
 
-`install --local` copies skill bodies, agent definitions, hooks, and MCP settings from the assets bundled in the installed `@azure/functions-skills` npm package. It does not fetch templates from GitHub or use a source ref. When a newer npm package is available, the CLI prints an update command so users can refresh the bundled assets before reinstalling or updating.
+`install --local` copies skill bodies, MCP settings, and telemetry hooks from the installed `@azure/functions-skills` npm package. It does not copy agent definitions, instruction files, routing files, or prompts.
+
+```bash
+npx @azure/functions-skills install --local --agent ghcp --dir ./my-app
+npx @azure/functions-skills update --local --agent ghcp --dir ./my-app
+npx @azure/functions-skills install --local --agent ghcp --dir ./my-app --no-telemetry
+```
 
 VS Code extensions can call the same local install flow from TypeScript:
 
@@ -76,8 +51,6 @@ import { installLocalSkills } from '@azure/functions-skills/setup';
 const result = await installLocalSkills({
   targetDir: workspaceFolder.uri.fsPath,
   agents: ['ghcp'],
-  yes: true,
-  prerequisites: 'skip',
 });
 ```
 
@@ -88,20 +61,19 @@ Common options:
 | `targetDir` | Required workspace root where local skills should be installed. |
 | `agents` | Optional agents: `ghcp`, `claude`, `codex`. Defaults to GHCP-compatible setup when omitted. |
 | `dryRun` | Return planned local files without writing. |
-| `yes` | Approve safe noninteractive changes such as local state `.gitignore` updates. |
-| `prerequisites` | `auto`, `check-only`, or `skip`, matching the CLI prerequisite behavior. |
 | `checkForUpdates` | Set `false` to skip npm package freshness guidance. |
 | `runner` | Optional command runner for tests or extension-host controlled npm checks. |
-| `initializeGitForGhcp` | Set `false` to skip GHCP git initialization. |
-| `telemetryEnabled` | Set `false` to opt this workspace out of Azure Functions Skills telemetry. |
 
-The result includes installed agents, files written, local state, git setup status, `.gitignore` status, and `packageUpdate` guidance that extensions can surface in their own UI.
+The result includes installed agents, files written, planned files, dry-run status, and `packageUpdate` guidance that extensions can surface in their own UI.
 
 ## Telemetry
 
-Azure Functions Skills collects usage telemetry to understand which skills, hooks, and Azure Functions MCP tools are used. Events include skill/tool names, relative Azure Functions skill-file paths, client name, session id, and plugin version. Telemetry does **not** include file contents, prompts, or tool arguments.
+Azure Functions Skills collects usage telemetry to understand which bundled skills and Azure Functions MCP tools are used. Events include allowlisted skill/tool names, relative allowlisted Azure Functions skill-file paths, client name, session id, and timestamp. Telemetry does **not** include file contents, prompts, raw tool arguments, credentials, or absolute paths. Events are sent by the `@azure/functions-skills` package directly to the Azure Functions team's Application Insights resource; the package does not use Azure MCP as a telemetry destination or transport.
 
-To opt out for a workspace, install with `--no-telemetry`, set `telemetry.enabled` to `false` in `.azure-functions-skills/state.local.json`, or set either `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or `AZURE_MCP_COLLECT_TELEMETRY=false` in the environment.
+For host-managed plugin installs, opt out by setting either
+`AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or `AZURE_MCP_COLLECT_TELEMETRY=false`
+in the environment. Workspace-local installs can also use `--no-telemetry`; that preference
+is stored in the installed `telemetry.config.json` and preserved by local updates.
 
 ## Skills
 
@@ -109,6 +81,7 @@ For contributor guidance on the product boundary between Azure Skills and Azure 
 
 | Skill | Purpose |
 | --- | --- |
+| [`azure-functions-help`](templates/skills/azure-functions-help/SKILL.md) | Discover and route to the best Azure Functions skill |
 | [`azure-functions-setup`](templates/skills/azure-functions-setup/SKILL.md) | Verify local prerequisites (Azure CLI, Core Tools, runtimes, Azure Skills) |
 | [`azure-functions-create`](templates/skills/azure-functions-create/SKILL.md) | Create new Functions projects or add functions via Azure MCP templates |
 | [`azure-functions-agents`](templates/skills/azure-functions-agents/SKILL.md) | Build Azure Functions hosted AI agent apps, scheduled agents, connector-triggered agents, and chat/API agents |
@@ -121,7 +94,7 @@ For contributor guidance on the product boundary between Azure Skills and Azure 
 | [`azure-functions-common`](templates/skills/azure-functions-common/SKILL.md) | Shared language, trigger, binding, extension, routing references |
 | [`azure-functions-feedback`](templates/skills/azure-functions-feedback/SKILL.md) | Turn session findings into previewed issues or pull requests |
 
-The `functions-copilot` agent routes user requests to the right skill and suggests the next step after each workflow.
+The `azure-functions-help` skill provides the discovery and routing entry point.
 
 ## Doctor — pre-deployment validation
 
@@ -184,7 +157,7 @@ Doctor also includes **supply-chain security checks** (lifecycle scripts, unpinn
 
 ## Contributing
 
-We welcome contributions. The canonical source for skills, agents, hooks, and MCP definitions lives under [`templates/`](templates/) — edit there, then `npm run build:plugin-payload` to regenerate the published plugin payload.
+We welcome contributions. The canonical source for skills, telemetry hooks, and MCP definitions lives under [`templates/`](templates/) — edit there, then `npm run build:plugin-payload` to regenerate the published plugin payload.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 

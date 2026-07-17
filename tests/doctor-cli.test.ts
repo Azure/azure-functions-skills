@@ -154,5 +154,27 @@ describe('doctor CLI', () => {
     })();
     expect(stdout).toContain('azure-functions-skills doctor');
     expect(stdout).toContain('--deep');
+    expect(stdout).toContain('text|json|markdown|html');
+    expect(stdout).not.toContain('sarif');
+  });
+
+  it('rejects unsupported report formats instead of writing text', () => {
+    const dir = makeTmp('cli-doc-invalid-format-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const reportPath = join(dir, 'report.sarif');
+
+    const { exitCode, stderr } = runDoctor([
+      '--dir',
+      dir,
+      '--no-deep',
+      '--format',
+      'sarif',
+      '--output',
+      reportPath,
+    ]);
+
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain('Unsupported report format: sarif');
+    expect(existsSync(reportPath)).toBe(false);
   });
 });
