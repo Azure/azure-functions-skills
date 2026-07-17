@@ -135,6 +135,22 @@ Options:
 | 11 | `function-bindings` | bindings | function.json / attribute syntax is correct | high |
 | 12 | `entry-point` | code | Function entry points resolve correctly | critical |
 | 13 | `typescript-build` | build | TypeScript build config is correct (TS projects) | medium |
+| 14 | `lifecycle-scripts` | security | No risky npm lifecycle scripts | high |
+| 15 | `unpinned-prod-deps` | security | Production npm dependencies are pinned | medium |
+| 16 | `missing-lockfile` | security | Node.js lockfile exists | medium |
+| 17 | `tracked-secret-files` | security | Local secret files are ignored and untracked | high |
+| 18 | `install-script-deps` | security | Direct dependencies do not add unexpected install scripts | info |
+| 19 | `python-programming-model` | structure | Python v1/v2/mixed model is identified | high |
+| 20 | `python-dependency-manifest` | dependencies | External imports have a deployment manifest | high |
+| 21 | `python-azure-functions` | dependencies | `azure-functions` exists and supports the model | high |
+| 22 | `python-worker-dependency` | dependencies | App does not pin the platform-managed worker | medium |
+| 23 | `python-blueprint-registration` | code | Blueprint functions are registered | high |
+| 24 | `python-native-dependencies` | dependencies | Native-wheel deployment risk is surfaced | info |
+| 25 | `python-deploy-artifacts` | build | Development artifacts are excluded | low |
+| 26 | `python-durable-configuration` | configuration | Durable host defaults are reviewed | low |
+| 27 | `application-insights` | configuration | Local observability evidence is surfaced | info |
+| 28 | `python-unpinned-requirements` | security | Python dependencies are pinned | medium |
+| 29 | `python-missing-lockfile` | security | Python lockfile or hashes exist | medium |
 
 ### Check Result Schema
 

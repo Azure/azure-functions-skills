@@ -11,20 +11,37 @@ import {
   DEPRECATED_SETTINGS,
 } from './rules.js';
 import { checkVersionStatus, getLanguageVersions } from './stacks.js';
+import { makeCheckResult as result } from './check-result.js';
+import {
+  PYTHON_CHECKS,
+  applicationInsightsCheck,
+  pythonAzureFunctionsCheck,
+  pythonBlueprintRegistrationCheck,
+  pythonDependencyManifestCheck,
+  pythonDeployArtifactsCheck,
+  pythonDurableConfigurationCheck,
+  pythonMissingLockfileCheck,
+  pythonNativeDependenciesCheck,
+  pythonProgrammingModelCheck,
+  pythonUnpinnedRequirementsCheck,
+  pythonWorkerDependencyCheck,
+} from './python-checks.js';
+
+export {
+  applicationInsightsCheck,
+  pythonAzureFunctionsCheck,
+  pythonBlueprintRegistrationCheck,
+  pythonDependencyManifestCheck,
+  pythonDeployArtifactsCheck,
+  pythonDurableConfigurationCheck,
+  pythonMissingLockfileCheck,
+  pythonNativeDependenciesCheck,
+  pythonProgrammingModelCheck,
+  pythonUnpinnedRequirementsCheck,
+  pythonWorkerDependencyCheck,
+};
 
 // ── Helper ──
-
-function result(
-  check: DoctorCheck,
-  overrides: Partial<DoctorCheckResult> & { status: DoctorCheckResult['status']; title: string; message: string },
-): DoctorCheckResult {
-  return {
-    id: check.id,
-    category: check.category,
-    severity: check.defaultSeverity,
-    ...overrides,
-  };
-}
 
 function buildVersionResult(
   check: DoctorCheck,
@@ -680,7 +697,14 @@ export const missingLockfileCheck: DoctorCheck = {
 
 // ── Check 17: tracked-secret-files (supply-chain) ──
 
-const SECRET_FILE_NAMES = ['.env', '.env.local', '.env.production', '.env.development', '.env.staging'];
+const SECRET_FILE_NAMES = [
+  '.env',
+  '.env.local',
+  '.env.production',
+  '.env.development',
+  '.env.staging',
+  'local.settings.json',
+];
 
 export const trackedSecretFilesCheck: DoctorCheck = {
   id: 'tracked-secret-files',
@@ -695,8 +719,8 @@ export const trackedSecretFilesCheck: DoctorCheck = {
     if (found.length === 0) {
       return [result(trackedSecretFilesCheck, {
         status: 'pass',
-        title: 'No environment files in workspace',
-        message: 'No .env-style files were found',
+        title: 'No local secret files in workspace',
+        message: 'No .env-style files or local.settings.json were found',
       })];
     }
 
@@ -706,7 +730,7 @@ export const trackedSecretFilesCheck: DoctorCheck = {
     if (tracked.length > 0) {
       return [result(trackedSecretFilesCheck, {
         status: 'fail',
-        title: 'Environment files are tracked by git',
+        title: 'Local secret files are tracked by git',
         message: `${tracked.join(', ')} ${tracked.length === 1 ? 'is' : 'are'} committed to the git index. Adding to .gitignore later does not remove the secrets from history. The files are tracked even if .gitignore covers them now.`,
         recommendation: 'Run `git rm --cached <file>` to stop tracking, then `git commit`. Rotate any secrets that may have been pushed to a shared remote. Use `git filter-repo` or BFG to scrub history if required.',
       })];
@@ -717,13 +741,13 @@ export const trackedSecretFilesCheck: DoctorCheck = {
     if (unignored.length === 0) {
       return [result(trackedSecretFilesCheck, {
         status: 'pass',
-        title: 'Environment files are gitignored',
-        message: `${found.length} .env-style file(s) found and all are listed in .gitignore`,
+        title: 'Local secret files are gitignored',
+        message: `${found.length} local secret file(s) found and all are listed in .gitignore`,
       })];
     }
     return [result(trackedSecretFilesCheck, {
       status: 'fail',
-      title: 'Environment files are not gitignored',
+      title: 'Local secret files are not gitignored',
       message: `Found ${unignored.join(', ')} but they are not covered by .gitignore. These files often contain secrets.`,
       recommendation: 'Add the file(s) to .gitignore and rotate any secrets that may have been committed. Verify with `git ls-files` that the files are not tracked.',
     })];
@@ -770,6 +794,7 @@ function isIgnored(filename: string, patterns: string[]): boolean {
     if (p === `/${filename}`) return true;
     if (p === '.env*' && filename.startsWith('.env')) return true;
     if (p === '*.env' && filename.endsWith('.env')) return true;
+    if (p === 'local.settings.json' && filename === 'local.settings.json') return true;
     return false;
   });
 }
@@ -834,119 +859,6 @@ export const installScriptDepsCheck: DoctorCheck = {
   },
 };
 
-// ── Check 19: python-unpinned-requirements (supply-chain) ──
-
-export const pythonUnpinnedRequirementsCheck: DoctorCheck = {
-  id: 'python-unpinned-requirements',
-  category: 'security',
-  defaultSeverity: 'medium',
-  appliesTo: (ctx) => ctx.language === 'python' && existsSync(join(ctx.dir, 'requirements.txt')),
-  run: async (ctx) => {
-    if (ctx.language !== 'python' || !existsSync(join(ctx.dir, 'requirements.txt'))) {
-      return [result(pythonUnpinnedRequirementsCheck, {
-        status: 'skip',
-        title: 'Python unpinned-requirements audit skipped',
-        message: 'Not a Python Functions project or requirements.txt not found',
-      })];
-    }
-    const text = readFileSync(join(ctx.dir, 'requirements.txt'), 'utf-8');
-    const unpinned: string[] = [];
-    let total = 0;
-    for (const rawLine of text.split(/\r?\n/)) {
-      const line = stripPyComment(rawLine).trim();
-      if (line.length === 0) continue;
-      if (line.startsWith('-')) continue; // pip flags like -r, -c, --index-url
-      total++;
-      const name = line.split(/[<>=!~;[\s]/)[0];
-      if (!isPinnedRequirement(line)) {
-        unpinned.push(name);
-      }
-    }
-    if (total === 0 || unpinned.length === 0) {
-      return [result(pythonUnpinnedRequirementsCheck, {
-        status: 'pass',
-        title: 'Python requirements are pinned',
-        message: 'Every requirement in requirements.txt is pinned with ==',
-      })];
-    }
-    const list = unpinned.slice(0, 5).join(', ') + (unpinned.length > 5 ? `, +${unpinned.length - 5} more` : '');
-    return [result(pythonUnpinnedRequirementsCheck, {
-      status: 'warn',
-      title: 'Python requirements are not pinned',
-      message: `${unpinned.length} packages in requirements.txt are not pinned to an exact version: ${list}. Each install can resolve to a newer release that could include a compromised package (durabletask-style supply-chain attacks).`,
-      file: 'requirements.txt',
-      recommendation: 'Pin every direct dependency with ==, e.g. `azure-functions==1.18.0`. Use `pip-compile` (pip-tools) or `uv pip compile` to generate a fully resolved, hash-locked file.',
-    })];
-  },
-};
-
-// ── Check 20: python-missing-lockfile (supply-chain) ──
-
-export const pythonMissingLockfileCheck: DoctorCheck = {
-  id: 'python-missing-lockfile',
-  category: 'security',
-  defaultSeverity: 'medium',
-  appliesTo: (ctx) => ctx.language === 'python' && existsSync(join(ctx.dir, 'requirements.txt')),
-  run: async (ctx) => {
-    if (ctx.language !== 'python' || !existsSync(join(ctx.dir, 'requirements.txt'))) {
-      return [result(pythonMissingLockfileCheck, {
-        status: 'skip',
-        title: 'Python lockfile audit skipped',
-        message: 'Not a Python Functions project or requirements.txt not found',
-      })];
-    }
-    const lockCandidates = ['requirements.lock', 'requirements.txt.lock', 'poetry.lock', 'Pipfile.lock', 'uv.lock', 'pdm.lock'];
-    const hasLock = lockCandidates.some(n => existsSync(join(ctx.dir, n)));
-    if (hasLock) {
-      return [result(pythonMissingLockfileCheck, {
-        status: 'pass',
-        title: 'Python lockfile present',
-        message: 'A Python dependency lockfile is committed',
-      })];
-    }
-    // Hash-pinned requirements.txt is effectively a lock
-    const text = readFileSync(join(ctx.dir, 'requirements.txt'), 'utf-8');
-    const hasAnyRequirement = text.split(/\r?\n/).some(l => {
-      const s = stripPyComment(l).trim();
-      return s.length > 0 && !s.startsWith('-');
-    });
-    const allHashed = hasAnyRequirement && text.split(/\r?\n/).every(l => {
-      const s = stripPyComment(l).trim();
-      if (s.length === 0 || s.startsWith('-')) return true;
-      return s.includes('--hash=');
-    });
-    if (allHashed) {
-      return [result(pythonMissingLockfileCheck, {
-        status: 'pass',
-        title: 'requirements.txt is hash-locked',
-        message: 'Every entry in requirements.txt uses --hash, providing reproducible installs',
-      })];
-    }
-    return [result(pythonMissingLockfileCheck, {
-      status: 'warn',
-      title: 'No Python lockfile present',
-      message: 'No poetry.lock, Pipfile.lock, uv.lock, requirements.lock, or hash-pinned requirements.txt was found. Without a lockfile, transient indexes can resolve to compromised package versions on the next install (durabletask-style risk).',
-      recommendation: 'Generate and commit a lockfile. Examples: `pip-compile --generate-hashes -o requirements.txt requirements.in`, `poetry lock`, `uv lock`. Install in CI with `pip install --require-hashes -r requirements.txt` or the lock-aware command for your tool.',
-    })];
-  },
-};
-
-function stripPyComment(line: string): string {
-  const i = line.indexOf('#');
-  return i >= 0 ? line.slice(0, i) : line;
-}
-
-function isPinnedRequirement(line: string): boolean {
-  // Strip extras/markers/hashes for the comparator check
-  const head = line.split(';')[0].split(' --hash=')[0];
-  // Must contain an == that is not part of !=
-  // Simple heuristic: an `==` exists in the version specifier
-  const m = head.match(/[<>=!~]=?/g);
-  if (!m) return false;
-  // If only `==` operators are present, it is pinned
-  return m.every(op => op === '==');
-}
-
 // ── All Tier 1 checks ──
 
 export const ALL_CHECKS: DoctorCheck[] = [
@@ -969,6 +881,5 @@ export const ALL_CHECKS: DoctorCheck[] = [
   missingLockfileCheck,
   trackedSecretFilesCheck,
   installScriptDepsCheck,
-  pythonUnpinnedRequirementsCheck,
-  pythonMissingLockfileCheck,
+  ...PYTHON_CHECKS,
 ];

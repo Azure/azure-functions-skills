@@ -373,8 +373,8 @@ describe('typescript-build check', () => {
 // ── ALL_CHECKS ──
 
 describe('ALL_CHECKS registry', () => {
-  it('contains 20 checks', () => {
-    expect(ALL_CHECKS).toHaveLength(20);
+  it('contains 29 checks', () => {
+    expect(ALL_CHECKS).toHaveLength(29);
   });
 
   it('has unique IDs', () => {

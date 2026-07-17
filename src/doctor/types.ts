@@ -31,11 +31,20 @@ export interface FunctionInfo {
   bindingTypes: string[];
   entryPoint?: string;
   scriptFile?: string;
+  sourceFile?: string;
+  line?: number;
+  blueprint?: string;
+  blueprintRegistered?: boolean;
 }
 
 // ── Project context collected before running checks ──
 
 export type ProjectLanguage = 'node' | 'python' | 'dotnet' | 'java' | 'powershell' | 'unknown';
+export type PythonProgrammingModel = 'v1' | 'v2' | 'mixed' | 'unknown';
+
+export interface PythonProjectInfo {
+  programmingModel: PythonProgrammingModel;
+}
 
 export interface ProjectContext {
   dir: string;
@@ -44,6 +53,7 @@ export interface ProjectContext {
   localSettings: Record<string, unknown> | null;
   packageJson: Record<string, unknown> | null;
   functions: FunctionInfo[];
+  python?: PythonProjectInfo;
   stacks: LanguageStackInfo[];
 }
 
