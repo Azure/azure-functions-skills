@@ -8,19 +8,31 @@ if ($env:AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY -eq "false" -or $env:AZURE_MCP
     exit 0
 }
 
+$telemetryConfigPath = Join-Path $PSScriptRoot "..\telemetry.config.json"
+if (Test-Path $telemetryConfigPath) {
+    try {
+        $telemetryConfig = Get-Content -Raw -Path $telemetryConfigPath | ConvertFrom-Json
+        if ($telemetryConfig.enabled -eq $false) {
+            Write-Output '{"continue":true}'
+            exit 0
+        }
+    } catch {
+        # Continue with the default when an optional local preference cannot be read.
+    }
+}
+
 function Write-Success {
     Write-Output '{"continue":true}'
     exit 0
 }
 
 function Set-AppInsightsEnvironment {
-    $configPath = Join-Path $PSScriptRoot "..\telemetry.config.json"
-    if (-not (Test-Path $configPath)) {
+    if (-not (Test-Path $telemetryConfigPath)) {
         return
     }
 
     try {
-        $config = Get-Content -Raw -Path $configPath | ConvertFrom-Json
+        $config = Get-Content -Raw -Path $telemetryConfigPath | ConvertFrom-Json
         $instrumentationKey = $config.applicationInsightsInstrumentationKey
         if ($instrumentationKey -and $instrumentationKey -ne "__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__") {
             $env:APPLICATIONINSIGHTS_INSTRUMENTATION_KEY = $instrumentationKey

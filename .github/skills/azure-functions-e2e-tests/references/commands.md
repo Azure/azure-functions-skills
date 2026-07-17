@@ -78,9 +78,9 @@ S1XL-5. test ! -e $WS/.azure-functions-skills && test ! -e $WS/AGENTS.md && test
 
 Pass when every command exits 0 and the file list contains only the expected skill, MCP, and telemetry surfaces.
 
-## Scenario 2: Replacement update and legacy cleanup
+## Scenario 2: Ownership-aware update and legacy cleanup
 
-Each case seeds stale managed assets and a user-owned hook, then verifies that update removes only Azure Functions-owned assets.
+Each case modifies a bundled skill, seeds user-owned skills/settings/hooks, and records a legacy telemetry opt-out. Update must replace bundled content, preserve user content, migrate the opt-out, and remove legacy state.
 
 ### TC-S2-GHCP-LOCAL
 
@@ -89,11 +89,11 @@ Expected commands: 7
 ```text
 S2GL-1. mkdir -p $WS
 S2GL-2. $CLI install --local --agent ghcp --dir $WS
-S2GL-3. mkdir -p $WS/.github/skills/azure-functions-stale && printf 'stale\n' > $WS/.github/skills/azure-functions-stale/SKILL.md
-S2GL-4. mkdir -p $WS/.github/hooks/scripts && printf 'user-owned\n' > $WS/.github/hooks/scripts/custom-hook.sh
-S2GL-5. mkdir -p $WS/.azure-functions-skills $WS/.github/agents && printf '{}\n' > $WS/.azure-functions-skills/state.local.json && printf 'legacy\n' > $WS/.github/agents/functions-copilot.agent.md && printf 'customer\n<!-- azure-functions-skills:start version=0.0.2 -->\nlegacy routing\n<!-- azure-functions-skills:end -->\n' > $WS/AGENTS.md
+S2GL-3. printf 'stale bundled\n' > $WS/.github/skills/azure-functions-help/SKILL.md && mkdir -p $WS/.github/skills/azure-functions-internal-runbook && printf 'user-owned\n' > $WS/.github/skills/azure-functions-internal-runbook/SKILL.md
+S2GL-4. mkdir -p $WS/.github/hooks/scripts && printf 'user-owned\n' > $WS/.github/hooks/scripts/custom-hook.sh && printf '{"inputs":[{"id":"subscription"}],"mcpServers":{"custom":{"command":"custom-server","args":[]}}}\n' > $WS/.mcp.json
+S2GL-5. mkdir -p $WS/.azure-functions-skills $WS/.github/agents && printf '{"telemetry":{"enabled":false}}\n' > $WS/.azure-functions-skills/state.local.json && printf 'legacy\n' > $WS/.github/agents/functions-copilot.agent.md && printf 'customer\n<!-- azure-functions-skills:start version=0.0.2 -->\nlegacy routing\n<!-- azure-functions-skills:end -->\n' > $WS/AGENTS.md
 S2GL-6. $CLI update --local --agent ghcp --dir $WS
-S2GL-7. test -f $WS/.github/skills/azure-functions-help/SKILL.md && test ! -e $WS/.github/skills/azure-functions-stale && test ! -e $WS/.azure-functions-skills && test ! -e $WS/.github/agents/functions-copilot.agent.md && test "$(cat $WS/AGENTS.md)" = "customer" && test "$(cat $WS/.github/hooks/scripts/custom-hook.sh)" = "user-owned"
+S2GL-7. test -f $WS/.github/skills/azure-functions-help/SKILL.md && ! grep -q 'stale bundled' $WS/.github/skills/azure-functions-help/SKILL.md && test "$(cat $WS/.github/skills/azure-functions-internal-runbook/SKILL.md)" = "user-owned" && test ! -e $WS/.azure-functions-skills && test ! -e $WS/.github/agents/functions-copilot.agent.md && test "$(cat $WS/AGENTS.md)" = "customer" && test "$(cat $WS/.github/hooks/scripts/custom-hook.sh)" = "user-owned" && node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('$WS/.mcp.json'));const t=JSON.parse(fs.readFileSync('$WS/.github/hooks/telemetry.config.json'));if(m.mcpServers.custom.command!=='custom-server'||m.mcpServers.azure.command!=='npx'||t.enabled!==false)process.exit(1)"
 ```
 
 ### TC-S2-CLAUDE-LOCAL
@@ -103,11 +103,11 @@ Expected commands: 7
 ```text
 S2CL-1. mkdir -p $WS
 S2CL-2. $CLI install --local --agent claude --dir $WS
-S2CL-3. mkdir -p $WS/.claude/skills/azure-functions-stale && printf 'stale\n' > $WS/.claude/skills/azure-functions-stale/SKILL.md
-S2CL-4. mkdir -p $WS/.claude/hooks && printf 'user-owned\n' > $WS/.claude/hooks/custom-hook.json
-S2CL-5. mkdir -p $WS/.azure-functions-skills && printf '{}\n' > $WS/.azure-functions-skills/state.local.json && printf 'customer\n<!-- azure-functions-skills:start version=0.0.2 -->\nlegacy routing\n<!-- azure-functions-skills:end -->\n' > $WS/CLAUDE.md
+S2CL-3. printf 'stale bundled\n' > $WS/.claude/skills/azure-functions-help/SKILL.md && mkdir -p $WS/.claude/skills/azure-functions-internal-runbook && printf 'user-owned\n' > $WS/.claude/skills/azure-functions-internal-runbook/SKILL.md
+S2CL-4. mkdir -p $WS/.claude/hooks && printf 'user-owned\n' > $WS/.claude/hooks/custom-hook.json && printf '{"permissions":{"allow":["Read"]},"mcpServers":{"custom":{"command":"custom-server","args":[]}},"hooks":{"PostToolUse":[{"hooks":[{"type":"command","command":"custom-hook"}]}]}}\n' > $WS/.claude/settings.json
+S2CL-5. mkdir -p $WS/.azure-functions-skills && printf '{"telemetry":{"enabled":false}}\n' > $WS/.azure-functions-skills/state.local.json && printf 'customer\n<!-- azure-functions-skills:start version=0.0.2 -->\nlegacy routing\n<!-- azure-functions-skills:end -->\n' > $WS/CLAUDE.md
 S2CL-6. $CLI update --local --agent claude --dir $WS
-S2CL-7. test -f $WS/.claude/skills/azure-functions-help/SKILL.md && test ! -e $WS/.claude/skills/azure-functions-stale && test ! -e $WS/.azure-functions-skills && test "$(cat $WS/CLAUDE.md)" = "customer" && test "$(cat $WS/.claude/hooks/custom-hook.json)" = "user-owned"
+S2CL-7. test -f $WS/.claude/skills/azure-functions-help/SKILL.md && ! grep -q 'stale bundled' $WS/.claude/skills/azure-functions-help/SKILL.md && test "$(cat $WS/.claude/skills/azure-functions-internal-runbook/SKILL.md)" = "user-owned" && test ! -e $WS/.azure-functions-skills && test "$(cat $WS/CLAUDE.md)" = "customer" && test "$(cat $WS/.claude/hooks/custom-hook.json)" = "user-owned" && node -e "const fs=require('fs');const s=JSON.parse(fs.readFileSync('$WS/.claude/settings.json'));const t=JSON.parse(fs.readFileSync('$WS/.claude/hooks/telemetry.config.json'));if(s.permissions.allow[0]!=='Read'||s.mcpServers.custom.command!=='custom-server'||s.mcpServers.azure.command!=='npx'||!JSON.stringify(s.hooks).includes('custom-hook')||!JSON.stringify(s.hooks).includes('track-telemetry.sh')||t.enabled!==false)process.exit(1)"
 ```
 
 ### TC-S2-CODEX-LOCAL
@@ -117,14 +117,14 @@ Expected commands: 7
 ```text
 S2XL-1. mkdir -p $WS
 S2XL-2. $CLI install --local --agent codex --dir $WS
-S2XL-3. mkdir -p $WS/.agents/skills/azure-functions-stale && printf 'stale\n' > $WS/.agents/skills/azure-functions-stale/SKILL.md
-S2XL-4. mkdir -p $WS/.codex/hooks && printf 'user-owned\n' > $WS/.codex/hooks/custom-hook.json
-S2XL-5. mkdir -p $WS/.azure-functions-skills && printf '{}\n' > $WS/.azure-functions-skills/state.local.json && printf 'customer\n<!-- azure-functions-skills:start version=0.0.2 -->\nlegacy routing\n<!-- azure-functions-skills:end -->\n' > $WS/AGENTS.md
+S2XL-3. printf 'stale bundled\n' > $WS/.agents/skills/azure-functions-help/SKILL.md && mkdir -p $WS/.agents/skills/azure-functions-internal-runbook && printf 'user-owned\n' > $WS/.agents/skills/azure-functions-internal-runbook/SKILL.md
+S2XL-4. mkdir -p $WS/.codex/hooks && printf 'user-owned\n' > $WS/.codex/hooks/custom-hook.json && printf '{"hooks":{"PostToolUse":[{"type":"command","command":"custom-hook"}]}}\n' > $WS/.codex/hooks.json && printf 'model = "gpt-test"\n\n[mcp_servers.custom]\ncommand = "custom-server"\n\n[mcp_servers.azure]\ncommand = "old-azure"\n' > $WS/.codex/config.toml
+S2XL-5. mkdir -p $WS/.azure-functions-skills && printf '{"telemetry":{"enabled":false}}\n' > $WS/.azure-functions-skills/state.local.json && printf 'customer\n<!-- azure-functions-skills:start version=0.0.2 -->\nlegacy routing\n<!-- azure-functions-skills:end -->\n' > $WS/AGENTS.md
 S2XL-6. $CLI update --local --agent codex --dir $WS
-S2XL-7. test -f $WS/.agents/skills/azure-functions-help/SKILL.md && test ! -e $WS/.agents/skills/azure-functions-stale && test ! -e $WS/.azure-functions-skills && test "$(cat $WS/AGENTS.md)" = "customer" && test "$(cat $WS/.codex/hooks/custom-hook.json)" = "user-owned"
+S2XL-7. test -f $WS/.agents/skills/azure-functions-help/SKILL.md && ! grep -q 'stale bundled' $WS/.agents/skills/azure-functions-help/SKILL.md && test "$(cat $WS/.agents/skills/azure-functions-internal-runbook/SKILL.md)" = "user-owned" && test ! -e $WS/.azure-functions-skills && test "$(cat $WS/AGENTS.md)" = "customer" && test "$(cat $WS/.codex/hooks/custom-hook.json)" = "user-owned" && grep -q 'model = "gpt-test"' $WS/.codex/config.toml && grep -q '\[mcp_servers.custom\]' $WS/.codex/config.toml && grep -q 'command = "npx"' $WS/.codex/config.toml && ! grep -q 'old-azure' $WS/.codex/config.toml && node -e "const fs=require('fs');const h=JSON.parse(fs.readFileSync('$WS/.codex/hooks.json'));const t=JSON.parse(fs.readFileSync('$WS/.codex/hooks/telemetry.config.json'));if(!JSON.stringify(h.hooks).includes('custom-hook')||!JSON.stringify(h.hooks).includes('track-telemetry.sh')||t.enabled!==false)process.exit(1)"
 ```
 
-For every Scenario 2 case, all seven commands must exit 0. A missing current skill, surviving stale/state asset, modified user hook, or surviving managed instruction block is a failure.
+For every Scenario 2 case, all seven commands must exit 0. A missing refreshed bundled skill, removed user asset, lost user setting/hook, lost telemetry opt-out, surviving legacy state, or surviving managed instruction block is a failure.
 
 ## Total command counts
 

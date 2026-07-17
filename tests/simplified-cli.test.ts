@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
@@ -44,6 +44,31 @@ describe('simplified CLI', () => {
 
     expect(existsSync(join(dir, '.github', 'skills', 'azure-functions-help', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(dir, '.github', 'hooks', 'azure-functions-telemetry.json'))).toBe(true);
+    expect(existsSync(join(dir, '.azure-functions-skills'))).toBe(false);
+  });
+
+  it('supports workspace-local telemetry opt-out without legacy state', () => {
+    const dir = makeTempDir();
+    const environment = { ...process.env, AZURE_FUNCTIONS_SKILLS_SKIP_UPDATE_CHECK: '1' };
+
+    execFileSync(process.execPath, [
+      CLI_PATH,
+      'install',
+      '--local',
+      '--agent',
+      'ghcp',
+      '--dir',
+      dir,
+      '--no-telemetry',
+    ], {
+      cwd: ROOT_DIR,
+      env: environment,
+    });
+
+    const config = JSON.parse(
+      readFileSync(join(dir, '.github', 'hooks', 'telemetry.config.json'), 'utf-8'),
+    ) as { enabled?: boolean };
+    expect(config.enabled).toBe(false);
     expect(existsSync(join(dir, '.azure-functions-skills'))).toBe(false);
   });
 

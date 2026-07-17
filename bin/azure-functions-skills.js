@@ -5,6 +5,7 @@ import { join } from 'node:path';
 const args = process.argv.slice(2);
 const command = args[0];
 const TARGETS = ['ghcp', 'claude', 'codex'];
+const DOCTOR_FORMATS = ['text', 'json', 'markdown', 'html'];
 
 const HELP = `
 @azure/functions-skills — Azure Functions skills for coding agents
@@ -27,7 +28,7 @@ Options:
   --dir <path>              Project directory (default: current directory)
   --checks <ids>            Comma-separated check IDs
   --severity <level>        Failure threshold (default: high)
-  --format <text|json|sarif>
+  --format <text|json|markdown|html>
   --output <path>           Report output path
   --deep                    Run AI-assisted analysis
   --accept-deep-risk        Acknowledge elevated agent permissions
@@ -99,6 +100,7 @@ Options:
   --all              Install for all supported agents
   --dir <path>       Target directory (default: current directory)
   --dry-run          List files without writing them
+  --no-telemetry     Disable telemetry for this workspace
 `.trim());
     process.exit(0);
   }
@@ -126,6 +128,7 @@ Options:
     targetDir: dir,
     agents,
     dryRun: args.includes('--dry-run'),
+    telemetryEnabled: args.includes('--no-telemetry') ? false : undefined,
   });
 
   if (result.dryRun) {
@@ -196,21 +199,25 @@ async function runDoctorCommand() {
   const dir = getFlag('--dir') || process.cwd();
   const output = getFlag('--output') || join(dir, '.azure-functions-doctor', 'doctor-report.json');
   const checksFlag = getFlag('--checks');
+  const format = getFlag('--format') || 'text';
   try {
+    if (!DOCTOR_FORMATS.includes(format)) {
+      throw new Error(`Unsupported report format: ${format}. Available: ${DOCTOR_FORMATS.join(', ')}`);
+    }
     const { report, exitCode } = await runDoctor({
       dir,
       deep: args.includes('--deep') && !args.includes('--no-deep'),
       acceptDeepRisk: args.includes('--accept-deep-risk'),
       agent: getFlag('--agent'),
       timeout: Number.parseInt(getFlag('--timeout') || '300', 10),
-      format: getFlag('--format') || 'text',
+      format,
       output,
       checks: checksFlag ? checksFlag.split(',').map(value => value.trim()) : undefined,
       severity: getFlag('--severity') || 'high',
     });
     console.log(formatReport(report, 'text'));
     mkdirSync(dirname(output), { recursive: true });
-    writeFileSync(output, formatReport(report, getFlag('--format') || 'text'));
+    writeFileSync(output, formatReport(report, format));
     process.exit(exitCode);
   } catch (error) {
     console.error(`Doctor failed: ${errorMessage(error)}`);

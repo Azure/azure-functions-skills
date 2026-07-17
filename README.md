@@ -40,6 +40,7 @@ Open your coding agent normally and ask which Azure Functions workflow to use. `
 ```bash
 npx @azure/functions-skills install --local --agent ghcp --dir ./my-app
 npx @azure/functions-skills update --local --agent ghcp --dir ./my-app
+npx @azure/functions-skills install --local --agent ghcp --dir ./my-app --no-telemetry
 ```
 
 VS Code extensions can call the same local install flow from TypeScript:
@@ -69,7 +70,10 @@ The result includes installed agents, files written, planned files, dry-run stat
 
 Azure Functions Skills collects usage telemetry to understand which skills, hooks, and Azure Functions MCP tools are used. Events include skill/tool names, relative Azure Functions skill-file paths, client name, session id, and plugin version. Telemetry does **not** include file contents, prompts, or tool arguments.
 
-To opt out, set either `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or `AZURE_MCP_COLLECT_TELEMETRY=false` in the environment.
+For host-managed plugin installs, opt out by setting either
+`AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or `AZURE_MCP_COLLECT_TELEMETRY=false`
+in the environment. Workspace-local installs can also use `--no-telemetry`; that preference
+is stored in the installed `telemetry.config.json` and preserved by local updates.
 
 ## Skills
 

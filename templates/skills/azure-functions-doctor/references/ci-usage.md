@@ -11,7 +11,7 @@ The recommended CI mode is built-in checks plus deep analysis.
     node-version: '22'
 - run: az version
 # Install/authenticate the selected agent CLI before this step.
-- run: npx @azure/functions-skills doctor --deep --agent github-copilot --format json --output doctor-report.json --severity high
+- run: npx @azure/functions-skills doctor --deep --accept-deep-risk --agent github-copilot --format json --output doctor-report.json --severity high
 - uses: actions/upload-artifact@v4
   if: always()
   with:

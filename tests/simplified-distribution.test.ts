@@ -72,16 +72,19 @@ describe('simplified distribution', () => {
     },
   );
 
-  it('replaces local managed assets without creating state or preserving stale skill files', async () => {
+  it('replaces bundled skills while preserving user-created Azure Functions skills', async () => {
     const root = makeTempDir('af-skills-replace-');
-    const staleSkillDir = join(root, '.github', 'skills', 'azure-functions-stale');
+    const bundledSkill = join(root, '.github', 'skills', 'azure-functions-help', 'SKILL.md');
+    const userSkillDir = join(root, '.github', 'skills', 'azure-functions-internal-runbook');
     const legacyStateDir = join(root, '.azure-functions-skills');
     const legacyAgent = join(root, '.github', 'agents', 'functions-copilot.agent.md');
     const instructions = join(root, 'AGENTS.md');
-    mkdirSync(staleSkillDir, { recursive: true });
+    mkdirSync(join(bundledSkill, '..'), { recursive: true });
+    mkdirSync(userSkillDir, { recursive: true });
     mkdirSync(legacyStateDir, { recursive: true });
     mkdirSync(join(legacyAgent, '..'), { recursive: true });
-    writeFileSync(join(staleSkillDir, 'SKILL.md'), 'stale');
+    writeFileSync(bundledSkill, 'stale bundled content');
+    writeFileSync(join(userSkillDir, 'SKILL.md'), 'user-owned');
     writeFileSync(join(legacyStateDir, 'state.local.json'), '{}');
     writeFileSync(legacyAgent, 'legacy');
     writeFileSync(instructions, [
@@ -99,7 +102,8 @@ describe('simplified distribution', () => {
     });
 
     expect(result.filesWritten).toBeGreaterThan(0);
-    expect(existsSync(staleSkillDir)).toBe(false);
+    expect(readFileSync(bundledSkill, 'utf-8')).not.toBe('stale bundled content');
+    expect(readFileSync(join(userSkillDir, 'SKILL.md'), 'utf-8')).toBe('user-owned');
     expect(existsSync(legacyStateDir)).toBe(false);
     expect(existsSync(legacyAgent)).toBe(false);
     expect(readFileSync(instructions, 'utf-8')).toBe('customer content\n');
@@ -123,5 +127,234 @@ describe('simplified distribution', () => {
     });
 
     expect(readFileSync(customHook, 'utf-8')).toBe('user-owned');
+  });
+
+  it.each([
+    ['claude', join('.claude', 'hooks', 'hooks.json')],
+    ['codex', join('.codex', 'hooks.json')],
+  ] as const)('preserves registered user hooks in %s settings', async (agent, hookSettingsPath) => {
+    const root = makeTempDir(`af-skills-preserve-${agent}-hook-settings-`);
+    const hookSettings = join(root, hookSettingsPath);
+    mkdirSync(join(hookSettings, '..'), { recursive: true });
+    writeFileSync(hookSettings, JSON.stringify({
+      hooks: {
+        PostToolUse: [{
+          hooks: [{ type: 'command', command: 'custom-hook' }],
+        }],
+      },
+    }));
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: [agent],
+      checkForUpdates: false,
+    });
+
+    const settings = JSON.parse(readFileSync(hookSettings, 'utf-8')) as {
+      hooks: { PostToolUse: Array<{ hooks?: Array<{ command?: string }>; command?: string }> };
+    };
+    const serialized = JSON.stringify(settings.hooks.PostToolUse);
+    expect(serialized).toContain('custom-hook');
+    expect(serialized).toContain('track-telemetry.sh');
+  });
+
+  it('merges GHCP MCP settings without removing user servers', async () => {
+    const root = makeTempDir('af-skills-preserve-ghcp-settings-');
+    writeFileSync(join(root, '.mcp.json'), JSON.stringify({
+      inputs: [{ id: 'subscription' }],
+      mcpServers: {
+        custom: { command: 'custom-server', args: ['start'] },
+        azure: { command: 'old-azure', args: [] },
+      },
+    }));
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['ghcp'],
+      checkForUpdates: false,
+    });
+
+    const settings = JSON.parse(readFileSync(join(root, '.mcp.json'), 'utf-8')) as {
+      inputs: Array<{ id: string }>;
+      mcpServers: Record<string, { command: string }>;
+    };
+    expect(settings.inputs).toEqual([{ id: 'subscription' }]);
+    expect(settings.mcpServers.custom.command).toBe('custom-server');
+    expect(settings.mcpServers.azure.command).toBe('npx');
+  });
+
+  it('merges Claude MCP and telemetry hooks without removing user settings', async () => {
+    const root = makeTempDir('af-skills-preserve-claude-settings-');
+    const settingsPath = join(root, '.claude', 'settings.json');
+    mkdirSync(join(settingsPath, '..'), { recursive: true });
+    writeFileSync(settingsPath, JSON.stringify({
+      permissions: { allow: ['Read'] },
+      mcpServers: { custom: { command: 'custom-server', args: [] } },
+      hooks: {
+        PostToolUse: [{
+          matcher: 'Write',
+          hooks: [{ type: 'command', command: 'custom-hook' }],
+        }],
+      },
+    }));
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['claude'],
+      checkForUpdates: false,
+    });
+
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as {
+      permissions: { allow: string[] };
+      mcpServers: Record<string, { command: string }>;
+      hooks: { PostToolUse: Array<{ hooks: Array<{ command: string }> }> };
+    };
+    expect(settings.permissions.allow).toEqual(['Read']);
+    expect(settings.mcpServers.custom.command).toBe('custom-server');
+    expect(settings.mcpServers.azure.command).toBe('npx');
+    expect(settings.hooks.PostToolUse.some(entry =>
+      entry.hooks.some(hook => hook.command === 'custom-hook'))).toBe(true);
+    expect(settings.hooks.PostToolUse.some(entry =>
+      entry.hooks.some(hook => hook.command.includes('track-telemetry.sh')))).toBe(true);
+  });
+
+  it('updates the owned Codex MCP section without removing user TOML', async () => {
+    const root = makeTempDir('af-skills-preserve-codex-settings-');
+    const configPath = join(root, '.codex', 'config.toml');
+    mkdirSync(join(configPath, '..'), { recursive: true });
+    writeFileSync(configPath, [
+      'model = "gpt-test"',
+      '',
+      '[mcp_servers.custom]',
+      'command = "custom-server"',
+      '',
+      '[mcp_servers.azure]',
+      'command = "old-azure"',
+      '',
+    ].join('\n'));
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['codex'],
+      checkForUpdates: false,
+    });
+
+    const config = readFileSync(configPath, 'utf-8');
+    expect(config).toContain('model = "gpt-test"');
+    expect(config).toContain('[mcp_servers.custom]');
+    expect(config).toContain('command = "custom-server"');
+    expect(config).toContain('[mcp_servers.azure]');
+    expect(config).toContain('command = "npx"');
+    expect(config).not.toContain('command = "old-azure"');
+    expect(config.match(/\[mcp_servers\.azure\]/g)).toHaveLength(1);
+  });
+
+  it('migrates legacy telemetry opt-out and preserves it across updates', async () => {
+    const root = makeTempDir('af-skills-migrate-telemetry-');
+    const legacyState = join(root, '.azure-functions-skills', 'state.local.json');
+    mkdirSync(join(legacyState, '..'), { recursive: true });
+    writeFileSync(legacyState, JSON.stringify({ telemetry: { enabled: false } }));
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['ghcp'],
+      checkForUpdates: false,
+    });
+
+    const configPath = join(root, '.github', 'hooks', 'telemetry.config.json');
+    const migrated = JSON.parse(readFileSync(configPath, 'utf-8')) as { enabled?: boolean };
+    expect(migrated.enabled).toBe(false);
+    expect(existsSync(join(root, '.azure-functions-skills'))).toBe(false);
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['ghcp'],
+      checkForUpdates: false,
+    });
+
+    const updated = JSON.parse(readFileSync(configPath, 'utf-8')) as { enabled?: boolean };
+    expect(updated.enabled).toBe(false);
+  });
+
+  it('preserves a legacy workspace opt-out when agents update at different times', async () => {
+    const root = makeTempDir('af-skills-migrate-multi-agent-telemetry-');
+    const legacyState = join(root, '.azure-functions-skills', 'state.local.json');
+    mkdirSync(join(legacyState, '..'), { recursive: true });
+    writeFileSync(legacyState, JSON.stringify({ telemetry: { enabled: false } }));
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['ghcp'],
+      checkForUpdates: false,
+    });
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['claude'],
+      checkForUpdates: false,
+    });
+
+    const claudeConfig = JSON.parse(
+      readFileSync(join(root, '.claude', 'hooks', 'telemetry.config.json'), 'utf-8'),
+    ) as { enabled?: boolean };
+    expect(claudeConfig.enabled).toBe(false);
+  });
+
+  it('records a library telemetry opt-out without creating legacy state', async () => {
+    const root = makeTempDir('af-skills-library-telemetry-');
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['codex'],
+      telemetryEnabled: false,
+      checkForUpdates: false,
+    });
+
+    const config = JSON.parse(
+      readFileSync(join(root, '.codex', 'hooks', 'telemetry.config.json'), 'utf-8'),
+    ) as { enabled?: boolean };
+    expect(config.enabled).toBe(false);
+    expect(existsSync(join(root, '.azure-functions-skills'))).toBe(false);
+  });
+
+  it('applies an explicit workspace opt-out to agents installed later', async () => {
+    const root = makeTempDir('af-skills-explicit-multi-agent-telemetry-');
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['ghcp'],
+      telemetryEnabled: false,
+      checkForUpdates: false,
+    });
+    await installLocalSkills({
+      targetDir: root,
+      agents: ['claude'],
+      checkForUpdates: false,
+    });
+
+    const config = JSON.parse(
+      readFileSync(join(root, '.claude', 'hooks', 'telemetry.config.json'), 'utf-8'),
+    ) as { enabled?: boolean };
+    expect(config.enabled).toBe(false);
+  });
+
+  it('rejects malformed user settings before changing managed assets', async () => {
+    const root = makeTempDir('af-skills-invalid-settings-');
+    const bundledSkill = join(root, '.github', 'skills', 'azure-functions-help', 'SKILL.md');
+    const legacyState = join(root, '.azure-functions-skills', 'state.local.json');
+    mkdirSync(join(bundledSkill, '..'), { recursive: true });
+    mkdirSync(join(legacyState, '..'), { recursive: true });
+    writeFileSync(bundledSkill, 'original bundled content');
+    writeFileSync(legacyState, JSON.stringify({ telemetry: { enabled: false } }));
+    writeFileSync(join(root, '.mcp.json'), '{ invalid json');
+
+    await expect(installLocalSkills({
+      targetDir: root,
+      agents: ['ghcp'],
+      checkForUpdates: false,
+    })).rejects.toThrow('Cannot safely update');
+
+    expect(readFileSync(bundledSkill, 'utf-8')).toBe('original bundled content');
+    expect(existsSync(legacyState)).toBe(true);
+    expect(readFileSync(join(root, '.mcp.json'), 'utf-8')).toBe('{ invalid json');
   });
 });

@@ -15,6 +15,12 @@ import { execSync } from 'node:child_process';
 import { buildTarget } from '../build/build-target.js';
 import { loadHooks, loadMcpServers, loadSkills } from '../build/loader.js';
 import { checkPackageUpdate, type CommandRunner, type PackageUpdateInfo } from './package-update.js';
+import {
+  prepareWorkspaceFile,
+  resolveTelemetryEnabled,
+  setTelemetryEnabled,
+  telemetryConfigPath,
+} from './workspace-assets.js';
 import type { BuildData, CliAgentName } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -24,6 +30,7 @@ export interface LocalInstallOptions {
   readonly targetDir: string;
   readonly agents?: CliAgentName[];
   readonly dryRun?: boolean;
+  readonly telemetryEnabled?: boolean;
   readonly checkForUpdates?: boolean;
   readonly runner?: CommandRunner;
 }
@@ -65,13 +72,22 @@ export async function installLocalSkills(options: LocalInstallOptions): Promise<
 
   try {
     const data = loadBuildData();
+    const telemetryEnabled = resolveTelemetryEnabled(options.targetDir, options.telemetryEnabled);
     for (const agent of agents) {
       buildTarget(agent, data, stagingRoot);
       const agentRoot = join(stagingRoot, agent);
+      if (telemetryEnabled !== undefined) {
+        setTelemetryEnabled(telemetryConfigPath(agentRoot, agent), telemetryEnabled);
+      }
+      prepareWorkspaceTree(agentRoot, options.targetDir);
       plannedFiles.push(...listFiles(agentRoot));
-      if (options.dryRun) continue;
-      removeManagedAssets(options.targetDir, agent);
-      filesWritten += copyTree(agentRoot, options.targetDir);
+    }
+    if (!options.dryRun) {
+      for (const agent of agents) {
+        const agentRoot = join(stagingRoot, agent);
+        removeManagedAssets(options.targetDir, agent, data.skills.map(skill => skill.id));
+        filesWritten += copyTree(agentRoot, options.targetDir);
+      }
     }
   } finally {
     rmSync(stagingRoot, { recursive: true, force: true });
@@ -94,15 +110,11 @@ function loadBuildData(): BuildData {
   };
 }
 
-function removeManagedAssets(targetDir: string, agent: CliAgentName): void {
+function removeManagedAssets(targetDir: string, agent: CliAgentName, skillIds: string[]): void {
   removeLegacyAssets(targetDir, agent);
   const skillsRoot = join(targetDir, agent === 'ghcp' ? '.github' : agent === 'claude' ? '.claude' : '.agents', 'skills');
-  if (existsSync(skillsRoot)) {
-    for (const entry of readdirSync(skillsRoot, { withFileTypes: true })) {
-      if (entry.isDirectory() && entry.name.startsWith('azure-functions-')) {
-        rmSync(join(skillsRoot, entry.name), { recursive: true, force: true });
-      }
-    }
+  for (const skillId of skillIds) {
+    rmSync(join(skillsRoot, skillId), { recursive: true, force: true });
   }
 
   for (const path of managedTelemetryPaths(agent)) {
@@ -148,12 +160,10 @@ function managedTelemetryPaths(agent: CliAgentName): string[] {
   }
   if (agent === 'claude') {
     return [
-      join('.claude', 'hooks', 'hooks.json'),
       ...telemetryFiles.map(path => join('.claude', 'hooks', path)),
     ];
   }
   return [
-    join('.codex', 'hooks.json'),
     ...telemetryFiles.map(path => join('.codex', 'hooks', path)),
   ];
 }
@@ -169,6 +179,19 @@ function collectFiles(root: string, current: string, files: string[]): void {
     const fullPath = join(current, entry.name);
     if (entry.isDirectory()) collectFiles(root, fullPath, files);
     else if (entry.isFile()) files.push(relative(root, fullPath).replaceAll('\\', '/'));
+  }
+}
+
+function prepareWorkspaceTree(source: string, destination: string, relativePath = ''): void {
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const sourcePath = join(source, entry.name);
+    const destinationPath = join(destination, entry.name);
+    const entryRelativePath = relativePath ? join(relativePath, entry.name) : entry.name;
+    if (entry.isDirectory()) {
+      prepareWorkspaceTree(sourcePath, destinationPath, entryRelativePath);
+    } else if (entry.isFile()) {
+      prepareWorkspaceFile(entryRelativePath, destinationPath, sourcePath);
+    }
   }
 }
 

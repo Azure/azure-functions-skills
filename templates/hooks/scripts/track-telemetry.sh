@@ -16,6 +16,12 @@ return_success() {
 }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+config_path="${script_dir}/../telemetry.config.json"
+if [ -f "$config_path" ] && grep -Eq '"enabled"[[:space:]]*:[[:space:]]*false' "$config_path"; then
+    echo '{"continue":true}'
+    exit 0
+fi
+
 extract_json_field() {
     local json="$1"
     local field="$2"
@@ -57,8 +63,6 @@ extract_toolargs_path() {
 configure_appinsights() {
     local config_path
     local instrumentation_key
-    config_path="${script_dir}/../telemetry.config.json"
-
     if [ ! -f "$config_path" ]; then
         return
     fi
