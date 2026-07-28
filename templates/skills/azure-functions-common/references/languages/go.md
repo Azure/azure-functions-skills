@@ -16,11 +16,13 @@ Use this file when investigating Azure Functions issues involving Go apps, the G
 
 `native` is also the runtime value for other native-binary workers, so it does not by itself prove the app is Go. Confirm with at least one secondary signal before loading Go-specific guidance:
 
-- `go.mod` in the project root, especially requiring `github.com/Azure/azure-functions-golang-worker`.
+- `go.mod` in the project root, especially requiring `github.com/azure/azure-functions-golang-worker`.
 - `main.go` calling `sdk.FunctionApp()` and `worker.Start(app)`.
 - A compiled binary as the deployment entry point (commonly `bin/app`).
 
 If none of these are present, the app is more likely a custom handler. Use custom-handler guidance instead.
+
+> **Module path casing.** The GitHub repository is `Azure/azure-functions-golang-worker`, but the Go module path is lowercase: `github.com/azure/azure-functions-golang-worker`. Go module paths are case-sensitive, so `go get` and every import must use the lowercase form.
 
 ## Public repositories
 
@@ -50,7 +52,7 @@ If none of these are present, the app is more likely a custom handler. Use custo
 - **Worker-driven indexing.** Triggers and bindings are declared in Go code through functional options. Go projects do **not** use `function.json`. A `function.json` in a Go project is a migration leftover or a mistake, not the source of truth.
 - **Registration shape.** `app := sdk.FunctionApp()`, then `app.HTTP(...)` / `app.Timer(...)` / etc., then `worker.Start(app)`.
 - **Core triggers** (`sdk/`, payload delivered inline over gRPC): HTTP, Timer, Cosmos DB, SQL, Event Grid, Queue, Event Hubs, Service Bus queue, Service Bus topic.
-- **Extension triggers** (`triggers/`, Azure SDK client injected): Blob. Activated with a blank import such as `_ "github.com/Azure/azure-functions-golang-worker/triggers/blob"`. A missing blank import is a common cause of "trigger not registered" symptoms.
+- **Extension triggers** (`triggers/`, Azure SDK client injected): Blob. Activated with a blank import such as `_ "github.com/azure/azure-functions-golang-worker/triggers/blob"`. A missing blank import is a common cause of "trigger not registered" symptoms.
 - **HTTP handlers** use standard `http.ResponseWriter` and `*http.Request`.
 - **Extension bundles still apply.** Go is a non-.NET runtime, so non-HTTP triggers require an extension bundle in `host.json`.
 
@@ -68,7 +70,7 @@ If none of these are present, the app is more likely a custom handler. Use custo
 
 ## Investigation guidance
 
-- Confirm the worker module version first. Preview releases move quickly, and pinning to a published tag is the supported configuration. Compare the version in `go.mod` against the releases page.
+- Confirm the worker module version first. Preview releases move quickly, and pinning to a published tag is the supported configuration. Every published version is currently a `vX.Y.Z-preview` tag; `go list -m -versions github.com/azure/azure-functions-golang-worker` lists what exists. Compare it against `go.mod`.
 - Check the Core Tools version for any local reproduction. Versions before 4.12.0 do not support Go at all and produce misleading "unsupported runtime" errors.
 - For crashes, look for whole-worker termination rather than a single failed invocation. That pattern points at goroutine panics, and the fix is propagating panics as errors (`sdk.RecoverTo`) rather than adding handler-level recovery.
 - For binding or trigger problems, verify the Go registration call and the `host.json` extension bundle together. There is no `function.json` to inspect.

@@ -21,7 +21,7 @@ Reference files are bundled with `azure-functions-common`:
 | `FUNCTIONS_WORKER_RUNTIME=golang` (legacy value) | `languages/go.md` |
 | Durable bindings, Durable package, or orchestration/entity/activity symptom | `languages/durable-functions.md` |
 
-`native` is not unique to Go. It is the runtime value for native-binary workers generally, so `native` alone does not identify a Go app. Confirm with a secondary signal — `go.mod` requiring `github.com/Azure/azure-functions-golang-worker`, a `main.go` calling `worker.Start`, or a compiled binary entry point — before loading `languages/go.md`. Without one of those signals, treat the app as a custom handler.
+`native` is not unique to Go. It is the runtime value for native-binary workers generally, so `native` alone does not identify a Go app. Confirm with a secondary signal — `go.mod` requiring `github.com/azure/azure-functions-golang-worker`, a `main.go` calling `worker.Start`, or a compiled binary entry point — before loading `languages/go.md`. Without one of those signals, treat the app as a custom handler.
 
 ## Extension routing
 

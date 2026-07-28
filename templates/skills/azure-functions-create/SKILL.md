@@ -17,6 +17,12 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 ## Workflow
 
+### Step 0 — Check for Go
+
+If the user asks for **Go** (or Golang), go straight to **Path C (Go)**. Neither the Azure MCP template set nor the templates manifest contains Go templates. Do not call `functions_template_get` with a Go language value, do not invent a Go template ID, and do not silently scaffold a different language instead.
+
+For every other language, continue with Step 1.
+
 ### Step 1 — Detect Azure MCP tools
 
 Check whether the following Azure MCP tools are available in your current tool list:
@@ -54,7 +60,7 @@ Apply the returned guidelines (programming models, extension bundles version, au
 
 Ask the user (or detect from context):
 
-- **Language**: `csharp` | `python` | `typescript` | `javascript` | `java` | `powershell`
+- **Language**: `csharp` | `python` | `typescript` | `javascript` | `java` | `powershell` — for Go, use **Path C** instead
 - **Trigger / template**: let the MCP list decide (step A.3)
 - **Project name**: directory name
 - **Runtime version** (optional): e.g. Node.js `22`, Python `3.11`, Java `21`
@@ -198,12 +204,157 @@ func start
 
 ---
 
+### Path C — Go (preview)
+
+Use this path for every Go request, whether or not the Azure MCP tools are available. Go is not represented in the Azure MCP template set or in the templates manifest, so there is nothing to discover — scaffold directly from the Go worker SDK.
+
+Tell the user up front that **Go support on Azure Functions is in public preview** and may change before GA.
+
+Load `azure-functions-common/references/languages/go.md` for background before writing files.
+
+#### C.1 Verify prerequisites
+
+- Go 1.24 or later — `go version`
+- Azure Functions Core Tools **4.12.0 or later** — `func --version`
+
+Core Tools before 4.12.0 does not ship the `native` worker and rejects Go projects with a misleading "unsupported worker runtime" error. If either prerequisite is missing or too old, stop and suggest **azure-functions-setup**.
+
+#### C.2 Initialize the module
+
+```bash
+mkdir <project-name>
+cd <project-name>
+go mod init <module-name>
+go get github.com/azure/azure-functions-golang-worker@<tag>
+go mod tidy
+```
+Two things to get right:
+
+- **Module path casing.** The GitHub repository is `Azure/azure-functions-golang-worker`, but the Go module path is lowercase `github.com/azure/azure-functions-golang-worker`. Go module paths are case-sensitive; the uppercase form will not resolve.
+- **Pin a published tag.** Every published version is currently a preview tag (`vX.Y.Z-preview`); there is no stable release yet. Because they are all prereleases, a bare `go get` resolves to the newest preview, which is acceptable, but record the resolved version in `go.mod` and upgrade deliberately. Check https://github.com/Azure/azure-functions-golang-worker/releases or run `go list -m -versions github.com/azure/azure-functions-golang-worker` to see what exists. Do not depend on `main` — it is an active development branch. Never invent a tag; if you cannot list versions, let `go get` resolve and report the version it chose.
+
+#### C.3 Write the project files
+
+`main.go` — register functions in code and start the worker:
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/azure/azure-functions-golang-worker/sdk"
+	"github.com/azure/azure-functions-golang-worker/worker"
+)
+
+func hello(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		name = "world"
+	}
+	fmt.Fprintf(w, "Hello, %s!", name)
+}
+
+func main() {
+	app := sdk.FunctionApp()
+
+	app.HTTP("hello", hello,
+		sdk.WithMethods("GET", "POST"),
+		sdk.WithAuth("function"),
+	)
+
+	worker.Start(app)
+}
+```
+
+`host.json`:
+
+```json
+{
+  "version": "2.0",
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.*, 5.0.0)"
+  }
+}
+```
+
+`local.settings.json`:
+
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "native"
+  }
+}
+```
+
+Rules that differ from other languages:
+
+- `FUNCTIONS_WORKER_RUNTIME` is **`native`**, not `go` or `golang`. This is the single most common mistake in Go projects.
+- **Never author `function.json`.** The Go worker uses worker-driven indexing — triggers and bindings come from the registration options in code. A `function.json` file conflicts with indexing.
+- The extension bundle is still required. Go is a non-.NET runtime, so non-HTTP triggers resolve their extensions through the bundle.
+- Do not add `local.settings.json` to source control; make sure `.gitignore` covers it.
+
+#### C.4 Trigger reference
+
+Register triggers with the matching `app.*` method:
+
+| Trigger | Registration | Tier |
+| --- | --- | --- |
+| HTTP | `app.HTTP(name, handler, ...)` | Core |
+| Timer | `app.Timer(name, handler, ...)` | Core |
+| Cosmos DB | `app.CosmosDB(name, handler, ...)` | Core |
+| SQL | `app.SQL(name, handler, ...)` | Core |
+| Event Grid | `app.EventGrid(name, handler, ...)` | Core |
+| Storage Queue | `app.Queue(name, handler, ...)` | Core |
+| Event Hubs | `app.EventHub(name, handler, ...)` | Core |
+| Service Bus queue | `app.ServiceBusQueue(name, handler, ...)` | Core |
+| Service Bus topic | `app.ServiceBusTopic(name, handler, ...)` | Core |
+| Blob | `app.Blob(name, handler, ...)` | Extension — requires a blank import |
+
+Extension triggers need their package activated with a blank import, for example:
+
+```go
+import _ "github.com/azure/azure-functions-golang-worker/triggers/blob"
+```
+
+Omitting the blank import is the usual cause of a trigger that never registers.
+
+If the user asks for a trigger that is not in this table, say it is not available in the Go worker preview rather than improvising a binding. Check the worker samples at https://github.com/Azure/azure-functions-golang-worker/tree/main/samples before concluding.
+
+**Durable Functions is not available for Go.** If the user asks for orchestrations, entities, or the `durableClient` binding, explain the gap and offer a supported language or a non-Durable pattern.
+
+#### C.5 Verify
+
+```bash
+go build ./...
+func start
+```
+
+`func start` compiles the Go application into `bin/app` (`bin\app.exe` on Windows) before starting the host, so a build error surfaces as a host start failure. Build first so the two failure modes stay distinguishable.
+
+On a healthy start the host prints the preview notice, `Building Go worker binary ...`, `Worker process started and initialized.`, and the indexed function list. If the function list is empty, the registration call is missing or the trigger's extension package was not blank-imported.
+
+Then perform real end-to-end verification, using the same standard as Path A:
+
+- **HTTP triggers**: send an actual request and check the status code and body, for example `curl "http://localhost:7071/api/hello?name=World"`.
+- **Non-HTTP triggers**: load `azure-functions-common/references/local-emulators.md`, and ask before installing or starting any emulator. If the user declines, skip emulator-backed E2E and give manual/Azure test steps instead.
+
+A `webjobs.storage` unhealthy warning is expected when `AzureWebJobsStorage` points at the development storage emulator and Azurite is not running. It does not block HTTP triggers, but non-HTTP triggers need a real storage endpoint.
+
+---
+
 ### Adding functions to existing projects
 
 If `host.json` already exists, do **not** re-initialize. Instead:
 
 - **MCP path**: call `functions_template_get` with the same language as the existing project and specify the desired template name. Write the returned file.
 - **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
+- **Go path**: add another `app.*` registration in the existing project and, for an extension trigger, add the blank import. Do not run `go mod init` again and do not create `function.json`.
 
 ## After Creation
 
