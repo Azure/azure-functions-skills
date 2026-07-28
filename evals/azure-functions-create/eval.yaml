@@ -4,10 +4,15 @@ description: |
 
   Covers:
     - Routing (skill-invocation) for typical "create a function" prompts
-      across TypeScript HTTP, Python timer, and existing-project flows.
+      across TypeScript HTTP, Python timer, Go HTTP, and existing-project
+      flows.
     - Response-quality checks that the skill follows Path A (Azure MCP)
       when available, does not fabricate template IDs, and includes
       proper local end-to-end verification.
+    - Go (Path C): Go has no Azure MCP template and no manifest entry,
+      so the skill must scaffold from the worker SDK, use
+      FUNCTIONS_WORKER_RUNTIME=native, use the lower-case module path,
+      and never author function.json.
     - "Do not re-initialize an existing project" guardrail.
 
   Environment:
@@ -300,3 +305,114 @@ stimuli:
       - type: output-not-matches
         config:
           pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Go (preview) — Path C
+  # Go has no Azure MCP template and no manifest entry, so the skill
+  # must route to Path C instead of fabricating a template ID or
+  # silently substituting another language.  #
+  # NOTE: the Go stimuli drop `panic:` from the runtime-failure
+  # pattern used elsewhere in this suite. Go guidance legitimately
+  # discusses goroutine panics (GO-001 / sdk.RecoverTo), so `panic:`
+  # is an expected substring rather than a crash signal here.  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Routing — create Go HTTP function"
+    prompt: |
+      I want to create a new Azure Functions project in Go with an HTTP trigger.
+      Please scaffold it for me.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: smoke
+      cost: llm
+      area: routing
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
+    constraints:
+      max_turns: 12
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed"
+
+  - name: "Quality — Go scaffolding follows Path C and the native runtime"
+    prompt: |
+      Create a Go Azure Functions project with an HTTP trigger named "hello".
+      Walk me through the scaffolding step by step before writing files, and
+      show me the contents of local.settings.json and host.json.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: full
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
+    constraints:
+      max_turns: 20
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      # Must use the native worker runtime, never "go" or "golang"
+      - name: go_uses_native_runtime
+        type: output-matches
+        config:
+          pattern: "(?i)FUNCTIONS_WORKER_RUNTIME[^\\n]{0,40}native"
+      - name: go_not_go_runtime_value
+        type: output-not-matches
+        config:
+          pattern: "(?i)FUNCTIONS_WORKER_RUNTIME[\"'\\s:=]+[\"'](go|golang)[\"']"
+      # Must use the lower-case module path
+      - name: go_lowercase_module_path
+        type: output-contains
+        config:
+          substring: "github.com/azure/azure-functions-golang-worker"
+      # Must register in code via the worker SDK
+      - name: go_worker_start
+        type: output-matches
+        config:
+          pattern: "worker\\.Start|sdk\\.FunctionApp"
+      # Must NOT author function.json — Go uses worker-driven indexing
+      - name: go_no_function_json
+        type: output-not-matches
+        config:
+          pattern: "(?i)(creat|writ|add|generat)\\w*\\s+(a\\s+|the\\s+)?`?function\\.json"
+      # Must NOT invent an Azure MCP template ID for Go
+      - name: go_no_fabricated_template
+        type: output-not-matches
+        config:
+          pattern: "(?i)http-trigger-go(lang)?(-azd)?"
+      # Must propose `func start` based verification
+      - type: output-contains
+        config:
+          substring: "func start"
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed"

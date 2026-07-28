@@ -8,8 +8,8 @@ The goal is to prevent the most common incident classes from reaching production
 
 | Tier | Engine | Speed | Trust model | What it catches |
 | --- | --- | --- | --- | --- |
-| **Tier 1** (built-in) | Deterministic Node.js checks | < 1s | No external execution | Missing `host.json`, deprecated app settings, unsupported runtime versions, missing `FUNCTIONS_WORKER_RUNTIME`, extension bundle drift, function entry point errors, TypeScript build mismatches, **supply-chain risks (lifecycle scripts, unpinned prod deps, missing lockfile, tracked `.env` files, install-script deps)** |
-| **Tier 2** (`--deep`) | Headless LLM agent (Copilot / Claude / Codex) | ~60–120s | Agent runs with elevated permissions (write, shell) | Async/await anti-patterns, missing exception handling, hardcoded secrets, output-binding error gaps, durable non-determinism, service bus autoComplete conflicts, idempotency gaps, **semantic supply-chain attack patterns (import-time side effects, fetch-then-eval, anti-analysis, credential exfiltration)** |
+| **Tier 1** (built-in) | Deterministic Node.js checks | < 1s | No external execution | Missing `host.json`, deprecated app settings, unsupported runtime versions, missing `FUNCTIONS_WORKER_RUNTIME`, extension bundle drift, function entry point errors, TypeScript build mismatches, Go toolchain and worker-module pinning, **supply-chain risks (lifecycle scripts, unpinned prod deps, missing lockfile, tracked `.env` files, install-script deps)** |
+| **Tier 2** (`--deep`) | Headless LLM agent (Copilot / Claude / Codex) | ~60–120s | Agent runs with elevated permissions (write, shell) | Async/await anti-patterns, missing exception handling, hardcoded secrets, output-binding error gaps, durable non-determinism, service bus autoComplete conflicts, idempotency gaps, Go goroutine panic escape, **semantic supply-chain attack patterns (import-time side effects, fetch-then-eval, anti-analysis, credential exfiltration)** |
 
 Tier 1 always runs. Tier 2 is opt-in.
 
@@ -171,7 +171,7 @@ Documentation is easy to overlook. The runtime refusal at the doctor level catch
 When `--deep` runs, the agent has access to focused checklists tagged by language and category:
 
 - `references/source-only-checks.md` — code patterns (try/catch, async/await, resource disposal)
-- `references/language-checks.md` — Python sync I/O, .NET in-process, Java old plugin versions, etc.
+- `references/language-checks.md` — Python sync I/O, .NET in-process, Java old plugin versions, Go goroutine panic safety, etc.
 - `references/iac-azure-resource-checks.md` — managed identity, network, scaling configs
 - `references/ai-semantic-checks.md` — Durable orchestrator determinism, output-binding gaps, idempotency
 - `references/supply-chain-checks.md` — supply chain attack patterns (lifecycle scripts, fetch-then-eval, credential exfiltration)
