@@ -5,7 +5,7 @@
  * Library:   import { chat, buildStartupPrompt, LAUNCHERS } from '@azure/functions-skills/chat'
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -109,11 +109,22 @@ function detectProject(dir: string): { language: string; hasHostJson: true } | n
   if (!existsSync(hostJsonPath)) return null;
 
   let language = 'unknown';
-  if (existsSync(join(dir, 'package.json'))) language = 'node';
+  // go.mod is checked first: a Go project may also carry a package.json for tooling.
+  if (existsSync(join(dir, 'go.mod'))) language = 'go';
+  else if (existsSync(join(dir, 'package.json'))) language = 'node';
   else if (existsSync(join(dir, 'requirements.txt')) || existsSync(join(dir, 'function_app.py'))) language = 'python';
-  else if (existsSync(join(dir, '*.csproj'))) language = 'dotnet';
+  else if (hasProjectFile(dir)) language = 'dotnet';
 
   return { language, hasHostJson: true };
+}
+
+/** existsSync does not expand globs, so scan the directory for a .csproj/.fsproj. */
+function hasProjectFile(dir: string): boolean {
+  try {
+    return readdirSync(dir).some(f => f.endsWith('.csproj') || f.endsWith('.fsproj'));
+  } catch {
+    return false;
+  }
 }
 
 // ─── Startup prompt ───

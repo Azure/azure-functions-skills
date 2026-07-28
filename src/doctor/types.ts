@@ -35,7 +35,7 @@ export interface FunctionInfo {
 
 // ── Project context collected before running checks ──
 
-export type ProjectLanguage = 'node' | 'python' | 'dotnet' | 'java' | 'powershell' | 'unknown';
+export type ProjectLanguage = 'node' | 'python' | 'dotnet' | 'java' | 'powershell' | 'go' | 'unknown';
 
 export interface ProjectContext {
   dir: string;
