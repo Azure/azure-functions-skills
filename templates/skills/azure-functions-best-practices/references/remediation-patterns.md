@@ -30,6 +30,22 @@ Use these patterns only after presenting findings and receiving explicit user ap
 - Source/IaC changes: run project build/tests and deployment validation before publishing.
 - Security/RBAC changes: verify access with least privilege and confirm no secret values are printed.
 
+## Go-specific remediation
+
+Apply the same approval gate as every other change. These are source patches, so prefer a build plus local run before deployment.
+
+| Finding | Remediation |
+| --- | --- |
+| Panic risk in a user-started goroutine | Wrap the goroutine body so panics become errors. With `errgroup`, `defer sdk.RecoverTo(ctx, &err)` inside the `g.Go` closure. With a `WaitGroup`, defer `wg.Done` **before** `RecoverTo` so the error is assigned before `Wait` unblocks. |
+| Client created per invocation | Move the client to package scope, initialized once with `sync.Once`, and reuse it across invocations. |
+| Worker module tracks `main` or a pseudo-version | `go get github.com/azure/azure-functions-golang-worker@<published-tag>` then `go mod tidy`. Note the module path is lower-case. |
+| `FUNCTIONS_WORKER_RUNTIME` is `go` or `golang` | Set it to `native` in app settings and `local.settings.json`. |
+| `function.json` present | Delete it and confirm the equivalent `app.*` registration exists in code. |
+| Extension trigger never fires | Add the blank import for the trigger package, for example `_ "github.com/azure/azure-functions-golang-worker/triggers/blob"`. |
+| `go` directive below the worker minimum | Raise the `go` directive in `go.mod` and install a matching toolchain. |
+
+After a Go source change, rebuild and re-run locally before deploying: `go build ./...` then `func start` and a real trigger invocation.
+
 ## Escalation rules
 
 - Use `azure-functions-diagnostics` when a best-practice finding is tied to an active failure.

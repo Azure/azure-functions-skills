@@ -43,3 +43,6 @@ These checks can run without LLM semantics and without Azure resource access. Th
 - `host.json.version` is the schema version, not the Functions runtime version.
 - Use Azure CLI runtime metadata for language version checks; do not call internal stack endpoints directly.
 - Prefer Fail only for startup blockers, unsupported configurations, parse errors, and confirmed secrets.
+- `AS-001` valid `FUNCTIONS_WORKER_RUNTIME` values include `native`, which is what Go apps use. Do not report `native` as invalid. `golang` is a legacy value that still appears in older Go samples.
+- `DP-003` does not apply to Go. Go deploys a compiled binary and indexes functions from code, so there is no configured entry point file to resolve and no `function.json` to read. A `function.json` in a Go project is itself the finding.
+- The extension bundle range is commonly written with a wildcard, `[4.*, 5.0.0)`. That is the documented form and must not be reported as outdated.

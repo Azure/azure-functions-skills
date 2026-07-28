@@ -75,6 +75,21 @@ Before handing off, collect and pass the following Azure Functions-specific guid
 - Consider private networking and one Function App per independently scaling workload when appropriate.
 - Use Azure Functions endpoint verification after deploy; do not use `curl -I` for HTTP trigger verification because HEAD can return false negatives.
 
+## Go-specific deployment context
+
+Go apps deploy a compiled binary rather than source, which introduces failure modes no other language has. Pass these to Azure Skills, and check them first when a Go deployment fails.
+
+| Concern | Guidance |
+| --- | --- |
+| Target architecture | Build for the hosting platform, not the developer machine: `GOOS=linux GOARCH=amd64 go build -o bin/app .` for Linux plans. A binary built for Windows fails to start on Linux with no useful application log. |
+| Executable permission | The deployment package must preserve the execute bit on the binary. Flex Consumption mounts the package and honors the archive's file permissions, so a binary without the execute bit fails at platform startup rather than in the app. Windows `Compress-Archive` does **not** set Unix permissions \u2014 use a packaging method that does, or let `func azure functionapp publish` / `azd` build the package. |
+| Worker runtime setting | `FUNCTIONS_WORKER_RUNTIME` must be `native`. |
+| App setting updates | `az functionapp config appsettings set` can fail with a `KeyError: 'FUNCTIONS_WORKER_RUNTIME'` against native-runtime apps. Prefer setting app settings through IaC or the ARM REST API when that happens; do not work around it by changing the runtime value. |
+| Plan | Flex Consumption is the validated target for Go. |
+| Preview status | Go support is in preview. Confirm the user accepts that before a production deployment. |
+
+If a Go deployment succeeds but the app never becomes healthy, treat the binary architecture and the execute bit as the first two hypotheses before investigating bindings or configuration.
+
 ## Azure Skills plugin installation guidance
 
 If Azure Skills is unavailable, stop and ask the user to install it for their host:
