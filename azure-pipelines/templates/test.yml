@@ -1,8 +1,3 @@
-parameters:
-    - name: npmRegistry
-      type: string
-      default: 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/npm/registry/'
-
 jobs:
     - job: UnitTests
 
@@ -20,16 +15,10 @@ jobs:
             inputs:
                 versionSpec: $(NODE_VERSION)
             displayName: 'Install Node.js'
-          - pwsh: |
-                @(
-                  'registry=${{ parameters.npmRegistry }}'
-                  'always-auth=true'
-                ) | Set-Content .npmrc
-            displayName: 'Configure npm registry'
           - task: npmAuthenticate@0
             inputs:
-                workingFile: .npmrc
-            displayName: 'Authenticate npm feed'
+                workingFile: '$(Build.SourcesDirectory)/.npmrc'
+            displayName: 'Authenticate to Central Feed Service'
           - script: npm ci --include=optional
             displayName: 'npm ci'
           - script: npm run lint
