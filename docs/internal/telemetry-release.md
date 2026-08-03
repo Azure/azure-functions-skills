@@ -7,12 +7,14 @@ compiled placeholder immediately before `npm pack`.
 
 ## Release flow
 
-1. The internal AzDO mirror builds from the mirrored repository with the 1ES
-   template in `azure-pipelines/templates/build.yml`.
+1. The internal AzDO official or prerelease pipeline builds from the mirrored
+   repository with the 1ES template in `azure-pipelines/templates/build.yml`.
 2. The build copies the npm package inputs to `dropInput`.
-3. If the secret variable `ApplicationInsightsConnectionString` is present,
-   the build injects it into `dropInput/lib/telemetry/config.js`. Hook and plugin
-   files never contain the destination.
+3. The official and prerelease pipelines require the secret variable
+   `ApplicationInsightsConnectionString` and inject it into
+   `dropInput/lib/telemetry/config.js`. Public PR/CI builds do not receive the
+   secret and compile out the injection step. Hook and plugin files never
+   contain the destination.
 4. The build runs `npm pack --ignore-scripts` and publishes the `.tgz` as the
    official `drop` pipeline artifact through the 1ES template.
 5. The official drop is mirrored to the Azure SDK partner drops storage account

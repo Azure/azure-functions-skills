@@ -60,6 +60,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Use public npm registry
+        run: rm -f .npmrc
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:

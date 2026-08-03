@@ -43,6 +43,7 @@ extends:
                     parameters:
                         # Version to be published is specified in branch
                         IsPrerelease: false
+                        InjectTelemetryConnectionString: true
             - stage: Release
               dependsOn: Build
               jobs:

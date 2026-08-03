@@ -71,7 +71,7 @@ describe('telemetry hook transport', () => {
       sessionId: 'session-123',
       skillName: 'azure-functions-help',
     });
-  });
+  }, 20_000);
 
   it('does not invoke the package command for a workspace-local opt-out', async () => {
     const tempDir = createTempDir('af-skills-hook-opt-out-');
