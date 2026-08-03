@@ -51,6 +51,9 @@ scoring:
   weights:
     skill-invocation: 2.0
     tool-calls: 2.0
+    run-command: 2.0
+    file-exists: 1.0
+    file-not-exists: 1.5
     output-contains: 0.5
     output-matches: 1.0
     output-not-matches: 1.5
@@ -408,13 +411,13 @@ stimuli:
         type: output-matches
         config:
           pattern: "(?i)(?:no|not|never|don't|doesn't|do not|does not|without|avoid)[^.\\n]{0,60}function\\.json|function\\.json[^.\\n]{0,60}(?:is not|isn't|are not|aren't|not used|not needed|does not|doesn't|no longer|has no|conflicts)"
-      # And must not actually author one.
+      # And must not actually author one. Asserted on the workspace rather
+      # than on command text, so harmless verification such as
+      # `find . -name function.json` does not trip it.
       - name: go_does_not_author_function_json
-        type: tool-calls
+        type: file-not-exists
         config:
-          disallowed:
-            - name: "^(bash|powershell|run)$"
-              command: "function\\.json"
+          path: function.json
       # Must NOT invent an Azure MCP template ID for Go
       - name: go_no_fabricated_template
         type: output-not-matches
@@ -433,9 +436,10 @@ stimuli:
   - name: "Execution — Go scaffold actually builds"
     prompt: |
       Create a Go Azure Functions project with an HTTP trigger named "hello"
-      in the current directory. Actually run the commands, write the files,
-      and then build the project to prove it compiles. Report the exact
-      commands you ran and whether the build succeeded.
+      directly in the current directory, not in a subdirectory. Actually run
+      the commands and write the files, then build the project to prove it
+      compiles. Report the exact commands you ran and whether the build
+      succeeded.
     tags:
       type: integration
       skill: azure-functions-create
@@ -462,20 +466,31 @@ stimuli:
           required:
             - name: "^(bash|powershell|run)$"
               command: "\\bfunc\\s+init\\b[^\\n|;&]*--worker-runtime\\s+go\\b|\\bgo\\s+mod\\s+init\\b"
-      # And it must actually build. This is the assertion that would have
-      # caught the `go mod tidy` ordering defect, which produced a project
-      # that looked correct but did not compile.
-      - name: go_build_ran
-        type: tool-calls
+      # The scaffold must produce a real module.
+      - name: go_mod_written
+        type: file-exists
         config:
-          required:
-            - name: "^(bash|powershell|run)$"
-              command: "\\bgo\\s+build\\b|\\bfunc\\s+start\\b"
-      # Build must not fail for a missing worker module.
-      - name: go_no_missing_module_error
-        type: output-not-matches
+          path: go.mod
+      - name: go_main_written
+        type: file-exists
         config:
-          pattern: "(?i)no required module provides package|go: updates to go\\.mod needed"
+          path: main.go
+      - name: go_does_not_author_function_json
+        type: file-not-exists
+        config:
+          path: function.json
+      # The authoritative check. This compiles the workspace the agent
+      # produced and requires a clean exit, rather than trusting the agent's
+      # own summary of whether the build worked. This is the assertion that
+      # catches a scaffold which reads correctly but does not compile, which
+      # is exactly how the `go mod tidy` ordering defect shipped.
+      - name: go_scaffold_compiles
+        type: run-command
+        config:
+          command: go
+          args: ["build", "./..."]
+          expected_exit_code: 0
+          timeout: "5m"
       - type: completed
       - type: output-not-matches
         config:

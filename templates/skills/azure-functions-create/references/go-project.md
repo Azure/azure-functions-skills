@@ -27,6 +27,8 @@ func init <project-name> --worker-runtime go
 cd <project-name>
 ```
 
+Omit the project name to scaffold into the current directory instead of a subdirectory.
+
 This is the supported path and it is what the official documentation describes. It generates a complete, buildable project.
 
 | File | Notes |

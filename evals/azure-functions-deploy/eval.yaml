@@ -197,18 +197,18 @@ stimuli:
             - azure-functions-deploy
 
       # Preview hard limits: Flex Consumption only, Linux only.
+      # These are asserted positively. A negative grader such as "must not
+      # mention a Windows plan" is unusable here, because the required
+      # guidance itself says "do not select a Windows-hosted plan" and would
+      # match its own prohibition.
       - name: go_flex_consumption_only
         type: output-matches
         config:
           pattern: "(?i)flex consumption"
-      - name: go_linux_only
+      - name: go_linux_only_stated
         type: output-matches
         config:
-          pattern: "(?i)linux"
-      - name: go_no_windows_plan
-        type: output-not-matches
-        config:
-          pattern: "(?i)(deploy|host|run|use|select)[^.\\n]{0,40}\\bwindows\\b[^.\\n]{0,20}(plan|app service|hosting)"
+          pattern: "(?i)linux[^.\\n]{0,40}\\bonly\\b|\\bonly\\b[^.\\n]{0,40}linux|windows[^.\\n]{0,60}(?:not supported|unsupported|isn't supported|not available|cannot)|(?:do not|don't|never|avoid)[^.\\n]{0,40}windows"
 
       # Core Tools owns the build and packaging.
       - name: go_core_tools_packaging
