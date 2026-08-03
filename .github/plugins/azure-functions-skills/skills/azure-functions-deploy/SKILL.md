@@ -76,18 +76,35 @@ Before handing off, collect and pass the following Azure Functions-specific guid
 
 ## Go-specific deployment context
 
-Go apps deploy a compiled binary rather than source, which introduces failure modes no other language has. Pass these to Azure Skills, and check them first when a Go deployment fails.
+Go is in public preview, and Core Tools 4.12 or later owns the Go build and packaging. Lead with the supported commands rather than a hand-rolled package.
+
+Two preview constraints are hard limits, so check them before planning anything else.
+
+- Go function apps are supported **only on the Flex Consumption plan**.
+- Go function apps run on **Linux only** in Azure. Do not select or attempt a Windows-hosted plan.
+
+Supported deployment paths:
+
+| Command | What it does |
+| --- | --- |
+| `func azure functionapp publish <APP_NAME>` | Builds, packages, and deploys to an existing function app. Simplest path. |
+| `func pack` | Builds for Linux x64 and produces a deployable zip with the binary at the package root as `app`. Deploy it with `az functionapp deployment source config-zip`. |
+
+A package produced by `func pack` is ready to run, so do not request a remote build when deploying it.
+
+Other Go context to pass to Azure Skills:
 
 | Concern | Guidance |
 | --- | --- |
-| Target architecture | Build for the hosting platform, not the developer machine: `GOOS=linux GOARCH=amd64 go build -o bin/app .` for Linux plans. A binary built for Windows fails to start on Linux with no useful application log. |
-| Executable permission | The deployment package must preserve the execute bit on the binary. Flex Consumption mounts the package and honors the archive's file permissions, so a binary without the execute bit fails at platform startup rather than in the app. Windows `Compress-Archive` does **not** set Unix permissions \u2014 use a packaging method that does, or let `func azure functionapp publish` / `azd` build the package. |
+| Cross-compilation | Only needed with `func pack --no-build`. In that case build first with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/app .`. Otherwise Core Tools targets the right platform for you. |
+| Executable permission | Core Tools sets this correctly. It only becomes a problem with a hand-rolled archive, because some tools such as Windows `Compress-Archive` do not preserve Unix permissions, which leaves the platform unable to start the binary. Prefer `func pack`. |
 | Worker runtime setting | `FUNCTIONS_WORKER_RUNTIME` must be `native`. |
-| App setting updates | `az functionapp config appsettings set` can fail with a `KeyError: 'FUNCTIONS_WORKER_RUNTIME'` against native-runtime apps. Prefer setting app settings through IaC or the ARM REST API when that happens; do not work around it by changing the runtime value. |
-| Plan | Flex Consumption is the validated target for Go. |
-| Preview status | Go support is in preview. Confirm the user accepts that before a production deployment. |
+| Azure CLI version | 2.87.0 or later is required to create Azure resources or deploy packages for Go. |
+| Preview status | Confirm the user accepts preview status before a production deployment. |
 
-If a Go deployment succeeds but the app never becomes healthy, treat the binary architecture and the execute bit as the first two hypotheses before investigating bindings or configuration.
+If a Go deployment succeeds but the app never becomes healthy, check the plan and OS first, then whether the package was built by Core Tools or assembled by hand.
+
+Reference: https://learn.microsoft.com/azure/azure-functions/functions-reference-go
 
 ## Azure Skills plugin installation guidance
 

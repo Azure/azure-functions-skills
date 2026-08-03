@@ -326,14 +326,15 @@ describe('local-settings check', () => {
     expect(results[0].message).toContain('native');
   });
 
-  it('accepts the legacy golang runtime value without warning as hard failure', async () => {
+  it('warns and recommends native when a Go project uses the legacy golang value', async () => {
     const dir = makeTmp('chk-ls-go-legacy-');
     scaffoldGoProject(dir, {
       localSettings: { IsEncrypted: false, Values: { FUNCTIONS_WORKER_RUNTIME: 'golang' } },
     });
     const ctx = await loadProjectContext(dir);
     const results = await localSettingsCheck.run(ctx);
-    expect(results[0].status).not.toBe('fail');
+    expect(results[0].status).toBe('warn');
+    expect(results[0].recommendation).toContain('native');
   });
 });
 

@@ -271,11 +271,13 @@ Go サポートは preview である。所見を報告する際はその前提�
 | `GO-007` | context propagation | — | `context.Context` を無視、またはキャンセル不可 | AI | code analysis |
 | `GO-008` | startup cost | — | `init()` や `worker.Start` 前のブロッキング処理 | AI | code analysis |
 | `GO-009` | toolchain version | worker の最小要件を下回る `go` directive | `go` directive なし | Source-only | `go.mod` |
+| `GO-010` | unsupported feature | Go project 内の Durable trigger/binding または input/output binding | preview で support 外の trigger | Source-only | registrations + `host.json` |
 
 補足:
 
 - `GO-001` が Go で最も重要なチェックである。任意の goroutine で回復されない panic が発生すると process 全体が終了し、worker は複数 invocation を同時に抱えるため、その worker 上の全 in-flight request が失敗する。handler 内の panic は worker が既に回復するので報告しないこと。
-- `GO-004`: Go app は `FUNCTIONS_WORKER_RUNTIME=native` を使う。`golang` は legacy な旧値、`go` は常に誤り。
+- `GO-004`: Go app は `FUNCTIONS_WORKER_RUNTIME=native` を使う。`go` も `golang` も誤設定であり、修正は `native` 。
+- `GO-010`: Go worker は trigger のみを support する。input/output binding は存在せず、preview 中は Durable Functions も support 外。
 - `DP-003`（entry point resolution）は適用外。Go はコンパイル済み binary を deploy し、コードから index するため script file も `function.json` も存在しない。
 
 ---

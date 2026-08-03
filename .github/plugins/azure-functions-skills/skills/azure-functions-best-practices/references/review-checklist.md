@@ -12,6 +12,7 @@ Use this checklist after collecting Function App inventory. Apply only sections 
 - Python Function Apps run on Linux.
 - Go apps pin a published worker release rather than tracking `main`, and their preview status is acknowledged in production readiness decisions.
 - Go apps propagate panics from user-started goroutines as errors, because an unrecovered goroutine panic terminates the worker and fails every concurrent invocation on it.
+- Go apps are deployed to Flex Consumption on Linux, which are the only supported options during preview.
 - Durable Functions workloads consider Durable Task Scheduler when appropriate.
 - Durable Functions is not available for Go; a Go app requiring orchestration needs a different language or a non-Durable pattern.
 

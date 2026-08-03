@@ -44,7 +44,7 @@ Apply the same approval gate as every other change. These are source patches, so
 | Extension trigger never fires | Add the blank import for the trigger package, for example `_ "github.com/azure/azure-functions-golang-worker/triggers/blob"`. |
 | `go` directive below the worker minimum | Raise the `go` directive in `go.mod` and install a matching toolchain. |
 
-After a Go source change, rebuild and re-run locally before deploying: `go build ./...` then `func start` and a real trigger invocation.
+After a Go source change, re-run locally with `func start` and invoke the trigger for real. `func start` performs the `go build` itself, so a separate build step is not needed.
 
 ## Escalation rules
 

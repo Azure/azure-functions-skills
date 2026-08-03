@@ -163,7 +163,7 @@ func cleanup() {}
     writeFileSync(join(pkgDir, 'register.go'), `package handlers
 
 func Register(app *sdk.App) {
-	app.ServiceBusQueue("orders", handleOrders, sdk.WithQueue("orders"))
+	app.ServiceBusQueue("orders", handleOrders, sdk.WithQueueName("orders"))
 	app.Blob("thumbnails", handleBlob, sdk.WithPath("images/{name}"))
 }
 `);

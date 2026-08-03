@@ -20,16 +20,16 @@ func hello(w http.ResponseWriter, r *http.Request) {
 // Anti-pattern: goroutines started without propagating panics as errors.
 // An unrecovered panic in any goroutine terminates the whole worker process,
 // which kills every concurrent invocation on that worker, not just this one.
-func processEvents(ctx context.Context, events []bindings.EventHubEvent) error {
-	for _, e := range events {
+func processEvent(ctx context.Context, event bindings.EventHubMessage) error {
+	for i := 0; i < 3; i++ {
 		go func() {
-			mustProcess(e)
+			mustProcess(event)
 		}()
 	}
 	return nil
 }
 
-func mustProcess(e bindings.EventHubEvent) {
+func mustProcess(e bindings.EventHubMessage) {
 	panic("boom")
 }
 
@@ -37,7 +37,7 @@ func main() {
 	app := sdk.FunctionApp()
 
 	app.HTTP("hello", hello, sdk.WithAuth("anonymous"))
-	app.EventHub("processEvents", processEvents,
+	app.EventHub("processEvent", processEvent,
 		sdk.WithEventHubName("events"),
 		sdk.WithConnection("EventHubConnection"),
 	)

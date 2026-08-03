@@ -10,9 +10,11 @@ description: |
       when available, does not fabricate template IDs, and includes
       proper local end-to-end verification.
     - Go (Path C): Go has no Azure MCP template and no manifest entry,
-      so the skill must scaffold from the worker SDK, use
+      so the skill must scaffold with Core Tools or the worker SDK, use
       FUNCTIONS_WORKER_RUNTIME=native, use the lower-case module path,
-      and never author function.json.
+      and never author function.json. One Go stimulus actually runs the
+      scaffold and builds it, because a prose-only check cannot catch a
+      project that reads correctly but does not compile.
     - "Do not re-initialize an existing project" guardrail.
 
   Environment:
@@ -48,6 +50,7 @@ scoring:
   threshold: 0.8
   weights:
     skill-invocation: 2.0
+    tool-calls: 2.0
     output-contains: 0.5
     output-matches: 1.0
     output-not-matches: 1.5
@@ -397,11 +400,21 @@ stimuli:
         type: output-matches
         config:
           pattern: "worker\\.Start|sdk\\.FunctionApp"
-      # Must NOT author function.json — Go uses worker-driven indexing
-      - name: go_no_function_json
-        type: output-not-matches
+      # Must state that Go does not use function.json. This is asserted
+      # positively rather than by forbidding the phrase "create
+      # function.json", because a proximity pattern also matches correct
+      # negative guidance such as "do not create function.json".
+      - name: go_states_no_function_json
+        type: output-matches
         config:
-          pattern: "(?i)(creat|writ|add|generat)\\w*\\s+(a\\s+|the\\s+)?`?function\\.json"
+          pattern: "(?i)(?:no|not|never|don't|doesn't|do not|does not|without|avoid)[^.\\n]{0,60}function\\.json|function\\.json[^.\\n]{0,60}(?:is not|isn't|are not|aren't|not used|not needed|does not|doesn't|no longer|has no|conflicts)"
+      # And must not actually author one.
+      - name: go_does_not_author_function_json
+        type: tool-calls
+        config:
+          disallowed:
+            - name: "^(bash|powershell|run)$"
+              command: "function\\.json"
       # Must NOT invent an Azure MCP template ID for Go
       - name: go_no_fabricated_template
         type: output-not-matches
@@ -412,6 +425,57 @@ stimuli:
         config:
           substring: "func start"
       # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed"
+
+  - name: "Execution — Go scaffold actually builds"
+    prompt: |
+      Create a Go Azure Functions project with an HTTP trigger named "hello"
+      in the current directory. Actually run the commands, write the files,
+      and then build the project to prove it compiles. Report the exact
+      commands you ran and whether the build succeeded.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: full
+      cost: llm
+      area: e2e-scaffold
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+    constraints:
+      max_turns: 30
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      # The agent must actually scaffold, using the supported Core Tools
+      # command or an explicit module init.
+      - name: go_scaffold_command_ran
+        type: tool-calls
+        config:
+          required:
+            - name: "^(bash|powershell|run)$"
+              command: "\\bfunc\\s+init\\b[^\\n|;&]*--worker-runtime\\s+go\\b|\\bgo\\s+mod\\s+init\\b"
+      # And it must actually build. This is the assertion that would have
+      # caught the `go mod tidy` ordering defect, which produced a project
+      # that looked correct but did not compile.
+      - name: go_build_ran
+        type: tool-calls
+        config:
+          required:
+            - name: "^(bash|powershell|run)$"
+              command: "\\bgo\\s+build\\b|\\bfunc\\s+start\\b"
+      # Build must not fail for a missing worker module.
+      - name: go_no_missing_module_error
+        type: output-not-matches
+        config:
+          pattern: "(?i)no required module provides package|go: updates to go\\.mod needed"
       - type: completed
       - type: output-not-matches
         config:

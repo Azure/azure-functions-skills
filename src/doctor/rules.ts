@@ -27,10 +27,10 @@ export const MIN_GO_VERSION = '1.24';
 export const GO_WORKER_MODULE = 'github.com/azure/azure-functions-golang-worker';
 
 /**
- * Accepted `FUNCTIONS_WORKER_RUNTIME` values for Go apps.
- * Go runs on the host's `native` worker; `golang` is a legacy pre-release value.
+ * The only correct `FUNCTIONS_WORKER_RUNTIME` value for Go apps.
+ * Go runs on the host's `native` worker. `go` and `golang` are misconfigurations.
  */
-export const GO_WORKER_RUNTIME_VALUES = ['native', 'golang'];
+export const GO_WORKER_RUNTIME = 'native';
 
 /** Settings that are deprecated and should be replaced. */
 export const DEPRECATED_SETTINGS: Record<string, string> = {

@@ -11,7 +11,7 @@ import {
   DEPRECATED_SETTINGS,
   MIN_GO_VERSION,
   GO_WORKER_MODULE,
-  GO_WORKER_RUNTIME_VALUES,
+  GO_WORKER_RUNTIME,
 } from './rules.js';
 import { checkVersionStatus, getLanguageVersions } from './stacks.js';
 
@@ -459,13 +459,13 @@ export const localSettingsCheck: DoctorCheck = {
       })];
     }
 
-    if (ctx.language === 'go' && !GO_WORKER_RUNTIME_VALUES.includes(runtime.toLowerCase())) {
+    if (ctx.language === 'go' && runtime.toLowerCase() !== GO_WORKER_RUNTIME) {
       return [result(localSettingsCheck, {
         status: 'warn',
         title: 'Worker runtime mismatch',
-        message: `FUNCTIONS_WORKER_RUNTIME is "${runtime}", but Go apps run on the host's native worker and must use "native".`,
+        message: `FUNCTIONS_WORKER_RUNTIME is "${runtime}", but Go apps run on the host's native worker and must use "${GO_WORKER_RUNTIME}".`,
         file: 'local.settings.json',
-        recommendation: 'Set FUNCTIONS_WORKER_RUNTIME to "native"',
+        recommendation: `Set FUNCTIONS_WORKER_RUNTIME to "${GO_WORKER_RUNTIME}"`,
       })];
     }
 

@@ -160,3 +160,85 @@ stimuli:
       - type: output-not-matches
         config:
           pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Go (preview) — planning only, no Azure resources touched.
+  # Go adds several deploy branches that the TypeScript live stimulus
+  # never exercises, and its preview constraints are hard limits rather
+  # than preferences. This stimulus grades the plan, so it runs in the
+  # normal suite instead of the gated live suite.
+  #
+  # NOTE: `panic:` is dropped from the runtime-failure pattern here
+  # because Go guidance legitimately discusses goroutine panics.
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Quality — Go deployment plan respects preview constraints"
+    prompt: |
+      I have a Go Azure Functions app with an HTTP trigger and I want to deploy
+      it to Azure. Do not deploy anything yet. Walk me through the plan first:
+      which hosting plan and operating system I have to use, how the binary gets
+      built and packaged, and which app settings matter.
+    tags:
+      type: integration
+      skill: azure-functions-deploy
+      tier: full
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-deploy
+        - ../../templates/skills/azure-functions-common
+    constraints:
+      max_turns: 15
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-deploy
+
+      # Preview hard limits: Flex Consumption only, Linux only.
+      - name: go_flex_consumption_only
+        type: output-matches
+        config:
+          pattern: "(?i)flex consumption"
+      - name: go_linux_only
+        type: output-matches
+        config:
+          pattern: "(?i)linux"
+      - name: go_no_windows_plan
+        type: output-not-matches
+        config:
+          pattern: "(?i)(deploy|host|run|use|select)[^.\\n]{0,40}\\bwindows\\b[^.\\n]{0,20}(plan|app service|hosting)"
+
+      # Core Tools owns the build and packaging.
+      - name: go_core_tools_packaging
+        type: output-matches
+        config:
+          pattern: "func\\s+pack|func\\s+azure\\s+functionapp\\s+publish"
+
+      # Cross-compilation must be presented as the --no-build case, not
+      # as the default workflow.
+      - name: go_cross_compile_scoped
+        type: output-not-matches
+        config:
+          pattern: "(?i)you must (always )?(manually )?cross-compile"
+
+      # Native worker runtime.
+      - name: go_native_runtime
+        type: output-matches
+        config:
+          pattern: "(?i)FUNCTIONS_WORKER_RUNTIME[^\\n]{0,40}native"
+
+      # Planning only: nothing should actually be deployed.
+      - name: go_no_actual_deploy
+        type: tool-calls
+        config:
+          disallowed:
+            - name: "^(bash|powershell|run)$"
+              command: "\\bazd\\s+up\\b|func\\s+azure\\s+functionapp\\s+publish\\b|az\\s+functionapp\\s+create\\b"
+
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed"

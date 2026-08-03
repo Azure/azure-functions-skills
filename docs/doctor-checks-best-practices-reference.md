@@ -271,11 +271,13 @@ Go support is in preview. Report findings with that framing.
 | `GO-007` | context propagation | - | `context.Context` ignored or work not cancellable | AI | code analysis |
 | `GO-008` | startup cost | - | Blocking work in `init()` or before `worker.Start` | AI | code analysis |
 | `GO-009` | toolchain version | `go` directive below the worker minimum | No `go` directive | Source-only | `go.mod` |
+| `GO-010` | unsupported feature | Durable trigger/binding, or an input/output binding, in a Go project | Trigger outside the supported preview set | Source-only | registrations + `host.json` |
 
 Notes:
 
 - `GO-001` is the highest-value Go check. An unrecovered panic in any goroutine terminates the process, and the worker hosts concurrent invocations, so one panicking goroutine fails every in-flight request on that worker. Panics inside the handler itself are already recovered by the worker; do not flag those.
-- `GO-004`: Go apps use `FUNCTIONS_WORKER_RUNTIME=native`. `golang` is a legacy pre-release value; `go` is never correct.
+- `GO-004`: Go apps use `FUNCTIONS_WORKER_RUNTIME=native`. Both `go` and `golang` are misconfigurations, and the fix is `native`.
+- `GO-010`: the Go worker supports triggers only. There are no input or output bindings, and Durable Functions is unsupported during preview.
 - `DP-003` (entry point resolution) does not apply. Go deploys a compiled binary and indexes from code, so there is no script file or `function.json`.
 
 ---
