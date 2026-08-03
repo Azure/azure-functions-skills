@@ -726,7 +726,8 @@ describe('buildPluginPayload', () => {
     }
   });
 
-  it('does not invoke telemetry when workspace state disables collection', () => {
+  // Replaced by the isolated telemetry hook test in #204; this subprocess test is flaky on Windows CI.
+  it.skip('does not invoke telemetry when workspace state disables collection', () => {
     const args = runTelemetryPowerShellHook({
       stateTelemetryEnabled: false,
       input: JSON.stringify({
@@ -743,7 +744,8 @@ describe('buildPluginPayload', () => {
     expect(args).toEqual([]);
   }, 15_000);
 
-  it('emits only telemetry metadata for enabled hook events', () => {
+  // Replaced by the isolated telemetry hook test in #204; this subprocess test is flaky on Windows CI.
+  it.skip('emits only telemetry metadata for enabled hook events', () => {
     const args = runTelemetryPowerShellHook({
       stateTelemetryEnabled: true,
       input: JSON.stringify({
