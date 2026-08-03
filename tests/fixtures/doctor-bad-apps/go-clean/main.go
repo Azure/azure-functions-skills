@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"sync"
 
 	"github.com/azure/azure-functions-golang-worker/sdk"
+	"github.com/azure/azure-functions-golang-worker/sdk/bindings"
 	"github.com/azure/azure-functions-golang-worker/worker"
 )
 
@@ -32,12 +34,16 @@ func hello(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, %s!", name)
 }
 
-func cleanup() error {
+func cleanup(ctx context.Context, timer bindings.TimerInfo) error {
 	endpoint := os.Getenv("CLEANUP_ENDPOINT")
 	if endpoint == "" {
 		return nil
 	}
-	resp, err := client().Get(endpoint)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := client().Do(req)
 	if err != nil {
 		return err
 	}

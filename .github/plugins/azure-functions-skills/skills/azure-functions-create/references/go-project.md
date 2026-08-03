@@ -134,8 +134,8 @@ Core triggers receive their payload inline over gRPC and need no external SDK.
 | HTTP | `app.HTTP` | `func(http.ResponseWriter, *http.Request)` | `WithMethods`, `WithAuth`, `WithRoute` |
 | Timer | `app.Timer` | `func(context.Context, bindings.TimerInfo) error` | `WithSchedule` |
 | Cosmos DB | `app.CosmosDB` | `func(context.Context, []bindings.CosmosDocument) error` | `WithDatabase`, `WithContainer`, `WithConnection`, `WithLeaseContainer` |
-| Azure SQL | `app.SQL` | `func(context.Context, []bindings.SQLChange) error` | `WithTable`, `WithConnection` |
-| Event Grid | `app.EventGrid` | `func(context.Context, bindings.EventGridEvent) error` | `WithConnection` |
+| Azure SQL | `app.SQL` | `func(context.Context, []bindings.SQLChange) error` | `WithTable`, `WithConnection`, `WithLeasesTable` |
+| Event Grid | `app.EventGrid` | `func(context.Context, bindings.EventGridEvent) error` | none, the registration takes only a name and handler |
 | Storage Queue | `app.Queue` | `func(context.Context, bindings.QueueMessage) error` | `WithQueueName`, `WithConnection` |
 | Event Hubs | `app.EventHub` | `func(context.Context, bindings.EventHubMessage) error` | `WithEventHubName`, `WithConsumerGroup`, `WithConnection`, `WithCardinality` |
 | Service Bus queue | `app.ServiceBusQueue` | `func(context.Context, bindings.ServiceBusMessage) error` | `WithQueueName`, `WithConnection`, `WithIsSessionsEnabled` |
@@ -154,6 +154,8 @@ import _ "github.com/azure/azure-functions-golang-worker/triggers/blob"
 ```
 
 Retries are configured per function with `sdk.WithRetry`.
+
+`WithConnection` applies to the Cosmos DB, Azure SQL, Storage Queue, Event Hubs, Service Bus, and Blob triggers. It does not apply to Event Grid or Timer, so do not add it there. Cosmos DB has a further family of lease options beyond `WithLeaseContainer`, including `WithLeaseDatabase`, `WithLeaseConnection`, and the lease interval settings.
 
 If the user asks for a trigger that is not in these tables, say it is unavailable in the Go worker preview rather than improvising. Check the worker samples at https://github.com/Azure/azure-functions-golang-worker/tree/main/samples before concluding.
 
