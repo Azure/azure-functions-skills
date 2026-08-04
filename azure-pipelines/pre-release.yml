@@ -46,15 +46,34 @@ extends:
             - stage: Release
               dependsOn: Build
               jobs:
-                  - job: Release
-                    steps:
-                        - task: DownloadPipelineArtifact@2
-                          inputs:
-                              artifact: drop
-                              path: $(Pipeline.Workspace)/drop
-                          displayName: 'Download artifact'
-                        - template: /azure-pipelines/templates/npm-publish-steps.yml@self
-                          parameters:
-                              tgzPath: '$(Pipeline.Workspace)/drop'
-                              NpmPublishTag: ${{ parameters.NpmPublishTag }}
-                              NpmPublishDryRun: ${{ parameters.NpmPublishDryRun }}
+                  - ${{ if eq(parameters.NpmPublishDryRun, true) }}:
+                      - job: ValidateRelease
+                        displayName: 'Validate npm release'
+                        steps:
+                            - task: DownloadPipelineArtifact@2
+                              inputs:
+                                  artifact: drop
+                                  path: $(Pipeline.Workspace)/drop
+                              displayName: 'Download artifact'
+                            - template: /azure-pipelines/templates/npm-publish-steps.yml@self
+                              parameters:
+                                  tgzPath: '$(Pipeline.Workspace)/drop'
+                                  NpmPublishTag: ${{ parameters.NpmPublishTag }}
+                                  NpmPublishDryRun: true
+                  - ${{ if eq(parameters.NpmPublishDryRun, false) }}:
+                      - job: Release
+                        templateContext:
+                            type: releaseJob
+                            isProduction: true
+                            environment: azure-functions-skills-npm-prod
+                            inputs:
+                                - input: pipelineArtifact
+                                  artifactName: drop
+                                  targetPath: $(Pipeline.Workspace)/drop
+                        steps:
+                            - checkout: none
+                            - template: /azure-pipelines/templates/npm-publish-steps.yml@self
+                              parameters:
+                                  tgzPath: '$(Pipeline.Workspace)/drop'
+                                  NpmPublishTag: ${{ parameters.NpmPublishTag }}
+                                  NpmPublishDryRun: false

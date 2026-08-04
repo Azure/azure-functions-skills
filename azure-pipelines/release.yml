@@ -23,6 +23,9 @@ resources:
           source: functions-skills.official
           branch: main
 
+variables:
+    - group: azure-functions-skills-release
+
 extends:
     template: v1/1ES.Official.PipelineTemplate.yml@1es
     parameters:
@@ -41,43 +44,64 @@ extends:
                   image: 1es-ubuntu-22.04
                   os: linux
               jobs:
-                  - job: Release
-                    steps:
-                        - download: officialBuild
-                        - template: /azure-pipelines/templates/npm-publish-steps.yml@self
-                          parameters:
-                              tgzPath: '$(Pipeline.Workspace)/officialBuild/drop'
-                              NpmPublishTag: ${{ parameters.NpmPublishTag }}
-                              NpmPublishDryRun: ${{ parameters.NpmPublishDryRun }}
-            - stage: GitHubTagAndRelease
-              dependsOn: Release
-              pool:
-                  name: 1es-pool-azfunc
-                  image: 1es-windows-2022
-                  os: windows
-              jobs:
-                  - job: GitHubTagAndRelease
-                    steps:
-                        - download: officialBuild
-                        - task: DownloadPipelineArtifact@2
-                          inputs:
-                              artifact: drop
-                              path: $(Pipeline.Workspace)/drop
-                          displayName: 'Download drop artifact'
-                        - powershell: |
-                              $files = Get-ChildItem "$(Pipeline.Workspace)\drop" -Filter "*.tgz"
-                              if ($files.Count -ne 1) {
-                                  Write-Error "Expected one .tgz file, found $($files.Count)"
-                                  exit 1
-                              }
-                              $file = $files[0].Name
-                              if ($file -match '.*-(\d+\.\d+\.\d+.*)\.tgz') {
-                                  $version = $Matches[1]
-                                  Write-Host "Parsed version: $version"
-                                  Write-Host "##vso[task.setvariable variable=version]$version"
-                              } else {
-                                  Write-Error "Filename did not match expected pattern"
-                                  exit 1
-                              }
-                          displayName: 'Extract version from .tgz filename'
-                        - template: /azure-pipelines/templates/github-release.yml@self
+                  - ${{ if eq(parameters.NpmPublishDryRun, true) }}:
+                      - job: ValidateRelease
+                        displayName: 'Validate npm release'
+                        steps:
+                            - download: officialBuild
+                            - template: /azure-pipelines/templates/npm-publish-steps.yml@self
+                              parameters:
+                                  tgzPath: '$(Pipeline.Workspace)/officialBuild/drop'
+                                  NpmPublishTag: ${{ parameters.NpmPublishTag }}
+                                  NpmPublishDryRun: true
+                  - ${{ if eq(parameters.NpmPublishDryRun, false) }}:
+                      - job: Release
+                        templateContext:
+                            type: releaseJob
+                            isProduction: true
+                            environment: azure-functions-skills-npm-prod
+                            inputs:
+                                - input: pipelineArtifact
+                                  pipeline: officialBuild
+                                  artifactName: drop
+                                  targetPath: $(Pipeline.Workspace)/officialBuild/drop
+                        steps:
+                            - checkout: none
+                            - template: /azure-pipelines/templates/npm-publish-steps.yml@self
+                              parameters:
+                                  tgzPath: '$(Pipeline.Workspace)/officialBuild/drop'
+                                  NpmPublishTag: ${{ parameters.NpmPublishTag }}
+                                  NpmPublishDryRun: false
+            - ${{ if eq(parameters.NpmPublishDryRun, false) }}:
+                - stage: GitHubTagAndRelease
+                  dependsOn: Release
+                  pool:
+                      name: 1es-pool-azfunc
+                      image: 1es-windows-2022
+                      os: windows
+                  jobs:
+                      - job: GitHubTagAndRelease
+                        steps:
+                            - download: officialBuild
+                            - task: DownloadPipelineArtifact@2
+                              inputs:
+                                  artifact: drop
+                                  path: $(Pipeline.Workspace)/drop
+                              displayName: 'Download drop artifact'
+                            - powershell: |
+                                  $files = Get-ChildItem "$(Pipeline.Workspace)\drop" -Filter "*.tgz"
+                                  if ($files.Count -ne 1) {
+                                      Write-Error "Expected one .tgz file, found $($files.Count)"
+                                      exit 1
+                                  }
+                                  $file = $files[0].Name
+                                  if ($file -match '.*-(\d+\.\d+\.\d+.*)\.tgz') {
+                                      $version = $Matches[1]
+                                      Write-Host "Parsed version: $version"
+                                      Write-Host "##vso[task.setvariable variable=version]$version"
+                                  } else {
+                                      Write-Error "Filename did not match expected pattern"
+                                      exit 1
+                                  }
+                              displayName: 'Extract version from .tgz filename'
+                            - template: /azure-pipelines/templates/github-release.yml@self
