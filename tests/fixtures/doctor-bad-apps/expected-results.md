@@ -42,8 +42,8 @@ These findings are produced by built-in checks (`--no-deep`) and can be validate
 | `python-worker-dependency` | pass (medium) | `python-worker-dependency:warn` |
 | `python-blueprint-unregistered` | fail | `python-blueprint-registration:warn` |
 | `python-native-dependencies` | pass (info) | `python-native-dependencies:warn` |
-| `python-deploy-artifacts` | pass (low) | `python-deploy-artifacts:warn` |
-| `python-durable-defaults` | pass (low) | `python-durable-configuration:warn` |
+| `python-deploy-artifacts` | pass (medium) | `python-deploy-artifacts:warn`, `python-missing-lockfile:warn` |
+| `python-durable-defaults` | pass (low) | `python-durable-configuration:warn` (the missing `extensions.durableTask` block is intentional) |
 | `python-missing-application-insights` | pass (info) | `application-insights:warn` |
 | `python-v2-missing-storage` | fail | `connection-strings:fail` |
 

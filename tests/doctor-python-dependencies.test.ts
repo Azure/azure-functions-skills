@@ -5,6 +5,7 @@ import {
   hasExternalPythonImports,
   loadPythonDependencies,
 } from '../src/doctor/python-dependencies.js';
+import { readPythonFile } from '../src/doctor/python-files.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
 const TEMP_DIRS: string[] = [];
@@ -97,7 +98,7 @@ orjson = "^3.10"
     expect(manifest.dependencies).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'azure-functions', pinned: true }),
       expect.objectContaining({ name: 'httpx', pinned: false }),
-      expect.objectContaining({ name: 'orjson', pinned: false }),
+      expect.objectContaining({ name: 'orjson', pinned: false, line: 10 }),
     ]));
     expect(manifest.dependencies.some(dep => dep.name === 'python')).toBe(false);
   });
@@ -122,5 +123,14 @@ describe('hasExternalPythonImports', () => {
 
     expect(hasExternalPythonImports(standardOnly)).toBe(false);
     expect(hasExternalPythonImports(external)).toBe(true);
+  });
+
+  it('treats a Python file that disappears during discovery as non-fatal', () => {
+    const dir = makeTmp('doctor-pyimports-missing-');
+    const sourceFile = join(dir, 'function_app.py');
+    writeFileSync(sourceFile, 'import requests\n');
+
+    expect(readPythonFile(join(dir, 'deleted.py'))).toBeNull();
+    expect(hasExternalPythonImports(dir, () => null)).toBe(false);
   });
 });

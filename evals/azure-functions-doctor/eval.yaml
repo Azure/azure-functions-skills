@@ -40,6 +40,8 @@ stimuli:
       files:
         - src: fixtures/python-semantic/function_app.py
           dest: function_app.py
+        - src: fixtures/python-semantic/jobs.py
+          dest: jobs.py
         - src: fixtures/python-semantic/host.json
           dest: host.json
         - src: fixtures/python-semantic/requirements.txt
@@ -59,8 +61,8 @@ stimuli:
   - name: "Quality — semantic findings do not duplicate Python Tier 1"
     prompt: |
       Perform the Tier 2 review for this Python Functions workspace. Tier 1
-      already reported that the Blueprint is unregistered, azure-functions-worker
-      is explicitly declared, and numpy may require a platform-compatible wheel.
+      already reported that the Blueprint is unregistered, dependencies are not
+      pinned or locked, and numpy may require a platform-compatible wheel.
       Do not repeat those deterministic findings. Identify only semantic code
       problems and summarize the actionable result.
     tags:
@@ -75,6 +77,8 @@ stimuli:
       files:
         - src: fixtures/python-semantic/function_app.py
           dest: function_app.py
+        - src: fixtures/python-semantic/jobs.py
+          dest: jobs.py
         - src: fixtures/python-semantic/host.json
           dest: host.json
         - src: fixtures/python-semantic/requirements.txt
@@ -94,10 +98,6 @@ stimuli:
         type: output-not-matches
         config:
           pattern: "(?i)blueprint.{0,80}(unregistered|not registered|register_functions)"
-      - name: avoids_duplicate_worker_finding
-        type: output-not-matches
-        config:
-          pattern: "(?i)azure-functions-worker.{0,80}(remove|managed|conflict|pin)"
       - name: does_not_call_native_packages_malicious
         type: output-not-matches
         config:

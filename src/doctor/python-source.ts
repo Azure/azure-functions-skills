@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { relative, join, sep } from 'node:path';
+import { readPythonFile, type PythonFileReader } from './python-files.js';
 import type { FunctionInfo } from './types.js';
 
 const EXCLUDED_DIRECTORIES = new Set([
@@ -50,7 +51,11 @@ function moduleName(relativePath: string): string {
   return segments.join('.');
 }
 
-function listPythonFiles(root: string, dir = root): PythonFile[] {
+function listPythonFiles(
+  root: string,
+  dir = root,
+  readFile: PythonFileReader = readPythonFile,
+): PythonFile[] {
   const files: PythonFile[] = [];
   let entries;
   try {
@@ -64,17 +69,19 @@ function listPythonFiles(root: string, dir = root): PythonFile[] {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (!EXCLUDED_DIRECTORIES.has(entry.name)) {
-        files.push(...listPythonFiles(root, path));
+        files.push(...listPythonFiles(root, path, readFile));
       }
       continue;
     }
     if (!entry.isFile() || !entry.name.endsWith('.py')) continue;
     const relativePath = relative(root, path);
+    const source = readFile(path);
+    if (source === null) continue;
     files.push({
       path,
       relativePath,
       module: moduleName(relativePath),
-      source: readFileSync(path, 'utf-8'),
+      source,
     });
   }
   return files;
@@ -298,9 +305,12 @@ export interface PythonSourceInventory {
   functions: FunctionInfo[];
 }
 
-export function discoverPythonV2Functions(dir: string): PythonSourceInventory {
+export function discoverPythonV2Functions(
+  dir: string,
+  readFile: PythonFileReader = readPythonFile,
+): PythonSourceInventory {
   if (!existsSync(dir)) return { hasV2Application: false, functions: [] };
-  const pythonFiles = listPythonFiles(dir);
+  const pythonFiles = listPythonFiles(dir, dir, readFile);
   const initial = pythonFiles.map(file => {
     const cleanSource = maskStringsAndComments(file.source);
     const constructors = parseConstructors(cleanSource);

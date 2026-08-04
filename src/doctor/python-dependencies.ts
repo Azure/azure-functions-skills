@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { readPythonFile, type PythonFileReader } from './python-files.js';
 
 const EXCLUDED_DIRECTORIES = new Set([
   '.git',
@@ -207,11 +208,17 @@ function loadPyproject(root: string, manifest: PythonDependencyManifest): void {
     }
   }
 
-  const poetrySection = content.match(
-    /^\[tool\.poetry\.dependencies\]\s*$([\s\S]*?)(?=^\[[^\]]+\]\s*$|(?![\s\S]))/m,
-  )?.[1];
-  if (!poetrySection) return;
-  for (const [index, line] of poetrySection.split(/\r?\n/).entries()) {
+  let inPoetryDependencies = false;
+  for (const [index, line] of content.split(/\r?\n/).entries()) {
+    if (/^\s*\[tool\.poetry\.dependencies\]\s*$/.test(line)) {
+      inPoetryDependencies = true;
+      continue;
+    }
+    if (/^\s*\[[^\]]+\]\s*$/.test(line)) {
+      if (inPoetryDependencies) break;
+      continue;
+    }
+    if (!inPoetryDependencies) continue;
     const match = line.match(/^\s*([A-Za-z0-9_.-]+)\s*=\s*["']([^"']+)["']/);
     if (!match || normalizePackageName(match[1]) === 'python') continue;
     const dependency = parseRequirement(
@@ -265,13 +272,17 @@ function listPythonSourceFiles(root: string, dir = root): string[] {
   return files;
 }
 
-export function hasExternalPythonImports(dir: string): boolean {
+export function hasExternalPythonImports(
+  dir: string,
+  readFile: PythonFileReader = readPythonFile,
+): boolean {
   const sourceFiles = listPythonSourceFiles(dir);
   const localModules = new Set(
     sourceFiles.map(path => relative(dir, path).split(/[\\/]/)[0].replace(/\.py$/, '')),
   );
   for (const path of sourceFiles) {
-    const content = readFileSync(path, 'utf-8');
+    const content = readFile(path);
+    if (content === null) continue;
     for (const line of content.split(/\r?\n/)) {
       const match = line.match(/^\s*(?:import|from)\s+([A-Za-z_]\w*)/);
       if (!match) continue;

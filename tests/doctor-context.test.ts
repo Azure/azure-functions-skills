@@ -1,7 +1,8 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadProjectContext } from '../src/doctor/context.js';
+import { discoverPythonV2Functions } from '../src/doctor/python-source.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
 const TEMP_DIRS: string[] = [];
@@ -60,10 +61,33 @@ describe('loadProjectContext', () => {
     expect(ctx.python?.programmingModel).toBe('v2');
   });
 
-  it('uses the explicit worker runtime when package.json is only project tooling', async () => {
+  it('continues Python discovery when one source file cannot be read', () => {
+    const dir = makeTmp('doctor-ctx-python-unreadable-');
+    writeFileSync(join(dir, 'function_app.py'), [
+      'import azure.functions as func',
+      'app = func.FunctionApp()',
+      '@app.route(route="health")',
+      'def health(req): return "ok"',
+    ].join('\n'));
+    const unreadable = join(dir, 'unreadable.py');
+    writeFileSync(unreadable, 'raise RuntimeError()\n');
+
+    const inventory = discoverPythonV2Functions(
+      dir,
+      path => path === unreadable ? null : readFileSync(path, 'utf-8'),
+    );
+
+    expect(inventory.functions.map(fn => fn.name)).toContain('health');
+  });
+
+  it('uses the explicit Python worker runtime when package.json contains only repository tooling', async () => {
     const dir = makeTmp('doctor-ctx-python-worker-');
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
-    writeFileSync(join(dir, 'package.json'), JSON.stringify({ private: true }));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      private: true,
+      scripts: { lint: 'eslint .' },
+      devDependencies: { eslint: '^9.0.0' },
+    }));
     writeFileSync(join(dir, 'local.settings.json'), JSON.stringify({
       Values: { FUNCTIONS_WORKER_RUNTIME: 'python' },
     }));
