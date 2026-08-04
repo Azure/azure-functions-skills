@@ -9,8 +9,8 @@ These fixtures back the unit test suite and a manual E2E validation workflow.
 | Category | Fixtures | Purpose |
 | --- | --- | --- |
 | **Tier 1 only (numbered)** | `01-missing-host-json`, `02-host-json-missing-version`, … `10-entrypoint-tsconfig-errors` | Each isolates a single deterministic failure mode. |
-| **Tier 2 (`*-deep-*`)** | 16 fixtures across Node.js, Python, C#, Java, PowerShell | Each contains realistic code smell patterns: blocking I/O, missing error handling, secrets in source, durable non-determinism, etc. |
-| **Clean reference** | `node-clean`, `python-clean`, `csharp-clean`, `java-clean`, `powershell-clean` | Negative controls — should produce zero findings. |
+| **Tier 2 (`*-deep-*`)** | 17 fixtures across Node.js, Python, C#, Java, PowerShell, Go | Each contains realistic code smell patterns: blocking I/O, missing error handling, secrets in source, durable non-determinism, goroutine panic escape, etc. |
+| **Clean reference** | `node-clean`, `python-clean`, `csharp-clean`, `java-clean`, `powershell-clean`, `go-clean` | Negative controls — should produce zero findings. |
 
 Each fixture has `expected-results.md` describing what doctor *should* detect at each tier.
 

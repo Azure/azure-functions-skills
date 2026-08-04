@@ -16,14 +16,17 @@ Verify that the developer's environment has all prerequisites for Azure Function
 Run each check and report results:
 
 ```bash
-az --version        # Azure CLI ≥ 2.60
+az --version        # Azure CLI ≥ 2.60 (≥ 2.87.0 for Go deployments)
 azd version         # Azure Developer CLI, required for Azure Skills deployment workflows
-func --version      # Azure Functions Core Tools ≥ 4.x
+func --version      # Azure Functions Core Tools ≥ 4.x (≥ 4.12 for Go projects)
 node --version      # Node.js 24 or 22 for new Node.js/TypeScript projects
 python --version    # Python 3.13 preferred; 3.10-3.13 supported for Python projects
 python3 --version   # Use this fallback when python is not on PATH
 dotnet --version    # .NET SDK ≥ 8.0 (if .NET project)
+go version          # Go 1.24 or later (if Go project; Go support is in preview)
 ```
+
+Run the language checks that match the user's project or stated intent. Do not report a missing Go toolchain as a problem for a Python project, and do not report a missing Python interpreter as a problem for a Go project.
 
 ## Azure Skills Plugin Check
 
@@ -73,14 +76,32 @@ For language runtimes, prefer the latest Azure Functions **GA-supported** versio
 
 | Tool | Recommended version | Windows | macOS | Linux | Docs |
 |------|---------------------|---------|-------|-------|------|
-| Azure CLI | Latest stable, ≥ 2.60 | `winget install --exact --id Microsoft.AzureCLI` | `brew update && brew install azure-cli` | Use the distro-specific Microsoft Learn command for your package manager | https://learn.microsoft.com/cli/azure/install-azure-cli |
+| Azure CLI | Latest stable, ≥ 2.60; **≥ 2.87.0 for Go** | `winget install --exact --id Microsoft.AzureCLI` | `brew update && brew install azure-cli` | Use the distro-specific Microsoft Learn command for your package manager | https://learn.microsoft.com/cli/azure/install-azure-cli |
 | Azure Developer CLI | Latest stable | `winget install --exact --id Microsoft.Azd` | `brew install azure/azd/azd` | Use the Microsoft Learn instructions for your distro or install the signed `.deb`/`.rpm` package from the Azure Developer CLI release | https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd |
-| Core Tools | v4.x | Download and run the v4.x 64-bit MSI installer from Microsoft Learn | `brew tap azure/functions && brew install azure-functions-core-tools@4` | Use the Microsoft package repository for your distro, then install `azure-functions-core-tools-4` | https://learn.microsoft.com/azure/azure-functions/functions-run-local |
+| Core Tools | v4.x; **4.12 or later for Go** | Download and run the v4.x 64-bit MSI installer from Microsoft Learn | `brew tap azure/functions && brew install azure-functions-core-tools@4` | Use the Microsoft package repository for your distro, then install `azure-functions-core-tools-4` | https://learn.microsoft.com/azure/azure-functions/functions-run-local |
 | Node.js | Node.js 24 GA for new apps; Node.js 22 also supported | `winget install --exact --id OpenJS.NodeJS.LTS` or `fnm install 24` | `brew install node@24` or `fnm install 24` | Use your distro package manager or a version manager such as `fnm install 24` | https://learn.microsoft.com/azure/azure-functions/functions-versions |
 | Python | Python 3.13 GA for new apps; 3.10-3.13 supported | `winget install --exact --id Python.Python.3.13` | `brew install python@3.13` | Use your distro package manager or a version manager such as `pyenv install 3.13` | https://learn.microsoft.com/azure/azure-functions/functions-versions |
 | .NET SDK | .NET 8 LTS minimum; use the latest GA version supported by the target Functions model | `winget install --exact --id Microsoft.DotNet.SDK.8` | `brew install --cask dotnet-sdk` | Use the Microsoft Learn instructions for your distro | https://learn.microsoft.com/dotnet/core/install/ |
+| Go | Go 1.24 or later (Go support is in preview) | `winget install --exact --id GoLang.Go` | `brew install go` | Use your distro package manager or the official tarball from the Go downloads page | https://go.dev/dl/ |
 
 Azure Functions runtime 4.x currently supports Node.js 24 and 22 for Node.js/TypeScript apps, and Python 3.10 through 3.13 for Python apps. Python 3.14 can appear in preview; keep Python 3.13 as the default recommendation until the user opts into preview support. Mention hosting caveats when relevant: newer language versions might not be available on Linux Consumption, so Flex Consumption is the safer default for new Linux-hosted apps.
+
+### Go prerequisites
+
+Go support on Azure Functions is in **public preview**. Say so before recommending it for production work.
+
+Go has two version floors that no other language has.
+
+- **Core Tools 4.12 or later.** The `native` worker that runs Go ships in 4.12. Earlier 4.x versions reject a Go project with a misleading "unsupported worker runtime" error, so compare the reported `func --version` against 4.12 rather than only checking for a `4.` prefix.
+- **Azure CLI 2.87.0 or later**, needed when creating Azure resources or deploying packages. The general 2.60 floor used elsewhere in this checklist is not sufficient for Go, so a Go environment can otherwise be reported as ready when it is not. Check with `az version`.
+
+If the installed Core Tools or Azure CLI is present but below the Go floor, report it as a failing check and give the upgrade command for the user's platform.
+
+Go projects also use `FUNCTIONS_WORKER_RUNTIME=native` in `local.settings.json`, not `go` or `golang`. Mention this when a Go project is detected, because it is the most common local configuration mistake.
+
+Scaffold Go projects with `func init <project-name> --worker-runtime go`. `func new` is not supported for Go.
+
+See https://learn.microsoft.com/azure/azure-functions/functions-reference-go for the authoritative prerequisite list.
 
 ## After Setup
 

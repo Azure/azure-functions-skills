@@ -5,8 +5,8 @@ import { join } from 'node:path';
 const REMOVE_RETRY_OPTIONS = {
   recursive: true,
   force: true,
-  maxRetries: process.platform === 'win32' ? 5 : 2,
-  retryDelay: process.platform === 'win32' ? 100 : 25,
+  maxRetries: process.platform === 'win32' ? 10 : 2,
+  retryDelay: process.platform === 'win32' ? 200 : 25,
 };
 
 export function createTempDir(prefix: string): string {

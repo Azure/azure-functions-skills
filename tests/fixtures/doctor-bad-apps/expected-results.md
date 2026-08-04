@@ -30,6 +30,7 @@ These findings are produced by built-in checks (`--no-deep`) and can be validate
 | `csharp-clean` | C# | pass | None (all checks pass) |
 | `java-clean` | Java | pass | None (all checks pass) |
 | `powershell-clean` | PowerShell | pass | None (all checks pass) |
+| `go-clean` | Go | pass | None (all checks pass) |
 
 ### Deep fixtures — Tier 1 component
 
@@ -53,6 +54,7 @@ These fixtures also have deterministic issues detectable by `--no-deep`:
 | `java-deep-client-reuse` | `extension-bundle:warn` (missing extension bundle) |
 | `powershell-deep-install-module` | None expected |
 | `powershell-deep-managed-deps` | `deprecated-settings:warn` (AzureWebJobsDashboard) |
+| `go-deep-toolchain-and-runtime` | `go-version:fail` (go directive 1.21 below the 1.24 worker minimum), `go-version:warn` (worker pinned to a pseudo-version), `local-settings:warn` (FUNCTIONS_WORKER_RUNTIME is `go`, must be `native`) |
 
 ## Tier 2 (deep/LLM) — advisory assertions
 
@@ -154,6 +156,15 @@ These findings require `--deep` and are produced by LLM semantic analysis. Becau
 - 🚫 PS-001: `host.json` has `managedDependency.enabled: true` but `requirements.psd1` is missing
 - ⚠️ CQ-002: `$global:UserCache` hash table used as cross-invocation cache — per-worker only
 - ⚠️ CQ-007: No error handling around `Invoke-RestMethod` call
+
+### Go deep fixtures
+
+**`go-deep-toolchain-and-runtime`** — Expected deep findings:
+- 🚫 GO-001: `processEvents` starts goroutines that call `mustProcess`, which panics. An unrecovered goroutine panic terminates the worker process and fails every concurrent invocation on that worker, not just this one. Should use `sdk.RecoverTo` with `errgroup`.
+- ⚠️ GO-003: `http.Client` constructed inside the `hello` handler instead of at package scope
+- ⚠️ GO-004: `FUNCTIONS_WORKER_RUNTIME` is `go`; Go apps run on the native worker and must use `native`
+- ⚠️ GO-002: worker module pinned to an untagged pseudo-version rather than a published release
+- ⚠️ SC-002: `sdk.WithAuth("anonymous")` on the HTTP trigger — confirm the endpoint is intentionally public
 
 ### Supply-chain deep fixtures (Tier 1 + Tier 2)
 

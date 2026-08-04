@@ -9,6 +9,9 @@ import {
   RECOMMENDED_EXTENSION_BUNDLE,
   SUPPORTED_NODE_VERSIONS,
   DEPRECATED_SETTINGS,
+  MIN_GO_VERSION,
+  GO_WORKER_MODULE,
+  GO_WORKER_RUNTIME,
 } from './rules.js';
 import { checkVersionStatus, getLanguageVersions } from './stacks.js';
 
@@ -150,11 +153,10 @@ export const extensionBundleCheck: DoctorCheck = {
       })];
     }
 
-    // Parse version range like "[4.0.0, 5.0.0)"
-    const rangeMatch = versionStr.match(/\[(\d+\.\d+\.\d+),\s*(\d+\.\d+\.\d+)\)/);
+    // Parse version ranges like "[4.0.0, 5.0.0)" and the documented wildcard form "[4.*, 5.0.0)".
+    const rangeMatch = versionStr.match(/\[\s*(\d+)(?:\.(?:\d+|\*))*\s*,/);
     if (rangeMatch) {
-      const [, minVer] = rangeMatch;
-      const minMajor = parseVersionComponent(minVer.split('.')[0]);
+      const minMajor = parseVersionComponent(rangeMatch[1]);
       const recommendedMinMajor = parseVersionComponent(RECOMMENDED_EXTENSION_BUNDLE.minVersion.split('.')[0]);
       if (minMajor >= recommendedMinMajor) {
         return [result(extensionBundleCheck, {
@@ -341,7 +343,90 @@ export const dotnetVersionCheck: DoctorCheck = {
   },
 };
 
+// ── Check 6b: go-version ──
+
+/** Compare dotted numeric versions. Returns <0, 0, or >0. */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** Go pseudo-versions look like v0.0.0-20260101120000-abcdef123456. */
+function isGoPseudoVersion(version: string): boolean {
+  return /-\d{14}-[0-9a-f]{12}$/.test(version);
+}
+
+export const goVersionCheck: DoctorCheck = {
+  id: 'go-version',
+  category: 'configuration',
+  defaultSeverity: 'high',
+  appliesTo: (ctx) => ctx.language === 'go' && existsSync(join(ctx.dir, 'go.mod')),
+  run: async (ctx) => {
+    const goModPath = join(ctx.dir, 'go.mod');
+    let goMod: string;
+    try {
+      goMod = readFileSync(goModPath, 'utf-8');
+    } catch {
+      return [result(goVersionCheck, {
+        status: 'skip',
+        title: 'Go version check skipped',
+        message: 'go.mod could not be read',
+      })];
+    }
+
+    const results: DoctorCheckResult[] = [];
+
+    const directive = goMod.match(/^\s*go\s+(\d+\.\d+(?:\.\d+)?)\s*$/m)?.[1];
+    if (!directive) {
+      results.push(result(goVersionCheck, {
+        status: 'warn',
+        severity: 'medium',
+        title: 'No go directive in go.mod',
+        message: 'go.mod does not declare a go version, so the toolchain requirement cannot be verified.',
+        file: 'go.mod',
+        recommendation: `Add a go directive of ${MIN_GO_VERSION} or later`,
+      }));
+    } else if (compareVersions(directive, MIN_GO_VERSION) < 0) {
+      results.push(result(goVersionCheck, {
+        status: 'fail',
+        title: `Go ${directive} is below the worker minimum`,
+        message: `go.mod declares go ${directive}. The Azure Functions Go worker requires Go ${MIN_GO_VERSION} or later.`,
+        file: 'go.mod',
+        recommendation: `Update the go directive to ${MIN_GO_VERSION} or later and reinstall the matching toolchain`,
+      }));
+    } else {
+      results.push(result(goVersionCheck, {
+        status: 'pass',
+        title: `Go ${directive} supported`,
+        message: `go.mod declares go ${directive}, which meets the ${MIN_GO_VERSION} minimum. Go support is in preview.`,
+      }));
+    }
+
+    const workerVersion = goMod.match(
+      new RegExp(String.raw`${GO_WORKER_MODULE.replace(/[.]/g, '\\.')}\s+(v\S+)`),
+    )?.[1];
+    if (workerVersion && isGoPseudoVersion(workerVersion)) {
+      results.push(result(goVersionCheck, {
+        status: 'warn',
+        severity: 'medium',
+        title: 'Go worker pinned to an untagged commit',
+        message: `${GO_WORKER_MODULE} is pinned to pseudo-version ${workerVersion}, which tracks an untagged commit on an active development branch.`,
+        file: 'go.mod',
+        recommendation: `Pin a published release instead: go get ${GO_WORKER_MODULE}@<tag>`,
+      }));
+    }
+
+    return results;
+  },
+};
+
 // ── Check 7: local-settings ──
+
 
 export const localSettingsCheck: DoctorCheck = {
   id: 'local-settings',
@@ -359,13 +444,28 @@ export const localSettingsCheck: DoctorCheck = {
     }
 
     const values = (ctx.localSettings as Record<string, unknown>).Values as Record<string, unknown> | undefined;
-    if (!values || !values.FUNCTIONS_WORKER_RUNTIME) {
+    const runtime = typeof values?.FUNCTIONS_WORKER_RUNTIME === 'string'
+      ? (values.FUNCTIONS_WORKER_RUNTIME as string)
+      : undefined;
+
+    if (!runtime) {
+      const example = ctx.language === 'go' ? '"native"' : '"node", "python", "dotnet"';
       return [result(localSettingsCheck, {
         status: 'warn',
         title: 'Worker runtime not set',
         message: 'FUNCTIONS_WORKER_RUNTIME is not set in local.settings.json',
         file: 'local.settings.json',
-        recommendation: 'Add FUNCTIONS_WORKER_RUNTIME to Values (e.g. "node", "python", "dotnet")',
+        recommendation: `Add FUNCTIONS_WORKER_RUNTIME to Values (e.g. ${example})`,
+      })];
+    }
+
+    if (ctx.language === 'go' && runtime.toLowerCase() !== GO_WORKER_RUNTIME) {
+      return [result(localSettingsCheck, {
+        status: 'warn',
+        title: 'Worker runtime mismatch',
+        message: `FUNCTIONS_WORKER_RUNTIME is "${runtime}", but Go apps run on the host's native worker and must use "${GO_WORKER_RUNTIME}".`,
+        file: 'local.settings.json',
+        recommendation: `Set FUNCTIONS_WORKER_RUNTIME to "${GO_WORKER_RUNTIME}"`,
       })];
     }
 
@@ -956,6 +1056,7 @@ export const ALL_CHECKS: DoctorCheck[] = [
   nodeVersionCheck,
   pythonVersionCheck,
   dotnetVersionCheck,
+  goVersionCheck,
   localSettingsCheck,
   connectionStringsCheck,
   deprecatedSettingsCheck,

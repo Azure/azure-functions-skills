@@ -216,3 +216,67 @@ stimuli:
       - type: output-not-matches
         config:
           pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Response quality (tier: smoke) — Go prerequisites
+  # Go carries two version floors the other languages do not: the
+  # `native` worker that runs Go ships in Core Tools 4.12, and Azure
+  # CLI 2.87.0 is required to create resources or deploy.
+  # ──────────────────────────────────────────────────────────────
+
+  - name: "Quality — Go prerequisites include the Core Tools and Azure CLI floors"
+    prompt: |
+      I want to build an Azure Functions app in Go and deploy it to Azure.
+      Check whether my environment is ready and tell me exactly which tools
+      and minimum versions I need, including anything specific to Go.
+    tags:
+      type: integration
+      skill: azure-functions-setup
+      tier: smoke
+      cost: llm
+      area: response-quality
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-setup
+        - ../../templates/skills/azure-functions-common
+    constraints:
+      max_turns: 15
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-setup
+
+      # Must check the Go toolchain and state the 1.24 minimum
+      - name: go_toolchain_checked
+        type: output-matches
+        config:
+          pattern: "(?i)go version|\\bGo 1\\.2[4-9]|Go\\s+1\\.24"
+      # Must surface the Core Tools 4.12 floor that is unique to Go
+      - name: go_core_tools_floor
+        type: output-contains
+        config:
+          substring: "4.12"
+      # Must surface the Go-specific Azure CLI floor. The general 2.60
+      # check would otherwise report a Go deploy environment as ready
+      # when it cannot actually create resources or publish.
+      - name: go_azure_cli_floor
+        type: output-contains
+        config:
+          substring: "2.87"
+      # Must state that Go support is in preview
+      - name: go_preview_stated
+        type: output-matches
+        config:
+          pattern: "(?i)preview"
+      # Must not claim plain v4 Core Tools is sufficient for Go
+      - name: go_no_bare_v4_claim
+        type: output-not-matches
+        config:
+          pattern: "(?i)Core Tools[^\\n]*(any|just|only)\\s+4\\.x[^\\n]*(is|are)?\\s*(enough|sufficient|fine)"
+
+      # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed"

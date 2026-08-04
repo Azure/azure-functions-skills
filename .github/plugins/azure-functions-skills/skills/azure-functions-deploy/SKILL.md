@@ -74,6 +74,38 @@ Before handing off, collect and pass the following Azure Functions-specific guid
 - Consider private networking and one Function App per independently scaling workload when appropriate.
 - Use Azure Functions endpoint verification after deploy; do not use `curl -I` for HTTP trigger verification because HEAD can return false negatives.
 
+## Go-specific deployment context
+
+Go is in public preview, and Core Tools 4.12 or later owns the Go build and packaging. Lead with the supported commands rather than a hand-rolled package.
+
+Two preview constraints are hard limits, so check them before planning anything else.
+
+- Go function apps are supported **only on the Flex Consumption plan**.
+- Go function apps run on **Linux only** in Azure. Do not select or attempt a Windows-hosted plan.
+
+Supported deployment paths:
+
+| Command | What it does |
+| --- | --- |
+| `func azure functionapp publish <APP_NAME>` | Builds, packages, and deploys to an existing function app. Simplest path. |
+| `func pack` | Builds for Linux x64 and produces a deployable zip with the binary at the package root as `app`. Deploy it with `az functionapp deployment source config-zip`. |
+
+A package produced by `func pack` is ready to run, so do not request a remote build when deploying it.
+
+Other Go context to pass to Azure Skills:
+
+| Concern | Guidance |
+| --- | --- |
+| Cross-compilation | Only needed with `func pack --no-build`. In that case build first with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/app .`. Otherwise Core Tools targets the right platform for you. |
+| Executable permission | Core Tools sets this correctly. It only becomes a problem with a hand-rolled archive, because some tools such as Windows `Compress-Archive` do not preserve Unix permissions, which leaves the platform unable to start the binary. Prefer `func pack`. |
+| Worker runtime setting | `FUNCTIONS_WORKER_RUNTIME` must be `native`. |
+| Azure CLI version | 2.87.0 or later is required to create Azure resources or deploy packages for Go. |
+| Preview status | Confirm the user accepts preview status before a production deployment. |
+
+If a Go deployment succeeds but the app never becomes healthy, check the plan and OS first, then whether the package was built by Core Tools or assembled by hand.
+
+Reference: https://learn.microsoft.com/azure/azure-functions/functions-reference-go
+
 ## Azure Skills plugin installation guidance
 
 If Azure Skills is unavailable, stop and ask the user to install it for their host:

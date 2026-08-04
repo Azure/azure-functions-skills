@@ -17,6 +17,12 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 ## Workflow
 
+### Step 0 — Check for Go
+
+If the user asks for **Go** (or Golang), use **Path C** below. Neither the Azure MCP template set nor the templates manifest contains Go templates, so the other paths cannot produce a working Go project.
+
+For every other language, continue with Step 1.
+
 ### Step 1 — Detect Azure MCP tools
 
 Check whether the following Azure MCP tools are available in your current tool list:
@@ -198,12 +204,23 @@ func start
 
 ---
 
+### Path C — Go (preview)
+
+Go is not represented in the Azure MCP template set or in the templates manifest, so there is nothing to discover. Go also has its own scaffolding command, its own worker runtime value, and preview constraints that apply to no other language.
+
+Load [references/go-project.md](references/go-project.md) and follow it. Do not improvise a Go project from Path A or Path B.
+
+Tell the user up front that **Go support on Azure Functions is in public preview** and may change before GA.
+
+---
+
 ### Adding functions to existing projects
 
 If `host.json` already exists, do **not** re-initialize. Instead:
 
 - **MCP path**: call `functions_template_get` with the same language as the existing project and specify the desired template name. Write the returned file.
 - **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
+- **Go path**: `func new` is not supported for Go. Edit `main.go`, add another `app.*` registration and, for an extension trigger, the blank import. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
 
 ## After Creation
 
