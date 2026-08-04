@@ -2,6 +2,8 @@
 
 Minimal starter patterns for HTTP triggers. Use these only as a last-resort fallback when the Azure MCP tools are unavailable **and** `func new` does not produce the desired shape. Prefer the `functions list or get template` Azure MCP tool whenever possible — it returns maintained, complete templates.
 
+**Go is the exception.** The Azure MCP tools and the templates manifest do not include Go, so the Go snippet below is the primary starting point rather than a fallback. See Path C in the skill for the full Go workflow.
+
 ## TypeScript (Node.js v4 model)
 
 ```typescript
@@ -68,7 +70,44 @@ public HttpResponseMessage run(
 }
 ```
 
+## Go (preview)
+
+Go uses worker-driven indexing — there is no `function.json`. Register the function in code and start the worker. The module path is lowercase (`github.com/azure/...`) even though the repository is `Azure/...`.
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/azure/azure-functions-golang-worker/sdk"
+	"github.com/azure/azure-functions-golang-worker/worker"
+)
+
+func hello(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		name = "world"
+	}
+	fmt.Fprintf(w, "Hello, %s!", name)
+}
+
+func main() {
+	app := sdk.FunctionApp()
+
+	app.HTTP("hello", hello,
+		sdk.WithMethods("GET", "POST"),
+		sdk.WithAuth("function"),
+	)
+
+	worker.Start(app)
+}
+```
+
+Set `"FUNCTIONS_WORKER_RUNTIME": "native"` in `local.settings.json` — not `go` or `golang`.
+
 ## Notes
 
 - HTTP triggers default to `authLevel: 'function'`. Use `'anonymous'` only for explicitly public endpoints.
-- For non-HTTP triggers (Timer, Blob, Queue, Service Bus, Cosmos DB, Event Hub, etc.), always prefer the `functions list or get template` Azure MCP tool — binding configuration is error-prone to write by hand.
+- For non-HTTP triggers (Timer, Blob, Queue, Service Bus, Cosmos DB, Event Hub, etc.), always prefer the `functions list or get template` Azure MCP tool — binding configuration is error-prone to write by hand. Go is the exception: it has no MCP templates, so use the trigger table in Path C of the skill.

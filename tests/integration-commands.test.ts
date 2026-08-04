@@ -208,7 +208,11 @@ describe('CLI command integration', () => {
     assertFullPluginLayout(join(distDir, 'plugin', 'azure-functions-skills'), expectedSkillIds, expectedAgentFiles);
   });
 
-  it('setup installs each target workspace layout into a temp project directory', () => {
+  // Spawns the CLI once per target and copies the full workspace payload each
+  // time, so it is the slowest test here that is not already given headroom.
+  // It grows with the number of skills and reference files, and it timed out on
+  // the slowest CI runner at the 5s default.
+  it('setup installs each target workspace layout into a temp project directory', { timeout: 15_000 }, () => {
     const expectedSkillIds = templateSkillIds();
     const expectedAgentFiles = templateAgentFiles();
 

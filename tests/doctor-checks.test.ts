@@ -22,6 +22,7 @@ import {
   installScriptDepsCheck,
   pythonUnpinnedRequirementsCheck,
   pythonMissingLockfileCheck,
+  goVersionCheck,
   ALL_CHECKS,
 } from '../src/doctor/checks.js';
 
@@ -60,6 +61,25 @@ function scaffoldProject(dir: string, opts?: {
       writeFileSync(join(srcDir, `${fn.name}.ts`), fn.content);
     }
   }
+}
+
+// ── Helper: scaffold a minimal Go project ──
+function scaffoldGoProject(dir: string, opts?: {
+  goDirective?: string;
+  workerVersion?: string;
+  localSettings?: Record<string, unknown>;
+  mainGo?: string;
+}) {
+  writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+  const require = opts?.workerVersion
+    ? `\nrequire github.com/azure/azure-functions-golang-worker ${opts.workerVersion}\n`
+    : '';
+  writeFileSync(join(dir, 'go.mod'), `module myapp\n\ngo ${opts?.goDirective ?? '1.24.0'}\n${require}`);
+  writeFileSync(
+    join(dir, 'local.settings.json'),
+    JSON.stringify(opts?.localSettings ?? { IsEncrypted: false, Values: { FUNCTIONS_WORKER_RUNTIME: 'native' } }),
+  );
+  writeFileSync(join(dir, 'main.go'), opts?.mainGo ?? 'package main\n\nfunc main() { app.HTTP("hello", hello) }\n');
 }
 
 // ── project-exists ──
@@ -145,6 +165,47 @@ describe('extension-bundle check', () => {
     const ctx = await loadProjectContext(dir);
     const results = await extensionBundleCheck.run(ctx);
     expect(results[0].status).toBe('fail');
+  });
+
+  it('passes with the documented wildcard range [4.*, 5.0.0)', async () => {
+    const dir = makeTmp('chk-ext-wildcard-');
+    scaffoldProject(dir, {
+      hostJson: {
+        version: '2.0',
+        extensionBundle: {
+          id: 'Microsoft.Azure.Functions.ExtensionBundle',
+          version: '[4.*, 5.0.0)',
+        },
+      },
+      packageJson: { name: 'test' },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await extensionBundleCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('fails with an outdated wildcard range [3.*, 4.0.0)', async () => {
+    const dir = makeTmp('chk-ext-wildcard-old-');
+    scaffoldProject(dir, {
+      hostJson: {
+        version: '2.0',
+        extensionBundle: {
+          id: 'Microsoft.Azure.Functions.ExtensionBundle',
+          version: '[3.*, 4.0.0)',
+        },
+      },
+      packageJson: { name: 'test' },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await extensionBundleCheck.run(ctx);
+    expect(results[0].status).toBe('fail');
+  });
+
+  it('applies to Go projects', async () => {
+    const dir = makeTmp('chk-ext-go-');
+    scaffoldGoProject(dir);
+    const ctx = await loadProjectContext(dir);
+    expect(extensionBundleCheck.appliesTo(ctx)).toBe(true);
   });
 
   it('warns when extension bundle is not configured', async () => {
@@ -235,6 +296,104 @@ describe('local-settings check', () => {
     const ctx = await loadProjectContext(dir);
     const results = await localSettingsCheck.run(ctx);
     expect(results[0].status).toBe('warn');
+  });
+
+  it('passes for a Go project using the native worker runtime', async () => {
+    const dir = makeTmp('chk-ls-go-native-');
+    scaffoldGoProject(dir);
+    const ctx = await loadProjectContext(dir);
+    const results = await localSettingsCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('recommends the native runtime value for a Go project missing the setting', async () => {
+    const dir = makeTmp('chk-ls-go-missing-');
+    scaffoldGoProject(dir, { localSettings: { IsEncrypted: false, Values: {} } });
+    const ctx = await loadProjectContext(dir);
+    const results = await localSettingsCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+    expect(results[0].recommendation).toContain('native');
+  });
+
+  it('warns when a Go project sets a non-native worker runtime', async () => {
+    const dir = makeTmp('chk-ls-go-wrong-');
+    scaffoldGoProject(dir, {
+      localSettings: { IsEncrypted: false, Values: { FUNCTIONS_WORKER_RUNTIME: 'go' } },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await localSettingsCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+    expect(results[0].message).toContain('native');
+  });
+
+  it('warns and recommends native when a Go project uses the legacy golang value', async () => {
+    const dir = makeTmp('chk-ls-go-legacy-');
+    scaffoldGoProject(dir, {
+      localSettings: { IsEncrypted: false, Values: { FUNCTIONS_WORKER_RUNTIME: 'golang' } },
+    });
+    const ctx = await loadProjectContext(dir);
+    const results = await localSettingsCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+    expect(results[0].recommendation).toContain('native');
+  });
+});
+
+// ── go-version ──
+
+describe('go-version check', () => {
+  it('applies only to Go projects', async () => {
+    const goDir = makeTmp('chk-go-applies-');
+    scaffoldGoProject(goDir);
+    const goCtx = await loadProjectContext(goDir);
+    expect(goVersionCheck.appliesTo(goCtx)).toBe(true);
+
+    const nodeDir = makeTmp('chk-go-notapplies-');
+    scaffoldProject(nodeDir, { hostJson: { version: '2.0' }, packageJson: { name: 'test' } });
+    const nodeCtx = await loadProjectContext(nodeDir);
+    expect(goVersionCheck.appliesTo(nodeCtx)).toBe(false);
+  });
+
+  it('passes with a supported go directive', async () => {
+    const dir = makeTmp('chk-go-ok-');
+    scaffoldGoProject(dir, { goDirective: '1.24.0' });
+    const ctx = await loadProjectContext(dir);
+    const results = await goVersionCheck.run(ctx);
+    expect(results[0].status).toBe('pass');
+  });
+
+  it('fails when the go directive is below the worker minimum', async () => {
+    const dir = makeTmp('chk-go-old-');
+    scaffoldGoProject(dir, { goDirective: '1.21' });
+    const ctx = await loadProjectContext(dir);
+    const results = await goVersionCheck.run(ctx);
+    expect(results[0].status).toBe('fail');
+    expect(results[0].message).toContain('1.24');
+  });
+
+  it('warns when go.mod has no go directive', async () => {
+    const dir = makeTmp('chk-go-nodirective-');
+    scaffoldGoProject(dir);
+    writeFileSync(join(dir, 'go.mod'), 'module myapp\n');
+    const ctx = await loadProjectContext(dir);
+    const results = await goVersionCheck.run(ctx);
+    expect(results[0].status).toBe('warn');
+  });
+
+  it('warns when the worker module is pinned to a pseudo-version', async () => {
+    const dir = makeTmp('chk-go-pseudo-');
+    scaffoldGoProject(dir, { workerVersion: 'v0.0.0-20260101120000-abcdef123456' });
+    const ctx = await loadProjectContext(dir);
+    const results = await goVersionCheck.run(ctx);
+    const worker = results.find(r => r.message.includes('azure-functions-golang-worker'));
+    expect(worker?.status).toBe('warn');
+  });
+
+  it('passes when the worker module is pinned to a published preview tag', async () => {
+    const dir = makeTmp('chk-go-tagged-');
+    scaffoldGoProject(dir, { workerVersion: 'v0.6.0-preview' });
+    const ctx = await loadProjectContext(dir);
+    const results = await goVersionCheck.run(ctx);
+    expect(results.some(r => r.status === 'fail')).toBe(false);
   });
 });
 
@@ -373,8 +532,8 @@ describe('typescript-build check', () => {
 // ── ALL_CHECKS ──
 
 describe('ALL_CHECKS registry', () => {
-  it('contains 29 checks', () => {
-    expect(ALL_CHECKS).toHaveLength(29);
+  it('contains 30 checks', () => {
+    expect(ALL_CHECKS).toHaveLength(30);
   });
 
   it('has unique IDs', () => {

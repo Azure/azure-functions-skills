@@ -113,6 +113,23 @@ describe('loadProjectContext', () => {
     expect(ctx.language).toBe('java');
   });
 
+  it('detects go language from go.mod', async () => {
+    const dir = makeTmp('doctor-ctx-go-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'go.mod'), 'module myapp\n\ngo 1.24.0\n');
+    const ctx = await loadProjectContext(dir);
+    expect(ctx.language).toBe('go');
+  });
+
+  it('prefers go over node when a Go project also carries a package.json', async () => {
+    const dir = makeTmp('doctor-ctx-go-pkg-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'go.mod'), 'module myapp\n\ngo 1.24.0\n');
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'tooling-only' }));
+    const ctx = await loadProjectContext(dir);
+    expect(ctx.language).toBe('go');
+  });
+
   it('loads local.settings.json when present', async () => {
     const dir = makeTmp('doctor-ctx-settings-');
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
@@ -252,6 +269,80 @@ def orchestrator(context):
     expect(ctx.functions).toEqual([
       expect.objectContaining({ name: 'orchestrator', triggerType: 'orchestrationTrigger' }),
     ]);
+  });
+
+  it('discovers Go worker-indexed functions from app registrations', async () => {
+    const dir = makeTmp('doctor-ctx-go-funcs-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'go.mod'), 'module myapp\n\ngo 1.24.0\n');
+    writeFileSync(join(dir, 'main.go'), `package main
+
+import (
+	"net/http"
+
+	"github.com/azure/azure-functions-golang-worker/sdk"
+	"github.com/azure/azure-functions-golang-worker/worker"
+)
+
+func main() {
+	app := sdk.FunctionApp()
+	app.HTTP("hello", hello, sdk.WithMethods("GET"))
+	app.Timer("cleanup", cleanup, sdk.WithSchedule("0 */5 * * * *"))
+	worker.Start(app)
+}
+
+func hello(w http.ResponseWriter, r *http.Request) {}
+func cleanup() {}
+`);
+    const ctx = await loadProjectContext(dir);
+    const names = ctx.functions.map(f => f.name).sort();
+    expect(names).toEqual(['cleanup', 'hello']);
+    const hello = ctx.functions.find(f => f.name === 'hello');
+    expect(hello?.triggerType).toBe('httpTrigger');
+    const cleanup = ctx.functions.find(f => f.name === 'cleanup');
+    expect(cleanup?.triggerType).toBe('timerTrigger');
+  });
+
+  it('discovers Go functions declared in nested packages', async () => {
+    const dir = makeTmp('doctor-ctx-go-nested-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'go.mod'), 'module myapp\n\ngo 1.24.0\n');
+    const pkgDir = join(dir, 'internal', 'handlers');
+    mkdirSync(pkgDir, { recursive: true });
+    writeFileSync(join(pkgDir, 'register.go'), `package handlers
+
+func Register(app *sdk.App) {
+	app.ServiceBusQueue("orders", handleOrders, sdk.WithQueueName("orders"))
+	app.Blob("thumbnails", handleBlob, sdk.WithPath("images/{name}"))
+}
+`);
+    const ctx = await loadProjectContext(dir);
+    const byName = Object.fromEntries(ctx.functions.map(f => [f.name, f.triggerType]));
+    expect(byName.orders).toBe('serviceBusTrigger');
+    expect(byName.thumbnails).toBe('blobTrigger');
+  });
+
+  it('ignores Go registration-like calls inside vendor and test files', async () => {
+    const dir = makeTmp('doctor-ctx-go-ignore-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'go.mod'), 'module myapp\n\ngo 1.24.0\n');
+    writeFileSync(join(dir, 'main.go'), 'package main\n\nfunc main() { app.HTTP("real", h) }\n');
+    writeFileSync(join(dir, 'main_test.go'), 'package main\n\nfunc TestX(t *testing.T) { app.HTTP("fromTest", h) }\n');
+    const vendorDir = join(dir, 'vendor', 'example.com', 'dep');
+    mkdirSync(vendorDir, { recursive: true });
+    writeFileSync(join(vendorDir, 'dep.go'), 'package dep\n\nfunc f() { app.HTTP("fromVendor", h) }\n');
+    const ctx = await loadProjectContext(dir);
+    expect(ctx.functions.map(f => f.name)).toEqual(['real']);
+  });
+
+  it('does not run Go discovery for non-Go projects', async () => {
+    const dir = makeTmp('doctor-ctx-go-notgo-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'requirements.txt'), 'azure-functions\n');
+    writeFileSync(join(dir, 'notes.go'), 'package main\n\nfunc main() { app.HTTP("ghost", h) }\n');
+    const ctx = await loadProjectContext(dir);
+    expect(ctx.language).toBe('python');
+    expect(ctx.functions).toHaveLength(0);
   });
 
   it('handles malformed host.json gracefully', async () => {

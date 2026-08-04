@@ -2,7 +2,7 @@
  * Load project context by reading workspace files.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, relative, sep } from 'node:path';
 import type { FunctionInfo, ProjectContext, ProjectLanguage } from './types.js';
 import { discoverPythonV2Functions } from './python-source.js';
 
@@ -43,6 +43,10 @@ function detectLanguage(
   localSettings: Record<string, unknown> | null,
   hasPythonV2: boolean,
 ): ProjectLanguage {
+  // go.mod is checked first: a Go Functions project may also carry a package.json
+  // or worker runtime setting for unrelated tooling.
+  if (existsSync(join(dir, 'go.mod'))) return 'go';
+
   const explicitRuntime = localWorkerRuntime(localSettings);
   const knownRuntimes: ReadonlySet<ProjectLanguage> = new Set([
     'node', 'python', 'dotnet', 'java', 'powershell',
@@ -126,6 +130,89 @@ function discoverV4Functions(dir: string): FunctionInfo[] {
   return functions;
 }
 
+/**
+ * Go worker registration methods mapped to their Azure Functions trigger type.
+ * Mirrors the `app.*` surface of github.com/azure/azure-functions-golang-worker.
+ */
+const GO_TRIGGER_METHODS: Record<string, string> = {
+  HTTP: 'httpTrigger',
+  Timer: 'timerTrigger',
+  CosmosDB: 'cosmosDBTrigger',
+  SQL: 'sqlTrigger',
+  EventGrid: 'eventGridTrigger',
+  Queue: 'queueTrigger',
+  EventHub: 'eventHubTrigger',
+  ServiceBusQueue: 'serviceBusTrigger',
+  ServiceBusTopic: 'serviceBusTrigger',
+  Blob: 'blobTrigger',
+};
+
+const GO_REGISTRATION_RE = new RegExp(
+  String.raw`\.(${Object.keys(GO_TRIGGER_METHODS).join('|')})\s*\(\s*"([^"\r\n]+)"`,
+  'g',
+);
+
+/** Directories that never contain first-party function registrations. */
+const GO_SKIP_DIRS = new Set(['vendor', 'testdata', 'node_modules', 'bin', 'obj']);
+
+function collectGoSourceFiles(dir: string, out: string[], depth = 0): void {
+  if (depth > 6) return;
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue;
+    if (entry.isDirectory()) {
+      if (GO_SKIP_DIRS.has(entry.name)) continue;
+      collectGoSourceFiles(join(dir, entry.name), out, depth + 1);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    if (!entry.name.endsWith('.go')) continue;
+    if (entry.name.endsWith('_test.go')) continue;
+    out.push(join(dir, entry.name));
+  }
+}
+
+/**
+ * Discover functions in a Go project.
+ *
+ * The Go worker indexes functions from code, so there is no function.json to read.
+ * Registrations look like `app.HTTP("name", handler, ...)`; the receiver is matched
+ * loosely because projects are free to name the `*sdk.App` variable however they like.
+ */
+function discoverGoFunctions(dir: string): FunctionInfo[] {
+  const files: string[] = [];
+  collectGoSourceFiles(dir, files);
+
+  const byName = new Map<string, FunctionInfo>();
+  for (const file of files) {
+    let content: string;
+    try {
+      content = readFileSync(file, 'utf-8');
+    } catch {
+      continue;
+    }
+    GO_REGISTRATION_RE.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = GO_REGISTRATION_RE.exec(content)) !== null) {
+      const triggerType = GO_TRIGGER_METHODS[match[1]];
+      const name = match[2];
+      if (!triggerType || byName.has(name)) continue;
+      byName.set(name, {
+        name,
+        triggerType,
+        bindingTypes: [triggerType],
+        entryPoint: relative(dir, file).split(sep).join('/'),
+      });
+    }
+  }
+  return [...byName.values()];
+}
+
 export async function loadProjectContext(dir: string): Promise<ProjectContext> {
   const hostJson = readJson(join(dir, 'host.json'));
   const localSettings = readJson(join(dir, 'local.settings.json'));
@@ -135,11 +222,13 @@ export async function loadProjectContext(dir: string): Promise<ProjectContext> {
 
   const v1Functions = discoverV3Functions(dir);
   const nodeV4Functions = language === 'node' ? discoverV4Functions(dir) : [];
-  const functions = language === 'python'
-    ? [...v1Functions, ...pythonV2.functions]
-    : nodeV4Functions.length > 0
-      ? nodeV4Functions
-      : v1Functions;
+  const functions = language === 'go'
+    ? discoverGoFunctions(dir)
+    : language === 'python'
+      ? [...v1Functions, ...pythonV2.functions]
+      : nodeV4Functions.length > 0
+        ? nodeV4Functions
+        : v1Functions;
   const python = language === 'python'
     ? {
         programmingModel: v1Functions.length > 0 && pythonV2.hasV2Application

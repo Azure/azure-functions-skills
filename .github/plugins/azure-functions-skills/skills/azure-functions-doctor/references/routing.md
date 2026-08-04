@@ -16,6 +16,7 @@ Use this file first. Load only the reference files needed for the current projec
 | `language:python` | `language-checks.md` | Python Functions project |
 | `language:java` | `language-checks.md` | Java Functions project |
 | `language:powershell` | `language-checks.md` | PowerShell Functions project |
+| `language:go` | `language-checks.md` | Go Functions project (`go.mod` present, or `FUNCTIONS_WORKER_RUNTIME=native` with a Go signal) |
 | `ci` | `ci-usage.md` | GitHub Actions or CLI execution guidance is needed |
 
 ## Loading rules

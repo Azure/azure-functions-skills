@@ -37,6 +37,24 @@ describe('buildStartupPrompt', () => {
     expect(prompt).toContain('Functions project detected');
   });
 
+  it('reports go as the language for a Go project', async () => {
+    const dir = resetDir(join(DIST_DIR, 'go-project'));
+    writeFileSync(join(dir, 'host.json'), '{"version":"2.0"}');
+    writeFileSync(join(dir, 'go.mod'), 'module myapp\n\ngo 1.24.0\n');
+
+    const prompt = await buildStartupPrompt(dir);
+    expect(prompt).toContain('Functions project detected (go)');
+  });
+
+  it('reports dotnet as the language for a project containing a csproj', async () => {
+    const dir = resetDir(join(DIST_DIR, 'dotnet-project'));
+    writeFileSync(join(dir, 'host.json'), '{"version":"2.0"}');
+    writeFileSync(join(dir, 'MyFunc.csproj'), '<Project></Project>');
+
+    const prompt = await buildStartupPrompt(dir);
+    expect(prompt).toContain('Functions project detected (dotnet)');
+  });
+
   it('includes suggested actions for new project', async () => {
     const dir = resetDir(join(DIST_DIR, 'empty-dir'));
 

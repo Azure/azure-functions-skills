@@ -69,6 +69,7 @@ pre-deployment doctor では、チェックを検出可能性で分ける必要�
 | .NET | `.csproj` TargetFramework, Worker SDK, Azure CLI runtime metadata | unsupported TFM / SDK combination | in-process migration advisory |
 | Java | `pom.xml` / Gradle Java version, Azure CLI runtime metadata | unsupported Java version | nearing EOL |
 | PowerShell | `requirements.psd1`, app settings, Azure CLI runtime metadata | unsupported PowerShell version | preview / nearing EOL |
+| Go | `go.mod` の `go` directive, worker module version, app settings | worker の最小要件を下回る `go` directive | `go` directive なし、worker が untagged な pseudo-version に pin されている |
 
 ---
 
@@ -255,6 +256,30 @@ Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=Enable
 | `PS-002` | `profile.ps1` startup cost | — | slow or blocking work at startup | Source-only / AI | script analysis |
 | `PS-003` | module installation in invocation | — | `Install-Module` in function path | Source-only | pattern matching |
 
+### 10.6 Go
+
+Go サポートは preview である。所見を報告する際はその前提を明示すること。
+
+| ID | チェック | Fail | Warning | スコープ | 検出方法 |
+|----|---------|------|---------|----------|----------|
+| `GO-001` | goroutine panic safety | — | panic を error として伝搬しない goroutine の起動 | AI | code analysis |
+| `GO-002` | worker module pinning | — | worker module が `main` または untagged pseudo-version を参照 | Source-only | `go.mod` |
+| `GO-003` | client reuse | — | package スコープではなく invocation 毎に client を生成 | Source-only / AI | pattern matching |
+| `GO-004` | worker runtime value | native worker が受け付けない `FUNCTIONS_WORKER_RUNTIME` | 推定可能だが設定がない | Source-only | `local.settings.json`, app settings |
+| `GO-005` | indexing model conflict | worker-indexed な Go project に `function.json` が存在 | registration 名/route の不一致 | Source-only | file existence + `app.*` registrations |
+| `GO-006` | extension activation | — | extension trigger を blank import なしで登録 | Source-only | imports + registrations |
+| `GO-007` | context propagation | — | `context.Context` を無視、またはキャンセル不可 | AI | code analysis |
+| `GO-008` | startup cost | — | `init()` や `worker.Start` 前のブロッキング処理 | AI | code analysis |
+| `GO-009` | toolchain version | worker の最小要件を下回る `go` directive | `go` directive なし | Source-only | `go.mod` |
+| `GO-010` | unsupported feature | Go project 内の Durable trigger/binding または input/output binding | preview で support 外の trigger | Source-only | registrations + `host.json` |
+
+補足:
+
+- `GO-001` が Go で最も重要なチェックである。任意の goroutine で回復されない panic が発生すると process 全体が終了し、worker は複数 invocation を同時に抱えるため、その worker 上の全 in-flight request が失敗する。handler 内の panic は worker が既に回復するので報告しないこと。
+- `GO-004`: Go app は `FUNCTIONS_WORKER_RUNTIME=native` を使う。`go` も `golang` も誤設定であり、修正は `native` 。
+- `GO-010`: Go worker は trigger のみを support する。input/output binding は存在せず、preview 中は Durable Functions も support 外。
+- `DP-003`（entry point resolution）は適用外。Go はコンパイル済み binary を deploy し、コードから index するため script file も `function.json` も存在しない。
+
 ---
 
 ## 実装ティア
@@ -281,7 +306,8 @@ Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=Enable
 | `node-version` | `RT-003` | `package.json` / runtime metadata による Node.js version |
 | `python-version` | `RT-003` | local settings / runtime metadata による Python version |
 | `dotnet-version` | `RT-003` | runtime metadata 上の .NET supported versions |
-| `local-settings` | `AS-001` | `local.settings.json` と `FUNCTIONS_WORKER_RUNTIME` |
+| `go-version` | `RT-003`, `GO-009`, `GO-002` | `go.mod` の `go` directive による Go toolchain 最小要件と untagged な worker module pin |
+| `local-settings` | `AS-001`, `GO-004` | `local.settings.json` と `FUNCTIONS_WORKER_RUNTIME`（Go が使う `native` 値を含む） |
 | `connection-strings` | `AS-002`, `ST-001` | non-HTTP trigger の host storage setting presence |
 | `deprecated-settings` | `AS-003` | deprecated app settings |
 | `function-bindings` | `DP-002` | unknown trigger type |

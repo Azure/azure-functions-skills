@@ -39,7 +39,7 @@ export interface FunctionInfo {
 
 // ── Project context collected before running checks ──
 
-export type ProjectLanguage = 'node' | 'python' | 'dotnet' | 'java' | 'powershell' | 'unknown';
+export type ProjectLanguage = 'node' | 'python' | 'dotnet' | 'java' | 'powershell' | 'go' | 'unknown';
 export type PythonProgrammingModel = 'v1' | 'v2' | 'mixed' | 'unknown';
 
 export interface PythonProjectInfo {

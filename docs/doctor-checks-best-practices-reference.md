@@ -69,6 +69,7 @@ Do not hardcode a language version table. Doctor should prefer Azure CLI (`az fu
 | .NET | `.csproj` TargetFramework, Worker SDK, Azure CLI runtime metadata | Unsupported TFM / SDK combination | In-process migration advisory |
 | Java | `pom.xml` / Gradle Java version, Azure CLI runtime metadata | Unsupported Java version | Nearing EOL |
 | PowerShell | `requirements.psd1`, app settings, Azure CLI runtime metadata | Unsupported PowerShell version | Preview / nearing EOL |
+| Go | `go.mod` `go` directive, worker module version, app settings | `go` directive below the worker minimum | No `go` directive, worker pinned to an untagged pseudo-version |
 
 ---
 
@@ -255,6 +256,30 @@ Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=Enable
 | `PS-002` | `profile.ps1` startup cost | - | Slow or blocking work at startup | Source-only / AI | script analysis |
 | `PS-003` | module installation in invocation | - | `Install-Module` in function path | Source-only | pattern matching |
 
+### 10.6 Go
+
+Go support is in preview. Report findings with that framing.
+
+| ID | Check | Fail | Warning | Scope | Detection |
+|----|-------|------|---------|-------|-----------|
+| `GO-001` | goroutine panic safety | - | Goroutine started without propagating panics as errors | AI | code analysis |
+| `GO-002` | worker module pinning | - | Worker module tracks `main` or an untagged pseudo-version | Source-only | `go.mod` |
+| `GO-003` | client reuse | - | Client constructed per invocation instead of at package scope | Source-only / AI | pattern matching |
+| `GO-004` | worker runtime value | `FUNCTIONS_WORKER_RUNTIME` not accepted by the native worker | Setting absent where inferable | Source-only | `local.settings.json`, app settings |
+| `GO-005` | indexing model conflict | `function.json` present in a worker-indexed Go project | Registration name/route mismatch | Source-only | file existence + `app.*` registrations |
+| `GO-006` | extension activation | - | Extension trigger registered without its blank import | Source-only | imports + registrations |
+| `GO-007` | context propagation | - | `context.Context` ignored or work not cancellable | AI | code analysis |
+| `GO-008` | startup cost | - | Blocking work in `init()` or before `worker.Start` | AI | code analysis |
+| `GO-009` | toolchain version | `go` directive below the worker minimum | No `go` directive | Source-only | `go.mod` |
+| `GO-010` | unsupported feature | Durable trigger/binding, or an input/output binding, in a Go project | Trigger outside the supported preview set | Source-only | registrations + `host.json` |
+
+Notes:
+
+- `GO-001` is the highest-value Go check. An unrecovered panic in any goroutine terminates the process, and the worker hosts concurrent invocations, so one panicking goroutine fails every in-flight request on that worker. Panics inside the handler itself are already recovered by the worker; do not flag those.
+- `GO-004`: Go apps use `FUNCTIONS_WORKER_RUNTIME=native`. Both `go` and `golang` are misconfigurations, and the fix is `native`.
+- `GO-010`: the Go worker supports triggers only. There are no input or output bindings, and Durable Functions is unsupported during preview.
+- `DP-003` (entry point resolution) does not apply. Go deploys a compiled binary and indexes from code, so there is no script file or `function.json`.
+
 ---
 
 ## Implementation tiers
@@ -281,7 +306,8 @@ Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=Enable
 | `node-version` | `RT-003` | Node.js version from `package.json` / runtime metadata |
 | `python-version` | `RT-003` | Python version from local settings / runtime metadata |
 | `dotnet-version` | `RT-003` | .NET supported versions from runtime metadata |
-| `local-settings` | `AS-001` | `local.settings.json` and `FUNCTIONS_WORKER_RUNTIME` |
+| `go-version` | `RT-003`, `GO-009`, `GO-002` | Go toolchain minimum from the `go.mod` `go` directive, plus untagged worker module pins |
+| `local-settings` | `AS-001`, `GO-004` | `local.settings.json` and `FUNCTIONS_WORKER_RUNTIME`, including the `native` value used by Go |
 | `connection-strings` | `AS-002`, `ST-001` | Host storage setting presence for non-HTTP triggers |
 | `deprecated-settings` | `AS-003` | Deprecated app settings |
 | `function-bindings` | `DP-002` | Unknown trigger types |

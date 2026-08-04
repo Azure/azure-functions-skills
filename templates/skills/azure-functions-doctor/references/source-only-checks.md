@@ -48,3 +48,7 @@ These checks can run without LLM semantics and without Azure resource access. Th
 - Prefer Fail only for startup blockers, unsupported configurations, parse errors, and confirmed secrets.
 - Treat native Python dependency detection as compatibility information, not
   evidence of a vulnerable or malicious package.
+- `AS-001` valid `FUNCTIONS_WORKER_RUNTIME` values include `native`, which is what Go apps use. Do not report `native` as invalid. `go` and `golang` are misconfigurations in a Go project, and the fix is `native`.
+- `DP-003` does not apply to Go. Go deploys a compiled binary and indexes functions from code, so there is no configured entry point file to resolve and no `function.json` to read. A `function.json` in a Go project is itself the finding.
+- `DP-002` binding inventory in a Go project only ever contains triggers. The Go worker has no input or output bindings.
+- The extension bundle range is commonly written with a wildcard, `[4.*, 5.0.0)`. That is the documented form and must not be reported as outdated.
