@@ -16,6 +16,7 @@ import { loadProjectContext } from './context.js';
 import { resolveStacks } from './stacks.js';
 import { buildDoctorPrompt, runAiAnalysis, mergeReports } from './ai-analysis.js';
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 const SEVERITY_ORDER: CheckSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
@@ -67,7 +68,7 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
   const ctx = await loadProjectContext(options.dir);
 
   // Resolve stacks from API / cache / fallback
-  const cacheDir = join(options.dir, '.azure-functions-skills');
+  const cacheDir = join(options.dir, '.azure-functions-doctor');
   ctx.stacks = await resolveStacks({
     cacheDir,
     offline: process.env.AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE === '1',
@@ -118,7 +119,7 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
         },
       };
     } else {
-      const resolvedAgent = await resolveDeepAgent(options.dir, options.agent);
+      const resolvedAgent = options.agent;
       if (!resolvedAgent) {
         report = {
           ...report,
@@ -127,7 +128,7 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
             ai: {
               ran: false,
               checks: [],
-              error: 'AI analysis skipped: no agent specified and none installed in workspace state. Pass --agent github-copilot|claude-code|codex.',
+              error: 'AI analysis skipped: --agent is required. Pass --agent github-copilot|claude-code|codex.',
             },
           },
         };
@@ -146,11 +147,11 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
         };
       } else {
         // Ensure skill files are installed so the agent has context
-        await ensureSkillsInstalled(options.dir, resolvedAgent, options.installMode);
+        await ensureSkillsInstalled(options.dir, resolvedAgent);
 
         const reportPath = join(
           options.dir,
-          '.azure-functions-skills',
+          '.azure-functions-doctor',
           'doctor-ai-findings.json',
         );
         const prompt = buildDoctorPrompt(results, reportPath);
@@ -197,72 +198,16 @@ async function executeChecks(
 }
 
 /**
- * Ensure skill/agent workspace files are installed before deep analysis.
- * Checks install state; if no agent is installed, runs the install flow.
- *
- * Default: local workspace install (applySetup) — safe for CI and ephemeral environments.
- * With installMode 'plugin': plugin registration + workspace activation.
+ * Ensure workspace-local skills are available before deep analysis.
  */
-async function ensureSkillsInstalled(dir: string, agentLauncher: string, installMode: 'local' | 'plugin' = 'local'): Promise<void> {
-  const { readState, getInstalledTargets, recordInstallState } = await import('../setup/state.js');
-
+async function ensureSkillsInstalled(dir: string, agentLauncher: string): Promise<void> {
   const target = launcherToTarget(agentLauncher);
-
-  const state = readState(dir);
-  if (state) {
-    const installed = getInstalledTargets(state);
-    // Check that this specific target is installed, not just any target
-    if (installed.includes(target)) return;
-  }
-
-  let effectiveMode: 'local' | 'plugin' = installMode;
-  const includeAgent = target === 'ghcp';
-
-  if (installMode === 'plugin') {
-    // Plugin registration + workspace activation (developer machine)
-    try {
-      const { runPluginOperation } = await import('../setup/plugin-install.js');
-      const { applyWorkspace } = await import('../setup/workspace.js');
-
-      await runPluginOperation({
-        action: 'install',
-        agents: [target],
-        projectDir: dir,
-        workspace: false,
-        yes: true,
-      });
-
-      await applyWorkspace(dir, {
-        agents: [target],
-        mode: 'plugin-reference',
-        yes: true,
-        includeMcp: true,
-        includeHooks: true,
-        includeAgent,
-      });
-    } catch (err) {
-      // Fall back to local install if plugin CLI is unavailable
-      console.error(buildPluginFallbackWarning((err as Error).message));
-      effectiveMode = 'local';
-      const { applySetup } = await import('../setup/index.js');
-      await applySetup(dir, { agents: [target], prerequisites: 'skip' });
-    }
-  } else {
-    // Local workspace install (default — CI-safe)
-    const { applySetup } = await import('../setup/index.js');
-    await applySetup(dir, { agents: [target], prerequisites: 'skip' });
-  }
-
-  // Record state with the actual install mode used
-  recordInstallState(dir, {
-    action: 'install',
+  if (existsSync(localSkillRoot(dir, target))) return;
+  const { installLocalSkills } = await import('../setup/index.js');
+  await installLocalSkills({
+    targetDir: dir,
     agents: [target],
-    mode: effectiveMode,
-    source: 'doctor-auto',
-    scope: 'workspace',
-    includeMcp: effectiveMode === 'plugin',
-    includeHooks: effectiveMode === 'plugin',
-    includeAgent,
+    checkForUpdates: false,
   });
 }
 
@@ -275,26 +220,10 @@ function launcherToTarget(agent: string): BuildTargetName {
   }
 }
 
-function targetToLauncher(target: BuildTargetName): string {
-  switch (target) {
-    case 'ghcp': return 'github-copilot';
-    case 'claude': return 'claude-code';
-    case 'codex': return 'codex';
-  }
-}
-
-/**
- * Resolve which launcher to use for deep analysis.
- * Priority: explicit --agent > first installed agent recorded in state > undefined.
- */
-async function resolveDeepAgent(dir: string, explicit?: string): Promise<string | undefined> {
-  if (explicit) return explicit;
-  const { readState, getInstalledTargets } = await import('../setup/state.js');
-  const state = readState(dir);
-  if (!state) return undefined;
-  const installed = getInstalledTargets(state);
-  if (installed.length === 0) return undefined;
-  return targetToLauncher(installed[0]);
+function localSkillRoot(dir: string, target: BuildTargetName): string {
+  if (target === 'ghcp') return join(dir, '.github', 'skills', 'azure-functions-doctor', 'SKILL.md');
+  if (target === 'claude') return join(dir, '.claude', 'skills', 'azure-functions-doctor', 'SKILL.md');
+  return join(dir, '.agents', 'skills', 'azure-functions-doctor', 'SKILL.md');
 }
 
 /**
@@ -322,12 +251,4 @@ export function isContributorPrContext(): boolean {
   if (process.env.BUILD_REASON === 'PullRequest') return true;
   if (process.env.CI_PIPELINE_SOURCE === 'merge_request_event') return true;
   return false;
-}
-
-/**
- * Build the warning shown when plugin install fails and we fall back to local install.
- * Must remain pure ASCII so it does not mojibake on Windows PowerShell stderr (cp932/cp1252).
- */
-export function buildPluginFallbackWarning(errMessage: string): string {
-  return `[WARN] Plugin install failed (${errMessage}), falling back to local install.`;
 }

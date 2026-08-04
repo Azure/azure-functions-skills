@@ -6,7 +6,7 @@ applyTo: "templates/**"
 
 ## Canonical Source
 
-- `templates/` is the single source of truth for all agents, skills, hooks, prompts, MCP, and routing definitions.
+- `templates/` is the single source of truth for skills, telemetry hooks, and MCP definitions.
 - Generated files under `.github/plugins/`, `.plugin/`, and `.claude-plugin/` are derived — never hand-edit them.
 
 ## Workflow

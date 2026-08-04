@@ -63,3 +63,4 @@ extends:
                   - template: /azure-pipelines/templates/build.yml@self
                     parameters:
                         IsPrerelease: ${{ parameters.IsPrerelease }}
+                        InjectTelemetryConnectionString: true

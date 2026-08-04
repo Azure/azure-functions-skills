@@ -21,7 +21,7 @@ Not allowed:
 
 - Real coding-agent tokens.
 - Azure login.
-- Live plugin installation against user accounts.
+- Host-managed plugin installation against user accounts.
 - Network operations that require secrets.
 
 ## Level 2: protected real-agent E2E
@@ -40,8 +40,7 @@ Requirements:
 
 Allowed:
 
-- Real GitHub Copilot CLI, Claude Code, and Codex execution when configured.
-- Plugin/setup/chat validation.
+- Workspace-local install and update validation for all three host layouts.
 - HTML artifact publishing.
 
 Not allowed:
@@ -79,8 +78,8 @@ Not allowed:
 ## Recommended rollout
 
 1. Add static scenario and schema tests.
-2. Add local real-agent setup/chat scenarios.
-3. Add plugin scenarios.
-4. Add protected workflow and publish HTML as artifact.
-5. Add README report link and badges after the report format stabilizes.
+2. Add workspace-local install and update scenarios.
+3. Add a protected workflow and publish HTML as an artifact.
+4. Add README report links and badges after the report format stabilizes.
+5. Keep host-managed plugin testing in each host tool's own integration suite.
 6. Add live Azure deploy/diagnostics scenarios last.

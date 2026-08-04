@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AgentDefinitions, HookDefinitions, McpServer, Skill } from '../types.js';
+import type { HookDefinitions, McpServer, Skill } from '../types.js';
 
 /**
  * Load all skills from the skills directory.
@@ -96,19 +96,9 @@ export function loadMcpServers(yamlPath: string): McpServer[] {
 }
 
 /**
- * Load agent definitions from the agents directory.
- */
-export function loadAgents(agentsDir: string): AgentDefinitions {
-  const agentsMd = readFileSync(join(agentsDir, 'AGENTS.md'), 'utf-8');
-  const copilot = readFileSync(join(agentsDir, 'functions-copilot.agent.md'), 'utf-8');
-  return { agentsMd, copilot };
-}
-
-/**
  * Load hooks from the hooks directory.
  */
 export function loadHooks(hooksDir: string): HookDefinitions {
-  const welcome = readFileSync(join(hooksDir, 'welcome-setup.md'), 'utf-8');
   const copilotTelemetry = readFileSync(join(hooksDir, 'copilot-hooks.json'), 'utf-8');
   const claudeTelemetry = readFileSync(join(hooksDir, 'hooks.json'), 'utf-8');
   const cursorTelemetry = readFileSync(join(hooksDir, 'cursor-hooks.json'), 'utf-8');
@@ -116,7 +106,6 @@ export function loadHooks(hooksDir: string): HookDefinitions {
   const trackTelemetryPowerShell = readFileSync(join(hooksDir, 'scripts', 'track-telemetry.ps1'), 'utf-8');
   const trackTelemetryShell = readFileSync(join(hooksDir, 'scripts', 'track-telemetry.sh'), 'utf-8');
   return {
-    welcome,
     copilotTelemetry,
     claudeTelemetry,
     cursorTelemetry,

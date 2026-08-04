@@ -2,7 +2,15 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
-import type { CommandRunner } from './prerequisites/types.js';
+export interface CommandResult {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+export interface CommandRunner {
+  (command: string, args: string[], options?: { cwd?: string }): Promise<CommandResult>;
+}
 
 export type PackageUpdateStatus = 'current' | 'update-available' | 'check-failed' | 'disabled';
 

@@ -45,7 +45,7 @@ function defaultOpts(dir: string, overrides?: Partial<DoctorOptions>): DoctorOpt
     deep: false,
     timeout: 300,
     format: 'text',
-    output: join(dir, '.azure-functions-skills', 'doctor-report.json'),
+    output: join(dir, '.azure-functions-doctor', 'doctor-report.json'),
     severity: 'high',
     ...overrides,
   };

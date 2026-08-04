@@ -2,7 +2,7 @@
 
 > **Looking to contribute?** Start with [CONTRIBUTING.md](../CONTRIBUTING.md). This page is the deeper reference for internal build/test/release commands.
 
-This repository keeps canonical agent, skill, hook, prompt, and MCP content under `templates/`. Generated plugin payloads and marketplace manifests are committed so users can install the current repository state without rebuilding locally.
+This repository keeps canonical skill, telemetry hook, and MCP content under `templates/`. Generated plugin payloads and marketplace manifests are committed so users can install the current repository state without rebuilding locally.
 
 ## Prerequisites
 
@@ -29,20 +29,18 @@ npm run check
 ## Key Directories
 
 ```text
-templates/   Canonical agents, skills, hooks, prompts, and MCP definitions
+templates/   Canonical skills, telemetry hooks, and MCP definitions
 src/         TypeScript CLI and build system
-tests/       Vitest coverage for build, setup, chat, validation, and release helpers
+tests/       Vitest coverage for build, local install, validation, and release helpers
 .github/plugins/azure-functions-skills/  Generated plugin payload
 ```
 
 ## Update Templates And Plugin Payloads
 
 1. Edit the canonical source under `templates/`:
-   - `templates/agents/` for agent definitions.
    - `templates/skills/` for skill content, references, and scripts.
-   - `templates/hooks/` for hook payloads.
+   - `templates/hooks/` for telemetry hook payloads.
    - `templates/mcp/servers.yaml` for MCP server definitions.
-   - `templates/prompts/` for chat startup prompt content.
 2. Run validation while iterating:
 
    ```bash
@@ -81,17 +79,9 @@ npm run build
 Install workspace-local files into a temporary project:
 
 ```bash
-node bin/azure-functions-skills.js setup --agent ghcp --dir ../tmp-functions-app --skip-prerequisites
-node bin/azure-functions-skills.js setup --agent claude --dir ../tmp-functions-app --skip-prerequisites
-node bin/azure-functions-skills.js setup --agent codex --dir ../tmp-functions-app --skip-prerequisites
-```
-
-Launch a target CLI through the chat command:
-
-```bash
-node bin/azure-functions-skills.js chat --agent github-copilot --dir ../tmp-functions-app --skip-prerequisites -- -p "List the Azure Functions skills you can see."
-node bin/azure-functions-skills.js chat --agent claude-code --dir ../tmp-functions-app --skip-prerequisites --prompt "List the Azure Functions skills you can see." -- -p --output-format text --no-session-persistence
-node bin/azure-functions-skills.js chat --agent codex --dir ../tmp-functions-app --skip-prerequisites --prompt "List the Azure Functions skills you can see." -- exec --sandbox read-only --json --skip-git-repo-check --cd .
+node bin/azure-functions-skills.js install --local --agent ghcp --dir ../tmp-functions-app
+node bin/azure-functions-skills.js install --local --agent claude --dir ../tmp-functions-app
+node bin/azure-functions-skills.js install --local --agent codex --dir ../tmp-functions-app
 ```
 
 ## Release CLI Package

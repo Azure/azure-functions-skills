@@ -132,7 +132,7 @@ describe('Doctor types', () => {
       deep: false,
       timeout: 300,
       format: 'text',
-      output: '.azure-functions-skills/doctor-report.json',
+      output: '.azure-functions-doctor/doctor-report.json',
       severity: 'high',
     };
     expect(opts.deep).toBe(false);

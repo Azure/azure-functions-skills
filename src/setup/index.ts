@@ -1,187 +1,211 @@
-/**
- * Setup module — detects coding agents and applies Azure Functions skill files.
- * Usable as CLI (`npx @azure/functions-skills setup`) or library (VS Code extension).
- */
-
-import { existsSync, mkdirSync, cpSync, readdirSync, rmSync, mkdtempSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { loadSkills, loadMcpServers, loadAgents, loadHooks } from '../build/loader.js';
 import { buildTarget } from '../build/build-target.js';
-import { ensurePrerequisites } from './prerequisites/index.js';
-import type { BuildData, CliAgentName, SetupOptions, SetupResult } from '../types.js';
+import { loadHooks, loadMcpServers, loadSkills } from '../build/loader.js';
+import { checkPackageUpdate, type CommandRunner, type PackageUpdateInfo } from './package-update.js';
+import {
+  prepareWorkspaceFile,
+  resolveTelemetryEnabled,
+  setTelemetryEnabled,
+  telemetryConfigPath,
+} from './workspace-assets.js';
+import type { BuildData, CliAgentName } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
 
-/**
- * Detect which coding agents are available in the environment.
- * Returns an array of agent identifiers: 'ghcp', 'claude', 'codex'.
- */
-export async function detectAgents(): Promise<CliAgentName[]> {
-  const agents: CliAgentName[] = [];
-
-  // IDE detection (file-based)
-  if (existsSync('.vscode') || process.env.VSCODE_PID) {
-    agents.push('ghcp');
-  }
-
-  // CLI binary detection
-  const checks: Array<{ name: CliAgentName; cmd: string }> = [
-    { name: 'claude', cmd: process.platform === 'win32' ? 'where claude' : 'which claude' },
-    { name: 'codex', cmd: process.platform === 'win32' ? 'where codex' : 'which codex' },
-  ];
-
-  for (const { name, cmd } of checks) {
-    try {
-      execSync(cmd, { stdio: 'ignore' });
-      agents.push(name);
-    } catch {
-      // not installed
-    }
-  }
-
-  // Cursor detection
-  if (existsSync('.cursor')) {
-    agents.push('ghcp'); // Cursor uses GHCP-compatible format
-  }
-
-  // If nothing detected, default to ghcp (most common)
-  if (agents.length === 0) {
-    agents.push('ghcp');
-  }
-
-  return [...new Set(agents)];
+export interface LocalInstallOptions {
+  readonly targetDir: string;
+  readonly agents?: CliAgentName[];
+  readonly dryRun?: boolean;
+  readonly telemetryEnabled?: boolean;
+  readonly checkForUpdates?: boolean;
+  readonly runner?: CommandRunner;
 }
 
-/**
- * Apply Azure Functions skill setup to a target directory.
- *
- * @param {string} targetDir - Directory to write files to
- * @param {object} options
- * @param {string[]} options.agents - Agent identifiers to set up for
- * @returns {object} Summary with agents, filesWritten, welcomeMessage
- */
-export async function applySetup(targetDir: string, options: SetupOptions = {}): Promise<SetupResult> {
-  const agents = options.agents || await detectAgents();
-  const prerequisiteMode = options.prerequisites || 'auto';
+export interface LocalInstallResult {
+  readonly agents: CliAgentName[];
+  readonly filesWritten: number;
+  readonly plannedFiles: string[];
+  readonly dryRun: boolean;
+  readonly packageUpdate: PackageUpdateInfo;
+}
 
-  // Load canonical sources
-  const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
-  const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-  const agentDefs = loadAgents(join(TEMPLATES_DIR, 'agents'));
-  const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
-  const data: BuildData = { skills, mcpServers, agents: agentDefs, hooks };
-
-  // Build each target to a temp location, then copy to targetDir
-  const tmpDir = mkdtempSync(join(tmpdir(), 'af-skills-tmp-'));
-  let totalFiles = 0;
-
-  try {
-    for (const agent of agents) {
-      mkdirSync(tmpDir, { recursive: true });
-      buildTarget(agent, data, tmpDir);
-
-      // Copy workspace files from tmpDir/<agent>/ to targetDir/.
-      // buildTarget also emits plugin package artifacts under the same target
-      // directory; those are useful for release packaging but would duplicate
-      // workspace skills/agents when installed directly into a project.
-      const agentDir = join(tmpDir, agent);
-      totalFiles += copyWorkspaceFiles(agentDir, targetDir, agent);
-    }
-  } finally {
-    // Cleanup temp dir (in OS temp, no lock issues)
+export async function detectAgents(): Promise<CliAgentName[]> {
+  const agents: CliAgentName[] = [];
+  if (existsSync('.vscode') || process.env.VSCODE_PID || existsSync('.cursor')) agents.push('ghcp');
+  for (const [name, command] of [
+    ['claude', process.platform === 'win32' ? 'where claude' : 'which claude'],
+    ['codex', process.platform === 'win32' ? 'where codex' : 'which codex'],
+  ] as const) {
     try {
-      if (existsSync(tmpDir)) {
-        rmSync(tmpDir, { recursive: true, force: true });
-      }
+      execSync(command, { stdio: 'ignore' });
+      agents.push(name);
     } catch {
-      // Best-effort cleanup — OS temp dir will be cleaned eventually
+      // The agent is not installed.
     }
   }
+  return agents.length > 0 ? [...new Set(agents)] : ['ghcp'];
+}
 
-  const prerequisiteResults = await ensurePrerequisites({
-    targets: agents,
-    projectDir: targetDir,
-    mode: prerequisiteMode,
-    runner: options.prerequisiteRunner,
+export async function installLocalSkills(options: LocalInstallOptions): Promise<LocalInstallResult> {
+  const agents = options.agents || ['ghcp'];
+  const packageUpdate = await checkPackageUpdate({
+    enabled: options.checkForUpdates !== false,
+    runner: options.runner,
   });
+  const stagingRoot = mkdtempSync(join(tmpdir(), 'azure-functions-skills-'));
+  const plannedFiles: string[] = [];
+  let filesWritten = 0;
 
-  const skillLines = skills.map(skill => `    • ${skill.id} — ${skill.title}`);
-  const prerequisiteLines = formatPrerequisiteLines(prerequisiteResults);
-  const welcomeMessage = [
-    '',
-    '⚡ Azure Functions Skills installed!',
-    '',
-    `  Agents configured: ${agents.join(', ')}`,
-    `  Files written: ${totalFiles}`,
-    '',
-    '  Skills available:',
-    ...skillLines,
-    '',
-    '  External prerequisites:',
-    ...prerequisiteLines,
-    '',
-    '  Get started: Ask your AI assistant to "set up Azure Functions"',
-    '',
-  ].join('\n');
+  try {
+    const data = loadBuildData();
+    const telemetryEnabled = resolveTelemetryEnabled(options.targetDir, options.telemetryEnabled);
+    for (const agent of agents) {
+      buildTarget(agent, data, stagingRoot);
+      const agentRoot = join(stagingRoot, agent);
+      if (telemetryEnabled !== undefined) {
+        setTelemetryEnabled(telemetryConfigPath(agentRoot, agent), telemetryEnabled);
+      }
+      prepareWorkspaceTree(agentRoot, options.targetDir);
+      plannedFiles.push(...listFiles(agentRoot));
+    }
+    if (!options.dryRun) {
+      for (const agent of agents) {
+        const agentRoot = join(stagingRoot, agent);
+        removeManagedAssets(options.targetDir, agent, data.skills.map(skill => skill.id));
+        filesWritten += copyTree(agentRoot, options.targetDir);
+      }
+    }
+  } finally {
+    rmSync(stagingRoot, { recursive: true, force: true });
+  }
 
   return {
     agents,
-    filesWritten: totalFiles,
-    welcomeMessage,
-    prerequisites: prerequisiteResults,
+    filesWritten,
+    plannedFiles: [...new Set(plannedFiles)].sort(),
+    dryRun: options.dryRun === true,
+    packageUpdate,
   };
 }
 
-function formatPrerequisiteLines(results: SetupResult['prerequisites']): string[] {
-  if (!results || results.length === 0) return ['    • none'];
-  return results.map(result => `    • ${result.id} (${result.target}) — ${result.status}: ${result.message}`);
+function loadBuildData(): BuildData {
+  return {
+    skills: loadSkills(join(TEMPLATES_DIR, 'skills')),
+    mcpServers: loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')),
+    hooks: loadHooks(join(TEMPLATES_DIR, 'hooks')),
+  };
 }
 
-function copyWorkspaceFiles(src: string, dest: string, agent: CliAgentName): number {
-  return copyRecursive(src, dest, relativePath => !isPluginOnlyArtifact(agent, relativePath));
+function removeManagedAssets(targetDir: string, agent: CliAgentName, skillIds: string[]): void {
+  removeLegacyAssets(targetDir, agent);
+  const skillsRoot = join(targetDir, agent === 'ghcp' ? '.github' : agent === 'claude' ? '.claude' : '.agents', 'skills');
+  for (const skillId of skillIds) {
+    rmSync(join(skillsRoot, skillId), { recursive: true, force: true });
+  }
+
+  for (const path of managedTelemetryPaths(agent)) {
+    rmSync(join(targetDir, path), { recursive: true, force: true });
+  }
 }
 
-function isPluginOnlyArtifact(agent: CliAgentName, relativePath: string): boolean {
-  const [topLevel, secondLevel] = relativePath.split(/[\\/]/);
-
+function removeLegacyAssets(targetDir: string, agent: CliAgentName): void {
+  rmSync(join(targetDir, '.azure-functions-skills'), { recursive: true, force: true });
   if (agent === 'ghcp') {
-    return ['plugin.json', 'skills', 'agents', 'hooks.json'].includes(topLevel);
+    rmSync(join(targetDir, '.github', 'agents', 'functions-copilot.agent.md'), { force: true });
+    rmSync(join(targetDir, '.github', 'hooks', 'welcome-setup.json'), { force: true });
   }
-
-  if (agent === 'codex') {
-    if (['.codex-plugin', 'skills', '.mcp.json'].includes(topLevel)) return true;
-    return topLevel === '.agents' && secondLevel === 'plugins';
-  }
-
-  return false;
+  removeLegacyInstructionBlock(
+    join(targetDir, agent === 'claude' ? 'CLAUDE.md' : 'AGENTS.md'),
+  );
 }
 
-/**
- * Copy all files from src to dest recursively.
- * Returns the number of files copied.
- */
-function copyRecursive(src: string, dest: string, shouldCopy: (relativePath: string) => boolean, relativePath = ''): number {
-  if (!existsSync(src)) return 0;
-  let count = 0;
+function removeLegacyInstructionBlock(path: string): void {
+  if (!existsSync(path)) return;
+  const content = readFileSync(path, 'utf-8');
+  const cleaned = content
+    .replace(/<!-- azure-functions-skills:start[^\n]* -->[\s\S]*?<!-- azure-functions-skills:end -->/g, '')
+    .trim();
+  if (cleaned.length === 0) {
+    rmSync(path, { force: true });
+  } else {
+    writeFileSync(path, `${cleaned}\n`);
+  }
+}
 
-  const entries = readdirSync(src, { withFileTypes: true });
-  for (const entry of entries) {
-    const srcPath = join(src, entry.name);
-    const destPath = join(dest, entry.name);
+function managedTelemetryPaths(agent: CliAgentName): string[] {
+  const telemetryFiles = [
+    'telemetry.config.json',
+    join('scripts', 'track-telemetry.ps1'),
+    join('scripts', 'track-telemetry.sh'),
+  ];
+  if (agent === 'ghcp') {
+    return [
+      join('.github', 'hooks', 'azure-functions-telemetry.json'),
+      ...telemetryFiles.map(path => join('.github', 'hooks', path)),
+    ];
+  }
+  if (agent === 'claude') {
+    return [
+      ...telemetryFiles.map(path => join('.claude', 'hooks', path)),
+    ];
+  }
+  return [
+    ...telemetryFiles.map(path => join('.codex', 'hooks', path)),
+  ];
+}
+
+function listFiles(root: string): string[] {
+  const files: string[] = [];
+  collectFiles(root, root, files);
+  return files;
+}
+
+function collectFiles(root: string, current: string, files: string[]): void {
+  for (const entry of readdirSync(current, { withFileTypes: true })) {
+    const fullPath = join(current, entry.name);
+    if (entry.isDirectory()) collectFiles(root, fullPath, files);
+    else if (entry.isFile()) files.push(relative(root, fullPath).replaceAll('\\', '/'));
+  }
+}
+
+function prepareWorkspaceTree(source: string, destination: string, relativePath = ''): void {
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const sourcePath = join(source, entry.name);
+    const destinationPath = join(destination, entry.name);
     const entryRelativePath = relativePath ? join(relativePath, entry.name) : entry.name;
-
-    if (!shouldCopy(entryRelativePath)) continue;
-
     if (entry.isDirectory()) {
-      mkdirSync(destPath, { recursive: true });
-      count += copyRecursive(srcPath, destPath, shouldCopy, entryRelativePath);
-    } else {
-      mkdirSync(dirname(destPath), { recursive: true });
-      cpSync(srcPath, destPath);
+      prepareWorkspaceTree(sourcePath, destinationPath, entryRelativePath);
+    } else if (entry.isFile()) {
+      prepareWorkspaceFile(entryRelativePath, destinationPath, sourcePath);
+    }
+  }
+}
+
+function copyTree(source: string, destination: string): number {
+  let count = 0;
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const sourcePath = join(source, entry.name);
+    const destinationPath = join(destination, entry.name);
+    if (entry.isDirectory()) {
+      mkdirSync(destinationPath, { recursive: true });
+      count += copyTree(sourcePath, destinationPath);
+    } else if (entry.isFile()) {
+      mkdirSync(dirname(destinationPath), { recursive: true });
+      cpSync(sourcePath, destinationPath, { force: true });
       count++;
     }
   }
@@ -189,14 +213,8 @@ function copyRecursive(src: string, dest: string, shouldCopy: (relativePath: str
 }
 
 export {
-  installLocalSkills,
-  type GitRepoResult,
-  type GitRepoResultStatus,
-  type LocalInstallOptions,
-  type LocalInstallResult,
-} from './local-install.js';
-export {
   checkPackageUpdate,
+  type CommandRunner,
   type PackageUpdateInfo,
   type PackageUpdateOptions,
   type PackageUpdateStatus,

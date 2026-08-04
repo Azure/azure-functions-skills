@@ -1,7 +1,8 @@
 {
   "name": "azure-functions-skills",
   "version": "0.0.5-preview",
-  "description": "Azure Functions skills for setup, create, and deploy workflows",
+  "description": "Azure Functions skills, MCP, and telemetry hooks",
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.json"
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./.mcp.json"
 }

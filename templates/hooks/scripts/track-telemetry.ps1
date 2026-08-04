@@ -1,5 +1,5 @@
 # Telemetry tracking hook for Azure Functions Skills
-# Reads hook JSON from stdin, tracks Azure Functions skill usage, and publishes via Azure MCP plugin telemetry.
+# Reads hook JSON from stdin and publishes sanitized Azure Functions skill usage.
 
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -8,70 +8,22 @@ if ($env:AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY -eq "false" -or $env:AZURE_MCP
     exit 0
 }
 
+$telemetryConfigPath = Join-Path $PSScriptRoot "..\telemetry.config.json"
+if (Test-Path $telemetryConfigPath) {
+    try {
+        $telemetryConfig = Get-Content -Raw -Path $telemetryConfigPath | ConvertFrom-Json
+        if ($telemetryConfig.enabled -eq $false) {
+            Write-Output '{"continue":true}'
+            exit 0
+        }
+    } catch {
+        # Continue with the default when an optional local preference cannot be read.
+    }
+}
+
 function Write-Success {
     Write-Output '{"continue":true}'
     exit 0
-}
-
-$PackageVersion = $null
-$InstallMode = "unknown"
-$InstallScope = "unknown"
-
-function Get-StatePath {
-    $scriptRelative = Join-Path $PSScriptRoot "..\..\state.local.json"
-    if (Test-Path $scriptRelative) {
-        return $scriptRelative
-    }
-
-    $cwdRelative = Join-Path (Get-Location) ".azure-functions-skills\state.local.json"
-    if (Test-Path $cwdRelative) {
-        return $cwdRelative
-    }
-
-    return $null
-}
-
-function Initialize-WorkspaceTelemetryState {
-    $statePath = Get-StatePath
-    if (-not $statePath) {
-        return
-    }
-
-    try {
-        $state = Get-Content -Raw -Path $statePath | ConvertFrom-Json
-        if ($state.telemetry -and $state.telemetry.enabled -eq $false) {
-            Write-Success
-        }
-        if ($state.package -and $state.package.version) {
-            $script:PackageVersion = $state.package.version
-        }
-        if ($state.install -and $state.install.mode) {
-            $script:InstallMode = $state.install.mode
-        }
-        if ($state.install -and $state.install.scope) {
-            $script:InstallScope = $state.install.scope
-        }
-    } catch {
-        return
-    }
-}
-
-function Set-AppInsightsEnvironment {
-    $configPath = Join-Path $PSScriptRoot "..\telemetry.config.json"
-    if (-not (Test-Path $configPath)) {
-        return
-    }
-
-    try {
-        $config = Get-Content -Raw -Path $configPath | ConvertFrom-Json
-        $instrumentationKey = $config.applicationInsightsInstrumentationKey
-        if ($instrumentationKey -and $instrumentationKey -ne "__APPLICATIONINSIGHTS_INSTRUMENTATION_KEY__") {
-            $env:APPLICATIONINSIGHTS_INSTRUMENTATION_KEY = $instrumentationKey
-            $env:APPINSIGHTS_INSTRUMENTATIONKEY = $instrumentationKey
-        }
-    } catch {
-        return
-    }
 }
 
 try {
@@ -83,8 +35,6 @@ try {
 if ([string]::IsNullOrWhiteSpace($rawInput)) {
     Write-Success
 }
-
-Initialize-WorkspaceTelemetryState
 
 try {
     $inputData = $rawInput | ConvertFrom-Json
@@ -240,29 +190,21 @@ if (-not $filePath -and -not $skillName) {
 }
 
 if ($shouldTrack) {
-    Set-AppInsightsEnvironment
-
-    $pluginVersion = $PackageVersion
-    if ($pluginVersion -and $InstallMode -ne "unknown" -and $InstallScope -ne "unknown") {
-        $pluginVersion = "$pluginVersion+$InstallMode.$InstallScope"
+    $event = [ordered]@{
+        timestamp = $timestamp
+        eventType = $eventType
+        clientName = $clientName
+        pluginName = "azure-functions-skills"
     }
-
-    $mcpArgs = @(
-        "server", "plugin-telemetry",
-        "--timestamp", $timestamp,
-        "--client-name", $clientName,
-        "--plugin-name", "azure-functions-skills"
-    )
-
-    if ($pluginVersion) { $mcpArgs += "--plugin-version"; $mcpArgs += $pluginVersion }
-    if ($eventType) { $mcpArgs += "--event-type"; $mcpArgs += $eventType }
-    if ($sessionId) { $mcpArgs += "--session-id"; $mcpArgs += $sessionId }
-    if ($skillName) { $mcpArgs += "--skill-name"; $mcpArgs += $skillName }
-    if ($azureToolName) { $mcpArgs += "--tool-name"; $mcpArgs += $azureToolName }
-    if ($filePath) { $mcpArgs += "--file-reference"; $mcpArgs += ($filePath -replace '/', '\') }
+    if ($sessionId) { $event.sessionId = $sessionId }
+    if ($skillName) { $event.skillName = $skillName }
+    if ($azureToolName) { $event.toolName = $azureToolName }
+    if ($filePath) { $event.fileReference = ($filePath -replace '/', '\') }
 
     try {
-        & npx -y @azure/mcp@latest @mcpArgs 2>&1 | Out-Null
+        $event | ConvertTo-Json -Compress |
+            & npx -y "@azure/functions-skills@latest" telemetry 2>&1 |
+            Out-Null
     } catch { }
 }
 
