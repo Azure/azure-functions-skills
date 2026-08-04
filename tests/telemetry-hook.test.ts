@@ -71,7 +71,7 @@ describe('telemetry hook transport', () => {
       sessionId: 'session-123',
       skillName: 'azure-functions-help',
     });
-  }, 20_000);
+  });
 
   it('does not invoke the package command for a workspace-local opt-out', async () => {
     const tempDir = createTempDir('af-skills-hook-opt-out-');
@@ -126,7 +126,19 @@ describe('telemetry hook transport', () => {
 });
 
 function runPowerShellHook(tempDir: string, environment: NodeJS.ProcessEnv) {
-  writeFileSync(join(tempDir, 'npx.cmd'), '@echo off\r\nnode "%FAKE_NPX_CAPTURE%" %*\r\n');
+  const hookScript = join(ROOT, 'templates', 'hooks', 'scripts', 'track-telemetry.ps1');
+  const harnessScript = join(tempDir, 'run-hook.ps1');
+  writeFileSync(harnessScript, [
+    'function npx {',
+    '  $payload = @($input) -join [Environment]::NewLine',
+    '  $arguments = @($args)',
+    '  [IO.File]::WriteAllText($env:TELEMETRY_CAPTURE, $payload)',
+    '  [IO.File]::WriteAllText($env:TELEMETRY_ARGS, (ConvertTo-Json -Compress -InputObject $arguments))',
+    '  $global:LASTEXITCODE = 17',
+    '}',
+    '& $env:TELEMETRY_HOOK',
+    '',
+  ].join('\r\n'));
   return spawnSync(
     'pwsh',
     [
@@ -134,12 +146,15 @@ function runPowerShellHook(tempDir: string, environment: NodeJS.ProcessEnv) {
       '-NoProfile',
       '-NonInteractive',
       '-File',
-      join(ROOT, 'templates', 'hooks', 'scripts', 'track-telemetry.ps1'),
+      harnessScript,
     ],
     {
       cwd: ROOT,
       encoding: 'utf-8',
-      env: environment,
+      env: {
+        ...environment,
+        TELEMETRY_HOOK: hookScript,
+      },
       input: HOOK_INPUT,
     },
   );
