@@ -12,6 +12,8 @@ import { installLocalSkills } from '../src/setup/index.js';
 
 const ROOT = join(import.meta.dirname, '..');
 const TEMP_DIRS: string[] = [];
+const POWERSHELL_PROCESS_TIMEOUT_MS = 45_000;
+const HOOK_TEST_TIMEOUT_MS = process.platform === 'win32' ? 50_000 : 5_000;
 const HOOK_INPUT = JSON.stringify({
   toolName: 'skill',
   sessionId: 'session-123',
@@ -71,7 +73,7 @@ describe('telemetry hook transport', () => {
       sessionId: 'session-123',
       skillName: 'azure-functions-help',
     });
-  });
+  }, HOOK_TEST_TIMEOUT_MS);
 
   it('does not invoke the package command for a workspace-local opt-out', async () => {
     const tempDir = createTempDir('af-skills-hook-opt-out-');
@@ -127,8 +129,7 @@ describe('telemetry hook transport', () => {
 
 function runPowerShellHook(tempDir: string, environment: NodeJS.ProcessEnv) {
   const hookScript = join(ROOT, 'templates', 'hooks', 'scripts', 'track-telemetry.ps1');
-  const harnessScript = join(tempDir, 'run-hook.ps1');
-  writeFileSync(harnessScript, [
+  const harness = [
     'function npx {',
     '  $payload = @($input) -join [Environment]::NewLine',
     '  $arguments = @($args)',
@@ -138,15 +139,15 @@ function runPowerShellHook(tempDir: string, environment: NodeJS.ProcessEnv) {
     '}',
     '& $env:TELEMETRY_HOOK',
     '',
-  ].join('\r\n'));
+  ].join('\n');
   return spawnSync(
     'pwsh',
     [
       '-NoLogo',
       '-NoProfile',
       '-NonInteractive',
-      '-File',
-      harnessScript,
+      '-Command',
+      harness,
     ],
     {
       cwd: ROOT,
@@ -156,6 +157,7 @@ function runPowerShellHook(tempDir: string, environment: NodeJS.ProcessEnv) {
         TELEMETRY_HOOK: hookScript,
       },
       input: HOOK_INPUT,
+      timeout: POWERSHELL_PROCESS_TIMEOUT_MS,
     },
   );
 }
