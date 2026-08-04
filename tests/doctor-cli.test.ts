@@ -14,6 +14,13 @@ afterAll(() => { for (const d of TEMP_DIRS) removeDir(d); });
 
 const CLI = join(import.meta.dirname, '..', 'bin', 'azure-functions-skills.js');
 
+interface DoctorReport {
+  language: string;
+  tiers: {
+    builtin: { ran: boolean; checks: Array<{ id: string; status: string; message: string }> };
+  };
+}
+
 function runDoctor(args: string[]): { stdout: string; stderr: string; exitCode: number } {
   try {
     const stdout = execFileSync(process.execPath, [CLI, 'doctor', ...args], {
@@ -140,6 +147,46 @@ describe('doctor CLI', () => {
     // stdout always contains human-readable text, even when --format json
     expect(stdout).toContain('Azure Functions Doctor');
     expect(stdout).toContain('Summary:');
+  });
+
+  it('reports a clean Go fixture with no problems', () => {
+    const fixture = join(import.meta.dirname, 'fixtures', 'doctor-bad-apps', 'go-clean');
+    const reportPath = join(makeTmp('cli-doc-go-clean-'), 'report.json');
+
+    const { exitCode, stdout } = runDoctor(['--dir', fixture, '--no-deep', '--format', 'json', '--output', reportPath]);
+
+    expect(stdout).toContain('(go)');
+    expect(exitCode).toBe(0);
+
+    const report = JSON.parse(readFileSync(reportPath, 'utf-8')) as DoctorReport;
+    expect(report.language).toBe('go');
+
+    const checks = report.tiers.builtin.checks;
+    expect(checks.find(c => c.id === 'go-version')?.status).toBe('pass');
+    // The documented wildcard bundle range must not be flagged.
+    expect(checks.find(c => c.id === 'extension-bundle')?.status).toBe('pass');
+    // Go uses worker-driven indexing, so function discovery must still find the triggers.
+    expect(checks.find(c => c.id === 'function-bindings')?.status).toBe('pass');
+    expect(checks.some(c => c.status === 'fail')).toBe(false);
+  });
+
+  it('flags an old Go toolchain, an untagged worker pin, and a wrong worker runtime', () => {
+    const fixture = join(import.meta.dirname, 'fixtures', 'doctor-bad-apps', 'go-deep-toolchain-and-runtime');
+    const reportPath = join(makeTmp('cli-doc-go-bad-'), 'report.json');
+
+    const { exitCode } = runDoctor(['--dir', fixture, '--no-deep', '--format', 'json', '--output', reportPath]);
+    expect(exitCode).toBe(1);
+
+    const report = JSON.parse(readFileSync(reportPath, 'utf-8')) as DoctorReport;
+    const checks = report.tiers.builtin.checks;
+
+    const goResults = checks.filter(c => c.id === 'go-version');
+    expect(goResults.some(c => c.status === 'fail' && c.message.includes('1.24'))).toBe(true);
+    expect(goResults.some(c => c.status === 'warn' && c.message.includes('pseudo-version'))).toBe(true);
+
+    const localSettings = checks.find(c => c.id === 'local-settings');
+    expect(localSettings?.status).toBe('warn');
+    expect(localSettings?.message).toContain('native');
   });
 
   it('help doctor prints usage', () => {

@@ -17,6 +17,10 @@ Use this file when investigating Durable Functions issues that cross language bo
 | durabletask-mssql | https://github.com/microsoft/durabletask-mssql | SQL Server storage provider |
 | durabletask-netherite | https://github.com/microsoft/durabletask-netherite | Netherite/Event Hubs storage provider |
 
+## Language support gaps
+
+- **Go is not supported.** There is no shipped Durable Functions SDK for the Go worker, so `orchestrationTrigger`, `activityTrigger`, `entityTrigger`, and the `durableClient` binding are unavailable in Go apps. Do not propose a Durable design for a Go project. Recommend a supported language for the Durable portion, or a non-Durable pattern such as queue or Event Hubs chaining. If a Go app already declares Durable bindings, treat it as an unsupported configuration rather than a runtime bug.
+
 ## Public documentation
 
 | Topic | URL |

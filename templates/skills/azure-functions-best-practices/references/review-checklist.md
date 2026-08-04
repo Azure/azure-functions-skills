@@ -10,13 +10,17 @@ Use this checklist after collecting Function App inventory. Apply only sections 
 - JavaScript/TypeScript apps use the v4 programming model when practical.
 - Python apps use the v2 programming model when practical.
 - Python Function Apps run on Linux.
+- Go apps pin a published worker release rather than tracking `main`, and their preview status is acknowledged in production readiness decisions.
+- Go apps propagate panics from user-started goroutines as errors, because an unrecovered goroutine panic terminates the worker and fails every concurrent invocation on it.
+- Go apps are deployed to Flex Consumption on Linux, which are the only supported options during preview.
 - Durable Functions workloads consider Durable Task Scheduler when appropriate.
+- Durable Functions is not available for Go; a Go app requiring orchestration needs a different language or a non-Durable pattern.
 
 ## Host and app configuration
 
 - `FUNCTIONS_EXTENSION_VERSION` is configured for Functions v4.
-- `FUNCTIONS_WORKER_RUNTIME` matches the deployed app language.
-- Non-.NET apps use extension bundle `[4.*, 5.0.0)` unless there is a justified exception.
+- `FUNCTIONS_WORKER_RUNTIME` matches the deployed app language. Go is the exception: Go apps run on the native worker and must use `native`, not `go` or `golang`.
+- Non-.NET apps use extension bundle `[4.*, 5.0.0)` unless there is a justified exception. Go is a non-.NET runtime, so this applies to Go as well.
 - Required app settings are present; unresolved `%SETTING_NAME%` placeholders are treated as configuration issues.
 - `local.settings.json` is used only for local development and is not committed with secrets.
 - `WEBSITE_RUN_FROM_PACKAGE` / package deployment settings are consistent with the deployment method.
