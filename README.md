@@ -25,7 +25,37 @@ Copilot CLI runtime requires Node 24 or later. Claude Code and Codex do not curr
 
 ### 1. Install the plugin with your coding agent
 
-Use the plugin manager built into GitHub Copilot, Claude Code, or Codex to install the `Azure/azure-functions-skills` repository plugin. The npm package does not install or launch coding-agent plugins.
+Choose your coding agent and follow its install steps:
+
+#### GitHub Copilot CLI
+
+Start an interactive Copilot session with `copilot`, then run:
+
+```text
+/plugin marketplace add Azure/azure-functions-skills
+/plugin install azure-functions-skills@azure-functions-skills
+```
+
+#### Claude Code
+
+Start an interactive Claude Code session with `claude`, then run:
+
+```text
+/plugin marketplace add Azure/azure-functions-skills
+/plugin install azure-functions-skills@azure-functions-skills
+```
+
+#### Codex CLI
+
+Add this repository as a plugin marketplace from your terminal:
+
+```bash
+codex plugin marketplace add Azure/azure-functions-skills
+```
+
+Then start Codex, run `/plugins`, select **azure-functions-skills**, and choose **Install plugin**.
+
+> The [`@azure/functions-skills`](https://www.npmjs.com/package/@azure/functions-skills) npm package provides the companion CLI and workspace-local install flow. Installing it does not install or launch a coding-agent plugin.
 
 ### 2. Ask for Azure Functions help
 
