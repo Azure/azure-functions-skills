@@ -36,6 +36,29 @@ Start an interactive Copilot session with `copilot`, then run:
 /plugin install azure-functions-skills@azure-functions-skills
 ```
 
+#### GitHub Copilot app
+
+1. Open **Settings** (the gear icon), then select **Plugins**.
+2. Select **Install** to open the plugin installer, then add `Azure/azure-functions-skills` as a marketplace.
+3. Select **azure-functions-skills**, review its contents, and confirm the installation.
+
+#### GitHub Copilot in VS Code (Preview)
+
+1. Enable the `chat.plugins.enabled` setting. Your organization may manage this setting.
+2. Add this marketplace to your user `settings.json`:
+
+   ```json
+   {
+     "chat.plugins.marketplaces": [
+       "Azure/azure-functions-skills"
+     ]
+   }
+   ```
+
+3. Open the Extensions view (`Ctrl+Shift+X` or `Cmd+Shift+X`), search for `@agentPlugins`, and install **azure-functions-skills**.
+
+VS Code also discovers plugins installed by GitHub Copilot CLI. See [Agent plugins in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-plugins) for more options.
+
 #### Claude Code
 
 Start an interactive Claude Code session with `claude`, then run:
