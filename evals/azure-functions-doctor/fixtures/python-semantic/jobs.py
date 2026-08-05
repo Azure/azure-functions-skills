@@ -1,3 +1,5 @@
+import logging
+
 import azure.functions as func
 
 jobs = func.Blueprint()
@@ -9,4 +11,4 @@ jobs = func.Blueprint()
     connection="AzureWebJobsStorage",
 )
 def process_job(message: func.QueueMessage) -> None:
-    print(message.get_body().decode())
+    logging.info(message.get_body().decode())

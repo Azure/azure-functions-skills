@@ -61,8 +61,7 @@ stimuli:
   - name: "Quality — semantic findings do not duplicate Python Tier 1"
     prompt: |
       Perform the Tier 2 review for this Python Functions workspace. Tier 1
-      already reported that the Blueprint is unregistered, dependencies are not
-      pinned or locked, and numpy may require a platform-compatible wheel.
+      already reported that dependencies are not pinned or locked.
       Do not repeat those deterministic findings. Identify only semantic code
       problems and summarize the actionable result.
     tags:
@@ -93,15 +92,11 @@ stimuli:
       - name: reports_blocking_http_in_async_handler
         type: output-matches
         config:
-          pattern: "(?i)(requests\\.get|synchronous|blocking).{0,80}(async|event loop)|(?:async|event loop).{0,80}(requests\\.get|synchronous|blocking)"
-      - name: avoids_duplicate_blueprint_finding
+          pattern: "(?i)(urlopen|urllib|synchronous|blocking).{0,80}(async|event loop)|(?:async|event loop).{0,80}(urlopen|urllib|synchronous|blocking)"
+      - name: does_not_report_registered_blueprint
         type: output-not-matches
         config:
-          pattern: "(?i)blueprint.{0,80}(unregistered|not registered|register_functions)"
-      - name: does_not_call_native_packages_malicious
-        type: output-not-matches
-        config:
-          pattern: "(?i)(numpy|native (dependency|package)).{0,80}(malicious|malware|compromised)"
+          pattern: "(?i)blueprint.{0,80}(unregistered|not registered|registration.{0,20}missing)"
       - type: completed
       - type: output-not-matches
         config:
