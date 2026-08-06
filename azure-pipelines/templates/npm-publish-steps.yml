@@ -3,9 +3,6 @@ parameters:
       type: string
     - name: NpmPublishTag
       type: string
-    - name: NpmPublishDryRun
-      type: boolean
-      default: true
 
 steps:
     - pwsh: |
@@ -18,32 +15,10 @@ steps:
           Write-Host "##vso[task.setvariable variable=npmPackagePath]$($packages[0].FullName)"
       displayName: 'Validate npm package artifact'
 
-    - ${{ if eq(parameters.NpmPublishDryRun, true) }}:
-        - task: NodeTool@0
-          displayName: 'Install Node.js'
-          inputs:
-              versionSpec: 22.x
+    - task: NodeTool@0
+      displayName: 'Install Node.js'
+      inputs:
+          versionSpec: 22.x
 
-        - script: npm publish "$(npmPackagePath)" --tag "${{ parameters.NpmPublishTag }}" --registry "https://registry.npmjs.org" --dry-run --ignore-scripts
-          displayName: 'Validate npm publish (dry run)'
-
-    - ${{ if eq(parameters.NpmPublishDryRun, false) }}:
-        - task: SFP.release-tasks.custom-build-release-task.EsrpRelease@12
-          displayName: 'Publish npm package through ESRP Release'
-          inputs:
-              connectedservicename: '$(EsrpReleaseServiceConnection)'
-              usemanagedidentity: true
-              keyvaultname: '$(EsrpReleaseKeyVaultName)'
-              signcertname: '$(EsrpReleaseSignCertName)'
-              clientid: '$(EsrpReleaseClientId)'
-              intent: 'PackageDistribution'
-              contenttype: 'npm'
-              contentsource: 'Folder'
-              folderlocation: '${{ parameters.tgzPath }}'
-              waitforreleasecompletion: true
-              owners: '$(EsrpReleaseOwner)'
-              approvers: '$(EsrpReleaseApprover)'
-              serviceendpointurl: 'https://api.esrp.microsoft.com'
-              mainpublisher: '$(EsrpReleaseMainPublisher)'
-              domaintenantid: '$(EsrpReleaseDomainTenantId)'
-              productstate: '${{ parameters.NpmPublishTag }}'
+    - script: npm publish "$(npmPackagePath)" --tag "${{ parameters.NpmPublishTag }}" --registry "https://registry.npmjs.org" --dry-run --ignore-scripts
+      displayName: 'Validate npm publish (dry run)'

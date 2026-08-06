@@ -23,8 +23,9 @@ replaces that placeholder immediately before `npm pack`.
    ```
 
 6. `azure-pipelines/release.yml` consumes the official build's `drop` artifact
-   and publishes it to npm through ESRP Release v12. It does not use an npm
-   token or manually upload to partner blob storage.
+   and delegates npm publishing to the internal engineering
+   `release-npm-package.yml` template with its ESRP option enabled. It does not
+   expose the fixed ESRP infrastructure configuration or use an npm token.
 
 If the official build mirroring is delayed or a controlled re-upload is needed,
 run `azure-pipelines/partner-drop-upload.yml`. It consumes the selected
@@ -42,26 +43,21 @@ Required AzDO variable group: `azure-functions-skills-release`.
 | `PartnerBlobAzureServiceConnection` | Azure service connection used by the helper upload pipeline. |
 | `PartnerBlobStorageAccount` | Partner storage account name, expected to be `azuresdkpartnerdrops`. |
 | `PartnerBlobContainer` | Partner blob container name, expected to be `drops`. |
-| `EsrpReleaseServiceConnection` | Azure Resource Manager service connection used by ESRP Release. The shared Azure Functions value is `azfunc-internal-esrp-prod`. |
-| `EsrpReleaseKeyVaultName` | Key Vault containing the ESRP signing certificate. The shared Azure Functions value is `kv-azfunc-esrp-prod`. |
-| `EsrpReleaseSignCertName` | ESRP request-signing certificate name. The shared Azure Functions value is `esrp-signing`. |
-| `EsrpReleaseClientId` | Managed identity or app client ID onboarded to ESRP Release for npm publishing. |
-| `EsrpReleaseOwner` | Individual Microsoft alias that owns the ESRP release. Distribution lists and security groups are not supported. |
-| `EsrpReleaseApprover` | Individual Microsoft alias that approves the ESRP release; use a different person from the owner. |
-| `EsrpReleaseMainPublisher` | Main publisher assigned during ESRP onboarding, normally `ESRPRELPACMAN` for npm. |
-| `EsrpReleaseDomainTenantId` | Domain tenant ID assigned during ESRP onboarding. |
+| `EsrpReleaseSignCertName` | ESRP Release request-signing certificate name provisioned in the internal Key Vault. |
+| `EsrpOwners` | Comma- or newline-separated individual Microsoft aliases that own the ESRP release. Distribution lists and security groups are not supported. |
+| `EsrpApprovers` | Comma- or newline-separated individual Microsoft aliases that approve the ESRP release; these must differ from the owners. |
+| `EsrpManualApprovers` | Azure DevOps users or groups allowed to approve the manual validation before ESRP publishing. |
 
-The mirror project must also contain an
-`azure-functions-skills-npm-prod` Azure DevOps environment. Configure its
-approval check before enabling real publishing, authorize the release
-pipelines to use the variable group, environment, service connection, and
-official-build pipeline resource, and add `microsoft1es` plus
-`microsoft-oss-releases` as read/write collaborators for the npm package.
+Authorize the release pipelines to use the variable group, internal engineering
+repository, ESRP service connection, and official-build pipeline resource. Add
+`microsoft1es` plus `microsoft-oss-releases` as read/write collaborators for
+the npm package.
 
 Both release pipelines default to a local npm dry run. Queue with
 `NpmPublishDryRun: false` only after checking the package version and tag.
-ESRP Release is auto-approved after the environment checks complete, and
-`NpmPublishTag` is passed as ESRP's npm `productstate`.
+Real publishing requires Azure DevOps manual validation before the engineering
+template invokes ESRP Release. `NpmPublishTag` is passed to the engineering
+template as `esrpNpmTag`.
 
 ## Runtime telemetry hook
 

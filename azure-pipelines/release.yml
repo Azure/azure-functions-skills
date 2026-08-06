@@ -17,6 +17,10 @@ resources:
           type: git
           name: 1ESPipelineTemplates/1ESPipelineTemplates
           ref: refs/tags/release
+        - repository: eng
+          type: git
+          name: engineering
+          ref: refs/heads/main
     pipelines:
         - pipeline: officialBuild
           project: internal
@@ -53,25 +57,15 @@ extends:
                               parameters:
                                   tgzPath: '$(Pipeline.Workspace)/officialBuild/drop'
                                   NpmPublishTag: ${{ parameters.NpmPublishTag }}
-                                  NpmPublishDryRun: true
                   - ${{ if eq(parameters.NpmPublishDryRun, false) }}:
-                      - job: Release
-                        templateContext:
-                            type: releaseJob
-                            isProduction: true
-                            environment: azure-functions-skills-npm-prod
-                            inputs:
-                                - input: pipelineArtifact
-                                  pipeline: officialBuild
-                                  artifactName: drop
-                                  targetPath: $(Pipeline.Workspace)/officialBuild/drop
-                        steps:
-                            - checkout: none
-                            - template: /azure-pipelines/templates/npm-publish-steps.yml@self
-                              parameters:
-                                  tgzPath: '$(Pipeline.Workspace)/officialBuild/drop'
-                                  NpmPublishTag: ${{ parameters.NpmPublishTag }}
-                                  NpmPublishDryRun: false
+                      - template: /ci/release-npm-package.yml@eng
+                        parameters:
+                            artifact:
+                                name: drop
+                                pipeline: officialBuild
+                            publishMethod: esrp
+                            esrpNpmTag: ${{ parameters.NpmPublishTag }}
+                            approvers: '$(EsrpManualApprovers)'
             - ${{ if eq(parameters.NpmPublishDryRun, false) }}:
                 - stage: GitHubTagAndRelease
                   dependsOn: Release
