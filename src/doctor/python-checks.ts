@@ -29,8 +29,14 @@ function dependencyFile(dependency: PythonDependency | undefined): string | unde
   return dependency?.sourceFile;
 }
 
-function dependencyVersion(dependency: PythonDependency): [number, number, number] | undefined {
-  const match = dependency.specifier.match(/^==\s*(\d+)\.(\d+)(?:\.(\d+))?/);
+function parseVersion(
+  specifier: string,
+  operator: '==' | '<',
+): [number, number, number] | undefined {
+  const pattern = operator === '=='
+    ? /^==\s*(\d+)\.(\d+)(?:\.(\d+))?/
+    : /^<\s*(\d+)\.(\d+)(?:\.(\d+))?/;
+  const match = specifier.match(pattern);
   if (!match) return undefined;
   return [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
 }
@@ -134,16 +140,19 @@ export const pythonAzureFunctionsCheck: DoctorCheck = {
         recommendation: 'Add a supported azure-functions package version to the application dependency manifest.',
       })];
     }
-    const version = dependencyVersion(dependency);
+    const exactVersion = parseVersion(dependency.specifier, '==');
+    const upperBound = parseVersion(dependency.specifier, '<');
     if (
-      version
-      && ctx.python?.programmingModel !== 'v1'
-      && versionLessThan(version, MINIMUM_PYTHON_V2_LIBRARY_VERSION)
+      ctx.python?.programmingModel !== 'v1'
+      && (
+        (exactVersion && versionLessThan(exactVersion, MINIMUM_PYTHON_V2_LIBRARY_VERSION))
+        || (upperBound && !versionLessThan(MINIMUM_PYTHON_V2_LIBRARY_VERSION, upperBound))
+      )
     ) {
       return [result(pythonAzureFunctionsCheck, {
         status: 'fail',
         title: 'azure-functions dependency is too old for Python v2',
-        message: `azure-functions ${version.join('.')} is below the Python v2 minimum ${MINIMUM_PYTHON_V2_LIBRARY_VERSION.join('.')}.`,
+        message: `azure-functions constraint "${dependency.specifier}" excludes the Python v2 minimum ${MINIMUM_PYTHON_V2_LIBRARY_VERSION.join('.')}.`,
         file: dependency.sourceFile,
         line: dependency.line,
         recommendation: `Upgrade azure-functions to ${MINIMUM_PYTHON_V2_LIBRARY_VERSION.join('.')} or later.`,
@@ -347,88 +356,6 @@ export const applicationInsightsCheck: DoctorCheck = {
   },
 };
 
-export const pythonUnpinnedRequirementsCheck: DoctorCheck = {
-  id: 'python-unpinned-requirements',
-  category: 'security',
-  defaultSeverity: 'medium',
-  appliesTo: ctx => ctx.language === 'python' && loadPythonDependencies(ctx.dir).kind !== 'none',
-  run: async ctx => {
-    const manifest = loadPythonDependencies(ctx.dir);
-    if (ctx.language !== 'python' || manifest.kind === 'none') {
-      return [result(pythonUnpinnedRequirementsCheck, {
-        status: 'skip',
-        title: 'Python unpinned-requirements audit skipped',
-        message: 'Not a Python Functions project or dependency manifest not found',
-      })];
-    }
-    const unpinned = manifest.dependencies.filter(dependency => !dependency.pinned);
-    if (unpinned.length === 0) {
-      return [result(pythonUnpinnedRequirementsCheck, {
-        status: 'pass',
-        title: 'Python requirements are pinned',
-        message: 'Every declared Python dependency is pinned to an exact version',
-      })];
-    }
-    const list = unpinned.slice(0, 5).map(item => item.name).join(', ')
-      + (unpinned.length > 5 ? `, +${unpinned.length - 5} more` : '');
-    return [result(pythonUnpinnedRequirementsCheck, {
-      status: 'warn',
-      title: 'Python requirements are not pinned',
-      message: `${unpinned.length} Python dependencies are not pinned to exact versions: ${list}. Each install can resolve to a newer release.`,
-      file: manifest.files[0],
-      recommendation: 'Pin every direct dependency and generate a reviewed lockfile with hashes.',
-    })];
-  },
-};
-
-export const pythonMissingLockfileCheck: DoctorCheck = {
-  id: 'python-missing-lockfile',
-  category: 'security',
-  defaultSeverity: 'medium',
-  appliesTo: ctx => ctx.language === 'python' && loadPythonDependencies(ctx.dir).kind !== 'none',
-  run: async ctx => {
-    const manifest = loadPythonDependencies(ctx.dir);
-    if (ctx.language !== 'python' || manifest.kind === 'none') {
-      return [result(pythonMissingLockfileCheck, {
-        status: 'skip',
-        title: 'Python lockfile audit skipped',
-        message: 'Not a Python Functions project or dependency manifest not found',
-      })];
-    }
-    const lockCandidates = [
-      'requirements.lock',
-      'requirements.txt.lock',
-      'poetry.lock',
-      'Pipfile.lock',
-      'uv.lock',
-      'pdm.lock',
-    ];
-    if (lockCandidates.some(name => existsSync(join(ctx.dir, name)))) {
-      return [result(pythonMissingLockfileCheck, {
-        status: 'pass',
-        title: 'Python lockfile present',
-        message: 'A Python dependency lockfile is committed',
-      })];
-    }
-    if (
-      manifest.dependencies.length > 0
-      && manifest.dependencies.every(dependency => dependency.hashes.length > 0)
-    ) {
-      return [result(pythonMissingLockfileCheck, {
-        status: 'pass',
-        title: 'Python requirements are hash-locked',
-        message: 'Every declared dependency has an integrity hash',
-      })];
-    }
-    return [result(pythonMissingLockfileCheck, {
-      status: 'warn',
-      title: 'No Python lockfile present',
-      message: 'No supported Python lockfile or fully hash-pinned dependency manifest was found.',
-      recommendation: 'Generate and commit a lockfile or a fully resolved requirements file with hashes.',
-    })];
-  },
-};
-
 export const PYTHON_CHECKS: DoctorCheck[] = [
   pythonProgrammingModelCheck,
   pythonDependencyManifestCheck,
@@ -439,6 +366,4 @@ export const PYTHON_CHECKS: DoctorCheck[] = [
   pythonDeployArtifactsCheck,
   pythonDurableConfigurationCheck,
   applicationInsightsCheck,
-  pythonUnpinnedRequirementsCheck,
-  pythonMissingLockfileCheck,
 ];

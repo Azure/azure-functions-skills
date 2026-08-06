@@ -324,8 +324,6 @@ Notes:
 | `python-deploy-artifacts` | `PF-006` | Tests, environments, and caches not excluded by `.funcignore` |
 | `python-durable-configuration` | `PF-007` | Durable triggers relying on implicit host defaults |
 | `application-insights` | `AS-006` | Local-only observability setting presence |
-| `python-unpinned-requirements` | Supply chain | Floating direct Python dependencies |
-| `python-missing-lockfile` | Supply chain | Missing lockfile or dependency hashes |
 
 #### Easy additions for `--no-deep`
 

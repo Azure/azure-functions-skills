@@ -324,8 +324,6 @@ Go サポートは preview である。所見を報告する際はその前提�
 | `python-deploy-artifacts` | `PF-006` | `.funcignore` で除外されない test / environment / cache |
 | `python-durable-configuration` | `PF-007` | implicit host default に依存する Durable trigger |
 | `application-insights` | `AS-006` | local observability setting の存在 |
-| `python-unpinned-requirements` | Supply chain | floating Python dependency |
-| `python-missing-lockfile` | Supply chain | lockfile / dependency hash の欠如 |
 
 #### `--no-deep` で追加実装しやすいもの
 
