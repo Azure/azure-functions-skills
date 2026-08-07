@@ -43,7 +43,6 @@ Required AzDO variable group: `azure-functions-skills-release`.
 | `PartnerBlobAzureServiceConnection` | Azure service connection used by the helper upload pipeline. |
 | `PartnerBlobStorageAccount` | Partner storage account name, expected to be `azuresdkpartnerdrops`. |
 | `PartnerBlobContainer` | Partner blob container name, expected to be `drops`. |
-| `EsrpReleaseSignCertName` | ESRP Release request-signing certificate name provisioned in the internal Key Vault. |
 | `EsrpOwners` | Comma- or newline-separated individual Microsoft aliases that own the ESRP release. Distribution lists and security groups are not supported. |
 | `EsrpApprovers` | Comma- or newline-separated individual Microsoft aliases that approve the ESRP release; these must differ from the owners. |
 | `EsrpManualApprovers` | Azure DevOps users or groups allowed to approve the manual validation before ESRP publishing. |
