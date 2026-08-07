@@ -148,14 +148,16 @@ or service outage.
 
 ## Bicep Files
 
-Use [../assets/infra/app/connector-gateway.bicep](../assets/infra/app/connector-gateway.bicep)
+Use `infra/app/connector-gateway.bicep` from the retrieved `ai-serverless-agents-python` template
 as the current example. It creates:
 
 - `Microsoft.Web/connectorGateways@2026-05-01-preview`
 - `Microsoft.Web/connectorGateways/connections@2026-05-01-preview`
 - connection access policies for the app identity, deployer, and Connector Gateway identity
 - `Microsoft.Web/connectorGateways/mcpserverconfigs@2026-05-01-preview`
-- `trigger-config.bicep` can create `Microsoft.Web/connectorGateways/triggerconfigs@2026-05-01-preview`
+- The supplemental
+  [trigger-config.bicep](../assets/infra/app/trigger-config.bicep) can create
+  `Microsoft.Web/connectorGateways/triggerconfigs@2026-05-01-preview` for connector-triggered agents.
 
 Keep Connector Namespace child resource names simple and provider-safe. Connection names,
 MCP server config names, and trigger config names should use short lowercase app names such as

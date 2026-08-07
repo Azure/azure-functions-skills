@@ -173,7 +173,7 @@ Baseline structure:
     app/
       api.bicep
       connector-gateway.bicep
-      trigger-config.bicep        # if using connector triggers
+      trigger-config.bicep        # copy from this skill's supplemental asset if using connector triggers
       foundry.bicep
       rbac.bicep
       session-pool.bicep
