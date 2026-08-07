@@ -10,6 +10,10 @@ Do not use a bundled copy of the template. Retrieve the template through Azure M
 `functions_template_get` first, then fall back to the manifest `repositoryUrl`, `folderPath`, and
 `gitRef` if MCP retrieval fails.
 
+Use the exact template identifier `ai-serverless-agents-python` for MCP and CDN manifest lookup.
+The skill name and user-facing brand can change independently from this catalog identifier; do not
+derive or rename the lookup value from `azure-functions-intelligent-apps`.
+
 The official template includes:
 
 - `azure.yaml`
