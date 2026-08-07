@@ -9,6 +9,9 @@ trigger:
         include:
             - main
             - release/*
+    tags:
+        include:
+            - v*
 
 resources:
     repositories:

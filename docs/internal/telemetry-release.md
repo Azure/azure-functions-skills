@@ -28,6 +28,11 @@ compiled placeholder immediately before `npm pack`.
    and delegates npm publishing to the internal engineering
    `release-npm-package.yml` template with its ESRP option enabled. It does not
    expose the fixed ESRP infrastructure configuration or use an npm token.
+7. After npm publishing succeeds, a maintainer creates and pushes a signed
+   `v<version>` tag to the public GitHub repository. The tag triggers
+   `.github/workflows/draft-release.yml`, which creates the draft GitHub
+   Release using `GITHUB_TOKEN`. The code-mirror pipeline also mirrors `v*`
+   tags to the internal repository.
 
 If the official build mirroring is delayed or a controlled re-upload is needed,
 run `azure-pipelines/partner-drop-upload.yml`. It consumes the selected
@@ -59,6 +64,15 @@ Both release pipelines default to a local npm dry run. Queue with
 Real publishing requires Azure DevOps manual validation before the engineering
 template invokes ESRP Release. `NpmPublishTag` is passed to the engineering
 template as `esrpNpmTag`.
+
+Azure DevOps does not hold GitHub credentials or create GitHub tags/releases.
+After a successful release, create the signed tag from the exact public commit
+used for the release:
+
+```text
+git tag -s v<version> -m "v<version>"
+git push origin v<version>
+```
 
 ## Runtime telemetry hook
 
