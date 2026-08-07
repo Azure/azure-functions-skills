@@ -17,6 +17,10 @@ resources:
           type: git
           name: 1ESPipelineTemplates/1ESPipelineTemplates
           ref: refs/tags/release
+        - repository: eng
+          type: git
+          name: engineering
+          ref: refs/tags/release
 
 variables:
     - group: azure-functions-skills-release
@@ -47,15 +51,23 @@ extends:
             - stage: Release
               dependsOn: Build
               jobs:
-                  - job: Release
-                    steps:
-                        - task: DownloadPipelineArtifact@2
-                          inputs:
-                              artifact: drop
-                              path: $(Pipeline.Workspace)/drop
-                          displayName: 'Download artifact'
-                        - template: /azure-pipelines/templates/npm-publish-steps.yml@self
-                          parameters:
-                              tgzPath: '$(Pipeline.Workspace)/drop'
-                              NpmPublishTag: ${{ parameters.NpmPublishTag }}
-                              NpmPublishDryRun: ${{ parameters.NpmPublishDryRun }}
+                  - ${{ if eq(parameters.NpmPublishDryRun, true) }}:
+                      - job: ValidateRelease
+                        displayName: 'Validate npm release'
+                        steps:
+                            - task: DownloadPipelineArtifact@2
+                              inputs:
+                                  artifact: drop
+                                  path: $(Pipeline.Workspace)/drop
+                              displayName: 'Download artifact'
+                            - template: /azure-pipelines/templates/npm-publish-steps.yml@self
+                              parameters:
+                                tgzPath: '$(Pipeline.Workspace)/drop'
+                                NpmPublishTag: ${{ parameters.NpmPublishTag }}
+                  - ${{ if eq(parameters.NpmPublishDryRun, false) }}:
+                      - template: /ci/release-npm-package.yml@eng
+                        parameters:
+                            artifact: drop
+                            publishMethod: esrp
+                            esrpNpmTag: ${{ parameters.NpmPublishTag }}
+                            approvers: '$(EsrpManualApprovers)'

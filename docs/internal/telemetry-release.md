@@ -25,7 +25,9 @@ compiled placeholder immediately before `npm pack`.
    ```
 
 6. `azure-pipelines/release.yml` consumes the official build's `drop` artifact
-   for npm publishing. It does not manually upload to partner blob storage.
+   and delegates npm publishing to the internal engineering
+   `release-npm-package.yml` template with its ESRP option enabled. It does not
+   expose the fixed ESRP infrastructure configuration or use an npm token.
 
 If the official build mirroring is delayed or a controlled re-upload is needed,
 run `azure-pipelines/partner-drop-upload.yml`. It consumes the selected
@@ -43,6 +45,20 @@ Required AzDO variable group: `azure-functions-skills-release`.
 | `PartnerBlobAzureServiceConnection` | Azure service connection used by the helper upload pipeline. |
 | `PartnerBlobStorageAccount` | Partner storage account name, expected to be `azuresdkpartnerdrops`. |
 | `PartnerBlobContainer` | Partner blob container name, expected to be `drops`. |
+| `EsrpOwners` | Comma- or newline-separated individual Microsoft aliases that own the ESRP release. Distribution lists and security groups are not supported. |
+| `EsrpApprovers` | Comma- or newline-separated individual Microsoft aliases that approve the ESRP release; these must differ from the owners. |
+| `EsrpManualApprovers` | Azure DevOps users or groups allowed to approve the manual validation before ESRP publishing. |
+
+Authorize the release pipelines to use the variable group, internal engineering
+repository, ESRP service connection, and official-build pipeline resource. Add
+`microsoft1es` plus `microsoft-oss-releases` as read/write collaborators for
+the npm package.
+
+Both release pipelines default to a local npm dry run. Queue with
+`NpmPublishDryRun: false` only after checking the package version and tag.
+Real publishing requires Azure DevOps manual validation before the engineering
+template invokes ESRP Release. `NpmPublishTag` is passed to the engineering
+template as `esrpNpmTag`.
 
 ## Runtime telemetry hook
 

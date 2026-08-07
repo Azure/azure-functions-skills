@@ -1,23 +1,24 @@
 parameters:
-    tgzPath: ''
-    NpmPublishTag: ''
-    NpmPublishDryRun: false
+    - name: tgzPath
+      type: string
+    - name: NpmPublishTag
+      type: string
 
 steps:
+    - pwsh: |
+          $packages = @(Get-ChildItem -Path '${{ parameters.tgzPath }}' -Recurse -File -Filter '*.tgz')
+          if ($packages.Count -ne 1) {
+              throw "Expected exactly one npm package under '${{ parameters.tgzPath }}'; found $($packages.Count)."
+          }
+
+          Write-Host "Using npm package $($packages[0].FullName)"
+          Write-Host "##vso[task.setvariable variable=npmPackagePath]$($packages[0].FullName)"
+      displayName: 'Validate npm package artifact'
+
     - task: NodeTool@0
       displayName: 'Install Node.js'
       inputs:
           versionSpec: 22.x
 
-    - script: mv *.tgz package.tgz
-      displayName: 'Rename tgz file'
-      workingDirectory: '${{ parameters.tgzPath }}'
-
-    - task: Npm@1
-      displayName: 'npm publish'
-      inputs:
-          command: custom
-          workingDir: '${{ parameters.tgzPath }}'
-          verbose: true
-          customCommand: 'publish package.tgz --tag ${{ parameters.NpmPublishTag }} --dry-run ${{ lower(parameters.NpmPublishDryRun) }}'
-          customEndpoint: azure-functions-skills-npm
+    - script: npm publish "$(npmPackagePath)" --tag "${{ parameters.NpmPublishTag }}" --registry "https://registry.npmjs.org" --dry-run --ignore-scripts
+      displayName: 'Validate npm publish (dry run)'
