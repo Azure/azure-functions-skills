@@ -161,6 +161,16 @@ dependencies = ["azure-functions==1.21.0"]
     expect((await pythonAzureFunctionsCheck.run(await loadProjectContext(oldDir)))[0].status).toBe('fail');
   });
 
+  it('fails when an upper bound excludes the Python v2 minimum', async () => {
+    const dir = makeTmp('doctor-azurefunctions-upper-bound-');
+    writePythonApp(dir, 'import azure.functions as func\napp = func.FunctionApp()\n');
+    writeRequirements(dir, 'azure-functions<1.17\n');
+
+    const results = await pythonAzureFunctionsCheck.run(await loadProjectContext(dir));
+
+    expect(results[0].status).toBe('fail');
+  });
+
   it('warns when the platform-managed worker is declared', async () => {
     const dir = makeTmp('doctor-pyworker-');
     writePythonApp(dir, 'import azure.functions as func\napp = func.FunctionApp()\n');

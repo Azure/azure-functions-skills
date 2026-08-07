@@ -23,10 +23,8 @@ import {
   pythonDependencyManifestCheck,
   pythonDeployArtifactsCheck,
   pythonDurableConfigurationCheck,
-  pythonMissingLockfileCheck,
   pythonNativeDependenciesCheck,
   pythonProgrammingModelCheck,
-  pythonUnpinnedRequirementsCheck,
   pythonWorkerDependencyCheck,
 } from './python-checks.js';
 
@@ -37,10 +35,8 @@ export {
   pythonDependencyManifestCheck,
   pythonDeployArtifactsCheck,
   pythonDurableConfigurationCheck,
-  pythonMissingLockfileCheck,
   pythonNativeDependenciesCheck,
   pythonProgrammingModelCheck,
-  pythonUnpinnedRequirementsCheck,
   pythonWorkerDependencyCheck,
 };
 

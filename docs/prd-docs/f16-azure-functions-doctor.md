@@ -149,8 +149,6 @@ Options:
 | 25 | `python-deploy-artifacts` | build | Development artifacts are excluded | low |
 | 26 | `python-durable-configuration` | configuration | Durable host defaults are reviewed | low |
 | 27 | `application-insights` | configuration | Local observability evidence is surfaced | info |
-| 28 | `python-unpinned-requirements` | security | Python dependencies are pinned | medium |
-| 29 | `python-missing-lockfile` | security | Python lockfile or hashes exist | medium |
 
 ### Check Result Schema
 

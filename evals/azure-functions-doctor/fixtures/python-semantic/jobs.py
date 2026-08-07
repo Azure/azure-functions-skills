@@ -11,4 +11,4 @@ jobs = func.Blueprint()
     connection="AzureWebJobsStorage",
 )
 def process_job(message: func.QueueMessage) -> None:
-    logging.info(message.get_body().decode())
+    logging.info("Processing queue message")

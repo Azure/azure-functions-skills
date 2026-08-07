@@ -15,7 +15,7 @@ defaults:
   model: claude-sonnet-4.6
 
 scoring:
-  threshold: 0.8
+  threshold: 0.85
   weights:
     skill-invocation: 0.35
     output-matches: 0.20
@@ -44,6 +44,8 @@ stimuli:
           dest: jobs.py
         - src: fixtures/python-semantic/host.json
           dest: host.json
+        - src: fixtures/python-semantic/local.settings.json
+          dest: local.settings.json
         - src: fixtures/python-semantic/requirements.txt
           dest: requirements.txt
     constraints:
@@ -61,9 +63,9 @@ stimuli:
   - name: "Quality — semantic findings do not duplicate Python Tier 1"
     prompt: |
       Perform the Tier 2 review for this Python Functions workspace. Tier 1
-      already reported that dependencies are not pinned or locked.
-      Do not repeat those deterministic findings. Identify only semantic code
-      problems and summarize the actionable result.
+      deterministic checks have already completed. Do not duplicate those
+      findings. Identify only semantic code problems and summarize the
+      actionable result.
     tags:
       type: integration
       skill: azure-functions-doctor
@@ -80,6 +82,8 @@ stimuli:
           dest: jobs.py
         - src: fixtures/python-semantic/host.json
           dest: host.json
+        - src: fixtures/python-semantic/local.settings.json
+          dest: local.settings.json
         - src: fixtures/python-semantic/requirements.txt
           dest: requirements.txt
     constraints:
@@ -97,6 +101,10 @@ stimuli:
         type: output-not-matches
         config:
           pattern: "(?i)blueprint.{0,80}(unregistered|not registered|registration.{0,20}missing)"
+      - name: does_not_require_python_pins_or_lockfile
+        type: output-not-matches
+        config:
+          pattern: "(?i)(requirements?.{0,40}(unpinned|not pinned|pin exact)|missing.{0,30}(lockfile|requirements\\.lock)|requirements\\.lock.{0,30}(missing|required))"
       - type: completed
       - type: output-not-matches
         config:
