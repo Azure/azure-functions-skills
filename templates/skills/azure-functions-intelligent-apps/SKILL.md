@@ -1,14 +1,14 @@
 ---
-name: azure-functions-agents
-description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions serverless agents and event-driven AI agents using the Azure Functions serverless agents runtime. Use when the user says serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, event-driven AI automation, HTTP/chat agent, webhook-style agent, or Azure Functions hosted agent."
-argument-hint: 'Describe the agent, trigger, tools, model needs, and deployment target'
+name: azure-functions-intelligent-apps
+description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions AI apps using the Azure Functions agents runtime. Use whenever the user asks for an AI app, artificial intelligence app, AI application, artificial intelligence application, intelligent app, intelligent application, Azure Functions AI app, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, event-driven AI automation, HTTP/chat agent, webhook-style agent, or Azure Functions hosted agent."
+argument-hint: 'Describe the AI app, triggers, agents, tools, model needs, and deployment target'
 ---
 
-# Azure Functions Agents
+# Azure Functions AI Apps
 
-Use this skill to build serverless agents on Azure Functions with the Azure Functions serverless
-agents runtime. Align terminology and flows with the Microsoft Learn quickstart "Build serverless
-agents using Azure Functions": agents are defined in markdown files, runtime defaults live in
+Use this skill to build AI apps on Azure Functions with the Azure Functions agents runtime. An AI
+app can contain one or more agents for interactive, scheduled, event-driven, or background
+workflows. Agent definitions live in markdown files, runtime defaults live in
 `agents.config.yaml`, remote MCP servers live in `mcp.json`, and deployment uses `azd`.
 
 ## Current Defaults
@@ -61,7 +61,7 @@ Load only the files needed for the task:
 | Bicep, azd, deployment, local development | [infra-and-deployment.md](./references/infra-and-deployment.md) |
 | Azure resource naming abbreviations used by the Bicep assets | [abbreviations.json](./references/abbreviations.json) |
 | Diagnostics and common failures | [troubleshooting.md](./references/troubleshooting.md) |
-| Official serverless agents quickstart template and Learn article | [quickstart-reference.md](./references/quickstart-reference.md) |
+| Official Azure Functions AI app quickstart template and Learn article | [quickstart-reference.md](./references/quickstart-reference.md) |
 
 ## Assess the Workspace
 
@@ -140,7 +140,7 @@ Use **manifest discovery + MCP primary retrieval** when Azure MCP tools are avai
 1. Fetch the Azure Functions template manifest from
    `https://cdn.functions.azure.com/public/templates-manifest/manifest.json` and find
    `ai-serverless-agents-python`. Use its catalog metadata (`priority`, `categories`, `tags`,
-   `whatsIncluded`) to explain why this is the correct serverless agents scaffold. Keep
+   `whatsIncluded`) to explain why this is the correct Azure Functions AI app scaffold. Keep
    `repositoryUrl`, `folderPath`, and `gitRef` for fallback.
 2. Call Azure MCP `functions_template_get` with `language: python` and
    `template: ai-serverless-agents-python`. This is the primary source for the complete project
@@ -156,7 +156,7 @@ When Azure MCP tools are not available, skip directly to the manifest/GitHub fal
 invent a project structure from memory.
 
 Do not use bundled template files as a scaffold source. This skill intentionally does not include a
-full copy of the serverless agents template because the template evolves independently; always
+full copy of the Azure Functions AI app template because the template evolves independently; always
 retrieve it from MCP first or from the manifest GitHub coordinates as fallback.
 
 After scaffolding from MCP or GitHub, tailor the app to the user's agent.

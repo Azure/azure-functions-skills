@@ -31,7 +31,6 @@ const CLIENT_NAMES = new Set([
   'unknown',
 ]);
 export const BUNDLED_SKILL_NAMES = new Set([
-  'azure-functions-agents',
   'azure-functions-best-practices',
   'azure-functions-common',
   'azure-functions-create',
@@ -41,6 +40,7 @@ export const BUNDLED_SKILL_NAMES = new Set([
   'azure-functions-feedback',
   'azure-functions-health-status',
   'azure-functions-help',
+  'azure-functions-intelligent-apps',
   'azure-functions-inventory',
   'azure-functions-setup',
 ]);

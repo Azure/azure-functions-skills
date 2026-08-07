@@ -111,12 +111,12 @@ When all checks pass, suggest the next step:
 
 > ✅ Your environment is ready! Next:
 > - Use **azure-functions-create** to scaffold a new Azure Functions project (HTTP triggers, timer triggers, queue triggers, etc.)
-> - Use **azure-functions-agents** to build an AI-powered agent app on Azure Functions (scheduled agents, chat agents, connector-triggered agents, background AI workflows)
+> - Use **azure-functions-intelligent-apps** to build an Azure Functions AI app (scheduled agents, chat agents, connector-triggered agents, background AI workflows)
 
 For deployment, confirm the Azure Skills plugin is available before suggesting **azure-functions-deploy**. `azure-functions-deploy` delegates to `azure-prepare`, `azure-validate`, and `azure-deploy`.
 
 ## Next steps
 
-- On success, suggest `azure-functions-create` for traditional Functions projects, or `azure-functions-agents` for AI agent apps — let the user choose based on their goal.
+- On success, suggest `azure-functions-create` for traditional Functions projects, or `azure-functions-intelligent-apps` for Azure Functions AI apps — let the user choose based on their goal.
 - On failure, keep the user in `azure-functions-setup`: explain fixes, then ask them to rerun setup verification.
 - If deployment is requested and Azure Skills is missing, keep the user in `azure-functions-setup` until the Azure Skills plugin is installed or the user explicitly chooses a fallback deployment path.
