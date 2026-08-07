@@ -20,8 +20,6 @@ import {
   missingLockfileCheck,
   trackedSecretFilesCheck,
   installScriptDepsCheck,
-  pythonUnpinnedRequirementsCheck,
-  pythonMissingLockfileCheck,
   goVersionCheck,
   ALL_CHECKS,
 } from '../src/doctor/checks.js';
@@ -532,8 +530,8 @@ describe('typescript-build check', () => {
 // ── ALL_CHECKS ──
 
 describe('ALL_CHECKS registry', () => {
-  it('contains 21 checks', () => {
-    expect(ALL_CHECKS).toHaveLength(21);
+  it('contains 28 checks', () => {
+    expect(ALL_CHECKS).toHaveLength(28);
   });
 
   it('has unique IDs', () => {
@@ -801,83 +799,6 @@ describe('install-script-deps check', () => {
     }));
     const ctx = await loadProjectContext(dir);
     const results = await installScriptDepsCheck.run(ctx);
-    expect(results[0].status).toBe('pass');
-  });
-});
-
-// ── Supply-chain (Python): unpinned-requirements ──
-
-describe('python-unpinned-requirements check', () => {
-  it('skips when not a python project', async () => {
-    const dir = makeTmp('chk-pyunpin-skip-');
-    scaffoldProject(dir, { hostJson: { version: '2.0' }, packageJson: { name: 'n' } });
-    const ctx = await loadProjectContext(dir);
-    const results = await pythonUnpinnedRequirementsCheck.run(ctx);
-    expect(results[0].status).toBe('skip');
-  });
-
-  it('passes when requirements.txt pins every package', async () => {
-    const dir = makeTmp('chk-pyunpin-ok-');
-    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
-    writeFileSync(join(dir, 'requirements.txt'), 'azure-functions==1.18.0\nrequests==2.31.0\n');
-    const ctx = await loadProjectContext(dir);
-    const results = await pythonUnpinnedRequirementsCheck.run(ctx);
-    expect(results[0].status).toBe('pass');
-  });
-
-  it('warns when requirements.txt has unpinned packages', async () => {
-    const dir = makeTmp('chk-pyunpin-bad-');
-    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
-    writeFileSync(
-      join(dir, 'requirements.txt'),
-      'azure-functions\nrequests>=2.0\nflask~=2.3\n# comment\n'
-    );
-    const ctx = await loadProjectContext(dir);
-    const results = await pythonUnpinnedRequirementsCheck.run(ctx);
-    expect(results[0].status).toBe('warn');
-    expect(results[0].message).toContain('azure-functions');
-  });
-});
-
-// ── Supply-chain (Python): missing-lockfile ──
-
-describe('python-missing-lockfile check', () => {
-  it('skips when not a python project', async () => {
-    const dir = makeTmp('chk-pylock-skip-');
-    scaffoldProject(dir, { hostJson: { version: '2.0' }, packageJson: { name: 'n' } });
-    const ctx = await loadProjectContext(dir);
-    const results = await pythonMissingLockfileCheck.run(ctx);
-    expect(results[0].status).toBe('skip');
-  });
-
-  it('warns when no python lockfile is present', async () => {
-    const dir = makeTmp('chk-pylock-warn-');
-    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
-    writeFileSync(join(dir, 'requirements.txt'), 'azure-functions==1.18.0\n');
-    const ctx = await loadProjectContext(dir);
-    const results = await pythonMissingLockfileCheck.run(ctx);
-    expect(results[0].status).toBe('warn');
-  });
-
-  it('passes when requirements.txt uses --hash for every dep', async () => {
-    const dir = makeTmp('chk-pylock-hash-');
-    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
-    writeFileSync(
-      join(dir, 'requirements.txt'),
-      'azure-functions==1.18.0 --hash=sha256:abc\nrequests==2.31.0 --hash=sha256:def\n'
-    );
-    const ctx = await loadProjectContext(dir);
-    const results = await pythonMissingLockfileCheck.run(ctx);
-    expect(results[0].status).toBe('pass');
-  });
-
-  it('passes when poetry.lock is present', async () => {
-    const dir = makeTmp('chk-pylock-poetry-');
-    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
-    writeFileSync(join(dir, 'requirements.txt'), 'azure-functions==1.18.0\n');
-    writeFileSync(join(dir, 'poetry.lock'), '# poetry lock\n');
-    const ctx = await loadProjectContext(dir);
-    const results = await pythonMissingLockfileCheck.run(ctx);
     expect(results[0].status).toBe('pass');
   });
 });

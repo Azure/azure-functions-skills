@@ -1,6 +1,6 @@
 # Supply chain security checks (Tier 2 / `--deep`)
 
-Load this reference when the project has a `package.json`, `requirements.txt`, `pom.xml`, or other dependency manifest. These checks complement the Tier 1 deterministic supply-chain checks (`lifecycle-scripts`, `unpinned-prod-deps`, `missing-lockfile`, `tracked-secret-files`, `install-script-deps`) with semantic analysis the LLM is uniquely good at.
+Load this reference when the project has a `package.json`, `requirements.txt`, `pom.xml`, or other dependency manifest. These checks complement Tier 1 deterministic supply-chain analysis with semantic analysis the LLM is uniquely good at. The `lifecycle-scripts`, `unpinned-prod-deps`, `missing-lockfile`, and `install-script-deps` checks apply to Node.js projects; `tracked-secret-files` applies across supported project types.
 
 ## Threat model
 
@@ -167,6 +167,6 @@ For each finding produced from this checklist, use:
 
 ## Cross-reference
 
-- Tier 1 deterministic checks: `lifecycle-scripts`, `unpinned-prod-deps`, `missing-lockfile`, `tracked-secret-files`, `install-script-deps` in `src/doctor/checks.ts`
+- Tier 1 deterministic checks: Node.js-only `lifecycle-scripts`, `unpinned-prod-deps`, `missing-lockfile`, and `install-script-deps`, plus cross-language `tracked-secret-files`, in `src/doctor/checks.ts`
 - Background: StepSecurity analysis of the durabletask PyPI compromise (May 19, 2026)
 - Generic guidance: [SLSA framework](https://slsa.dev/), npm provenance, PyPI Trusted Publishing

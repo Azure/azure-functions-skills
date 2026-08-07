@@ -64,3 +64,8 @@ Write your findings as a JSON array to the file path specified below. Each findi
 3. Do not repeat findings already covered by the Tier 1 built-in checks.
 4. If no issues are found, write an empty JSON array `[]`.
 5. Do not modify any project files — this is a read-only analysis.
+6. For Python projects, treat programming-model discovery, Blueprint
+   registration, dependency-manifest presence, `azure-functions-worker`,
+   native-wheel compatibility, and deployment-artifact filtering as Tier 1
+   concerns. Report them only when the Tier 1 context shows that the relevant
+   deterministic check did not run or could not determine the result.

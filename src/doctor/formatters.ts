@@ -27,7 +27,7 @@ function formatTextReport(report: DoctorReport): string {
     lines.push('Built-in checks:');
     for (const c of report.tiers.builtin.checks) {
       const icon = statusIcon(c.status);
-      lines.push(`  ${icon} ${padId(c.id)}${c.message}`);
+      lines.push(`  ${icon} ${padId(c.id)} ${c.message}`);
       if (c.recommendation && c.status !== 'pass') {
         lines.push(`${''.padEnd(28)}${c.recommendation}`);
       }
@@ -41,7 +41,7 @@ function formatTextReport(report: DoctorReport): string {
     for (const c of report.tiers.ai.checks) {
       const icon = statusIcon(c.status);
       const fileSuffix = c.file ? ` ${c.file}${c.line ? `:${c.line}` : ''}` : '';
-      lines.push(`  ${icon} ${padId(c.id)}${c.message}${fileSuffix}`);
+      lines.push(`  ${icon} ${padId(c.id)} ${c.message}${fileSuffix}`);
     }
     lines.push('');
   }

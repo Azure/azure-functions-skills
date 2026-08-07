@@ -1,7 +1,8 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadProjectContext } from '../src/doctor/context.js';
+import { discoverPythonV2Functions } from '../src/doctor/python-source.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
 const TEMP_DIRS: string[] = [];
@@ -46,6 +47,53 @@ describe('loadProjectContext', () => {
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
     writeFileSync(join(dir, 'requirements.txt'), 'azure-functions\n');
     const ctx = await loadProjectContext(dir);
+    expect(ctx.language).toBe('python');
+  });
+
+  it('detects python from function_app.py when the dependency manifest is missing', async () => {
+    const dir = makeTmp('doctor-ctx-python-source-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'function_app.py'), 'import azure.functions as func\napp = func.FunctionApp()\n');
+
+    const ctx = await loadProjectContext(dir);
+
+    expect(ctx.language).toBe('python');
+    expect(ctx.python?.programmingModel).toBe('v2');
+  });
+
+  it('continues Python discovery when one source file cannot be read', () => {
+    const dir = makeTmp('doctor-ctx-python-unreadable-');
+    writeFileSync(join(dir, 'function_app.py'), [
+      'import azure.functions as func',
+      'app = func.FunctionApp()',
+      '@app.route(route="health")',
+      'def health(req): return "ok"',
+    ].join('\n'));
+    const unreadable = join(dir, 'unreadable.py');
+    writeFileSync(unreadable, 'raise RuntimeError()\n');
+
+    const inventory = discoverPythonV2Functions(
+      dir,
+      path => path === unreadable ? null : readFileSync(path, 'utf-8'),
+    );
+
+    expect(inventory.functions.map(fn => fn.name)).toContain('health');
+  });
+
+  it('uses the explicit Python worker runtime when package.json contains only repository tooling', async () => {
+    const dir = makeTmp('doctor-ctx-python-worker-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      private: true,
+      scripts: { lint: 'eslint .' },
+      devDependencies: { eslint: '^9.0.0' },
+    }));
+    writeFileSync(join(dir, 'local.settings.json'), JSON.stringify({
+      Values: { FUNCTIONS_WORKER_RUNTIME: 'python' },
+    }));
+
+    const ctx = await loadProjectContext(dir);
+
     expect(ctx.language).toBe('python');
   });
 
@@ -120,6 +168,107 @@ app.http('httpTrigger1', { methods: ['GET'], handler: async (req, ctx) => ({ bod
     expect(ctx.functions).toHaveLength(1);
     expect(ctx.functions[0].name).toBe('HttpTrigger1');
     expect(ctx.functions[0].triggerType).toBe('httpTrigger');
+  });
+
+  it('discovers Python v2 FunctionApp and Blueprint triggers with aliases', async () => {
+    const dir = makeTmp('doctor-ctx-pyv2-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'requirements.txt'), 'azure-functions==1.21.0\n');
+    writeFileSync(join(dir, 'function_app.py'), `
+import azure.functions as func
+from jobs import jobs_blueprint as jobs
+
+application = func.FunctionApp()
+application.register_functions(jobs)
+
+@application.route(route="health")
+def health(req):
+    return "ok"
+`);
+    writeFileSync(join(dir, 'jobs.py'), `
+from azure.functions import Blueprint as FunctionsBlueprint
+
+jobs_blueprint = FunctionsBlueprint()
+
+@jobs_blueprint.queue_trigger(arg_name="message", queue_name="jobs", connection="Storage")
+def process_job(message):
+    pass
+`);
+
+    const ctx = await loadProjectContext(dir);
+
+    expect(ctx.python?.programmingModel).toBe('v2');
+    expect(ctx.functions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'health', triggerType: 'httpTrigger' }),
+      expect.objectContaining({
+        name: 'process_job',
+        triggerType: 'queueTrigger',
+        blueprint: 'jobs_blueprint',
+        blueprintRegistered: true,
+      }),
+    ]));
+  });
+
+  it('classifies projects containing function.json and FunctionApp as mixed', async () => {
+    const dir = makeTmp('doctor-ctx-pymixed-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'function_app.py'), `
+import azure.functions as func
+app = func.FunctionApp()
+@app.timer_trigger(schedule="0 */5 * * * *", arg_name="timer")
+def scheduled(timer):
+    pass
+`);
+    const legacyDir = join(dir, 'Legacy');
+    mkdirSync(legacyDir);
+    writeFileSync(join(legacyDir, 'function.json'), JSON.stringify({
+      bindings: [{ type: 'httpTrigger', direction: 'in', name: 'req' }],
+    }));
+
+    const ctx = await loadProjectContext(dir);
+
+    expect(ctx.python?.programmingModel).toBe('mixed');
+    expect(ctx.functions.map(fn => fn.name)).toEqual(expect.arrayContaining(['scheduled', 'Legacy']));
+  });
+
+  it('lets existing storage checks see Python v2 non-HTTP triggers', async () => {
+    const dir = makeTmp('doctor-ctx-pyqueue-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'local.settings.json'), JSON.stringify({
+      Values: { FUNCTIONS_WORKER_RUNTIME: 'python' },
+    }));
+    writeFileSync(join(dir, 'function_app.py'), `
+from azure.functions import FunctionApp
+app = FunctionApp()
+@app.service_bus_queue_trigger(arg_name="message", queue_name="orders", connection="ServiceBus")
+def consume(message):
+    pass
+`);
+
+    const ctx = await loadProjectContext(dir);
+
+    expect(ctx.functions).toEqual([
+      expect.objectContaining({ name: 'consume', triggerType: 'serviceBusTrigger' }),
+    ]);
+  });
+
+  it('discovers Durable Python v2 functions registered through DFApp aliases', async () => {
+    const dir = makeTmp('doctor-ctx-pydurable-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    writeFileSync(join(dir, 'function_app.py'), `
+import azure.durable_functions as durable
+durable_app = durable.DFApp()
+@durable_app.orchestration_trigger(context_name="context")
+def orchestrator(context):
+    return []
+`);
+
+    const ctx = await loadProjectContext(dir);
+
+    expect(ctx.language).toBe('python');
+    expect(ctx.functions).toEqual([
+      expect.objectContaining({ name: 'orchestrator', triggerType: 'orchestrationTrigger' }),
+    ]);
   });
 
   it('discovers Go worker-indexed functions from app registrations', async () => {

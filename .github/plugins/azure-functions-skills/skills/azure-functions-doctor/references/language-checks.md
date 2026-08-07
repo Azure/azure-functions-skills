@@ -34,8 +34,19 @@ Load only the section for the detected project language.
 | `PY-005` | Worker indexing flag | Known old runtime + v2 model requires flag and flag missing | Runtime unknown and old-host compatibility risk |
 | `PY-006` | Worker extensions | Missing required extension setting for custom worker extension usage | Custom extension pattern unclear |
 | `PY-007` | `azure-functions` package | Package version unsupported | Old package version |
+| `PY-008` | Blueprint registration | Decorated Blueprint is deterministically unregistered | Registration is dynamic and cannot be resolved statically |
+| `PY-009` | Platform-managed worker dependency | - | `azure-functions-worker` is declared by the application |
+| `PY-010` | Native dependency compatibility | - | Compiled packages may lack wheels for the deployment OS/architecture |
 
 Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=EnableWorkerIndexing` is absent. Newer host versions enable worker indexing by default.
+
+Tier 1 normally handles `PY-001`, `PY-003`, and `PY-007` through `PY-010`.
+Do not repeat those findings during deep analysis. For `PY-008`, inspect dynamic
+registration only when Tier 1 could not resolve an imported Blueprint. Native
+packages such as `numpy`, `cryptography`, and `orjson` are common legitimate
+dependencies; never describe them as malicious solely because they contain
+compiled code. The relevant risk is wheel and build compatibility with the
+Function App operating system and architecture.
 
 ## Java
 
