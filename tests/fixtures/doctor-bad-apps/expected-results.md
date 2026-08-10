@@ -2,6 +2,10 @@
 
 Run with `AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE=1` to keep version checks deterministic.
 
+`expected-results.json` is the machine-readable source used by `run-all.ps1` for
+Tier 1 status and minimum-finding comparisons. Keep its deterministic entries in
+sync with the tables below.
+
 ## Tier 1 (deterministic) — strict assertions
 
 These findings are produced by built-in checks (`--no-deep`) and can be validated automatically.
@@ -65,7 +69,7 @@ These fixtures also have deterministic issues detectable by `--no-deep`:
 | `python-deep-v1-incomplete-deps` | `deprecated-settings:warn` (AzureWebJobsDashboard) |
 | `python-deep-v2-async-antipatterns` | None expected |
 | `python-deep-secrets-sql-injection` | None expected |
-| `csharp-deep-blocking-async` | `dotnet-version:skip` (stacks API needed for .NET version validation; net6.0 EOL detected only with live stacks) |
+| `csharp-deep-blocking-async` | None expected offline (net6.0 EOL is detected only with live stacks) |
 | `csharp-deep-inprocess-antipatterns` | None expected (extension bundle check skips for .NET projects) |
 | `java-deep-client-reuse` | `extension-bundle:warn` (missing extension bundle) |
 | `powershell-deep-install-module` | None expected |
@@ -209,7 +213,10 @@ Tier 2 advisory:
 - 🚫 SC-104: hardcoded raw IP host in URL (`192.0.2.42`)
 - 🚫 SC-108: anti-analysis gates (Linux only, CPU > 2, skip Russian LANG)
 
-**`node-supply-chain-credential-collector`** — Tier 2 only:
+**`node-supply-chain-credential-collector`** — Tier 1:
+- `function-bindings:warn` (the fixture exports helper functions without a recognized Azure Functions trigger)
+
+Tier 2:
 - 🚫 SC-105: systematic credential harvesting from cloud / SSH / git / npm / docker / shell-history paths plus regex over env vars matching `TOKEN|SECRET|KEY|PASSWORD`
 - 🚫 SC-106: persistence installation via append to `~/.bashrc`
 - ⚠️ SC-103: silent empty catch around filesystem reads and persistence write
