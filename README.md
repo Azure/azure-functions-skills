@@ -25,11 +25,68 @@ Copilot CLI runtime requires Node 24 or later. Claude Code and Codex do not curr
 
 ### 1. Install the plugin with your coding agent
 
-Use the plugin manager built into GitHub Copilot, Claude Code, or Codex to install the `Azure/azure-functions-skills` repository plugin. The npm package does not install or launch coding-agent plugins.
+Choose your coding agent and follow its install steps:
 
-### 2. Ask for Azure Functions help
+#### GitHub Copilot CLI
 
-Open your coding agent normally and ask which Azure Functions workflow to use. `azure-functions-help` discovers the installed `azure-functions-*` skills and routes to the best match.
+Start an interactive Copilot session with `copilot`, then run:
+
+```text
+/plugin marketplace add Azure/azure-functions-skills
+/plugin install azure-functions-skills@azure-functions-skills
+```
+
+#### GitHub Copilot app
+
+1. Open **Settings** (the gear icon), then select **Plugins**.
+2. Select **Install** to open the plugin installer, then add `Azure/azure-functions-skills` as a marketplace.
+3. Select **azure-functions-skills**, review its contents, and confirm the installation.
+
+#### GitHub Copilot in VS Code (Preview)
+
+1. Enable the `chat.plugins.enabled` setting. Your organization may manage this setting.
+2. Add this marketplace to your user `settings.json`:
+
+   ```json
+   {
+     "chat.plugins.marketplaces": [
+       "Azure/azure-functions-skills"
+     ]
+   }
+   ```
+
+3. Open the Extensions view (`Ctrl+Shift+X` or `Cmd+Shift+X`), search for `@agentPlugins`, and install **azure-functions-skills**.
+
+VS Code also discovers plugins installed by GitHub Copilot CLI. See [Agent plugins in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-plugins) for more options.
+
+#### Claude Code
+
+Start an interactive Claude Code session with `claude`, then run:
+
+```text
+/plugin marketplace add Azure/azure-functions-skills
+/plugin install azure-functions-skills@azure-functions-skills
+```
+
+#### Codex CLI
+
+Add this repository as a plugin marketplace from your terminal:
+
+```bash
+codex plugin marketplace add Azure/azure-functions-skills
+```
+
+Then start Codex, run `/plugins`, select **azure-functions-skills**, and choose **Install plugin**.
+
+> The [`@azure/functions-skills`](https://www.npmjs.com/package/@azure/functions-skills) npm package provides the companion CLI and workspace-local install flow. Installing it does not install or launch a coding-agent plugin.
+
+### 2. Verify your prerequisites
+
+Ask your coding agent to run the `azure-functions-setup` skill. It checks the required Azure Functions tools and language runtimes, then guides you through installing or configuring anything that is missing.
+
+### 3. Ask for Azure Functions help
+
+Ask which Azure Functions workflow to use. `azure-functions-help` discovers the installed `azure-functions-*` skills and routes to the best match.
 
 > **More options?** See [CLI Reference](docs/cli-reference.md) for every command, flag, and headless example.
 
