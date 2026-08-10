@@ -80,9 +80,13 @@ Then start Codex, run `/plugins`, select **azure-functions-skills**, and choose 
 
 > The [`@azure/functions-skills`](https://www.npmjs.com/package/@azure/functions-skills) npm package provides the companion CLI and workspace-local install flow. Installing it does not install or launch a coding-agent plugin.
 
-### 2. Ask for Azure Functions help
+### 2. Verify your prerequisites
 
-Open your coding agent normally and ask which Azure Functions workflow to use. `azure-functions-help` discovers the installed `azure-functions-*` skills and routes to the best match.
+Ask your coding agent to run the `azure-functions-setup` skill. It checks the required Azure Functions tools and language runtimes, then guides you through installing or configuring anything that is missing.
+
+### 3. Ask for Azure Functions help
+
+Ask which Azure Functions workflow to use. `azure-functions-help` discovers the installed `azure-functions-*` skills and routes to the best match.
 
 > **More options?** See [CLI Reference](docs/cli-reference.md) for every command, flag, and headless example.
 
