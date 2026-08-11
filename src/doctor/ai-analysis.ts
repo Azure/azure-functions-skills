@@ -150,11 +150,13 @@ export function buildAgentCommand(
   agent: string,
   prompt: string,
   _reportPath: string,
+  model = 'auto',
 ): AgentCommand {
+  const modelArgs = model === 'auto' ? [] : ['--model', model];
   switch (agent) {
     case 'github-copilot': {
       const resolved = resolveCliCommand('copilot');
-      const baseArgs = ['-p', prompt, '--allow-all-tools'];
+      const baseArgs = ['-p', prompt, '--allow-all-tools', ...modelArgs];
       return { command: resolved.command, args: [...resolved.argsPrefix, ...baseArgs] };
     }
 
@@ -167,6 +169,7 @@ export function buildAgentCommand(
           '-p', prompt,
           '--dangerously-skip-permissions',
           '--max-turns', '20',
+          ...modelArgs,
         ],
       };
     }
@@ -178,6 +181,7 @@ export function buildAgentCommand(
         '--sandbox', 'workspace-write',
         '--skip-git-repo-check',
         '--ephemeral',
+        ...modelArgs,
         prompt,
       ];
       return { command: resolved.command, args: [...resolved.argsPrefix, ...baseArgs] };
@@ -231,9 +235,10 @@ export async function runAiAnalysis(
   reportPath: string,
   dir: string,
   timeoutMs: number,
+  model = 'auto',
 ): Promise<AiAnalysisResult> {
   const startTime = Date.now();
-  const cmd = buildAgentCommand(agent, prompt, reportPath);
+  const cmd = buildAgentCommand(agent, prompt, reportPath, model);
 
   // Inform the user before spawning the agent — the agent has elevated permissions
   // and project content can prompt-inject it on untrusted workspaces.
@@ -375,6 +380,7 @@ export function mergeReports(
   durationMs: number,
   error?: string,
   severityThreshold: CheckSeverity = 'high',
+  requestedModel = 'auto',
 ): DoctorReport {
   const allChecks = [...report.tiers.builtin.checks, ...aiFindings];
   const thresholdRank = severityRank(severityThreshold);
@@ -405,6 +411,7 @@ export function mergeReports(
         ran: true,
         checks: aiFindings,
         agent,
+        requestedModel,
         durationMs,
         ...(error ? { error } : {}),
       },

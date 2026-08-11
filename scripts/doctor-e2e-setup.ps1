@@ -96,6 +96,9 @@ Write-Host ""
 # Copy each fixture
 foreach ($fixture in $fixtures) {
     $dest = Join-Path $Target $fixture.Name
+    if (Test-Path $dest) {
+        throw "Fixture destination already exists: $dest. Use a new target or run doctor-e2e-cleanup.ps1 first."
+    }
     Copy-Item -Path $fixture.FullName -Destination $dest -Recurse -Force
     Write-Host "  [+] $($fixture.Name)" -ForegroundColor Green
 }
@@ -116,6 +119,7 @@ $runAllContent = @'
 param(
     [switch]$Deep,
     [string]$Agent = 'github-copilot',
+    [string]$Model = 'auto',
     [string]$Format = 'json',
     [int]$Timeout = 300,
     [string]$Filter = '*'
@@ -142,6 +146,10 @@ foreach ($d in $dirs) {
         $doctorArgs += '--accept-deep-risk'
         $doctorArgs += '--agent'
         $doctorArgs += $Agent
+        if ($Model -ne 'auto') {
+            $doctorArgs += '--model'
+            $doctorArgs += $Model
+        }
         $doctorArgs += '--timeout'
         $doctorArgs += $Timeout
     }
@@ -201,10 +209,10 @@ Write-Host "  cd $Target"
 Write-Host "  .\run-all.ps1"
 Write-Host ""
 Write-Host "  # Tier 2 (deep) — run all:"
-Write-Host "  .\run-all.ps1 -Deep -Agent github-copilot"
+Write-Host "  .\run-all.ps1 -Deep -Agent github-copilot -Model gpt-5.6-sol"
 Write-Host ""
 Write-Host "  # Single fixture:"
-Write-Host "  node $cliPath doctor --dir $Target\<fixture> --deep --agent github-copilot --format json"
+Write-Host "  node $cliPath doctor --dir $Target\<fixture> --deep --accept-deep-risk --agent github-copilot --model gpt-5.6-sol --format json"
 Write-Host ""
 Write-Host "Cleanup:"
 Write-Host "  .\scripts\doctor-e2e-cleanup.ps1 -Target $Target"

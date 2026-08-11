@@ -33,6 +33,9 @@ Options:
 - `-Filter <glob>` — pattern, e.g. `"python-*"` or `"node-deep-*"`
 - `-DeepOnly` — copy only `*-deep-*` fixtures (skips numbered and clean fixtures)
 
+The target must not already contain a selected fixture. Use a new target or run
+`doctor-e2e-cleanup.ps1` first; setup refuses to merge or nest fixture copies.
+
 The script also writes a `run-all.ps1` helper inside the target directory.
 
 ### 2. Run doctor against every fixture
@@ -44,7 +47,7 @@ cd Q:\temp\doctor-deep-test
 .\run-all.ps1
 
 # Tier 2 — invokes the agent for each fixture (~60–120s each, 16 fixtures ≈ 25 min total)
-.\run-all.ps1 -Deep -Agent github-copilot
+.\run-all.ps1 -Deep -Agent github-copilot -Model gpt-5.6-sol
 ```
 
 Each fixture's report is saved to `<fixture>/doctor-result.json`. A summary table is printed at the end:
@@ -73,8 +76,11 @@ Writes `ai-validation-report.html` to the fixtures directory with:
 - Overall recall metric (% of expected findings matched)
 - Per-fixture: matched / missed / extra findings
 - Drill-down: AI title, severity badge, file:line, full message
+- Match evidence, including required signals and findings covering multiple expectations
+- Requested/effective model provenance and invalid workspace results
 
-Typical recall on 16 fixtures with GitHub Copilot CLI: **~95%**.
+Deep recall is advisory and model-dependent. Always pass `-Model` when comparing
+runs, and do not compare reports marked invalid.
 
 > The deterministic Node.js script above is the only supported way to generate the validation report. A previous "ask a coding agent to write the report" option was withdrawn: pointing a general-purpose agent at adversarial fixture content is itself a prompt-injection surface.
 

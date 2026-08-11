@@ -46,10 +46,11 @@ Returns exit code `1` if any finding is at or above the `--severity` threshold (
 npx @azure/functions-skills doctor --dir . \
   --deep --accept-deep-risk \
   --agent github-copilot \
+  --model gpt-5.6-sol \
   --format html --output doctor-deep.html
 ```
 
-⚠️ `--deep` runs the agent with elevated permissions on workspace files. Use only on trusted workspaces. The `--accept-deep-risk` flag is required to acknowledge this — running with `--deep` alone refuses to start the agent.
+⚠️ `--deep` runs the agent with elevated permissions on workspace files. Use only on trusted workspaces. The `--accept-deep-risk` flag is required to acknowledge this — running with `--deep` alone refuses to start the agent. Pass `--model` when comparing runs; the requested model is persisted in `tiers.ai`.
 
 ## Output formats
 
@@ -190,7 +191,7 @@ A library of intentionally broken Azure Functions projects exercises the full do
 # Windows
 .\scripts\doctor-e2e-setup.ps1 -Target Q:\temp\doctor-deep-test -DeepOnly
 cd Q:\temp\doctor-deep-test
-.\run-all.ps1 -Deep -Agent github-copilot
+.\run-all.ps1 -Deep -Agent github-copilot -Model gpt-5.6-sol
 ```
 
 ## Troubleshooting

@@ -33,6 +33,7 @@ Options:
   --deep                    Run AI-assisted analysis
   --accept-deep-risk        Acknowledge elevated agent permissions
   --agent <name>            github-copilot, claude-code, or codex
+  --model <model-id>        Agent model (default: auto)
   --timeout <seconds>       AI analysis timeout (default: 300)
 `;
 
@@ -241,6 +242,7 @@ async function runDoctorCommand() {
       deep: args.includes('--deep') && !args.includes('--no-deep'),
       acceptDeepRisk: args.includes('--accept-deep-risk'),
       agent: getFlag('--agent'),
+      model: getFlag('--model') || 'auto',
       timeout: Number.parseInt(getFlag('--timeout') || '300', 10),
       format,
       output,

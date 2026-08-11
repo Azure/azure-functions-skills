@@ -247,6 +247,7 @@ describe('doctor CLI', () => {
     })();
     expect(stdout).toContain('azure-functions-skills doctor');
     expect(stdout).toContain('--deep');
+    expect(stdout).toContain('--model');
     expect(stdout).toContain('text|json|markdown|html');
     expect(stdout).not.toContain('sarif');
   });

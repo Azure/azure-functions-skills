@@ -36,7 +36,8 @@ function formatTextReport(report: DoctorReport): string {
   }
 
   if (report.tiers.ai.ran && report.tiers.ai.checks.length > 0) {
-    const agentLabel = report.tiers.ai.agent ? ` (${report.tiers.ai.agent})` : '';
+    const modelLabel = report.tiers.ai.requestedModel ? `, model: ${report.tiers.ai.requestedModel}` : '';
+    const agentLabel = report.tiers.ai.agent ? ` (${report.tiers.ai.agent}${modelLabel})` : '';
     lines.push(`AI analysis${agentLabel}:`);
     for (const c of report.tiers.ai.checks) {
       const icon = statusIcon(c.status);
@@ -155,6 +156,9 @@ function formatHtmlReport(report: DoctorReport): string {
   const overallStatus = summary.status === 'pass' ? 'PASS' : 'FAIL';
   const overallClass = summary.status === 'pass' ? 'status-pass' : 'status-fail';
   const aiAgent = tiers.ai.agent ? ` (${tiers.ai.agent})` : '';
+  const aiModel = tiers.ai.requestedModel
+    ? ` · Requested model: ${escapeHtml(tiers.ai.requestedModel)}${tiers.ai.effectiveModel ? ` · Effective model: ${escapeHtml(tiers.ai.effectiveModel)}` : ''}`
+    : '';
   const aiDurationStr = tiers.ai.durationMs ? `${(tiers.ai.durationMs / 1000).toFixed(1)}s` : '—';
 
   const builtinChecks = tiers.builtin.checks;
@@ -260,7 +264,7 @@ function formatHtmlReport(report: DoctorReport): string {
 
   ${tiers.ai.ran || tiers.ai.error ? `
     <h2>AI Analysis (Tier 2)${escapeHtml(aiAgent)}</h2>
-    <p class="meta">Duration: ${aiDurationStr}${tiers.ai.ran ? ` · Findings: ${aiChecks.length}` : ''}</p>
+    <p class="meta">Duration: ${aiDurationStr}${tiers.ai.ran ? ` · Findings: ${aiChecks.length}` : ''}${aiModel}</p>
     ${tiers.ai.error ? `<div class="ai-error"><strong>AI tier error:</strong> ${escapeHtml(tiers.ai.error)}</div>` : ''}
     ${aiChecks.length > 0 ? aiChecks.map(renderCheck).join('') : (tiers.ai.ran ? '<p class="empty">No AI findings reported.</p>' : '')}
   ` : ''}

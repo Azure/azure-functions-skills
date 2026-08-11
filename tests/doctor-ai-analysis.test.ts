@@ -74,24 +74,28 @@ describe('buildDoctorPrompt', () => {
 
 describe('buildAgentCommand', () => {
   it('builds github-copilot headless command', () => {
-    const cmd = buildAgentCommand('github-copilot', 'analyze this', '/tmp/report.json');
+    const cmd = buildAgentCommand('github-copilot', 'analyze this', '/tmp/report.json', 'gpt-5.6-sol');
     // On Windows, command may be process.execPath when .cmd wrapper is resolved
     const validCommands = ['copilot', process.execPath];
     expect(validCommands).toContain(cmd.command);
     expect(cmd.args).toContain('-p');
     expect(cmd.args.some(a => a.includes('analyze this'))).toBe(true);
     expect(cmd.args).toContain('--allow-all-tools');
+    expect(cmd.args).toContain('--model');
+    expect(cmd.args).toContain('gpt-5.6-sol');
   });
 
   it('builds claude-code headless command', () => {
-    const cmd = buildAgentCommand('claude-code', 'analyze this', '/tmp/report.json');
+    const cmd = buildAgentCommand('claude-code', 'analyze this', '/tmp/report.json', 'claude-sonnet-5');
     expect(cmd.command).toBe('claude');
     expect(cmd.args).toContain('-p');
     expect(cmd.args).toContain('--dangerously-skip-permissions');
+    expect(cmd.args).toContain('--model');
+    expect(cmd.args).toContain('claude-sonnet-5');
   });
 
   it('builds codex headless command', () => {
-    const cmd = buildAgentCommand('codex', 'analyze this', '/tmp/report.json');
+    const cmd = buildAgentCommand('codex', 'analyze this', '/tmp/report.json', 'gpt-5.3-codex');
     const validCommands = ['codex', process.execPath];
     expect(validCommands).toContain(cmd.command);
     expect(cmd.args).toContain('exec');
@@ -101,6 +105,13 @@ describe('buildAgentCommand', () => {
     expect(cmd.args).toContain('--ephemeral');
     expect(cmd.args).not.toContain('--approval-mode');
     expect(cmd.args).not.toContain('-q');
+    expect(cmd.args).toContain('--model');
+    expect(cmd.args).toContain('gpt-5.3-codex');
+  });
+
+  it('does not pass a model flag when automatic model selection is requested', () => {
+    const cmd = buildAgentCommand('github-copilot', 'analyze this', '/tmp/report.json', 'auto');
+    expect(cmd.args).not.toContain('--model');
   });
 
   it('throws for unknown agent', () => {
@@ -232,11 +243,13 @@ describe('mergeReports', () => {
       message: 'Missing await',
     }];
 
-    const merged = mergeReports(report, aiFindings, 'github-copilot', 5000);
+    const merged = mergeReports(report, aiFindings, 'github-copilot', 5000, undefined, 'high', 'gpt-5.6-sol');
     expect(merged.tiers.ai.ran).toBe(true);
     expect(merged.tiers.ai.checks).toHaveLength(1);
     expect(merged.tiers.ai.agent).toBe('github-copilot');
     expect(merged.tiers.ai.durationMs).toBe(5000);
+    expect(merged.tiers.ai.requestedModel).toBe('gpt-5.6-sol');
+    expect(merged.tiers.ai.effectiveModel).toBeUndefined();
     expect(merged.summary.total).toBe(2);
     expect(merged.summary.high).toBe(1);
     expect(merged.summary.status).toBe('fail');
@@ -248,6 +261,12 @@ describe('mergeReports', () => {
     expect(merged.tiers.ai.ran).toBe(true);
     expect(merged.tiers.ai.checks).toHaveLength(0);
     expect(merged.summary.status).toBe('pass');
+  });
+
+  it('records automatic model selection explicitly without claiming an effective model', () => {
+    const merged = mergeReports(makeBaseReport(), [], 'github-copilot', 3000, undefined, 'high', 'auto');
+    expect(merged.tiers.ai.requestedModel).toBe('auto');
+    expect(merged.tiers.ai.effectiveModel).toBeUndefined();
   });
 
   it('recalculates summary totals', () => {

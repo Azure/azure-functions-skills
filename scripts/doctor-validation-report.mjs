@@ -8,6 +8,7 @@
  *
  * Usage:
  *   node scripts/doctor-validation-report.mjs [--fixtures-dir <path>] [--output <path>]
+ *   node scripts/doctor-validation-report.mjs --list-expectations
  *
  * Defaults:
  *   --fixtures-dir  current working directory
@@ -32,6 +33,7 @@ function parseArgs(argv) {
     if (a === '--fixtures-dir' || a === '-d') out.fixturesDir = argv[++i];
     else if (a === '--output' || a === '-o') out.output = argv[++i];
     else if (a === '--help' || a === '-h') out.help = true;
+    else if (a === '--list-expectations') out.listExpectations = true;
     else if (!a.startsWith('-') && !out.fixturesDir) out.fixturesDir = a;
   }
   return out;
@@ -72,7 +74,7 @@ const EXPECTED = {
     { id: 'SC-001', desc: 'Storage account key split across variables',
       keywords: [['secret', 'key', 'credential', 'connection string', 'hardcod'], ['split', 'concatenat', 'obfuscat', 'accountkey', 'storage']] },
     { id: 'JS-005', desc: 'tsconfig CommonJS vs ESM mismatch',
-      keywords: [['tsconfig', 'module', 'commonjs', 'esm', 'esmodule', 'cjs']] },
+      keywords: [['commonjs', 'cjs'], ['esm', 'es module', 'import syntax', 'module mismatch']] },
   ],
   'node-deep-durable-nondeterministic': [
     { id: 'Durable', desc: 'Date.now() in orchestrator',
@@ -104,7 +106,7 @@ const EXPECTED = {
     { id: 'CQ-008', desc: 'Cosmos DB output binding without conflict handling',
       keywords: [['output binding', 'cosmos'], ['conflict', 'throttl', 'error', 'failure', 'no way to handle']] },
     { id: 'CQ-007', desc: 'Returns success without verifying output binding',
-      keywords: [['success', 'verif', 'confirm', 'binding succeed', 'before', 'return']] },
+      keywords: [['output binding', 'cosmos output', 'extraoutputs'], ['success', 'verif', 'confirm', 'binding succeed', 'write complete']] },
   ],
   'python-deep-blocking-sync': [
     { id: 'PY-002', desc: 'requests library — synchronous HTTP',
@@ -194,6 +196,18 @@ const EXPECTED = {
     { id: 'CQ-007', desc: 'No error handling around Invoke-RestMethod',
       keywords: [['invoke-restmethod', 'invoke restmethod'], ['try', 'catch', 'error', 'exception', 'handling']] },
   ],
+  'go-deep-toolchain-and-runtime': [
+    { id: 'GO-001', desc: 'Unrecovered panic in worker goroutine',
+      keywords: [['panic', 'mustprocess'], ['goroutine', 'worker process', 'recoverto', 'errgroup']] },
+    { id: 'GO-003', desc: 'http.Client constructed inside handler',
+      keywords: [['http.client', 'http client'], ['inside', 'handler', 'package scope', 'reuse', 'per invocation']] },
+    { id: 'GO-004', desc: 'FUNCTIONS_WORKER_RUNTIME must be native',
+      keywords: [['functions_worker_runtime', 'worker runtime'], ['native', 'must use native', 'set to go']] },
+    { id: 'GO-002', desc: 'Worker module pinned to pseudo-version',
+      keywords: [['pseudo-version', 'pseudo version', 'untagged'], ['worker', 'module', 'release', 'version']] },
+    { id: 'SC-002', desc: 'Anonymous HTTP trigger',
+      keywords: [['anonymous', 'withauth'], ['http', 'trigger', 'public', 'auth']] },
+  ],
   'node-supply-chain-postinstall': [
     { id: 'SC-101', desc: 'Module-load side effect (detached spawn at require)',
       keywords: [['spawn', 'detached', 'unref', 'module load', 'import time', 'at load'], ['side effect', 'module', 'load', 'import', 'startup']] },
@@ -209,6 +223,8 @@ const EXPECTED = {
       keywords: [['iife', 'self-executing', 'immediately', 'module load', 'import time'], ['side effect', 'load', 'startup']] },
     { id: 'SC-102', desc: 'Fetch then execute downloaded file',
       keywords: [['fetch', 'download', 'https.get', 'urlretrieve', 'retrieve'], ['execute', 'spawn', 'subprocess', 'run']] },
+    { id: 'SC-103', desc: 'Empty catch suppresses errors',
+      keywords: [['empty catch', 'silent', 'swallow'], ['error', 'exception', 'suppress', 'catch']] },
     { id: 'SC-104', desc: 'Raw IP host (C2 indicator)',
       keywords: [['raw ip', 'ip address', '192.0.2', '192.', 'numeric host'], ['c2', 'command and control', 'host', 'url']] },
     { id: 'SC-108', desc: 'Anti-analysis gates (Linux only, CPU >2, skip Russian)',
@@ -236,6 +252,18 @@ const EXPECTED = {
   ],
 };
 
+if (args.listExpectations) {
+  console.log(JSON.stringify(
+    Object.fromEntries(Object.entries(EXPECTED).map(([fixture, expectations]) => [
+      fixture,
+      expectations.map(expectation => expectation.id),
+    ])),
+    null,
+    2,
+  ));
+  process.exit(0);
+}
+
 function loadFixtureResult(fixtureDir) {
   const reportPath = join(fixtureDir, 'doctor-result.json');
   if (!existsSync(reportPath)) return null;
@@ -259,6 +287,68 @@ function findingHaystack(check) {
     check.file || '',
     check.recommendation || '',
   ].join(' ').toLowerCase();
+}
+
+function matchExpectation(expectation, check) {
+  const haystack = findingHaystack(check);
+  const matchedGroups = [];
+  for (const group of expectation.keywords) {
+    const signal = group
+      .filter(keyword => haystack.includes(keyword.toLowerCase()))
+      .sort((left, right) => right.length - left.length)[0];
+    if (!signal) return null;
+    matchedGroups.push(signal);
+  }
+  return {
+    check,
+    matchedGroups,
+    score: matchedGroups.reduce((total, signal) => total + signal.length, 0),
+  };
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function validateFixture(fixtureDir, name, report) {
+  const errors = [];
+  if (existsSync(join(fixtureDir, name))) {
+    errors.push(`nested fixture directory detected: ${name}/${name}`);
+  }
+  if (report && report.tiers?.ai?.ran !== true) {
+    errors.push('deep analysis did not run (tiers.ai.ran is not true)');
+  }
+  const cachePath = join(fixtureDir, '.azure-functions-doctor', 'doctor-ai-findings.json');
+  if (report && existsSync(cachePath)) {
+    try {
+      const cached = JSON.parse(readFileSync(cachePath, 'utf-8'));
+      if (!Array.isArray(cached)) {
+        errors.push('cached AI findings are not a JSON array');
+      } else {
+        const validCached = cached.filter(finding =>
+          finding && typeof finding === 'object'
+          && typeof finding.id === 'string'
+          && typeof finding.category === 'string'
+          && typeof finding.severity === 'string'
+          && typeof finding.status === 'string'
+          && typeof finding.title === 'string'
+          && typeof finding.message === 'string'
+        );
+        if (validCached.length !== cached.length) {
+          errors.push('cached AI findings contain invalid entries');
+        } else if (stableJson(validCached) !== stableJson(report.tiers?.ai?.checks || [])) {
+          errors.push('cached AI findings conflict with doctor-result.json');
+        }
+      }
+    } catch (error) {
+      errors.push(`cached AI findings are invalid: ${error.message}`);
+    }
+  }
+  return errors;
 }
 
 function escapeHtml(s) {
@@ -302,40 +392,47 @@ const fixtureResults = [];
 let totalExpected = 0;
 let totalMatched = 0;
 let totalExtra = 0;
+let invalidFixtures = 0;
+const findingEdges = new Map();
+const selectedFindingCoverage = new Map();
 
 for (const name of fixtures) {
   const fixtureDir = join(fixturesDir, name);
   const report = loadFixtureResult(fixtureDir);
   if (!report) {
     fixtureResults.push({ name, error: 'doctor-result.json not found or invalid' });
+    invalidFixtures++;
     continue;
   }
+  const integrityErrors = validateFixture(fixtureDir, name, report);
+  if (integrityErrors.length > 0) invalidFixtures++;
 
   const aiChecks = report.tiers?.ai?.checks || [];
   const aiError = report.tiers?.ai?.error;
   const aiDuration = report.tiers?.ai?.durationMs;
   const expected = EXPECTED[name] || [];
-  const usedAiChecks = new Set();
-
   const expectations = expected.map(exp => {
-    // Find a matching AI check that's not yet used
-    let matchedCheck = null;
-    for (const check of aiChecks) {
-      if (usedAiChecks.has(check)) continue;
-      const hay = findingHaystack(check);
-      const allGroupsHit = exp.keywords.every(group =>
-        group.some(kw => hay.includes(kw.toLowerCase()))
-      );
-      if (allGroupsHit) {
-        matchedCheck = check;
-        usedAiChecks.add(check);
-        break;
-      }
+    const candidates = aiChecks
+      .map(check => matchExpectation(exp, check))
+      .filter(Boolean)
+      .sort((left, right) => right.score - left.score);
+    for (const candidate of candidates) {
+      findingEdges.set(candidate.check, (findingEdges.get(candidate.check) || 0) + 1);
     }
-    return { ...exp, matched: matchedCheck };
+    return { ...exp, matched: candidates[0] || null, candidates };
   });
+  for (const expectation of expectations) {
+    if (expectation.matched) {
+      selectedFindingCoverage.set(
+        expectation.matched.check,
+        (selectedFindingCoverage.get(expectation.matched.check) || 0) + 1,
+      );
+    }
+  }
 
-  const extras = aiChecks.filter(c => !usedAiChecks.has(c));
+  const extras = aiChecks.filter(check =>
+    !expectations.some(expectation => expectation.candidates.some(candidate => candidate.check === check))
+  );
   const matchedCount = expectations.filter(e => e.matched).length;
 
   totalExpected += expectations.length;
@@ -348,14 +445,18 @@ for (const name of fixtures) {
     summary: report.summary,
     aiError,
     aiDuration,
+    requestedModel: report.tiers?.ai?.requestedModel || 'unknown',
+    effectiveModel: report.tiers?.ai?.effectiveModel,
     aiCount: aiChecks.length,
     expectations,
     extras,
     matchedCount,
+    integrityErrors,
   });
 }
 
 const recall = totalExpected > 0 ? (totalMatched / totalExpected) * 100 : 0;
+const associatedFindings = findingEdges.size;
 
 // ── Render HTML ──
 
@@ -434,6 +535,8 @@ const html = `<!DOCTYPE html>
     <div class="card"><div class="num">${totalMatched}</div><div class="label">Matched by AI</div></div>
     <div class="card"><div class="num">${recall.toFixed(0)}%</div><div class="label">Recall</div></div>
     <div class="card"><div class="num">${totalExtra}</div><div class="label">Extra findings</div></div>
+    <div class="card"><div class="num">${associatedFindings}</div><div class="label">Associated AI findings</div></div>
+    <div class="card"><div class="num">${invalidFixtures}</div><div class="label">Invalid fixtures</div></div>
   </div>
 
   <div class="legend">
@@ -485,8 +588,9 @@ const html = `<!DOCTYPE html>
     <div class="fixture-header">
       <div class="fixture-name">${escapeHtml(f.name)}</div>
       <div>${statusBadge(f.matchedCount, f.expectations.length)}</div>
-      <div class="fixture-meta">${escapeHtml(f.language)} · ${f.aiCount} AI checks · ${f.aiDuration ? (f.aiDuration / 1000).toFixed(1) + 's' : '—'}</div>
+      <div class="fixture-meta">${escapeHtml(f.language)} · ${f.aiCount} AI checks · ${f.aiDuration ? (f.aiDuration / 1000).toFixed(1) + 's' : '—'} · Requested model: ${escapeHtml(f.requestedModel)}${f.effectiveModel ? ` · Effective model: ${escapeHtml(f.effectiveModel)}` : ''}</div>
     </div>
+    ${f.integrityErrors.length > 0 ? `<div class="error-msg"><strong>INVALID:</strong> ${f.integrityErrors.map(escapeHtml).join('; ')}</div>` : ''}
     ${f.aiError ? `<div class="error-msg">AI tier error: ${escapeHtml(f.aiError)}</div>` : ''}
 
     <h3>Expected findings (${f.matchedCount}/${f.expectations.length} matched)</h3>
@@ -497,9 +601,12 @@ const html = `<!DOCTYPE html>
       </div>
       ${exp.matched ? `
         <div class="finding-msg">
-          → matched: <strong>${escapeHtml(exp.matched.title)}</strong> ${severityBadge(exp.matched.severity)}
-          ${exp.matched.file ? `<br><span class="finding-file">${escapeHtml(exp.matched.file)}${exp.matched.line ? ':' + exp.matched.line : ''}</span>` : ''}
-          <details><summary>Show AI message</summary><div>${escapeHtml(exp.matched.message)}</div></details>
+          → matched: <strong>${escapeHtml(exp.matched.check.title)}</strong> ${severityBadge(exp.matched.check.severity)}
+          · required groups: ${exp.matched.matchedGroups.map(escapeHtml).join(', ')}
+          ${exp.matched.check.file ? `<br><span class="finding-file">${escapeHtml(exp.matched.check.file)}${exp.matched.check.line ? ':' + exp.matched.check.line : ''}</span>` : ''}
+          ${selectedFindingCoverage.get(exp.matched.check) > 1 ? `<br><strong>matched ${selectedFindingCoverage.get(exp.matched.check)} expectations</strong>` : ''}
+          <details><summary>Show AI message</summary><div>${escapeHtml(exp.matched.check.message)}</div></details>
+          ${exp.candidates.length > 1 ? `<details><summary>Show ${exp.candidates.length - 1} alternative candidate(s)</summary><div>${exp.candidates.slice(1).map(candidate => `${escapeHtml(candidate.check.id)}: ${escapeHtml(candidate.check.title)} (signals: ${candidate.matchedGroups.map(escapeHtml).join(', ')})`).join('<br>')}</div></details>` : ''}
         </div>
       ` : `<div class="finding-msg" style="color:#a4262c">AI did not produce a matching finding.</div>`}
     </div>`).join('')}
@@ -519,7 +626,7 @@ const html = `<!DOCTYPE html>
 
   <h2>Notes</h2>
   <ul>
-    <li><strong>Matching strategy:</strong> Each expected finding has groups of keywords; a match requires <em>every group</em> to have at least one keyword present in the AI finding's title/message/file/id.</li>
+    <li><strong>Matching strategy:</strong> Every expected finding is evaluated against every AI finding. A match requires every required keyword group, and a single AI finding may cover multiple expectations.</li>
     <li><strong>Recall</strong> = matched expected findings ÷ total expected findings.</li>
     <li><strong>Extras</strong> are AI findings not matching any expected entry. These may be valid (LLM found additional issues) or hallucinations (false positives).</li>
     <li>This report is <strong>advisory</strong> — LLM output is non-deterministic; rerun to see variability.</li>
@@ -531,3 +638,10 @@ writeFileSync(outputPath, html, 'utf-8');
 console.log(`Report written: ${outputPath}`);
 console.log(`Overall: ${totalMatched}/${totalExpected} expected findings matched (${recall.toFixed(1)}% recall)`);
 console.log(`Extras: ${totalExtra} AI findings not in expected list`);
+if (invalidFixtures > 0) {
+  console.log(`INVALID: ${invalidFixtures} fixture workspace(s) failed integrity validation`);
+  for (const fixture of fixtureResults.filter(result => result.integrityErrors?.length)) {
+    console.log(`  ${fixture.name}: ${fixture.integrityErrors.join('; ')}`);
+  }
+  process.exitCode = 1;
+}

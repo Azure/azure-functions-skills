@@ -76,6 +76,8 @@ export interface TierResult {
 
 export interface AiTierResult extends TierResult {
   agent?: string;
+  requestedModel?: string;
+  effectiveModel?: string;
   durationMs?: number;
   error?: string;
 }
@@ -110,6 +112,7 @@ export interface DoctorOptions {
   dir: string;
   deep: boolean;
   agent?: string;
+  model?: string;
   timeout: number;
   format: OutputFormat;
   output: string;
