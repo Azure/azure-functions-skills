@@ -14,7 +14,7 @@ resources:
     pipelines:
         - pipeline: officialBuild
           project: internal
-          source: functions-skills.official
+          source: azure-functions-skills.official
           branch: main
 
 variables:
