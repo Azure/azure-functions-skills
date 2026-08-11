@@ -1,62 +1,84 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Azure Functions Skills E2E — 20260804-1011-main-merge</title>
+<title>Azure Functions Skills E2E Report — 20260810-132424</title>
 <style>
-  :root { color-scheme: light dark; --pass:#15803d; --fail:#b91c1c; --border:#94a3b8; }
-  body { max-width: 1500px; margin: 0 auto; padding: 24px; font: 14px/1.5 system-ui,sans-serif; }
-  h1,h2 { line-height:1.2; } .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
-  .card,details { border:1px solid var(--border); border-radius:8px; padding:12px; margin:12px 0; }
-  .card strong { display:block; font-size:1.5rem; } .pass { color:var(--pass); font-weight:700; }
-  .fail { color:var(--fail); font-weight:700; } table { border-collapse:collapse; width:100%; }
-  th,td { border:1px solid var(--border); padding:8px; vertical-align:top; text-align:left; }
-  pre { max-width:520px; max-height:280px; overflow:auto; white-space:pre-wrap; margin:0; }
-  .scroll { overflow:auto; } summary { cursor:pointer; } code { overflow-wrap:anywhere; }
-  @media print { details { break-inside:avoid; } details > * { display:block !important; } }
+  :root { --ok:#1a7f37; --bad:#cf222e; --warn:#9a6700; --bg:#f6f8fa; --bd:#d0d7de; --fg:#1f2328; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--fg); margin:0; padding:0 1rem 4rem; line-height:1.5; }
+  header { padding:1.5rem 0 1rem; border-bottom:1px solid var(--bd); }
+  h1 { margin:0 0 .25rem; font-size:1.5rem; }
+  .meta { color:#57606a; font-size:.9rem; }
+  .meta code { background:var(--bg); padding:.05rem .3rem; border-radius:4px; }
+  .cards { display:flex; flex-wrap:wrap; gap:.75rem; margin:1rem 0; }
+  .card { border:1px solid var(--bd); border-radius:8px; padding:.75rem 1rem; min-width:120px; background:#fff; }
+  .card .n { font-size:1.6rem; font-weight:700; }
+  .card.pass .n { color:var(--ok); } .card.fail .n { color:var(--bad); } .card.blocked .n { color:var(--warn); }
+  table.tbl { border-collapse:collapse; width:100%; margin:.5rem 0 1.5rem; }
+  table.tbl th, table.tbl td { border:1px solid var(--bd); padding:.4rem .6rem; text-align:left; font-size:.9rem; vertical-align:top; }
+  table.tbl th { background:var(--bg); }
+  .status { font-weight:700; text-transform:uppercase; font-size:.75rem; padding:.1rem .45rem; border-radius:999px; }
+  .status.pass { color:#fff; background:var(--ok); } .status.fail { color:#fff; background:var(--bad); }
+  .status.blocked { color:#fff; background:var(--warn); } .status.incomplete { color:#fff; background:#8250df; }
+  section.case { border:1px solid var(--bd); border-radius:8px; padding:1rem 1.25rem; margin:1rem 0; background:#fff; }
+  section.case h3 { margin-top:0; }
+  .analysis { color:#57606a; }
+  details.cmd { border:1px solid var(--bd); border-radius:6px; margin:.4rem 0; background:var(--bg); }
+  details.cmd summary { cursor:pointer; padding:.5rem .75rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+  details.cmd summary code { font-size:.82rem; }
+  .cid { font-weight:700; font-family:monospace; }
+  .badge { font-size:.72rem; font-weight:700; padding:.05rem .4rem; border-radius:999px; color:#fff; }
+  .badge.ok { background:var(--ok); } .badge.bad { background:var(--bad); } .badge.warn { background:var(--warn); }
+  details.cmd .kv, details.cmd .io { padding:0 .75rem; }
+  .io-h { font-size:.75rem; text-transform:uppercase; color:#57606a; margin-top:.4rem; }
+  pre { background:#0d1117; color:#e6edf3; padding:.6rem .8rem; border-radius:6px; overflow:auto; font-size:.8rem; max-height:420px; }
+  td.ok, .ok { color:var(--ok); font-weight:600; } td.bad, .bad { color:var(--bad); font-weight:600; }
+  .counters pre { background:var(--bg); color:var(--fg); border:1px solid var(--bd); }
+  a { color:#0969da; }
+  @media print { details.cmd[open] summary { } pre { max-height:none; } details { break-inside: avoid; } }
 </style>
 </head>
 <body>
-<h1>Azure Functions Skills E2E Report</h1>
-<p><strong>Run:</strong> 20260804-1011-main-merge<br>
-<strong>Package:</strong> 0.0.5-preview<br>
-<strong>Platform:</strong> Windows / Node.js v24.16.0<br>
-<strong>Commit:</strong> <code>3fd2a49fbff173447282fe0539197c88fabc9fb0</code><br>
-<strong>Started:</strong> 2026-08-04T17:10:49.7230886Z<br>
-<strong>Completed:</strong> 2026-08-04T17:11:28.5054542Z</p>
+<header>
+  <h1>Azure Functions Skills — Local E2E Report</h1>
+  <div class="meta">
+    Run ID <code>20260810-132424</code> &middot; Generated <code>2026-08-10T20:34:35.094Z</code><br>
+    Package version <code>0.0.6-preview</code> &middot; Platform <code>windows</code> &middot; Git commit <code>0bd094698feb680a684c41905b971ec43fd7eb4c</code>
+  </div>
+</header>
 
-<div class="cards">
-  <div class="card"><span>Test cases passed</span><strong class="pass">6/6</strong></div>
-  <div class="card"><span>Test cases failed</span><strong class="pass">0</strong></div>
-  <div class="card"><span>Commands</span><strong class="pass">38/38</strong></div>
-  <div class="card"><span>Missing commands</span><strong class="pass">0</strong></div>
-</div>
+<section>
+  <h2>Summary</h2>
+  <div class="cards">
+    <div class="card pass"><div class="n">6</div><div>Pass</div></div>
+    <div class="card fail"><div class="n">0</div><div>Fail</div></div>
+    <div class="card blocked"><div class="n">0</div><div>Blocked</div></div>
+    <div class="card"><div class="n">38/38</div><div>Commands (actual/expected)</div></div>
+    <div class="card"><div class="n">6</div><div>Test cases</div></div>
+  </div>
+</section>
 
-<h2>Test matrix</h2>
-<table><thead><tr><th>Test case</th><th>Agent</th><th>Scenario</th><th>Status</th></tr></thead>
-<tbody><tr><td>TC-S1-GHCP-LOCAL</td><td>GHCP</td><td>Fresh install</td><td class="pass">PASS</td></tr><tr><td>TC-S1-CLAUDE-LOCAL</td><td>Claude</td><td>Fresh install</td><td class="pass">PASS</td></tr><tr><td>TC-S1-CODEX-LOCAL</td><td>Codex</td><td>Fresh install</td><td class="pass">PASS</td></tr><tr><td>TC-S2-GHCP-LOCAL</td><td>GHCP</td><td>Ownership-aware update</td><td class="pass">PASS</td></tr><tr><td>TC-S2-CLAUDE-LOCAL</td><td>Claude</td><td>Ownership-aware update</td><td class="pass">PASS</td></tr><tr><td>TC-S2-CODEX-LOCAL</td><td>Codex</td><td>Ownership-aware update</td><td class="pass">PASS</td></tr></tbody></table>
+<section>
+  <h2>Preflight</h2>
+  <p>Status: <span class="status pass">pass</span> &middot;
+     <code>install --local</code> listed: <span class="ok">true</span> &middot;
+     <code>update --local</code> listed: <span class="ok">true</span> &middot;
+     no <code>chat</code>: <span class="ok">true</span> &middot;
+     no <code>setup</code>: <span class="ok">true</span></p>
 
-<h2>Preflight evidence</h2>
-<div class="scroll"><table>
-<thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout</th><th>stderr</th><th>Timestamp</th></tr></thead>
-<tbody>
-  <tr>
-    <td><code>PF-1</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' --version</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>0.0.5-preview
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:49.7230886Z</time></td>
-  </tr>
-  <tr>
-    <td><code>PF-2</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' --help</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>@azure/functions-skills — Azure Functions skills for coding agents
+  <details class="cmd">
+    <summary><span class="cid">PF-1</span> <span class="badge ok">exit 0</span> <code>$CLI --version</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>0.0.6-preview
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">PF-2</span> <span class="badge ok">exit 0</span> <code>$CLI --help</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>@azure/functions-skills — Azure Functions skills for coding agents
 
 Commands:
   install --local   Copy skills, MCP, and telemetry hooks into a workspace
@@ -67,811 +89,714 @@ Commands:
   build             Build local and plugin artifacts
 
 Plugin installation is managed by the host coding agent, not this package.
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:50.3616645Z</time></td>
-  </tr></tbody>
-</table></div>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+</section>
 
-<h2>Per-case evidence</h2>
-
-<details>
-  <summary><strong>TC-S1-GHCP-LOCAL</strong> — GHCP /
-    Fresh install <span class="pass">PASS</span>
-  </summary>
-  <p><strong>Analysis:</strong> The generated workspace contains the expected skill, MCP/settings, and telemetry hook surfaces, with obsolete managed assets absent.</p>
-  <p><strong>File verification:</strong> command
-    <code>S1GL-5</code> exited 0 and covers all required existence,
-    absence, preservation, replacement, and migration assertions for this case.</p>
-  <div class="scroll"><table>
-    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
-    <tbody>
+<section>
+  <h2>Test matrix</h2>
+  <table class="tbl"><thead><tr><th>Test case</th><th>Agent</th><th>Scenario</th><th>Status</th></tr></thead>
+  <tbody>
   <tr>
-    <td><code>S1GL-1</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' | Out-Null</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:50.9836100Z</time></td>
+    <td><a href="#TC-S1-GHCP-LOCAL">TC-S1-GHCP-LOCAL</a></td>
+    <td>ghcp</td>
+    <td>fresh-install</td>
+    <td class="status pass">pass</td>
   </tr>
   <tr>
-    <td><code>S1GL-2</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent ghcp --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally installed.
+    <td><a href="#TC-S1-CLAUDE-LOCAL">TC-S1-CLAUDE-LOCAL</a></td>
+    <td>claude</td>
+    <td>fresh-install</td>
+    <td class="status pass">pass</td>
+  </tr>
+  <tr>
+    <td><a href="#TC-S1-CODEX-LOCAL">TC-S1-CODEX-LOCAL</a></td>
+    <td>codex</td>
+    <td>fresh-install</td>
+    <td class="status pass">pass</td>
+  </tr>
+  <tr>
+    <td><a href="#TC-S2-GHCP-LOCAL">TC-S2-GHCP-LOCAL</a></td>
+    <td>ghcp</td>
+    <td>update-ownership</td>
+    <td class="status pass">pass</td>
+  </tr>
+  <tr>
+    <td><a href="#TC-S2-CLAUDE-LOCAL">TC-S2-CLAUDE-LOCAL</a></td>
+    <td>claude</td>
+    <td>update-ownership</td>
+    <td class="status pass">pass</td>
+  </tr>
+  <tr>
+    <td><a href="#TC-S2-CODEX-LOCAL">TC-S2-CODEX-LOCAL</a></td>
+    <td>codex</td>
+    <td>update-ownership</td>
+    <td class="status pass">pass</td>
+  </tr></tbody></table>
+</section>
+
+<section>
+  <h2>Per-case evidence</h2>
+
+  <section class="case" id="TC-S1-GHCP-LOCAL">
+    <h3>TC-S1-GHCP-LOCAL <span class="status pass">pass</span></h3>
+    <p class="analysis">Fresh GHCP local install produced skills, MCP, and telemetry hooks only; no legacy or agent-definition artifacts.</p>
+    <h4>Commands</h4>
+
+  <details class="cmd">
+    <summary><span class="cid">S1GL-1</span> <span class="badge ok">exit 0</span> <code>mkdir -p $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1GL-2</span> <span class="badge ok">exit 0</span> <code>$CLI install --local --agent ghcp --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally installed.
   Agents: ghcp
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:51.5566826Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1GL-3</code></td>
-    <td><code>Get-ChildItem -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' -Recurse -File | ForEach-Object { $_.FullName.Substring('Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL'.Length + 1) } | Sort-Object</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>.github\hooks\azure-functions-telemetry.json
-.github\hooks\scripts\track-telemetry.ps1
-.github\hooks\scripts\track-telemetry.sh
-.github\hooks\telemetry.config.json
-.github\skills\azure-functions-agents\assets\infra\app\trigger-config.bicep
-.github\skills\azure-functions-agents\references\abbreviations.json
-.github\skills\azure-functions-agents\references\agent-authoring.md
-.github\skills\azure-functions-agents\references\agent-files.md
-.github\skills\azure-functions-agents\references\built-in-endpoints.md
-.github\skills\azure-functions-agents\references\connector-mcp.md
-.github\skills\azure-functions-agents\references\connector-schemas.md
-.github\skills\azure-functions-agents\references\connector-smoke-tests.md
-.github\skills\azure-functions-agents\references\connector-teams.md
-.github\skills\azure-functions-agents\references\connector-triggers.md
-.github\skills\azure-functions-agents\references\connectors.md
-.github\skills\azure-functions-agents\references\infra-and-deployment.md
-.github\skills\azure-functions-agents\references\models.md
-.github\skills\azure-functions-agents\references\project-files.md
-.github\skills\azure-functions-agents\references\quickstart-reference.md
-.github\skills\azure-functions-agents\references\sessions.md
-.github\skills\azure-functions-agents\references\testing.md
-.github\skills\azure-functions-agents\references\tools-and-skills.md
-.github\skills\azure-functions-agents\references\triggers.md
-.github\skills\azure-functions-agents\references\troubleshooting.md
-.github\skills\azure-functions-agents\SKILL.md
-.github\skills\azure-functions-best-practices\references\remediation-patterns.md
-.github\skills\azure-functions-best-practices\references\review-checklist.md
-.github\skills\azure-functions-best-practices\SKILL.md
-.github\skills\azure-functions-common\references\extensions\azure-tables.md
-.github\skills\azure-functions-common\references\extensions\cosmos-db.md
-.github\skills\azure-functions-common\references\extensions\dapr.md
-.github\skills\azure-functions-common\references\extensions\durable-functions.md
-.github\skills\azure-functions-common\references\extensions\event-grid.md
-.github\skills\azure-functions-common\references\extensions\event-hubs.md
-.github\skills\azure-functions-common\references\extensions\extension-bundles.md
-.github\skills\azure-functions-common\references\extensions\fabric.md
-.github\skills\azure-functions-common\references\extensions\http.md
-.github\skills\azure-functions-common\references\extensions\kafka.md
-.github\skills\azure-functions-common\references\extensions\mcp.md
-.github\skills\azure-functions-common\references\extensions\mysql.md
-.github\skills\azure-functions-common\references\extensions\rabbitmq.md
-.github\skills\azure-functions-common\references\extensions\redis.md
-.github\skills\azure-functions-common\references\extensions\sendgrid.md
-.github\skills\azure-functions-common\references\extensions\service-bus.md
-.github\skills\azure-functions-common\references\extensions\signalr.md
-.github\skills\azure-functions-common\references\extensions\sql.md
-.github\skills\azure-functions-common\references\extensions\storage-blob.md
-.github\skills\azure-functions-common\references\extensions\storage-queue.md
-.github\skills\azure-functions-common\references\extensions\timer.md
-.github\skills\azure-functions-common\references\extensions\twilio.md
-.github\skills\azure-functions-common\references\extensions\web-pubsub.md
-.github\skills\azure-functions-common\references\languages\csharp.md
-.github\skills\azure-functions-common\references\languages\durable-functions.md
-.github\skills\azure-functions-common\references\languages\go.md
-.github\skills\azure-functions-common\references\languages\java.md
-.github\skills\azure-functions-common\references\languages\node-typescript.md
-.github\skills\azure-functions-common\references\languages\powershell.md
-.github\skills\azure-functions-common\references\languages\python.md
-.github\skills\azure-functions-common\references\local-emulators.md
-.github\skills\azure-functions-common\references\routing.md
-.github\skills\azure-functions-common\SKILL.md
-.github\skills\azure-functions-create\references\go-project.md
-.github\skills\azure-functions-create\references\language-snippets.md
-.github\skills\azure-functions-create\SKILL.md
-.github\skills\azure-functions-deploy\SKILL.md
-.github\skills\azure-functions-diagnostics\references\evidence-checklist.md
-.github\skills\azure-functions-diagnostics\references\workflow.md
-.github\skills\azure-functions-diagnostics\SKILL.md
-.github\skills\azure-functions-doctor\references\ai-semantic-checks.md
-.github\skills\azure-functions-doctor\references\ci-usage.md
-.github\skills\azure-functions-doctor\references\iac-azure-resource-checks.md
-.github\skills\azure-functions-doctor\references\language-checks.md
-.github\skills\azure-functions-doctor\references\routing.md
-.github\skills\azure-functions-doctor\references\source-only-checks.md
-.github\skills\azure-functions-doctor\references\supply-chain-checks.md
-.github\skills\azure-functions-doctor\SKILL.md
-.github\skills\azure-functions-feedback\SKILL.md
-.github\skills\azure-functions-health-status\references\health-status-commands-and-kql.md
-.github\skills\azure-functions-health-status\scripts\get-functionapp-health-status.ps1
-.github\skills\azure-functions-health-status\scripts\get-functionapp-health-status.sh
-.github\skills\azure-functions-health-status\SKILL.md
-.github\skills\azure-functions-help\SKILL.md
-.github\skills\azure-functions-inventory\references\inventory-commands.md
-.github\skills\azure-functions-inventory\scripts\get-functionapp-inventory.ps1
-.github\skills\azure-functions-inventory\scripts\get-functionapp-inventory.sh
-.github\skills\azure-functions-inventory\SKILL.md
-.github\skills\azure-functions-setup\SKILL.md
-.mcp.json
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:54.1875325Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1GL-4</code></td>
-    <td><code>if (-not (
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' '.github\skills\azure-functions-help\SKILL.md')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' '.mcp.json')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' '.github\hooks\azure-functions-telemetry.json')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' '.github\hooks\scripts\track-telemetry.sh'))
-)) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:54.8331685Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1GL-5</code></td>
-    <td><code>if (
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' '.azure-functions-skills')) -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' 'AGENTS.md')) -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' '.github\agents')) -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-GHCP-LOCAL' '.github\hooks\welcome-setup.json'))
-) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:55.4132238Z</time></td>
-  </tr></tbody>
-  </table></div>
-</details>
-<details>
-  <summary><strong>TC-S1-CLAUDE-LOCAL</strong> — Claude /
-    Fresh install <span class="pass">PASS</span>
-  </summary>
-  <p><strong>Analysis:</strong> The generated workspace contains the expected skill, MCP/settings, and telemetry hook surfaces, with obsolete managed assets absent.</p>
-  <p><strong>File verification:</strong> command
-    <code>S1CL-5</code> exited 0 and covers all required existence,
-    absence, preservation, replacement, and migration assertions for this case.</p>
-  <div class="scroll"><table>
-    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
-    <tbody>
-  <tr>
-    <td><code>S1CL-1</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' | Out-Null</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:55.9347954Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1CL-2</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent claude --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally installed.
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1GL-3</span> <span class="badge ok">exit 0</span> <code>find $WS -type f | sort</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\hooks\azure-functions-telemetry.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\hooks\scripts\track-telemetry.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\hooks\scripts\track-telemetry.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\hooks\telemetry.config.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\assets\infra\app\trigger-config.bicep
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\abbreviations.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\agent-authoring.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\agent-files.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\built-in-endpoints.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\connector-mcp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\connector-schemas.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\connector-smoke-tests.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\connector-teams.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\connector-triggers.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\connectors.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\infra-and-deployment.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\models.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\project-files.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\quickstart-reference.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\sessions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\testing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\tools-and-skills.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\triggers.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\references\troubleshooting.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-agents\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-best-practices\references\remediation-patterns.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-best-practices\references\review-checklist.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-best-practices\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\azure-tables.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\cosmos-db.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\dapr.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\durable-functions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\event-grid.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\event-hubs.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\extension-bundles.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\fabric.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\http.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\kafka.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\mcp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\mysql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\rabbitmq.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\redis.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\sendgrid.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\service-bus.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\signalr.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\sql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\storage-blob.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\storage-queue.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\timer.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\twilio.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\extensions\web-pubsub.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\languages\csharp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\languages\durable-functions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\languages\go.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\languages\java.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\languages\node-typescript.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\languages\powershell.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\languages\python.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\local-emulators.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\references\routing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-common\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-create\references\go-project.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-create\references\language-snippets.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-create\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-deploy\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-diagnostics\references\evidence-checklist.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-diagnostics\references\workflow.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-diagnostics\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-doctor\references\ai-semantic-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-doctor\references\ci-usage.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-doctor\references\iac-azure-resource-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-doctor\references\language-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-doctor\references\routing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-doctor\references\source-only-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-doctor\references\supply-chain-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-doctor\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-feedback\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-health-status\references\health-status-commands-and-kql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-health-status\scripts\get-functionapp-health-status.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-health-status\scripts\get-functionapp-health-status.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-health-status\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-help\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-inventory\references\inventory-commands.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-inventory\scripts\get-functionapp-inventory.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-inventory\scripts\get-functionapp-inventory.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-inventory\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.github\skills\azure-functions-setup\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-GHCP-LOCAL\.mcp.json
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1GL-4</span> <span class="badge ok">exit 0</span> <code>test -f $WS/.github/skills/azure-functions-help/SKILL.md &amp;&amp; test -f $WS/.mcp.json &amp;&amp; test -f $WS/.github/hooks/azure-functions-telemetry.json &amp;&amp; test -f $WS/.github/hooks/scripts/track-telemetry.sh</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1GL-5</span> <span class="badge ok">exit 0</span> <code>test ! -e $WS/.azure-functions-skills &amp;&amp; test ! -e $WS/AGENTS.md &amp;&amp; test ! -e $WS/.github/agents &amp;&amp; test ! -e $WS/.github/hooks/welcome-setup.json</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+    <h4>File verification</h4>
+    <table class="tbl"><thead><tr><th>Path</th><th>Expected</th><th>Result</th></tr></thead><tbody>
+    <tr><td><code>.github/skills/azure-functions-help/SKILL.md</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.mcp.json</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.github/hooks/azure-functions-telemetry.json</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.github/hooks/scripts/track-telemetry.sh</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.azure-functions-skills</code></td><td>absent</td><td class="ok">pass</td></tr>
+    <tr><td><code>AGENTS.md</code></td><td>absent</td><td class="ok">pass</td></tr>
+    <tr><td><code>.github/agents</code></td><td>absent</td><td class="ok">pass</td></tr>
+    <tr><td><code>.github/hooks/welcome-setup.json</code></td><td>absent</td><td class="ok">pass</td></tr></tbody></table>
+  </section>
+  <section class="case" id="TC-S1-CLAUDE-LOCAL">
+    <h3>TC-S1-CLAUDE-LOCAL <span class="status pass">pass</span></h3>
+    <p class="analysis">Fresh Claude local install produced skills, settings/MCP, and telemetry hooks only; no legacy or agent-definition artifacts.</p>
+    <h4>Commands</h4>
+
+  <details class="cmd">
+    <summary><span class="cid">S1CL-1</span> <span class="badge ok">exit 0</span> <code>mkdir -p $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1CL-2</span> <span class="badge ok">exit 0</span> <code>$CLI install --local --agent claude --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally installed.
   Agents: claude
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:56.4771319Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1CL-3</code></td>
-    <td><code>Get-ChildItem -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' -Recurse -File | ForEach-Object { $_.FullName.Substring('Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL'.Length + 1) } | Sort-Object</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>.claude\hooks\hooks.json
-.claude\hooks\scripts\track-telemetry.ps1
-.claude\hooks\scripts\track-telemetry.sh
-.claude\hooks\telemetry.config.json
-.claude\settings.json
-.claude\skills\azure-functions-agents\assets\infra\app\trigger-config.bicep
-.claude\skills\azure-functions-agents\references\abbreviations.json
-.claude\skills\azure-functions-agents\references\agent-authoring.md
-.claude\skills\azure-functions-agents\references\agent-files.md
-.claude\skills\azure-functions-agents\references\built-in-endpoints.md
-.claude\skills\azure-functions-agents\references\connector-mcp.md
-.claude\skills\azure-functions-agents\references\connector-schemas.md
-.claude\skills\azure-functions-agents\references\connector-smoke-tests.md
-.claude\skills\azure-functions-agents\references\connector-teams.md
-.claude\skills\azure-functions-agents\references\connector-triggers.md
-.claude\skills\azure-functions-agents\references\connectors.md
-.claude\skills\azure-functions-agents\references\infra-and-deployment.md
-.claude\skills\azure-functions-agents\references\models.md
-.claude\skills\azure-functions-agents\references\project-files.md
-.claude\skills\azure-functions-agents\references\quickstart-reference.md
-.claude\skills\azure-functions-agents\references\sessions.md
-.claude\skills\azure-functions-agents\references\testing.md
-.claude\skills\azure-functions-agents\references\tools-and-skills.md
-.claude\skills\azure-functions-agents\references\triggers.md
-.claude\skills\azure-functions-agents\references\troubleshooting.md
-.claude\skills\azure-functions-agents\SKILL.md
-.claude\skills\azure-functions-best-practices\references\remediation-patterns.md
-.claude\skills\azure-functions-best-practices\references\review-checklist.md
-.claude\skills\azure-functions-best-practices\SKILL.md
-.claude\skills\azure-functions-common\references\extensions\azure-tables.md
-.claude\skills\azure-functions-common\references\extensions\cosmos-db.md
-.claude\skills\azure-functions-common\references\extensions\dapr.md
-.claude\skills\azure-functions-common\references\extensions\durable-functions.md
-.claude\skills\azure-functions-common\references\extensions\event-grid.md
-.claude\skills\azure-functions-common\references\extensions\event-hubs.md
-.claude\skills\azure-functions-common\references\extensions\extension-bundles.md
-.claude\skills\azure-functions-common\references\extensions\fabric.md
-.claude\skills\azure-functions-common\references\extensions\http.md
-.claude\skills\azure-functions-common\references\extensions\kafka.md
-.claude\skills\azure-functions-common\references\extensions\mcp.md
-.claude\skills\azure-functions-common\references\extensions\mysql.md
-.claude\skills\azure-functions-common\references\extensions\rabbitmq.md
-.claude\skills\azure-functions-common\references\extensions\redis.md
-.claude\skills\azure-functions-common\references\extensions\sendgrid.md
-.claude\skills\azure-functions-common\references\extensions\service-bus.md
-.claude\skills\azure-functions-common\references\extensions\signalr.md
-.claude\skills\azure-functions-common\references\extensions\sql.md
-.claude\skills\azure-functions-common\references\extensions\storage-blob.md
-.claude\skills\azure-functions-common\references\extensions\storage-queue.md
-.claude\skills\azure-functions-common\references\extensions\timer.md
-.claude\skills\azure-functions-common\references\extensions\twilio.md
-.claude\skills\azure-functions-common\references\extensions\web-pubsub.md
-.claude\skills\azure-functions-common\references\languages\csharp.md
-.claude\skills\azure-functions-common\references\languages\durable-functions.md
-.claude\skills\azure-functions-common\references\languages\go.md
-.claude\skills\azure-functions-common\references\languages\java.md
-.claude\skills\azure-functions-common\references\languages\node-typescript.md
-.claude\skills\azure-functions-common\references\languages\powershell.md
-.claude\skills\azure-functions-common\references\languages\python.md
-.claude\skills\azure-functions-common\references\local-emulators.md
-.claude\skills\azure-functions-common\references\routing.md
-.claude\skills\azure-functions-common\SKILL.md
-.claude\skills\azure-functions-create\references\go-project.md
-.claude\skills\azure-functions-create\references\language-snippets.md
-.claude\skills\azure-functions-create\SKILL.md
-.claude\skills\azure-functions-deploy\SKILL.md
-.claude\skills\azure-functions-diagnostics\references\evidence-checklist.md
-.claude\skills\azure-functions-diagnostics\references\workflow.md
-.claude\skills\azure-functions-diagnostics\SKILL.md
-.claude\skills\azure-functions-doctor\references\ai-semantic-checks.md
-.claude\skills\azure-functions-doctor\references\ci-usage.md
-.claude\skills\azure-functions-doctor\references\iac-azure-resource-checks.md
-.claude\skills\azure-functions-doctor\references\language-checks.md
-.claude\skills\azure-functions-doctor\references\routing.md
-.claude\skills\azure-functions-doctor\references\source-only-checks.md
-.claude\skills\azure-functions-doctor\references\supply-chain-checks.md
-.claude\skills\azure-functions-doctor\SKILL.md
-.claude\skills\azure-functions-feedback\SKILL.md
-.claude\skills\azure-functions-health-status\references\health-status-commands-and-kql.md
-.claude\skills\azure-functions-health-status\scripts\get-functionapp-health-status.ps1
-.claude\skills\azure-functions-health-status\scripts\get-functionapp-health-status.sh
-.claude\skills\azure-functions-health-status\SKILL.md
-.claude\skills\azure-functions-help\SKILL.md
-.claude\skills\azure-functions-inventory\references\inventory-commands.md
-.claude\skills\azure-functions-inventory\scripts\get-functionapp-inventory.ps1
-.claude\skills\azure-functions-inventory\scripts\get-functionapp-inventory.sh
-.claude\skills\azure-functions-inventory\SKILL.md
-.claude\skills\azure-functions-setup\SKILL.md
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:58.8904583Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1CL-4</code></td>
-    <td><code>if (-not (
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\skills\azure-functions-help\SKILL.md')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\settings.json')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\hooks\hooks.json')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\hooks\scripts\track-telemetry.sh'))
-)) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:10:59.5341138Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1CL-5</code></td>
-    <td><code>if (
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' '.azure-functions-skills')) -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' 'CLAUDE.md')) -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CLAUDE-LOCAL' '.claude\agents'))
-) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:00.0848592Z</time></td>
-  </tr></tbody>
-  </table></div>
-</details>
-<details>
-  <summary><strong>TC-S1-CODEX-LOCAL</strong> — Codex /
-    Fresh install <span class="pass">PASS</span>
-  </summary>
-  <p><strong>Analysis:</strong> The generated workspace contains the expected skill, MCP/settings, and telemetry hook surfaces, with obsolete managed assets absent.</p>
-  <p><strong>File verification:</strong> command
-    <code>S1XL-5</code> exited 0 and covers all required existence,
-    absence, preservation, replacement, and migration assertions for this case.</p>
-  <div class="scroll"><table>
-    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
-    <tbody>
-  <tr>
-    <td><code>S1XL-1</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' | Out-Null</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:00.5910786Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1XL-2</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent codex --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally installed.
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1CL-3</span> <span class="badge ok">exit 0</span> <code>find $WS -type f | sort</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\hooks\hooks.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\hooks\scripts\track-telemetry.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\hooks\scripts\track-telemetry.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\hooks\telemetry.config.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\settings.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\assets\infra\app\trigger-config.bicep
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\abbreviations.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\agent-authoring.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\agent-files.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\built-in-endpoints.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\connector-mcp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\connector-schemas.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\connector-smoke-tests.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\connector-teams.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\connector-triggers.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\connectors.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\infra-and-deployment.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\models.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\project-files.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\quickstart-reference.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\sessions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\testing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\tools-and-skills.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\triggers.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\references\troubleshooting.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-agents\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-best-practices\references\remediation-patterns.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-best-practices\references\review-checklist.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-best-practices\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\azure-tables.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\cosmos-db.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\dapr.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\durable-functions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\event-grid.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\event-hubs.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\extension-bundles.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\fabric.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\http.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\kafka.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\mcp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\mysql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\rabbitmq.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\redis.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\sendgrid.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\service-bus.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\signalr.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\sql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\storage-blob.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\storage-queue.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\timer.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\twilio.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\extensions\web-pubsub.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\languages\csharp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\languages\durable-functions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\languages\go.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\languages\java.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\languages\node-typescript.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\languages\powershell.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\languages\python.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\local-emulators.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\references\routing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-common\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-create\references\go-project.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-create\references\language-snippets.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-create\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-deploy\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-diagnostics\references\evidence-checklist.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-diagnostics\references\workflow.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-diagnostics\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-doctor\references\ai-semantic-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-doctor\references\ci-usage.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-doctor\references\iac-azure-resource-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-doctor\references\language-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-doctor\references\routing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-doctor\references\source-only-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-doctor\references\supply-chain-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-doctor\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-feedback\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-health-status\references\health-status-commands-and-kql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-health-status\scripts\get-functionapp-health-status.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-health-status\scripts\get-functionapp-health-status.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-health-status\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-help\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-inventory\references\inventory-commands.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-inventory\scripts\get-functionapp-inventory.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-inventory\scripts\get-functionapp-inventory.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-inventory\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CLAUDE-LOCAL\.claude\skills\azure-functions-setup\SKILL.md
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1CL-4</span> <span class="badge ok">exit 0</span> <code>test -f $WS/.claude/skills/azure-functions-help/SKILL.md &amp;&amp; test -f $WS/.claude/settings.json &amp;&amp; test -f $WS/.claude/hooks/hooks.json &amp;&amp; test -f $WS/.claude/hooks/scripts/track-telemetry.sh</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1CL-5</span> <span class="badge ok">exit 0</span> <code>test ! -e $WS/.azure-functions-skills &amp;&amp; test ! -e $WS/CLAUDE.md &amp;&amp; test ! -e $WS/.claude/agents</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+    <h4>File verification</h4>
+    <table class="tbl"><thead><tr><th>Path</th><th>Expected</th><th>Result</th></tr></thead><tbody>
+    <tr><td><code>.claude/skills/azure-functions-help/SKILL.md</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.claude/settings.json</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.claude/hooks/hooks.json</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.claude/hooks/scripts/track-telemetry.sh</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.azure-functions-skills</code></td><td>absent</td><td class="ok">pass</td></tr>
+    <tr><td><code>CLAUDE.md</code></td><td>absent</td><td class="ok">pass</td></tr>
+    <tr><td><code>.claude/agents</code></td><td>absent</td><td class="ok">pass</td></tr></tbody></table>
+  </section>
+  <section class="case" id="TC-S1-CODEX-LOCAL">
+    <h3>TC-S1-CODEX-LOCAL <span class="status pass">pass</span></h3>
+    <p class="analysis">Fresh Codex local install produced skills, config/MCP, and telemetry hooks only; no legacy or agent-definition artifacts.</p>
+    <h4>Commands</h4>
+
+  <details class="cmd">
+    <summary><span class="cid">S1XL-1</span> <span class="badge ok">exit 0</span> <code>mkdir -p $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1XL-2</span> <span class="badge ok">exit 0</span> <code>$CLI install --local --agent codex --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally installed.
   Agents: codex
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:01.1339815Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1XL-3</code></td>
-    <td><code>Get-ChildItem -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' -Recurse -File | ForEach-Object { $_.FullName.Substring('Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL'.Length + 1) } | Sort-Object</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>.agents\skills\azure-functions-agents\assets\infra\app\trigger-config.bicep
-.agents\skills\azure-functions-agents\references\abbreviations.json
-.agents\skills\azure-functions-agents\references\agent-authoring.md
-.agents\skills\azure-functions-agents\references\agent-files.md
-.agents\skills\azure-functions-agents\references\built-in-endpoints.md
-.agents\skills\azure-functions-agents\references\connector-mcp.md
-.agents\skills\azure-functions-agents\references\connector-schemas.md
-.agents\skills\azure-functions-agents\references\connector-smoke-tests.md
-.agents\skills\azure-functions-agents\references\connector-teams.md
-.agents\skills\azure-functions-agents\references\connector-triggers.md
-.agents\skills\azure-functions-agents\references\connectors.md
-.agents\skills\azure-functions-agents\references\infra-and-deployment.md
-.agents\skills\azure-functions-agents\references\models.md
-.agents\skills\azure-functions-agents\references\project-files.md
-.agents\skills\azure-functions-agents\references\quickstart-reference.md
-.agents\skills\azure-functions-agents\references\sessions.md
-.agents\skills\azure-functions-agents\references\testing.md
-.agents\skills\azure-functions-agents\references\tools-and-skills.md
-.agents\skills\azure-functions-agents\references\triggers.md
-.agents\skills\azure-functions-agents\references\troubleshooting.md
-.agents\skills\azure-functions-agents\SKILL.md
-.agents\skills\azure-functions-best-practices\references\remediation-patterns.md
-.agents\skills\azure-functions-best-practices\references\review-checklist.md
-.agents\skills\azure-functions-best-practices\SKILL.md
-.agents\skills\azure-functions-common\references\extensions\azure-tables.md
-.agents\skills\azure-functions-common\references\extensions\cosmos-db.md
-.agents\skills\azure-functions-common\references\extensions\dapr.md
-.agents\skills\azure-functions-common\references\extensions\durable-functions.md
-.agents\skills\azure-functions-common\references\extensions\event-grid.md
-.agents\skills\azure-functions-common\references\extensions\event-hubs.md
-.agents\skills\azure-functions-common\references\extensions\extension-bundles.md
-.agents\skills\azure-functions-common\references\extensions\fabric.md
-.agents\skills\azure-functions-common\references\extensions\http.md
-.agents\skills\azure-functions-common\references\extensions\kafka.md
-.agents\skills\azure-functions-common\references\extensions\mcp.md
-.agents\skills\azure-functions-common\references\extensions\mysql.md
-.agents\skills\azure-functions-common\references\extensions\rabbitmq.md
-.agents\skills\azure-functions-common\references\extensions\redis.md
-.agents\skills\azure-functions-common\references\extensions\sendgrid.md
-.agents\skills\azure-functions-common\references\extensions\service-bus.md
-.agents\skills\azure-functions-common\references\extensions\signalr.md
-.agents\skills\azure-functions-common\references\extensions\sql.md
-.agents\skills\azure-functions-common\references\extensions\storage-blob.md
-.agents\skills\azure-functions-common\references\extensions\storage-queue.md
-.agents\skills\azure-functions-common\references\extensions\timer.md
-.agents\skills\azure-functions-common\references\extensions\twilio.md
-.agents\skills\azure-functions-common\references\extensions\web-pubsub.md
-.agents\skills\azure-functions-common\references\languages\csharp.md
-.agents\skills\azure-functions-common\references\languages\durable-functions.md
-.agents\skills\azure-functions-common\references\languages\go.md
-.agents\skills\azure-functions-common\references\languages\java.md
-.agents\skills\azure-functions-common\references\languages\node-typescript.md
-.agents\skills\azure-functions-common\references\languages\powershell.md
-.agents\skills\azure-functions-common\references\languages\python.md
-.agents\skills\azure-functions-common\references\local-emulators.md
-.agents\skills\azure-functions-common\references\routing.md
-.agents\skills\azure-functions-common\SKILL.md
-.agents\skills\azure-functions-create\references\go-project.md
-.agents\skills\azure-functions-create\references\language-snippets.md
-.agents\skills\azure-functions-create\SKILL.md
-.agents\skills\azure-functions-deploy\SKILL.md
-.agents\skills\azure-functions-diagnostics\references\evidence-checklist.md
-.agents\skills\azure-functions-diagnostics\references\workflow.md
-.agents\skills\azure-functions-diagnostics\SKILL.md
-.agents\skills\azure-functions-doctor\references\ai-semantic-checks.md
-.agents\skills\azure-functions-doctor\references\ci-usage.md
-.agents\skills\azure-functions-doctor\references\iac-azure-resource-checks.md
-.agents\skills\azure-functions-doctor\references\language-checks.md
-.agents\skills\azure-functions-doctor\references\routing.md
-.agents\skills\azure-functions-doctor\references\source-only-checks.md
-.agents\skills\azure-functions-doctor\references\supply-chain-checks.md
-.agents\skills\azure-functions-doctor\SKILL.md
-.agents\skills\azure-functions-feedback\SKILL.md
-.agents\skills\azure-functions-health-status\references\health-status-commands-and-kql.md
-.agents\skills\azure-functions-health-status\scripts\get-functionapp-health-status.ps1
-.agents\skills\azure-functions-health-status\scripts\get-functionapp-health-status.sh
-.agents\skills\azure-functions-health-status\SKILL.md
-.agents\skills\azure-functions-help\SKILL.md
-.agents\skills\azure-functions-inventory\references\inventory-commands.md
-.agents\skills\azure-functions-inventory\scripts\get-functionapp-inventory.ps1
-.agents\skills\azure-functions-inventory\scripts\get-functionapp-inventory.sh
-.agents\skills\azure-functions-inventory\SKILL.md
-.agents\skills\azure-functions-setup\SKILL.md
-.codex\config.toml
-.codex\hooks.json
-.codex\hooks\scripts\track-telemetry.ps1
-.codex\hooks\scripts\track-telemetry.sh
-.codex\hooks\telemetry.config.json
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:03.5768928Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1XL-4</code></td>
-    <td><code>if (-not (
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' '.agents\skills\azure-functions-help\SKILL.md')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' '.codex\config.toml')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' '.codex\hooks.json')) -and
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' '.codex\hooks\scripts\track-telemetry.sh'))
-)) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:04.2592261Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S1XL-5</code></td>
-    <td><code>if (
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' '.azure-functions-skills')) -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' 'AGENTS.md')) -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S1-CODEX-LOCAL' '.agents\agents'))
-) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:04.7733504Z</time></td>
-  </tr></tbody>
-  </table></div>
-</details>
-<details>
-  <summary><strong>TC-S2-GHCP-LOCAL</strong> — GHCP /
-    Ownership-aware update <span class="pass">PASS</span>
-  </summary>
-  <p><strong>Analysis:</strong> Bundled assets were replaced, user-owned skills/settings/hooks were preserved, legacy state was removed, and telemetry opt-out was migrated.</p>
-  <p><strong>File verification:</strong> command
-    <code>S2GL-7</code> exited 0 and covers all required existence,
-    absence, preservation, replacement, and migration assertions for this case.</p>
-  <div class="scroll"><table>
-    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
-    <tbody>
-  <tr>
-    <td><code>S2GL-1</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' | Out-Null</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:05.3298049Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2GL-2</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent ghcp --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally installed.
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1XL-3</span> <span class="badge ok">exit 0</span> <code>find $WS -type f | sort</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\assets\infra\app\trigger-config.bicep
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\abbreviations.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\agent-authoring.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\agent-files.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\built-in-endpoints.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\connector-mcp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\connector-schemas.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\connector-smoke-tests.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\connector-teams.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\connector-triggers.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\connectors.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\infra-and-deployment.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\models.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\project-files.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\quickstart-reference.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\sessions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\testing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\tools-and-skills.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\triggers.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\references\troubleshooting.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-agents\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-best-practices\references\remediation-patterns.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-best-practices\references\review-checklist.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-best-practices\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\azure-tables.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\cosmos-db.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\dapr.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\durable-functions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\event-grid.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\event-hubs.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\extension-bundles.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\fabric.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\http.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\kafka.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\mcp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\mysql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\rabbitmq.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\redis.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\sendgrid.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\service-bus.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\signalr.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\sql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\storage-blob.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\storage-queue.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\timer.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\twilio.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\extensions\web-pubsub.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\languages\csharp.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\languages\durable-functions.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\languages\go.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\languages\java.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\languages\node-typescript.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\languages\powershell.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\languages\python.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\local-emulators.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\references\routing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-common\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-create\references\go-project.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-create\references\language-snippets.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-create\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-deploy\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-diagnostics\references\evidence-checklist.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-diagnostics\references\workflow.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-diagnostics\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-doctor\references\ai-semantic-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-doctor\references\ci-usage.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-doctor\references\iac-azure-resource-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-doctor\references\language-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-doctor\references\routing.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-doctor\references\source-only-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-doctor\references\supply-chain-checks.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-doctor\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-feedback\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-health-status\references\health-status-commands-and-kql.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-health-status\scripts\get-functionapp-health-status.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-health-status\scripts\get-functionapp-health-status.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-health-status\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-help\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-inventory\references\inventory-commands.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-inventory\scripts\get-functionapp-inventory.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-inventory\scripts\get-functionapp-inventory.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-inventory\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.agents\skills\azure-functions-setup\SKILL.md
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.codex\config.toml
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.codex\hooks.json
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.codex\hooks\scripts\track-telemetry.ps1
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.codex\hooks\scripts\track-telemetry.sh
+Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure\reports\e2e\20260810-132424\workspaces\TC-S1-CODEX-LOCAL\.codex\hooks\telemetry.config.json
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1XL-4</span> <span class="badge ok">exit 0</span> <code>test -f $WS/.agents/skills/azure-functions-help/SKILL.md &amp;&amp; test -f $WS/.codex/config.toml &amp;&amp; test -f $WS/.codex/hooks.json &amp;&amp; test -f $WS/.codex/hooks/scripts/track-telemetry.sh</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S1XL-5</span> <span class="badge ok">exit 0</span> <code>test ! -e $WS/.azure-functions-skills &amp;&amp; test ! -e $WS/AGENTS.md &amp;&amp; test ! -e $WS/.agents/agents</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+    <h4>File verification</h4>
+    <table class="tbl"><thead><tr><th>Path</th><th>Expected</th><th>Result</th></tr></thead><tbody>
+    <tr><td><code>.agents/skills/azure-functions-help/SKILL.md</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.codex/config.toml</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.codex/hooks.json</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.codex/hooks/scripts/track-telemetry.sh</code></td><td>exists</td><td class="ok">pass</td></tr>
+    <tr><td><code>.azure-functions-skills</code></td><td>absent</td><td class="ok">pass</td></tr>
+    <tr><td><code>AGENTS.md</code></td><td>absent</td><td class="ok">pass</td></tr>
+    <tr><td><code>.agents/agents</code></td><td>absent</td><td class="ok">pass</td></tr></tbody></table>
+  </section>
+  <section class="case" id="TC-S2-GHCP-LOCAL">
+    <h3>TC-S2-GHCP-LOCAL <span class="status pass">pass</span></h3>
+    <p class="analysis">GHCP update refreshed the bundled skill, preserved user-owned skill/hook/MCP entries, migrated telemetry opt-out into telemetry.config.json, and removed legacy state plus managed instruction block.</p>
+    <h4>Commands</h4>
+
+  <details class="cmd">
+    <summary><span class="cid">S2GL-1</span> <span class="badge ok">exit 0</span> <code>mkdir -p $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2GL-2</span> <span class="badge ok">exit 0</span> <code>$CLI install --local --agent ghcp --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally installed.
   Agents: ghcp
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:05.8311439Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2GL-3</code></td>
-    <td><code>Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-help\SKILL.md') -Value 'stale bundled'
-New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-internal-runbook') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-internal-runbook\SKILL.md') -Value 'user-owned'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:08.2205640Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2GL-4</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\hooks\scripts') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\hooks\scripts\custom-hook.sh') -Value 'user-owned'
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.mcp.json') -Value '{&quot;inputs&quot;:[{&quot;id&quot;:&quot;subscription&quot;}],&quot;mcpServers&quot;:{&quot;custom&quot;:{&quot;command&quot;:&quot;custom-server&quot;,&quot;args&quot;:[]}}}'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:08.7947640Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2GL-5</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.azure-functions-skills'), (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\agents') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.azure-functions-skills\state.local.json') -Value '{&quot;telemetry&quot;:{&quot;enabled&quot;:false}}'
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\agents\functions-copilot.agent.md') -Value 'legacy'
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' 'AGENTS.md') -Value @('customer','&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;','legacy routing','&lt;!-- azure-functions-skills:end --&gt;')</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:09.3171449Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2GL-6</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' update --local --agent ghcp --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally updated.
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2GL-3</span> <span class="badge ok">exit 0</span> <code>printf 'stale bundled\n' &gt; $WS/.github/skills/azure-functions-help/SKILL.md &amp;&amp; mkdir -p $WS/.github/skills/azure-functions-internal-runbook &amp;&amp; printf 'user-owned\n' &gt; $WS/.github/skills/azure-functions-internal-runbook/SKILL.md</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2GL-4</span> <span class="badge ok">exit 0</span> <code>mkdir -p $WS/.github/hooks/scripts &amp;&amp; printf 'user-owned\n' &gt; $WS/.github/hooks/scripts/custom-hook.sh &amp;&amp; printf '{...custom mcp...}\n' &gt; $WS/.mcp.json</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2GL-5</span> <span class="badge ok">exit 0</span> <code>mkdir -p $WS/.azure-functions-skills $WS/.github/agents &amp;&amp; printf '{opt-out}' &gt; state.local.json &amp;&amp; printf 'legacy' &gt; functions-copilot.agent.md &amp;&amp; printf 'customer + managed block' &gt; $WS/AGENTS.md</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2GL-6</span> <span class="badge ok">exit 0</span> <code>$CLI update --local --agent ghcp --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally updated.
   Agents: ghcp
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:09.8671744Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2GL-7</code></td>
-    <td><code>$mcp = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.mcp.json') | ConvertFrom-Json
-$telemetry = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\hooks\telemetry.config.json') | ConvertFrom-Json
-if (
-    -not (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-help\SKILL.md')) -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-help\SKILL.md')).Contains('stale bundled') -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\skills\azure-functions-internal-runbook\SKILL.md')).Trim() -ne 'user-owned' -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.azure-functions-skills')) -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\agents\functions-copilot.agent.md')) -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' 'AGENTS.md')).Trim() -ne 'customer' -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-GHCP-LOCAL' '.github\hooks\scripts\custom-hook.sh')).Trim() -ne 'user-owned' -or
-    $mcp.mcpServers.custom.command -ne 'custom-server' -or
-    $mcp.mcpServers.azure.command -ne 'npx' -or
-    $telemetry.enabled -ne $false
-) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:12.3315520Z</time></td>
-  </tr></tbody>
-  </table></div>
-</details>
-<details>
-  <summary><strong>TC-S2-CLAUDE-LOCAL</strong> — Claude /
-    Ownership-aware update <span class="pass">PASS</span>
-  </summary>
-  <p><strong>Analysis:</strong> Bundled assets were replaced, user-owned skills/settings/hooks were preserved, legacy state was removed, and telemetry opt-out was migrated.</p>
-  <p><strong>File verification:</strong> command
-    <code>S2CL-7</code> exited 0 and covers all required existence,
-    absence, preservation, replacement, and migration assertions for this case.</p>
-  <div class="scroll"><table>
-    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
-    <tbody>
-  <tr>
-    <td><code>S2CL-1</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' | Out-Null</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:12.9760204Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2CL-2</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent claude --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally installed.
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2GL-7</span> <span class="badge ok">exit 0</span> <code>test -f help/SKILL.md &amp;&amp; ! grep -q 'stale bundled' &amp;&amp; cat runbook == user-owned &amp;&amp; test ! -e .azure-functions-skills &amp;&amp; test ! -e .github/agents/functions-copilot.agent.md &amp;&amp; cat AGENTS.md == customer &amp;&amp; cat custom-hook.sh == user-owned &amp;&amp; node -e (mcp.custom=custom-server, mcp.azure=npx, telemetry.enabled=false)</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+    <h4>File verification</h4>
+    <table class="tbl"><thead><tr><th>Path</th><th>Expected</th><th>Result</th></tr></thead><tbody>
+    <tr><td><code>.github/skills/azure-functions-help/SKILL.md</code></td><td>refreshed (no &quot;stale bundled&quot;)</td><td class="ok">pass</td></tr>
+    <tr><td><code>.github/skills/azure-functions-internal-runbook/SKILL.md</code></td><td>preserved user-owned</td><td class="ok">pass</td></tr>
+    <tr><td><code>.github/hooks/scripts/custom-hook.sh</code></td><td>preserved user-owned</td><td class="ok">pass</td></tr>
+    <tr><td><code>.azure-functions-skills</code></td><td>removed</td><td class="ok">pass</td></tr>
+    <tr><td><code>.github/agents/functions-copilot.agent.md</code></td><td>removed</td><td class="ok">pass</td></tr>
+    <tr><td><code>AGENTS.md</code></td><td>managed block stripped (== customer)</td><td class="ok">pass</td></tr></tbody></table>
+  </section>
+  <section class="case" id="TC-S2-CLAUDE-LOCAL">
+    <h3>TC-S2-CLAUDE-LOCAL <span class="status pass">pass</span></h3>
+    <p class="analysis">Claude update refreshed the bundled skill, preserved user settings (allow, custom MCP, custom hook), injected the telemetry hook, migrated opt-out, and removed legacy state plus managed block.</p>
+    <h4>Commands</h4>
+
+  <details class="cmd">
+    <summary><span class="cid">S2CL-1</span> <span class="badge ok">exit 0</span> <code>mkdir -p $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2CL-2</span> <span class="badge ok">exit 0</span> <code>$CLI install --local --agent claude --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally installed.
   Agents: claude
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:13.5193223Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2CL-3</code></td>
-    <td><code>Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-help\SKILL.md') -Value 'stale bundled'
-New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-internal-runbook') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-internal-runbook\SKILL.md') -Value 'user-owned'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:15.9836008Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2CL-4</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\hooks') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\hooks\custom-hook.json') -Value 'user-owned'
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\settings.json') -Value '{&quot;permissions&quot;:{&quot;allow&quot;:[&quot;Read&quot;]},&quot;mcpServers&quot;:{&quot;custom&quot;:{&quot;command&quot;:&quot;custom-server&quot;,&quot;args&quot;:[]}},&quot;hooks&quot;:{&quot;PostToolUse&quot;:[{&quot;hooks&quot;:[{&quot;type&quot;:&quot;command&quot;,&quot;command&quot;:&quot;custom-hook&quot;}]}]}}'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:16.5554175Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2CL-5</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.azure-functions-skills') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.azure-functions-skills\state.local.json') -Value '{&quot;telemetry&quot;:{&quot;enabled&quot;:false}}'
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' 'CLAUDE.md') -Value @('customer','&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;','legacy routing','&lt;!-- azure-functions-skills:end --&gt;')</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:17.0777642Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2CL-6</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' update --local --agent claude --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally updated.
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2CL-3</span> <span class="badge ok">exit 0</span> <code>printf 'stale bundled\n' &gt; help/SKILL.md &amp;&amp; mkdir -p runbook &amp;&amp; printf 'user-owned\n' &gt; runbook/SKILL.md</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2CL-4</span> <span class="badge ok">exit 0</span> <code>mkdir -p .claude/hooks &amp;&amp; printf 'user-owned\n' &gt; custom-hook.json &amp;&amp; printf '{custom settings}' &gt; .claude/settings.json</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2CL-5</span> <span class="badge ok">exit 0</span> <code>mkdir -p .azure-functions-skills &amp;&amp; printf '{opt-out}' &gt; state.local.json &amp;&amp; printf 'customer + managed block' &gt; $WS/CLAUDE.md</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2CL-6</span> <span class="badge ok">exit 0</span> <code>$CLI update --local --agent claude --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally updated.
   Agents: claude
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:17.6374032Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2CL-7</code></td>
-    <td><code>$settings = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\settings.json') | ConvertFrom-Json
-$telemetry = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\hooks\telemetry.config.json') | ConvertFrom-Json
-$hooks = $settings.hooks | ConvertTo-Json -Depth 10 -Compress
-if (
-    -not (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-help\SKILL.md')) -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-help\SKILL.md')).Contains('stale bundled') -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\skills\azure-functions-internal-runbook\SKILL.md')).Trim() -ne 'user-owned' -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.azure-functions-skills')) -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' 'CLAUDE.md')).Trim() -ne 'customer' -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CLAUDE-LOCAL' '.claude\hooks\custom-hook.json')).Trim() -ne 'user-owned' -or
-    $settings.permissions.allow[0] -ne 'Read' -or
-    $settings.mcpServers.custom.command -ne 'custom-server' -or
-    $settings.mcpServers.azure.command -ne 'npx' -or
-    -not $hooks.Contains('custom-hook') -or
-    -not $hooks.Contains('track-telemetry.sh') -or
-    $telemetry.enabled -ne $false
-) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:20.1031535Z</time></td>
-  </tr></tbody>
-  </table></div>
-</details>
-<details>
-  <summary><strong>TC-S2-CODEX-LOCAL</strong> — Codex /
-    Ownership-aware update <span class="pass">PASS</span>
-  </summary>
-  <p><strong>Analysis:</strong> Bundled assets were replaced, user-owned skills/settings/hooks were preserved, legacy state was removed, and telemetry opt-out was migrated.</p>
-  <p><strong>File verification:</strong> command
-    <code>S2XL-7</code> exited 0 and covers all required existence,
-    absence, preservation, replacement, and migration assertions for this case.</p>
-  <div class="scroll"><table>
-    <thead><tr><th>ID</th><th>Command</th><th>CWD</th><th>Exit</th><th>stdout (first 200 lines)</th><th>stderr (first 200 lines)</th><th>Timestamp</th></tr></thead>
-    <tbody>
-  <tr>
-    <td><code>S2XL-1</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' | Out-Null</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:20.7343104Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2XL-2</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' install --local --agent codex --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally installed.
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2CL-7</span> <span class="badge ok">exit 0</span> <code>test -f help/SKILL.md &amp;&amp; ! grep 'stale bundled' &amp;&amp; cat runbook == user-owned &amp;&amp; test ! -e .azure-functions-skills &amp;&amp; cat CLAUDE.md == customer &amp;&amp; cat custom-hook.json == user-owned &amp;&amp; node -e (allow[0]=Read, mcp.custom=custom-server, mcp.azure=npx, hooks include custom-hook + track-telemetry.sh, telemetry.enabled=false)</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+    <h4>File verification</h4>
+    <table class="tbl"><thead><tr><th>Path</th><th>Expected</th><th>Result</th></tr></thead><tbody>
+    <tr><td><code>.claude/skills/azure-functions-help/SKILL.md</code></td><td>refreshed (no &quot;stale bundled&quot;)</td><td class="ok">pass</td></tr>
+    <tr><td><code>.claude/skills/azure-functions-internal-runbook/SKILL.md</code></td><td>preserved user-owned</td><td class="ok">pass</td></tr>
+    <tr><td><code>.claude/hooks/custom-hook.json</code></td><td>preserved user-owned</td><td class="ok">pass</td></tr>
+    <tr><td><code>.azure-functions-skills</code></td><td>removed</td><td class="ok">pass</td></tr>
+    <tr><td><code>CLAUDE.md</code></td><td>managed block stripped (== customer)</td><td class="ok">pass</td></tr></tbody></table>
+  </section>
+  <section class="case" id="TC-S2-CODEX-LOCAL">
+    <h3>TC-S2-CODEX-LOCAL <span class="status pass">pass</span></h3>
+    <p class="analysis">Codex update refreshed the bundled skill, preserved user runbook/hook, merged config.toml (kept gpt-test model and custom server, replaced azure server with npx removing old-azure), injected telemetry hook, migrated opt-out, and removed legacy state plus managed block.</p>
+    <h4>Commands</h4>
+
+  <details class="cmd">
+    <summary><span class="cid">S2XL-1</span> <span class="badge ok">exit 0</span> <code>mkdir -p $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2XL-2</span> <span class="badge ok">exit 0</span> <code>$CLI install --local --agent codex --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally installed.
   Agents: codex
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:21.2786443Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2XL-3</code></td>
-    <td><code>Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-help\SKILL.md') -Value 'stale bundled'
-New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-internal-runbook') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-internal-runbook\SKILL.md') -Value 'user-owned'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:23.7275844Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2XL-4</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks\custom-hook.json') -Value 'user-owned'
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks.json') -Value '{&quot;hooks&quot;:{&quot;PostToolUse&quot;:[{&quot;type&quot;:&quot;command&quot;,&quot;command&quot;:&quot;custom-hook&quot;}]}}'
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.codex\config.toml') -Value @('model = &quot;gpt-test&quot;','','[mcp_servers.custom]','command = &quot;custom-server&quot;','','[mcp_servers.azure]','command = &quot;old-azure&quot;')</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:24.2690259Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2XL-5</code></td>
-    <td><code>New-Item -ItemType Directory -Force -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.azure-functions-skills') | Out-Null
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.azure-functions-skills\state.local.json') -Value '{&quot;telemetry&quot;:{&quot;enabled&quot;:false}}'
-Set-Content -Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' 'AGENTS.md') -Value @('customer','&lt;!-- azure-functions-skills:start version=0.0.2 --&gt;','legacy routing','&lt;!-- azure-functions-skills:end --&gt;')</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:24.8294404Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2XL-6</code></td>
-    <td><code>&amp; node 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\bin\azure-functions-skills.js' update --local --agent codex --dir 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL'</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre>Azure Functions Skills locally updated.
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2XL-3</span> <span class="badge ok">exit 0</span> <code>printf 'stale bundled\n' &gt; help/SKILL.md &amp;&amp; mkdir -p runbook &amp;&amp; printf 'user-owned\n' &gt; runbook/SKILL.md</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2XL-4</span> <span class="badge ok">exit 0</span> <code>mkdir -p .codex/hooks &amp;&amp; printf 'user-owned\n' &gt; custom-hook.json &amp;&amp; printf '{custom hooks.json}' &gt; .codex/hooks.json &amp;&amp; printf 'model=gpt-test + custom + azure=old-azure' &gt; .codex/config.toml</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2XL-5</span> <span class="badge ok">exit 0</span> <code>mkdir -p .azure-functions-skills &amp;&amp; printf '{opt-out}' &gt; state.local.json &amp;&amp; printf 'customer + managed block' &gt; $WS/AGENTS.md</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2XL-6</span> <span class="badge ok">exit 0</span> <code>$CLI update --local --agent codex --dir $WS</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>Azure Functions Skills locally updated.
   Agents: codex
   Files written: 88
-</pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:25.3546045Z</time></td>
-  </tr>
-  <tr>
-    <td><code>S2XL-7</code></td>
-    <td><code>$toml = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.codex\config.toml')
-$hooks = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks.json') | ConvertFrom-Json
-$telemetry = Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks\telemetry.config.json') | ConvertFrom-Json
-$hooksJson = $hooks.hooks | ConvertTo-Json -Depth 10 -Compress
-if (
-    -not (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-help\SKILL.md')) -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-help\SKILL.md')).Contains('stale bundled') -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.agents\skills\azure-functions-internal-runbook\SKILL.md')).Trim() -ne 'user-owned' -or
-    (Test-Path (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.azure-functions-skills')) -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' 'AGENTS.md')).Trim() -ne 'customer' -or
-    (Get-Content -Raw (Join-Path 'Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella\reports\e2e\20260804-1011-main-merge\workspaces\TC-S2-CODEX-LOCAL' '.codex\hooks\custom-hook.json')).Trim() -ne 'user-owned' -or
-    -not $toml.Contains('model = &quot;gpt-test&quot;') -or
-    -not $toml.Contains('[mcp_servers.custom]') -or
-    -not $toml.Contains('command = &quot;npx&quot;') -or
-    $toml.Contains('old-azure') -or
-    -not $hooksJson.Contains('custom-hook') -or
-    -not $hooksJson.Contains('track-telemetry.sh') -or
-    $telemetry.enabled -ne $false
-) { exit 1 }</code></td>
-    <td><code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-didactic-umbrella</code></td>
-    <td class="pass">0</td>
-    <td><pre></pre></td>
-    <td><pre></pre></td>
-    <td><time>2026-08-04T17:11:27.8909909Z</time></td>
-  </tr></tbody>
-  </table></div>
-</details>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre><em>(empty)</em></pre></div>
+  </details>
+  <details class="cmd">
+    <summary><span class="cid">S2XL-7</span> <span class="badge ok">exit 0</span> <code>test -f help/SKILL.md &amp;&amp; ! grep 'stale bundled' &amp;&amp; cat runbook == user-owned &amp;&amp; test ! -e .azure-functions-skills &amp;&amp; cat AGENTS.md == customer &amp;&amp; cat custom-hook.json == user-owned &amp;&amp; grep 'model = &quot;gpt-test&quot;' &amp;&amp; grep '[mcp_servers.custom]' &amp;&amp; grep 'command = &quot;npx&quot;' &amp;&amp; ! grep 'old-azure' &amp;&amp; node -e (hooks include custom-hook + track-telemetry.sh, telemetry.enabled=false)</code></summary>
+    <div class="kv"><strong>cwd:</strong> <code>Q:\ghcpapp\copilot-worktrees\azure-functions-skills\tsuyoshiushio-fluffy-adventure</code></div>
+    <div class="io"><div class="io-h">stdout (first 200 lines)</div><pre>
+</pre></div>
+    <div class="io"><div class="io-h">stderr</div><pre>
+</pre></div>
+  </details>
+    <h4>File verification</h4>
+    <table class="tbl"><thead><tr><th>Path</th><th>Expected</th><th>Result</th></tr></thead><tbody>
+    <tr><td><code>.agents/skills/azure-functions-help/SKILL.md</code></td><td>refreshed (no &quot;stale bundled&quot;)</td><td class="ok">pass</td></tr>
+    <tr><td><code>.agents/skills/azure-functions-internal-runbook/SKILL.md</code></td><td>preserved user-owned</td><td class="ok">pass</td></tr>
+    <tr><td><code>.codex/hooks/custom-hook.json</code></td><td>preserved user-owned</td><td class="ok">pass</td></tr>
+    <tr><td><code>.codex/config.toml (model)</code></td><td>model = &quot;gpt-test&quot; preserved</td><td class="ok">pass</td></tr>
+    <tr><td><code>.codex/config.toml (custom server)</code></td><td>[mcp_servers.custom] preserved</td><td class="ok">pass</td></tr>
+    <tr><td><code>.codex/config.toml (azure server)</code></td><td>command = &quot;npx&quot;, no old-azure</td><td class="ok">pass</td></tr>
+    <tr><td><code>.azure-functions-skills</code></td><td>removed</td><td class="ok">pass</td></tr>
+    <tr><td><code>AGENTS.md</code></td><td>managed block stripped (== customer)</td><td class="ok">pass</td></tr></tbody></table>
+  </section>
+</section>
 
-<h2>Actionable issues</h2>
-<p>None. Every required command exited 0 and all case-level assertions passed.</p>
+<section>
+  <h2>Issues found</h2>
+  <p class="ok">No issues found. All 38 commands exited 0 and all file checks passed.</p>
+</section>
 
-<h2>Machine-checkable counters</h2>
-<pre id="run-summary">{
-  &quot;runId&quot;: &quot;20260804-1011-main-merge&quot;,
-  &quot;packageVersion&quot;: &quot;0.0.5-preview&quot;,
+<section class="counters">
+  <h2>Machine-checkable counters</h2>
+  <pre id="counters-json">{
+  &quot;runId&quot;: &quot;20260810-132424&quot;,
+  &quot;packageVersion&quot;: &quot;0.0.6-preview&quot;,
   &quot;platform&quot;: &quot;windows&quot;,
+  &quot;gitCommit&quot;: &quot;0bd094698feb680a684c41905b971ec43fd7eb4c&quot;,
   &quot;expectedCommandCount&quot;: 38,
   &quot;actualCommandCount&quot;: 38,
   &quot;missingCommandIds&quot;: [],
@@ -883,19 +808,23 @@ if (
     &quot;unsupported&quot;: 0
   }
 }</pre>
+  <p>expectedCommandCount = <strong>38</strong> &middot; actualCommandCount = <strong>38</strong> &middot; missingCommandIds = <strong>(none)</strong></p>
+  <script type="application/json" id="e2e-counters">{"runId":"20260810-132424","packageVersion":"0.0.6-preview","platform":"windows","gitCommit":"0bd094698feb680a684c41905b971ec43fd7eb4c","expectedCommandCount":38,"actualCommandCount":38,"missingCommandIds":[],"testCases":{"total":6,"pass":6,"fail":0,"blocked":0,"unsupported":0}}</script>
+</section>
 
-<h2>Cross-Check Results</h2>
-<div id="cross-check">
-  <p><strong>Reviewer model:</strong> Claude Opus 4.8 (independent rubber-duck reviewer)</p>
-  <p><strong>Verified commands:</strong> 38 / 38<br>
-  <strong>Missing command IDs:</strong> none<br>
-  <strong>Duplicate, skipped, batched, or simplified commands:</strong> none<br>
-  <strong>Workaround commands:</strong> none<br>
-  <strong>Verdict overrides:</strong> none</p>
-  <p>The reviewer independently verified the authoritative order, Windows command
-  translations, PF-2 help contract, all Scenario 2 assertions, evidence fields,
-  generated workspaces, and machine-checkable counters.</p>
-  <p class="pass"><strong>Overall: VALID</strong></p>
-</div>
+<section>
+  <h2>Cross-Check Results</h2>
+  <p><strong>Overall: VALID</strong></p>
+  <table class="tbl"><tbody>
+    <tr><th>Reviewer model</th><td>claude-opus-4.8</td></tr>
+    <tr><th>Verified command count</th><td>38/38</td></tr>
+    <tr><th>Missing command IDs</th><td>none</td></tr>
+    <tr><th>Workarounds / extra / batched / reordered commands</th><td>none</td></tr>
+    <tr><th>Verdict overrides</th><td>none</td></tr>
+  </tbody></table>
+  <p>The reviewer compared <code>commands.md</code>, <code>checklist.md</code>, and this report: every command ID has evidence, no commands were skipped, batched, simplified, or supplemented with workarounds, and every verdict matches its command exit code and pass criteria.</p>
+  <p><strong>Non-blocking note:</strong> Several Scenario-2 seed and verify command strings are paraphrased in the per-case report summaries. This does not affect the run: the command IDs, the raw stdout/stderr/exit evidence under <code>raw/</code>, and the authoritative <code>commands.md</code> preserve full traceability of the exact commands executed.</p>
+</section>
+
 </body>
 </html>
