@@ -41,7 +41,8 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv.slice(2));
 if (args.help) {
-  console.log(`Usage: node doctor-validation-report.mjs [--fixtures-dir <path>] [--output <path>]`);
+  console.log(`Usage: node doctor-validation-report.mjs [--fixtures-dir <path>] [--output <path>]
+       node doctor-validation-report.mjs --list-expectations`);
   process.exit(0);
 }
 const fixturesDir = resolve(args.fixturesDir || process.cwd());
@@ -58,9 +59,9 @@ const EXPECTED = {
     { id: 'CQ-001/JS-006', desc: 'CosmosClient created inside handler (should be module-level)',
       keywords: [['cosmosclient', 'cosmos client', 'cosmos db client'], ['per invocation', 'inside handler', 'module-level', 'reuse', 'each invocation', 'every request', 'singleton']] },
     { id: 'CQ-004', desc: 'Fire-and-forget promise — items.create not awaited',
-      keywords: [['await', 'fire-and-forget', 'fire and forget', 'unawaited', 'not awaited', 'floating promise']] },
+      keywords: [['fire-and-forget', 'fire and forget', 'unawaited', 'not awaited', 'floating promise']] },
     { id: 'CQ-007', desc: 'No try/catch around external fetch()',
-      keywords: [['try', 'catch', 'error handling', 'exception']] },
+      keywords: [['try', 'catch', 'error handling', 'exception'], ['fetch', 'shipping api', 'network', 'external call']] },
   ],
   'node-deep-anonymous-admin': [
     { id: 'SC-002', desc: 'Anonymous auth on admin/destructive endpoint',
@@ -68,7 +69,7 @@ const EXPECTED = {
     { id: 'SC-009', desc: 'SQL injection via unvalidated userId',
       keywords: [['sql injection', 'sql', 'injection', 'parameteriz', 'sanitiz', 'unvalidat']] },
     { id: 'CQ-003', desc: 'CPU-intensive computeHash blocking',
-      keywords: [['cpu', 'blocking', 'expensive', 'sync', 'computehash', 'iteration', 'hash', 'tight loop']] },
+      keywords: [['computehash', 'iteration', 'hash', 'tight loop'], ['cpu', 'blocking', 'expensive', 'synchronous']] },
   ],
   'node-deep-secrets-obfuscated': [
     { id: 'SC-001', desc: 'Storage account key split across variables',
@@ -80,17 +81,17 @@ const EXPECTED = {
     { id: 'Durable', desc: 'Date.now() in orchestrator',
       keywords: [['date.now', 'date now', 'currentutcdatetime', 'current utc']] },
     { id: 'Durable', desc: 'Math.random() in orchestrator',
-      keywords: [['math.random', 'random', 'non-deterministic', 'nondeterministic', 'deterministic']] },
+      keywords: [['math.random', 'random value', 'random number'], ['orchestrator', 'durable', 'non-deterministic', 'nondeterministic']] },
     { id: 'Durable', desc: 'fetch() in orchestrator',
-      keywords: [['fetch', 'http', 'callhttp', 'activity']] },
+      keywords: [['fetch', 'callhttp'], ['orchestrator', 'durable', 'activity']] },
     { id: 'Durable', desc: 'setTimeout in orchestrator',
-      keywords: [['settimeout', 'createtimer', 'timer']] },
+      keywords: [['settimeout', 'createtimer'], ['orchestrator', 'durable', 'timer']] },
   ],
   'node-deep-eventhub-no-idempotency': [
     { id: 'CQ-005/EH-005', desc: 'Payment without idempotency key',
       keywords: [['idempot'], ['payment', 'charge', 'replay', 'duplicate']] },
     { id: 'EH-004', desc: 'Throwing blocks checkpoint',
-      keywords: [['throw', 'exception', 'checkpoint', 'batch', 'block']] },
+      keywords: [['throw', 'exception', 'failure'], ['checkpoint', 'event batch', 'entire batch']] },
     { id: 'CQ-005', desc: 'Irreversible side effect (email) before state tracking',
       keywords: [['email', 'side effect', 'irreversible', 'before', 'order', 'tracking']] },
   ],
@@ -204,9 +205,9 @@ const EXPECTED = {
     { id: 'GO-004', desc: 'FUNCTIONS_WORKER_RUNTIME must be native',
       keywords: [['functions_worker_runtime', 'worker runtime'], ['native', 'must use native', 'set to go']] },
     { id: 'GO-002', desc: 'Worker module pinned to pseudo-version',
-      keywords: [['pseudo-version', 'pseudo version', 'untagged'], ['worker', 'module', 'release', 'version']] },
+      keywords: [['pseudo-version', 'pseudo version', 'untagged'], ['worker module', 'worker sdk', 'published release']] },
     { id: 'SC-002', desc: 'Anonymous HTTP trigger',
-      keywords: [['anonymous', 'withauth'], ['http', 'trigger', 'public', 'auth']] },
+      keywords: [['anonymous', 'withauth'], ['http', 'trigger', 'public', 'endpoint']] },
   ],
   'node-supply-chain-postinstall': [
     { id: 'SC-101', desc: 'Module-load side effect (detached spawn at require)',
@@ -224,7 +225,7 @@ const EXPECTED = {
     { id: 'SC-102', desc: 'Fetch then execute downloaded file',
       keywords: [['fetch', 'download', 'https.get', 'urlretrieve', 'retrieve'], ['execute', 'spawn', 'subprocess', 'run']] },
     { id: 'SC-103', desc: 'Empty catch suppresses errors',
-      keywords: [['empty catch', 'silent', 'swallow'], ['error', 'exception', 'suppress', 'catch']] },
+      keywords: [['empty catch', 'silent', 'swallow'], ['error', 'exception', 'suppress']] },
     { id: 'SC-104', desc: 'Raw IP host (C2 indicator)',
       keywords: [['raw ip', 'ip address', '192.0.2', '192.', 'numeric host'], ['c2', 'command and control', 'host', 'url']] },
     { id: 'SC-108', desc: 'Anti-analysis gates (Linux only, CPU >2, skip Russian)',
@@ -294,10 +295,18 @@ function matchExpectation(expectation, check) {
   const matchedGroups = [];
   for (const group of expectation.keywords) {
     const signal = group
-      .filter(keyword => haystack.includes(keyword.toLowerCase()))
+      .filter(keyword => signalMatches(haystack, keyword))
       .sort((left, right) => right.length - left.length)[0];
     if (!signal) return null;
     matchedGroups.push(signal);
+  }
+
+  function signalMatches(haystack, keyword) {
+    const signal = keyword.toLowerCase();
+    if (!/^[a-z0-9_]+$/.test(signal)) return haystack.includes(signal);
+    const escaped = signal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const suffix = signal.length >= 3 ? '\\w*' : '\\b';
+    return new RegExp(`\\b${escaped}${suffix}`).test(haystack);
   }
   return {
     check,
@@ -322,27 +331,17 @@ function validateFixture(fixtureDir, name, report) {
   if (report && report.tiers?.ai?.ran !== true) {
     errors.push('deep analysis did not run (tiers.ai.ran is not true)');
   }
+  if (report?.tiers?.ai?.error) {
+    errors.push(`AI tier error: ${report.tiers.ai.error}`);
+  }
   const cachePath = join(fixtureDir, '.azure-functions-doctor', 'doctor-ai-findings.json');
   if (report && existsSync(cachePath)) {
     try {
       const cached = JSON.parse(readFileSync(cachePath, 'utf-8'));
       if (!Array.isArray(cached)) {
         errors.push('cached AI findings are not a JSON array');
-      } else {
-        const validCached = cached.filter(finding =>
-          finding && typeof finding === 'object'
-          && typeof finding.id === 'string'
-          && typeof finding.category === 'string'
-          && typeof finding.severity === 'string'
-          && typeof finding.status === 'string'
-          && typeof finding.title === 'string'
-          && typeof finding.message === 'string'
-        );
-        if (validCached.length !== cached.length) {
-          errors.push('cached AI findings contain invalid entries');
-        } else if (stableJson(validCached) !== stableJson(report.tiers?.ai?.checks || [])) {
-          errors.push('cached AI findings conflict with doctor-result.json');
-        }
+      } else if (stableJson(cached) !== stableJson(report.tiers?.ai?.checks || [])) {
+        errors.push('cached AI findings conflict with doctor-result.json');
       }
     } catch (error) {
       errors.push(`cached AI findings are invalid: ${error.message}`);
@@ -370,8 +369,9 @@ function statusBadge(matched, total) {
 }
 
 function severityBadge(sev) {
-  const cls = `sev-${sev}`;
-  return `<span class="sev ${cls}">${escapeHtml(sev)}</span>`;
+  const allowed = new Set(['critical', 'high', 'medium', 'low', 'info']);
+  const safeSeverity = allowed.has(sev) ? sev : 'info';
+  return `<span class="sev sev-${safeSeverity}">${escapeHtml(sev)}</span>`;
 }
 
 function statusGlyph(matched) {
@@ -393,7 +393,6 @@ let totalExpected = 0;
 let totalMatched = 0;
 let totalExtra = 0;
 let invalidFixtures = 0;
-const findingEdges = new Map();
 const selectedFindingCoverage = new Map();
 
 for (const name of fixtures) {
@@ -415,10 +414,11 @@ for (const name of fixtures) {
     const candidates = aiChecks
       .map(check => matchExpectation(exp, check))
       .filter(Boolean)
-      .sort((left, right) => right.score - left.score);
-    for (const candidate of candidates) {
-      findingEdges.set(candidate.check, (findingEdges.get(candidate.check) || 0) + 1);
-    }
+      .sort((left, right) =>
+        right.score - left.score
+        || compareText(left.check.id, right.check.id)
+        || compareText(left.check.title, right.check.title)
+      );
     return { ...exp, matched: candidates[0] || null, candidates };
   });
   for (const expectation of expectations) {
@@ -435,9 +435,11 @@ for (const name of fixtures) {
   );
   const matchedCount = expectations.filter(e => e.matched).length;
 
-  totalExpected += expectations.length;
-  totalMatched += matchedCount;
-  totalExtra += extras.length;
+  if (integrityErrors.length === 0) {
+    totalExpected += expectations.length;
+    totalMatched += matchedCount;
+    totalExtra += extras.length;
+  }
 
   fixtureResults.push({
     name,
@@ -456,7 +458,24 @@ for (const name of fixtures) {
 }
 
 const recall = totalExpected > 0 ? (totalMatched / totalExpected) * 100 : 0;
-const associatedFindings = findingEdges.size;
+const validFixtureResults = fixtureResults.filter(result =>
+  !result.error && result.integrityErrors.length === 0
+);
+const validFindingEdges = new Set(
+  validFixtureResults.flatMap(result =>
+    result.expectations.flatMap(expectation =>
+      expectation.candidates.map(candidate => candidate.check)
+    )
+  )
+);
+const associatedFindings = validFindingEdges.size;
+const validFixtureCount = validFixtureResults.length;
+
+function compareText(left, right) {
+  const a = String(left);
+  const b = String(right);
+  return a < b ? -1 : a > b ? 1 : 0;
+}
 
 // ── Render HTML ──
 
@@ -530,7 +549,7 @@ const html = `<!DOCTYPE html>
 
   <h2>Overall Summary</h2>
   <div class="overall">
-    <div class="card"><div class="num">${fixtures.length}</div><div class="label">Fixtures</div></div>
+    <div class="card"><div class="num">${validFixtureCount}/${fixtures.length}</div><div class="label">Valid fixtures</div></div>
     <div class="card"><div class="num">${totalExpected}</div><div class="label">Expected findings</div></div>
     <div class="card"><div class="num">${totalMatched}</div><div class="label">Matched by AI</div></div>
     <div class="card"><div class="num">${recall.toFixed(0)}%</div><div class="label">Recall</div></div>
@@ -603,7 +622,7 @@ const html = `<!DOCTYPE html>
         <div class="finding-msg">
           → matched: <strong>${escapeHtml(exp.matched.check.title)}</strong> ${severityBadge(exp.matched.check.severity)}
           · required groups: ${exp.matched.matchedGroups.map(escapeHtml).join(', ')}
-          ${exp.matched.check.file ? `<br><span class="finding-file">${escapeHtml(exp.matched.check.file)}${exp.matched.check.line ? ':' + exp.matched.check.line : ''}</span>` : ''}
+          ${exp.matched.check.file ? `<br><span class="finding-file">${escapeHtml(exp.matched.check.file)}${exp.matched.check.line ? ':' + escapeHtml(exp.matched.check.line) : ''}</span>` : ''}
           ${selectedFindingCoverage.get(exp.matched.check) > 1 ? `<br><strong>matched ${selectedFindingCoverage.get(exp.matched.check)} expectations</strong>` : ''}
           <details><summary>Show AI message</summary><div>${escapeHtml(exp.matched.check.message)}</div></details>
           ${exp.candidates.length > 1 ? `<details><summary>Show ${exp.candidates.length - 1} alternative candidate(s)</summary><div>${exp.candidates.slice(1).map(candidate => `${escapeHtml(candidate.check.id)}: ${escapeHtml(candidate.check.title)} (signals: ${candidate.matchedGroups.map(escapeHtml).join(', ')})`).join('<br>')}</div></details>` : ''}
@@ -619,7 +638,7 @@ const html = `<!DOCTYPE html>
         <span class="finding-id">[${escapeHtml(extra.id)}]</span> ${escapeHtml(extra.title)} ${severityBadge(extra.severity)}
       </div>
       <div class="finding-msg">${escapeHtml(extra.message)}</div>
-      ${extra.file ? `<div class="finding-file">${escapeHtml(extra.file)}${extra.line ? ':' + extra.line : ''}</div>` : ''}
+      ${extra.file ? `<div class="finding-file">${escapeHtml(extra.file)}${extra.line ? ':' + escapeHtml(extra.line) : ''}</div>` : ''}
     </div>`).join('')}
     ` : ''}
   </div>`).join('')}
@@ -627,7 +646,7 @@ const html = `<!DOCTYPE html>
   <h2>Notes</h2>
   <ul>
     <li><strong>Matching strategy:</strong> Every expected finding is evaluated against every AI finding. A match requires every required keyword group, and a single AI finding may cover multiple expectations.</li>
-    <li><strong>Recall</strong> = matched expected findings ÷ total expected findings.</li>
+    <li><strong>Recall</strong> = matched expected findings ÷ total expected findings across valid fixtures only.</li>
     <li><strong>Extras</strong> are AI findings not matching any expected entry. These may be valid (LLM found additional issues) or hallucinations (false positives).</li>
     <li>This report is <strong>advisory</strong> — LLM output is non-deterministic; rerun to see variability.</li>
   </ul>
@@ -636,12 +655,15 @@ const html = `<!DOCTYPE html>
 
 writeFileSync(outputPath, html, 'utf-8');
 console.log(`Report written: ${outputPath}`);
-console.log(`Overall: ${totalMatched}/${totalExpected} expected findings matched (${recall.toFixed(1)}% recall)`);
+console.log(`Overall: ${totalMatched}/${totalExpected} expected findings matched (${recall.toFixed(1)}% recall) across ${validFixtureCount}/${fixtures.length} valid fixtures`);
 console.log(`Extras: ${totalExtra} AI findings not in expected list`);
 if (invalidFixtures > 0) {
   console.log(`INVALID: ${invalidFixtures} fixture workspace(s) failed integrity validation`);
   for (const fixture of fixtureResults.filter(result => result.integrityErrors?.length)) {
     console.log(`  ${fixture.name}: ${fixture.integrityErrors.join('; ')}`);
+  }
+  for (const fixture of fixtureResults.filter(result => result.error)) {
+    console.log(`  ${fixture.name}: ${fixture.error}`);
   }
   process.exitCode = 1;
 }

@@ -52,6 +52,10 @@ npx @azure/functions-skills doctor --dir . \
 
 ⚠️ `--deep` runs the agent with elevated permissions on workspace files. Use only on trusted workspaces. The `--accept-deep-risk` flag is required to acknowledge this — running with `--deep` alone refuses to start the agent. Pass `--model` when comparing runs; the requested model is persisted in `tiers.ai`.
 
+The agent must write the requested findings file even when no issues are found
+(`[]`). If it exits without producing that file, doctor reports an AI execution
+error instead of reusing findings from an earlier run.
+
 ## Output formats
 
 | Format | Best for | Notes |

@@ -178,7 +178,9 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
     }
   }
 
-  const exitCode = report.summary.status === 'fail' ? 1 : 0;
+  const exitCode = report.tiers.ai.ran && report.tiers.ai.error
+    ? 2
+    : report.summary.status === 'fail' ? 1 : 0;
   return { report, exitCode };
 }
 

@@ -12,6 +12,7 @@ interface Finding {
   title: string;
   message: string;
   severity?: string;
+  line?: unknown;
 }
 
 function makeTmp(prefix: string): string {
@@ -28,6 +29,8 @@ function writeResult(root: string, fixture: string, findings: Finding[], options
   readonly ran?: boolean;
   readonly requestedModel?: string;
   readonly cachedFindings?: Finding[];
+  readonly error?: string;
+  readonly effectiveModel?: string;
 }): void {
   const fixtureDir = join(root, fixture);
   mkdirSync(fixtureDir, { recursive: true });
@@ -45,7 +48,8 @@ function writeResult(root: string, fixture: string, findings: Finding[], options
         ran: options?.ran ?? true,
         agent: 'github-copilot',
         requestedModel: options?.requestedModel ?? 'gpt-5.6-sol',
-        effectiveModel: options?.requestedModel ?? 'gpt-5.6-sol',
+        ...(options?.effectiveModel ? { effectiveModel: options.effectiveModel } : {}),
+        ...(options?.error ? { error: options.error } : {}),
         durationMs: 1000,
         checks,
       },
@@ -147,6 +151,34 @@ describe('doctor deep validation report', () => {
     expect(stdout).toContain('Extras: 2');
   });
 
+  it('does not treat retry or telemetry substrings as try error-handling evidence', () => {
+    const root = makeTmp('doctor-validation-boundary-');
+    writeResult(root, 'node-deep-client-reuse', [{
+      id: 'retry-telemetry',
+      title: 'Add retry telemetry',
+      message: 'Use a retry policy and improve telemetry for the registry entry.',
+    }]);
+
+    const { stdout } = runReport(root);
+
+    expect(stdout).toContain('0/3 expected findings matched');
+    expect(stdout).toContain('Extras: 1');
+  });
+
+  it('matches intentional keyword stems without matching inside unrelated words', () => {
+    const root = makeTmp('doctor-validation-stems-');
+    writeResult(root, 'node-deep-eventhub-no-idempotency', [{
+      id: 'missing-idempotency',
+      title: 'Payment is not idempotent',
+      message: 'No idempotency key protects the payment charge from replay duplicates.',
+    }]);
+
+    const { stdout } = runReport(root);
+
+    expect(stdout).toContain('1/3 expected findings matched');
+    expect(stdout).toContain('Extras: 0');
+  });
+
   it('is independent of expectation order and includes Go expectations', () => {
     const root = makeTmp('doctor-validation-go-');
     writeResult(root, 'go-deep-toolchain-and-runtime', [{
@@ -160,6 +192,31 @@ describe('doctor deep validation report', () => {
     expect(stdout).toContain('2/5 expected findings matched');
     expect(html).toContain('[GO-003]');
     expect(html).toContain('[GO-004]');
+  });
+
+  it('selects the same best candidate regardless of AI finding order', () => {
+    const firstRoot = makeTmp('doctor-validation-order-a-');
+    const secondRoot = makeTmp('doctor-validation-order-b-');
+    const findings = [
+      {
+        id: 'a-blocking',
+        title: 'A deterministic candidate',
+        message: 'GetAsync().Result blocks async work and risks deadlock.',
+      },
+      {
+        id: 'z-blocking',
+        title: 'Z deterministic candidate',
+        message: 'GetAsync().Result blocks async work and risks deadlock.',
+      },
+    ];
+    writeResult(firstRoot, 'csharp-deep-blocking-async', findings);
+    writeResult(secondRoot, 'csharp-deep-blocking-async', [...findings].reverse());
+
+    const first = runReport(firstRoot).html;
+    const second = runReport(secondRoot).html;
+
+    expect(first).toContain('→ matched: <strong>A deterministic candidate</strong>');
+    expect(second).toContain('→ matched: <strong>A deterministic candidate</strong>');
   });
 
   it('invalidates nested fixture workspaces', () => {
@@ -194,6 +251,19 @@ describe('doctor deep validation report', () => {
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toContain('deep analysis did not run');
     expect(result.stdout).toContain('cached AI findings conflict');
+    expect(result.stdout).toContain('across 0/2 valid fixtures');
+  });
+
+  it('invalidates a fixture when the AI tier reports an error', () => {
+    const root = makeTmp('doctor-validation-ai-error-');
+    writeResult(root, 'node-deep-client-reuse', [], {
+      error: 'Agent rejected unsupported model.',
+    });
+
+    const result = runInvalidReport(root);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('Agent rejected unsupported model.');
   });
 
   it('shows model provenance in the report', () => {
@@ -204,6 +274,23 @@ describe('doctor deep validation report', () => {
 
     expect(html).toContain('gpt-5.6-sol');
     expect(html).toContain('Requested model');
-    expect(html).toContain('Effective model');
+    expect(html).not.toContain('Effective model');
+  });
+
+  it('escapes agent-controlled severity and line values in HTML', () => {
+    const root = makeTmp('doctor-validation-escape-');
+    writeResult(root, 'node-deep-client-reuse', [{
+      id: 'floating-promise',
+      title: 'Promise is not awaited',
+      message: 'The items.create promise is fire-and-forget.',
+      severity: 'high"><script>alert(1)</script>',
+      line: '1"><script>alert(2)</script>',
+    }]);
+
+    const { html } = runReport(root);
+
+    expect(html.toLowerCase()).not.toContain('<script>');
+    expect(html).not.toContain('sev-high"');
+    expect(html).toContain('&lt;script&gt;');
   });
 });

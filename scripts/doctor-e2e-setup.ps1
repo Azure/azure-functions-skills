@@ -15,7 +15,7 @@
   Examples: "node-deep-*", "python-*", "*-clean"
 
 .PARAMETER DeepOnly
-  When set, copies only the "*-deep-*" fixtures (skips numbered and clean).
+  When set, copies fixtures with Tier 2 expectations (skips deterministic-only and clean fixtures).
 
 .EXAMPLE
   # Copy all fixtures to temp
@@ -45,6 +45,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $fixturesDir = Join-Path $repoRoot 'tests\fixtures\doctor-bad-apps'
 $cliPath = Join-Path $repoRoot 'bin\azure-functions-skills.js'
+$validationReportPath = Join-Path $repoRoot 'scripts\doctor-validation-report.mjs'
 
 if (-not (Test-Path $cliPath)) {
     Write-Error "CLI not found: $cliPath"
@@ -71,7 +72,13 @@ $fixtures = @(Get-ChildItem -Path $fixturesDir -Directory |
     Sort-Object Name)
 
 if ($DeepOnly) {
-    $fixtures = $fixtures | Where-Object { $_.Name -match '-deep-' }
+    $catalogJson = (& node $validationReportPath --list-expectations | Out-String)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to load deep fixture expectations from $validationReportPath"
+    }
+    $catalog = $catalogJson | ConvertFrom-Json
+    $deepFixtureNames = @($catalog.PSObject.Properties.Name)
+    $fixtures = $fixtures | Where-Object { $_.Name -in $deepFixtureNames }
 }
 
 if ($fixtures.Count -eq 0) {

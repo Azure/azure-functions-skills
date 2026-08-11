@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
@@ -18,6 +18,17 @@ afterAll(() => {
 });
 
 describe('doctor E2E fixture setup', () => {
+  it('defines destination protection and model forwarding in the generated helper', () => {
+    const source = readFileSync(SETUP_SCRIPT, 'utf-8');
+    expect(source).toContain('Fixture destination already exists');
+    expect(source).toContain("[string]$Model = 'auto'");
+    expect(source).toContain("$doctorArgs += '--model'");
+    expect(source).toContain('$doctorArgs += $Model');
+    expect(source).toContain('--list-expectations');
+    expect(source).toContain('$deepFixtureNames');
+    expect(source).not.toContain("Name -ne 'node-supply-chain-unpinned-deps'");
+  });
+
   it.runIf(process.platform === 'win32')('rejects an existing fixture destination instead of nesting a copy', () => {
     const target = makeTmp('doctor-e2e-setup-');
     execFileSync('powershell.exe', [

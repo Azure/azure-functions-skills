@@ -1,11 +1,12 @@
 import { describe, it, expect, afterAll, vi, afterEach } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTempDir, removeDir } from './helpers/fs.js';
 import {
   buildDoctorPrompt,
   buildAgentCommand,
   buildDeepWarning,
+  clearAiReport,
   readAiReport,
   mergeReports,
 } from '../src/doctor/ai-analysis.js';
@@ -147,6 +148,16 @@ describe('buildDeepWarning', () => {
 // ── readAiReport ──
 
 describe('readAiReport', () => {
+  it('removes a stale findings file before a new agent run', () => {
+    const dir = makeTmp('ai-report-stale-');
+    const reportPath = join(dir, 'report.json');
+    writeFileSync(reportPath, JSON.stringify([{ id: 'old-run' }]));
+
+    clearAiReport(reportPath);
+
+    expect(() => readFileSync(reportPath, 'utf-8')).toThrow();
+  });
+
   it('reads valid report file', async () => {
     const dir = makeTmp('ai-report-ok-');
     const reportPath = join(dir, 'report.json');

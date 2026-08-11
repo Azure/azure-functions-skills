@@ -31,7 +31,7 @@ cd <repo-root>
 Options:
 - `-Target <path>` — destination (default: `$env:TEMP\doctor-e2e-<timestamp>`)
 - `-Filter <glob>` — pattern, e.g. `"python-*"` or `"node-deep-*"`
-- `-DeepOnly` — copy only `*-deep-*` fixtures (skips numbered and clean fixtures)
+- `-DeepOnly` — copy all fixtures with Tier 2 expectations, including supply-chain fixtures
 
 The target must not already contain a selected fixture. Use a new target or run
 `doctor-e2e-cleanup.ps1` first; setup refuses to merge or nest fixture copies.
@@ -46,7 +46,7 @@ cd Q:\temp\doctor-deep-test
 # Tier 1 only — fast, no LLM cost
 .\run-all.ps1
 
-# Tier 2 — invokes the agent for each fixture (~60–120s each, 16 fixtures ≈ 25 min total)
+# Tier 2 — invokes the agent for each fixture (~60–120s each, 22 fixtures ≈ 35–45 min total)
 .\run-all.ps1 -Deep -Agent github-copilot -Model gpt-5.6-sol
 ```
 
