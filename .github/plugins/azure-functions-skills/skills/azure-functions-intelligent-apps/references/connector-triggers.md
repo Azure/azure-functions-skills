@@ -66,7 +66,10 @@ Callback URL shape:
 https://<function-app-name>.azurewebsites.net/runtime/webhooks/connector?functionName=<agent-function-name>&code=<connector_extension_key>
 ```
 
-Create a trigger config with the scaffolded `trigger-config.bicep` asset:
+The official `ai-serverless-agents-python` template does not currently include a connector trigger
+config. Copy this skill's
+[supplemental `trigger-config.bicep`](../assets/infra/app/trigger-config.bicep) to
+`infra/app/trigger-config.bicep`, then deploy it:
 
 ```bash
 az deployment group create \

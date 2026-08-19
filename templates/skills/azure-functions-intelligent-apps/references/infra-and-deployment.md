@@ -1,23 +1,26 @@
 # Infrastructure, Deployment, and Local Development
 
-Use the scaffolded Bicep in [../assets/infra](../assets/infra) as the current baseline. It is
-derived from the latest quickstart sample and provisions Foundry, Flex Consumption,
-identity-based storage settings, Application Insights, dynamic sessions, and optional Connector
-Namespace MCP resources.
+Use the Bicep retrieved with the official `ai-serverless-agents-python` template as the baseline.
+It provisions Foundry, Flex Consumption, identity-based storage settings, Application Insights,
+dynamic sessions, and optional Connector Namespace MCP resources.
 
-## Asset Files
+## Infrastructure Files
 
-| File | Purpose |
-| --- | --- |
-| `main.bicep` | Subscription-scope root template. Creates resource group and composes modules. |
-| `main.parameters.json` | Maps `azd` environment values to Bicep parameters. |
-| `app/api.bicep` | Flex Consumption function app with user-assigned identity and identity-based storage. |
-| `app/foundry.bicep` | Foundry account, project, model deployment, and model RBAC. |
-| `app/rbac.bicep` | Storage and Application Insights RBAC for the function app identity, plus deployer storage upload RBAC. |
-| `app/session-pool.bicep` | ACA dynamic session pool for `execute_python`. |
-| `app/session-pool-rbac.bicep` | Session Executor role for the app identity and deployer user. |
-| `app/connector-gateway.bicep` | Connector Namespace resources and connection MCP server config. |
-| `app/trigger-config.bicep` | Optional Connector Namespace trigger config that calls the function app connector webhook. |
+| File | Source | Purpose |
+| --- | --- | --- |
+| `main.bicep` | Retrieved template | Subscription-scope root template. Creates resource group and composes modules. |
+| `main.parameters.json` | Retrieved template | Maps `azd` environment values to Bicep parameters. |
+| `app/api.bicep` | Retrieved template | Flex Consumption function app with user-assigned identity and identity-based storage. |
+| `app/foundry.bicep` | Retrieved template | Foundry account, project, model deployment, and model RBAC. |
+| `app/rbac.bicep` | Retrieved template | Storage and Application Insights RBAC for the function app identity, plus deployer storage upload RBAC. |
+| `app/session-pool.bicep` | Retrieved template | ACA dynamic session pool for `execute_python`. |
+| `app/session-pool-rbac.bicep` | Retrieved template | Session Executor role for the app identity and deployer user. |
+| `app/connector-gateway.bicep` | Retrieved template | Connector Namespace resources and connection MCP server config. |
+| `app/trigger-config.bicep` | [Supplemental skill asset](../assets/infra/app/trigger-config.bicep) | Optional Connector Namespace trigger config that calls the function app connector webhook. |
+
+The official template does not currently include `trigger-config.bicep`. Copy the supplemental
+asset into `infra/app/` only for connector-triggered agents. It is deployed separately because its
+callback URL requires the `connector_extension` system key created after the Functions host starts.
 
 ## Local User Access
 
@@ -89,7 +92,8 @@ and match timer/connector/queue agent runtime timeouts with `timeout: 1800` in t
 `agents.config.yaml`. Keep synchronous HTTP work under the Azure front-end response limit of about
 230 seconds; use deferred triggers for longer runs.
 
-After `azd up`, get the key and deploy `trigger-config.bicep`:
+After copying the supplemental asset and running `azd up`, get the key and deploy
+`trigger-config.bicep`:
 
 ```bash
 function_name=$(azd env get-value AZURE_FUNCTION_NAME)

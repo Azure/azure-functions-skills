@@ -1,7 +1,7 @@
 # Project Files
 
-A serverless agents app is a Python Azure Functions app with agent-specific files in the
-function app project root, usually `src`.
+An Azure Functions AI app is a Python Azure Functions app with agent-specific files in the function
+app project root, usually `src`.
 
 ## Required and Common Files
 

@@ -32,7 +32,7 @@ system_tools:
 
 The session pool must be a Python code interpreter session pool, such as `PythonLTS`.
 
-Use the scaffolded files in [../assets/infra/app](../assets/infra/app):
+Use the files under `infra/app/` in the retrieved `ai-serverless-agents-python` template:
 
 - `session-pool.bicep` creates the pool.
 - `session-pool-rbac.bicep` assigns the `Azure ContainerApps Session Executor` role to both the

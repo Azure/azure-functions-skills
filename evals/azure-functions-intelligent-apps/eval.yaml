@@ -1,15 +1,15 @@
-name: azure-functions-agents-eval
+name: azure-functions-intelligent-apps-eval
 description: |
-  Evaluation suite for the azure-functions-agents skill.
+  Evaluation suite for the azure-functions-intelligent-apps skill.
 
-  Covers routing and response-quality checks for Azure Functions hosted AI agents,
+  Covers routing and response-quality checks for Azure Functions AI apps,
   including scheduled agents, chat/API endpoints, model upgrades, dynamic sessions,
   Connector Namespaces, Office 365/Teams connectors, built-in MCP endpoints, and
   local/deployed testing guidance.
 
 tags:
   type: integration
-  skill: azure-functions-agents
+  skill: azure-functions-intelligent-apps
 
 config:
   runs: 1
@@ -30,16 +30,16 @@ scoring:
 stimuli:
   - name: "Routing - scaffold chat UI and scheduled blog summary agent"
     prompt: |
-      Create a new Azure Functions serverless agents app with a chat UI and a daily timer agent that summarizes Microsoft blog posts. It should use code execution for browsing and deploy with azd.
+      Create a new Azure Functions AI app with a chat UI and a daily timer agent that summarizes Microsoft blog posts. It should use code execution for browsing and deploy with azd.
     tags:
       type: integration
-      skill: azure-functions-agents
+      skill: azure-functions-intelligent-apps
       tier: smoke
       cost: llm
       area: routing
     environment:
       skills:
-        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-intelligent-apps
         - ../../templates/skills/azure-functions-common
         - ../../templates/skills/azure-functions-deploy
     constraints:
@@ -48,7 +48,7 @@ stimuli:
       - type: skill-invocation
         config:
           required:
-            - azure-functions-agents
+            - azure-functions-intelligent-apps
       - type: output-matches
         config:
           pattern: "(?i)quickstart|assets/quickstart-sample|azurefunctions-agents-runtime"
@@ -68,23 +68,23 @@ stimuli:
 
   - name: "Quality - upgrade from gpt-4.1 with quota checks"
     prompt: |
-      Upgrade my serverless agents app to use a stronger model than gpt-4.1 in eastus2 if I have access.
+      Upgrade my artificial intelligence application on Azure Functions to use a stronger model than gpt-4.1 in eastus2 if I have access.
     tags:
       type: integration
-      skill: azure-functions-agents
+      skill: azure-functions-intelligent-apps
       tier: full
       cost: llm
       area: model-selection
     environment:
       skills:
-        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-intelligent-apps
     constraints:
       max_turns: 16
     graders:
       - type: skill-invocation
         config:
           required:
-            - azure-functions-agents
+            - azure-functions-intelligent-apps
       - type: output-matches
         config:
           pattern: "(?i)az cognitiveservices (model|usage) list|quota|AIServices"
@@ -104,23 +104,23 @@ stimuli:
 
   - name: "Quality - Outlook connector-triggered draft replies"
     prompt: |
-      Add an Office 365 Outlook connector-triggered agent that drafts replies when new email arrives.
+      Add an Office 365 Outlook connector-triggered agent to my intelligent app on Azure Functions so it drafts replies when new email arrives.
     tags:
       type: integration
-      skill: azure-functions-agents
+      skill: azure-functions-intelligent-apps
       tier: full
       cost: llm
       area: connectors
     environment:
       skills:
-        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-intelligent-apps
     constraints:
       max_turns: 20
     graders:
       - type: skill-invocation
         config:
           required:
-            - azure-functions-agents
+            - azure-functions-intelligent-apps
       - type: output-matches
         config:
           pattern: "(?i)Connector Namespace|connectorGateways|Microsoft.Web/connectorGateways"
@@ -147,23 +147,23 @@ stimuli:
 
   - name: "Quality - local testing and deployed timer invocation"
     prompt: |
-      How do I test my Azure Functions agent locally and then manually trigger the deployed timer function?
+      How do I test my Azure Functions AI application locally and then manually trigger its deployed timer function?
     tags:
       type: integration
-      skill: azure-functions-agents
+      skill: azure-functions-intelligent-apps
       tier: full
       cost: llm
       area: testing
     environment:
       skills:
-        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-intelligent-apps
     constraints:
       max_turns: 14
     graders:
       - type: skill-invocation
         config:
           required:
-            - azure-functions-agents
+            - azure-functions-intelligent-apps
       - type: output-matches
         config:
           pattern: "(?i)azd provision|local.settings.json|Azurite"
@@ -180,23 +180,23 @@ stimuli:
 
   - name: "Quality - built-in MCP endpoint and chat session IDs"
     prompt: |
-      Expose my daily_report.agent.md as a built-in MCP tool and explain how session IDs work with the chat APIs.
+      In my intelligent application on Azure Functions, expose daily_report.agent.md as a built-in MCP tool and explain how session IDs work with the chat APIs.
     tags:
       type: integration
-      skill: azure-functions-agents
+      skill: azure-functions-intelligent-apps
       tier: full
       cost: llm
       area: built-in-endpoints
     environment:
       skills:
-        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-intelligent-apps
     constraints:
       max_turns: 14
     graders:
       - type: skill-invocation
         config:
           required:
-            - azure-functions-agents
+            - azure-functions-intelligent-apps
       - type: output-matches
         config:
           pattern: '(?i)builtin_endpoints|mcp:\s*true'
@@ -213,23 +213,23 @@ stimuli:
 
   - name: "Quality - scheduled Teams briefing without chat surface"
     prompt: |
-      Create a scheduled morning briefing agent that reads recent email and posts a Teams summary every weekday. I don't need to chat with it.
+      Create an AI app on Azure Functions with a scheduled morning briefing agent that reads recent email and posts a Teams summary every weekday. I don't need to chat with it.
     tags:
       type: integration
-      skill: azure-functions-agents
+      skill: azure-functions-intelligent-apps
       tier: smoke
       cost: llm
       area: background-agents
     environment:
       skills:
-        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-intelligent-apps
     constraints:
       max_turns: 20
     graders:
       - type: skill-invocation
         config:
           required:
-            - azure-functions-agents
+            - azure-functions-intelligent-apps
       - type: output-matches
         config:
           pattern: "(?i)timer_trigger|schedule|timeout.*1800|functionTimeout"
@@ -249,23 +249,23 @@ stimuli:
 
   - name: "Quality - Teams chat link and direct connector smoke test"
     prompt: |
-      I need my Azure Functions agent to post Teams updates to this chat link: https://teams.microsoft.com/l/chat/19:49fc0a217754474cb887f684c0bc70ae@thread.v2/conversations?context=%7B%22contextType%22%3A%22chat%22%7D. Also show me how to smoke test the direct connector runtime if messages do not appear.
+      I need my artificial intelligence app on Azure Functions to post Teams updates to this chat link: https://teams.microsoft.com/l/chat/19:49fc0a217754474cb887f684c0bc70ae@thread.v2/conversations?context=%7B%22contextType%22%3A%22chat%22%7D. Also show me how to smoke test the direct connector runtime if messages do not appear.
     tags:
       type: integration
-      skill: azure-functions-agents
+      skill: azure-functions-intelligent-apps
       tier: full
       cost: llm
       area: teams-connectors
     environment:
       skills:
-        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-intelligent-apps
     constraints:
       max_turns: 20
     graders:
       - type: skill-invocation
         config:
           required:
-            - azure-functions-agents
+            - azure-functions-intelligent-apps
       - type: output-matches
         config:
           pattern: '19:49fc0a217754474cb887f684c0bc70ae@thread\.v2'
@@ -285,23 +285,23 @@ stimuli:
 
   - name: "Quality - Teams notes-to-self target"
     prompt: |
-      Can my agent post a note to my own Teams Notes chat? Here is the link: https://teams.microsoft.com/l/chat/48:notes/conversations?context=%7B%22contextType%22%3A%22chat%22%7D
+      Can my intelligent app on Azure Functions post a note to my own Teams Notes chat? Here is the link: https://teams.microsoft.com/l/chat/48:notes/conversations?context=%7B%22contextType%22%3A%22chat%22%7D
     tags:
       type: integration
-      skill: azure-functions-agents
+      skill: azure-functions-intelligent-apps
       tier: full
       cost: llm
       area: teams-connectors
     environment:
       skills:
-        - ../../templates/skills/azure-functions-agents
+        - ../../templates/skills/azure-functions-intelligent-apps
     constraints:
       max_turns: 16
     graders:
       - type: skill-invocation
         config:
           required:
-            - azure-functions-agents
+            - azure-functions-intelligent-apps
       - type: output-matches
         config:
           pattern: "48:notes"
