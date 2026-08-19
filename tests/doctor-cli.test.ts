@@ -247,6 +247,7 @@ describe('doctor CLI', () => {
     })();
     expect(stdout).toContain('azure-functions-skills doctor');
     expect(stdout).toContain('--deep');
+    expect(stdout).toContain('--model');
     expect(stdout).toContain('text|json|markdown|html');
     expect(stdout).not.toContain('sarif');
   });
@@ -269,5 +270,35 @@ describe('doctor CLI', () => {
     expect(exitCode).toBe(2);
     expect(stderr).toContain('Unsupported report format: sarif');
     expect(existsSync(reportPath)).toBe(false);
+  });
+
+  it('rejects --model without a model ID', () => {
+    const dir = makeTmp('cli-doc-model-missing-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+
+    const { exitCode, stderr } = runDoctor([
+      '--dir', dir,
+      '--deep',
+      '--agent', 'github-copilot',
+      '--model',
+      '--accept-deep-risk',
+    ]);
+
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain('--model requires a model ID');
+  });
+
+  it('rejects --model when deep analysis is disabled', () => {
+    const dir = makeTmp('cli-doc-model-nodeep-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+
+    const { exitCode, stderr } = runDoctor([
+      '--dir', dir,
+      '--no-deep',
+      '--model', 'gpt-5.6-sol',
+    ]);
+
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain('--model requires --deep');
   });
 });

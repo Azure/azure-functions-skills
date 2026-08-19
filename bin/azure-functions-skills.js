@@ -33,6 +33,7 @@ Options:
   --deep                    Run AI-assisted analysis
   --accept-deep-risk        Acknowledge elevated agent permissions
   --agent <name>            github-copilot, claude-code, or codex
+  --model <model-id>        Agent model (default: auto)
   --timeout <seconds>       AI analysis timeout (default: 300)
 `;
 
@@ -232,15 +233,23 @@ async function runDoctorCommand() {
   const output = getFlag('--output') || join(dir, '.azure-functions-doctor', 'doctor-report.json');
   const checksFlag = getFlag('--checks');
   const format = getFlag('--format') || 'text';
+  const model = getFlag('--model');
   try {
     if (!DOCTOR_FORMATS.includes(format)) {
       throw new Error(`Unsupported report format: ${format}. Available: ${DOCTOR_FORMATS.join(', ')}`);
+    }
+    if (args.includes('--model') && (!model || model.startsWith('-'))) {
+      throw new Error('--model requires a model ID, for example --model gpt-5.6-sol.');
+    }
+    if (model && (!args.includes('--deep') || args.includes('--no-deep'))) {
+      throw new Error('--model requires --deep because deterministic checks do not launch an AI agent.');
     }
     const { report, exitCode } = await runDoctor({
       dir,
       deep: args.includes('--deep') && !args.includes('--no-deep'),
       acceptDeepRisk: args.includes('--accept-deep-risk'),
       agent: getFlag('--agent'),
+      model: model || 'auto',
       timeout: Number.parseInt(getFlag('--timeout') || '300', 10),
       format,
       output,

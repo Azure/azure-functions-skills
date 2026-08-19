@@ -15,7 +15,7 @@
   Examples: "node-deep-*", "python-*", "*-clean"
 
 .PARAMETER DeepOnly
-  When set, copies only the "*-deep-*" fixtures (skips numbered and clean).
+  When set, copies fixtures with Tier 2 expectations (skips deterministic-only and clean fixtures).
 
 .EXAMPLE
   # Copy all fixtures to temp
@@ -45,6 +45,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $fixturesDir = Join-Path $repoRoot 'tests\fixtures\doctor-bad-apps'
 $cliPath = Join-Path $repoRoot 'bin\azure-functions-skills.js'
+$validationReportPath = Join-Path $repoRoot 'scripts\doctor-validation-report.mjs'
 
 if (-not (Test-Path $cliPath)) {
     Write-Error "CLI not found: $cliPath"
@@ -71,7 +72,13 @@ $fixtures = @(Get-ChildItem -Path $fixturesDir -Directory |
     Sort-Object Name)
 
 if ($DeepOnly) {
-    $fixtures = $fixtures | Where-Object { $_.Name -match '-deep-' }
+    $catalogJson = (& node $validationReportPath --list-expectations | Out-String)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to load deep fixture expectations from $validationReportPath"
+    }
+    $catalog = $catalogJson | ConvertFrom-Json
+    $deepFixtureNames = @($catalog.PSObject.Properties.Name)
+    $fixtures = $fixtures | Where-Object { $_.Name -in $deepFixtureNames }
 }
 
 if ($fixtures.Count -eq 0) {
@@ -96,6 +103,9 @@ Write-Host ""
 # Copy each fixture
 foreach ($fixture in $fixtures) {
     $dest = Join-Path $Target $fixture.Name
+    if (Test-Path $dest) {
+        throw "Fixture destination already exists: $dest. Use a new target or run doctor-e2e-cleanup.ps1 first."
+    }
     Copy-Item -Path $fixture.FullName -Destination $dest -Recurse -Force
     Write-Host "  [+] $($fixture.Name)" -ForegroundColor Green
 }
@@ -116,6 +126,7 @@ $runAllContent = @'
 param(
     [switch]$Deep,
     [string]$Agent = 'github-copilot',
+    [string]$Model = 'auto',
     [string]$Format = 'json',
     [int]$Timeout = 300,
     [string]$Filter = '*'
@@ -142,6 +153,10 @@ foreach ($d in $dirs) {
         $doctorArgs += '--accept-deep-risk'
         $doctorArgs += '--agent'
         $doctorArgs += $Agent
+        if ($Model -ne 'auto') {
+            $doctorArgs += '--model'
+            $doctorArgs += $Model
+        }
         $doctorArgs += '--timeout'
         $doctorArgs += $Timeout
     }
@@ -201,10 +216,10 @@ Write-Host "  cd $Target"
 Write-Host "  .\run-all.ps1"
 Write-Host ""
 Write-Host "  # Tier 2 (deep) — run all:"
-Write-Host "  .\run-all.ps1 -Deep -Agent github-copilot"
+Write-Host "  .\run-all.ps1 -Deep -Agent github-copilot -Model gpt-5.6-sol"
 Write-Host ""
 Write-Host "  # Single fixture:"
-Write-Host "  node $cliPath doctor --dir $Target\<fixture> --deep --agent github-copilot --format json"
+Write-Host "  node $cliPath doctor --dir $Target\<fixture> --deep --accept-deep-risk --agent github-copilot --model gpt-5.6-sol --format json"
 Write-Host ""
 Write-Host "Cleanup:"
 Write-Host "  .\scripts\doctor-e2e-cleanup.ps1 -Target $Target"
