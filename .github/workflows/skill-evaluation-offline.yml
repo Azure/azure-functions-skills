@@ -102,8 +102,18 @@ jobs:
         # and avoids races where the agent answers before the MCP server is ready.
         run: npx -y @azure/mcp@latest server --help >/dev/null
 
+      - name: Pre-warm Azure Functions Skills CLI cache
+        run: npx -y @azure/functions-skills@0.0.6-preview --version >/dev/null
+
       - name: Validate eval specs (vally lint)
-        run: npx vally lint --eval-spec evals
+        env:
+          EVAL_SPEC: ${{ inputs.eval_spec }}
+        run: |
+          if [ -n "${EVAL_SPEC}" ]; then
+            npx vally lint --eval-spec "${EVAL_SPEC}"
+          else
+            npx vally lint --eval-spec evals
+          fi
 
       - name: Run vally eval
         # Token is scoped to this step only (least privilege). The @github/copilot-sdk
@@ -111,6 +121,7 @@ jobs:
         # COPILOT_CLI_TOKEN secret is mapped onto that variable name here.
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           SUITE: ${{ inputs.suite || 'full' }}
           EVAL_SPEC: ${{ inputs.eval_spec }}
           MODEL: ${{ inputs.model }}

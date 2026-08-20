@@ -6,9 +6,11 @@ description: |
     - Routing (skill-invocation) for typical "create a function" prompts
       across TypeScript HTTP, Python timer, Go HTTP, and existing-project
       flows.
-    - Response-quality checks that the skill follows Path A (Azure MCP)
-      when available, does not fabricate template IDs, and includes
-      proper local end-to-end verification.
+    - Response-quality checks that the skill uses the manifest-backed
+      Azure Functions Skills CLI, does not fabricate template IDs, keeps
+      template contents out of the transcript, and includes proper local
+      end-to-end verification.
+    - Executable CLI scaffolding checks for both new and existing projects.
     - Go (Path C): Go has no Azure MCP template and no manifest entry,
       so the skill must scaffold with Core Tools or the worker SDK, use
       FUNCTIONS_WORKER_RUNTIME=native, use the lower-case module path,
@@ -18,21 +20,17 @@ description: |
     - "Do not re-initialize an existing project" guardrail.
 
   Environment:
-    - Each stimulus attaches the Azure MCP server (`@azure/mcp`) via
-      stdio, scoped to the `functions` namespace. All three Functions
-      tools (`functions_language_list`, `functions_project_get`,
-      `functions_template_get`) are readOnly and require no Azure
-      credentials, so this works in plain CI.
+    - Some stimuli attach the Azure MCP server (`@azure/mcp`) to prove
+      that the skill still prefers the lower-token CLI path when the
+      legacy template-content tool is available.
     - Cold start is slow because `npx -y @azure/mcp@latest` downloads
       the package on first run. Subsequent runs are fast thanks to npm
       cache; CI can pre-warm via `npm install -g @azure/mcp@latest` or
       `npx -y @azure/mcp@latest server --help`.
 
   Notes:
-    - Built-in graders only (skill-invocation / output-contains /
-      output-matches / output-not-matches / completed). We rely on
-      Vally's standard `copilot-sdk` executor; no custom executor tags
-      such as earlyTerminate are used.
+    - Built-in graders only. We rely on Vally's standard `copilot-sdk`
+      executor; no custom executor tags such as earlyTerminate are used.
     - Global graders (`completed`, `no_runtime_failure`) are duplicated
       into each stimulus per evaluate#125. See ../_base/common-graders.yaml.
 
@@ -49,15 +47,16 @@ config:
 scoring:
   threshold: 0.8
   weights:
-    skill-invocation: 2.0
-    tool-calls: 2.0
-    run-command: 2.0
-    file-exists: 1.0
-    file-not-exists: 1.5
-    output-contains: 0.5
-    output-matches: 1.0
-    output-not-matches: 1.5
-    completed: 1.0
+    skill-invocation: 0.15
+    tool-calls: 0.15
+    run-command: 0.15
+    file-exists: 0.075
+    file-not-exists: 0.11
+    file-matches: 0.075
+    output-contains: 0.04
+    output-matches: 0.075
+    output-not-matches: 0.10
+    completed: 0.075
 
 stimuli:
   # ─────────────────────────────────────────────────────────────────
@@ -172,7 +171,7 @@ stimuli:
   # Response quality (tier: full)
   # ─────────────────────────────────────────────────────────────────
 
-  - name: "Quality — uses Azure MCP path when scaffolding TypeScript HTTP"
+  - name: "Quality — uses template CLI when scaffolding TypeScript HTTP"
     prompt: |
       Create a TypeScript Azure Functions project with an HTTP trigger named "hello".
       Walk me through the scaffolding step by step before writing files.
@@ -200,18 +199,29 @@ stimuli:
         config:
           required:
             - azure-functions-create
-      # MCP-first guidance must be mentioned (tool names or "Azure MCP")
+      # The low-token CLI path must be described.
       - type: output-matches
         config:
-          pattern: "(?i)functions_(template|project|language)_(get|list)|Azure MCP"
-      # Must reference a properly-suffixed MCP template ID, not a bare alias
+          pattern: "(?i)(?:@azure/functions-skills(?:@[^\\s]+)?|azure-functions-skills)\\s+template\\s+(?:list|apply)"
+      # Must reference a properly-suffixed manifest template ID, not a bare alias.
       - type: output-matches
         config:
           pattern: "http-trigger-typescript(-azd)?"
+      - type: output-matches
+        config:
+          pattern: "(?i)--mode\\s+new"
+      # Template contents must not be requested through MCP.
+      - type: tool-calls
+        config:
+          disallowed:
+            - name: "functions_template_get"
       # Must NOT invent the bare ".NET-style" alias as the actual template ID
       - type: output-not-matches
         config:
           pattern: "(?<![\\w-])HttpTrigger(?![\\w-])"
+      - type: output-not-matches
+        config:
+          pattern: "(?i)\\bisPerson\\b"
       # Must propose `func start` based verification
       - type: output-contains
         config:
@@ -305,8 +315,194 @@ stimuli:
       # Should reference the "add to existing project" path
       - type: output-matches
         config:
-          pattern: "(?i)existing project|functions_template_get|add (a |the |new )?(function|trigger)"
+          pattern: "(?i)--mode\\s+add|existing project|add (a |the |new )?(function|trigger)"
+      - type: output-matches
+        config:
+          pattern: "(?i)(?:@azure/functions-skills(?:@[^\\s]+)?|azure-functions-skills)\\s+template\\s+apply"
+      - type: tool-calls
+        config:
+          disallowed:
+            - name: "functions_template_get"
       # Globals
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Executable template CLI E2E
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Execution — template CLI scaffolds a new TypeScript project"
+    prompt: |
+      Create a new TypeScript Azure Functions project with an HTTP trigger
+      directly in the current directory. Actually discover the template and
+      apply it, then install dependencies and build the project. Do not only
+      describe commands: run them and report whether the build succeeded.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: full
+      cost: llm
+      area: e2e-scaffold
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
+    constraints:
+      max_turns: 30
+      max_duration: "15m"
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      - name: template_list_ran
+        type: tool-calls
+        config:
+          required:
+            - name: "^(bash|powershell|run)$"
+              command: "(?i)(?:@azure/functions-skills(?:@[^\\s]+)?|azure-functions-skills)\\s+template\\s+list\\b[^\\n|;&]*--language\\s+['\"]?typescript\\b"
+      - name: template_apply_new_ran
+        type: tool-calls
+        config:
+          required:
+            - name: "^(bash|powershell|run)$"
+              command: "(?i)(?:@azure/functions-skills(?:@[^\\s]+)?|azure-functions-skills)\\s+template\\s+apply\\b(?=[^\\n|;&]*--template\\s+['\"]?http-trigger-typescript-azd['\"]?)(?=[^\\n|;&]*--mode\\s+new\\b)"
+      - type: tool-calls
+        config:
+          disallowed:
+            - name: "functions_template_get"
+      - name: new_project_host_written
+        type: file-exists
+        config:
+          path: host.json
+      - name: new_project_function_written
+        type: file-exists
+        config:
+          path: src/functions/httpGetFunction.ts
+      - name: new_project_compiles
+        type: run-command
+        config:
+          command: npm
+          args: ["run", "build"]
+          expected_exit_code: 0
+          timeout: "5m"
+      - type: completed
+      - type: output-not-matches
+        config:
+          pattern: "(?i)fatal error|unhandled exception|stack trace|crashed|panic:"
+
+  - name: "Execution — template CLI adds to an existing TypeScript project"
+    prompt: |
+      This directory already contains an Azure Functions TypeScript project.
+      Add the official TypeScript HTTP trigger template to it without
+      re-initializing the project or replacing user-owned files. Actually run
+      template discovery and application in add mode, install dependencies,
+      and build the resulting project.
+    tags:
+      type: integration
+      skill: azure-functions-create
+      tier: full
+      cost: llm
+      area: e2e-scaffold
+    environment:
+      skills:
+        - ../../templates/skills/azure-functions-create
+        - ../../templates/skills/azure-functions-common
+        - ../../templates/skills/azure-functions-setup
+      mcpServers:
+        azure:
+          type: stdio
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start", "--namespace", "functions"]
+          timeout: "120s"
+      files:
+        - src: fixtures/existing-project/host.json
+          dest: host.json
+        - src: fixtures/existing-project/package.json
+          dest: package.json
+        - src: fixtures/existing-project/tsconfig.json
+          dest: tsconfig.json
+        - src: fixtures/existing-project/user-owned.txt
+          dest: user-owned.txt
+    constraints:
+      max_turns: 30
+      max_duration: "15m"
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-create
+      - name: template_list_for_add_ran
+        type: tool-calls
+        config:
+          required:
+            - name: "^(bash|powershell|run)$"
+              command: "(?i)(?:@azure/functions-skills(?:@[^\\s]+)?|azure-functions-skills)\\s+template\\s+list\\b[^\\n|;&]*--language\\s+['\"]?typescript\\b"
+      - name: template_apply_add_ran
+        type: tool-calls
+        config:
+          required:
+            - name: "^(bash|powershell|run)$"
+              command: "(?i)(?:@azure/functions-skills(?:@[^\\s]+)?|azure-functions-skills)\\s+template\\s+apply\\b(?=[^\\n|;&]*--template\\s+['\"]?http-trigger-typescript-azd['\"]?)(?=[^\\n|;&]*--mode\\s+add\\b)"
+      - type: tool-calls
+        config:
+          disallowed:
+            - name: "functions_template_get"
+            - name: "^(bash|powershell|run)$"
+              command: "(?i)\\bfunc\\s+init\\b"
+            - name: "^(bash|powershell|run)$"
+              command: "(?i)(?:@azure/functions-skills(?:@[^\\s]+)?|azure-functions-skills)\\s+template\\s+apply\\b[^\\n|;&]*--force\\b"
+      - name: existing_host_preserved
+        type: file-matches
+        config:
+          path: host.json
+          pattern: "\"version\"\\s*:\\s*\"2\\.0\""
+      - name: user_file_preserved
+        type: file-matches
+        config:
+          path: user-owned.txt
+          pattern: "^user-owned\\s*$"
+      - name: existing_package_preserved
+        type: file-matches
+        config:
+          path: package.json
+          pattern: "\"name\"\\s*:\\s*\"existing-functions-project\""
+      - name: existing_project_not_reinitialized
+        type: file-not-exists
+        config:
+          path: azure.yaml
+      - name: existing_infra_not_added
+        type: file-not-exists
+        config:
+          path: infra/main.bicep
+      - name: template_license_not_added
+        type: file-not-exists
+        config:
+          path: LICENSE.md
+      - name: unrelated_demo_function_not_added
+        type: file-not-exists
+        config:
+          path: src/functions/httpPostBodyFunction.ts
+      - name: added_function_written
+        type: file-exists
+        config:
+          path: src/functions/httpGetFunction.ts
+      - name: existing_project_compiles
+        type: run-command
+        config:
+          command: npm
+          args: ["run", "build"]
+          expected_exit_code: 0
+          timeout: "5m"
       - type: completed
       - type: output-not-matches
         config:
