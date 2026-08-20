@@ -14,6 +14,14 @@ Guide the user through creating a new Azure Functions project or adding a functi
 
 Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest running **azure-functions-setup** first.
 
+Template discovery and application use the manifest-backed Azure Functions
+Skills CLI. Request the `latest` dist-tag explicitly so `npx` does not reuse
+an older locally installed package:
+
+```bash
+npx -y @azure/functions-skills@latest
+```
+
 ## Workflow
 
 ### Step 0 — Check for Go
@@ -22,34 +30,15 @@ If the user asks for **Go** (or Golang), use **Path C** below. Neither the Azure
 
 For every other language, continue with Step 1.
 
-### Step 1 — Detect Azure MCP tools
+### Step 1 — Gather requirements and best practices
 
-Check whether the following Azure MCP tools are available in your current tool list:
-
-- `functions_language_list` — list supported languages and runtime versions
-- `functions_project_get` — scaffold project-level files
-- `functions_template_get` — list templates (language only) or get a specific template (language + template)
-
-These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and return officially maintained templates across C#, Python, TypeScript, JavaScript, Java and PowerShell.
-
-Also check for the best practices tool:
+Check for the best practices tool:
 
 - `get_azure_bestpractices` / `get_azure_bestpractices_get` with `resource: azurefunctions`
 
-- **If available** → proceed with **Path A (MCP primary)**.
-- **If not available** → proceed with **Path B (composition algorithm fallback)**.
+If available, call it before generating code:
 
----
-
-### Path A — MCP primary (recommended)
-
-Use the Azure MCP Server as the **authoritative source of truth** for Azure Functions templates. Do **not** write function code from scratch when these tools are available.
-
-#### A.1 Gather requirements & best practices
-
-If `get_azure_bestpractices` is available, call it first:
-
-```
+```text
 Tool: get_azure_bestpractices
 resource: azurefunctions
 action: code-generation
@@ -60,21 +49,31 @@ Apply the returned guidelines (programming models, extension bundles version, au
 Ask the user (or detect from context):
 
 - **Language**: `csharp` | `python` | `typescript` | `javascript` | `java` | `powershell`
-- **Trigger / template**: let the MCP list decide (step A.3)
+- **Trigger / template**: let the CLI list decide (Path A.1)
 - **Project name**: directory name
 - **Runtime version** (optional): e.g. Node.js `22`, Python `3.11`, Java `21`
 
-#### A.2 Discover supported languages
+Resolve the target directory to an absolute path. Pass it with `--dir` on every apply command so files never land in the wrong workspace.
 
-Call `functions_language_list`. Returns supported languages with runtime versions, programming models, and prerequisites. Use this to confirm the user's language choice is supported and to suggest a default runtime version.
+---
 
-#### A.3 Browse available templates
+### Path A — Manifest-backed CLI (recommended)
 
-Call `functions_template_get` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
+The Azure Functions Skills CLI writes official templates directly to disk. This keeps template source files out of the LLM transcript. Do **not** call `functions_template_get`, fetch repository trees, download raw template files, or reproduce template contents manually while this path works.
 
-Do **not** invent or guess template identifiers such as `HttpTrigger`. Azure MCP template IDs are versioned, language-specific strings returned by the template list. For example, the TypeScript HTTP trigger template is currently returned as `http-trigger-typescript-azd`.
+#### A.1 Browse available templates
 
-When the user asks for a common trigger name, map it to one of the template IDs returned by the MCP list before calling the template-get operation. Examples:
+List matching template metadata:
+
+```bash
+npx -y @azure/functions-skills@latest template list --language <language>
+```
+
+Add `--resource <resource>` or `--iac <iac>` when the user supplied those constraints. Use `--json` only when structured metadata is needed for filtering; the default text list consumes fewer tokens. Neither format contains the full template payload. Use the result to confirm language support, available runtime choices, and the exact template ID. Present relevant matches and let the user choose when intent is ambiguous.
+
+Do **not** invent or guess template identifiers such as `HttpTrigger`. Template IDs are versioned, language-specific strings returned by `template list`. For example, the TypeScript HTTP trigger template is currently returned as `http-trigger-typescript-azd`.
+
+When the user asks for a common trigger name, map it to one of the IDs returned by the list. Examples:
 
 | User intent | Language | Prefer a returned template ID like |
 | --- | --- | --- |
@@ -83,36 +82,41 @@ When the user asks for a common trigger name, map it to one of the template IDs 
 | Blob trigger | `typescript` | `blob-eventgrid-trigger-typescript-azd` |
 | Queue / Service Bus trigger | `typescript` | `servicebus-trigger-typescript-azd` |
 
-If a template-get call fails with "template not found", immediately recover by calling `functions_template_get` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
+If apply reports "template not found", immediately run `template list` again with the same language and filters, then select the closest returned ID instead of retrying a guessed alias.
 
-#### A.4 Initialize the project
+#### A.2 Apply a new project
 
-Call `functions_project_get`:
+For a new project, apply the chosen template directly into the absolute target directory:
 
-```
-Tool: functions_project_get
-language: <chosen language, e.g. typescript>
-```
-
-Returns project-level files (`host.json`, `local.settings.json`, `package.json` / `requirements.txt` / `pom.xml` / `.csproj`, `tsconfig.json`, etc.). Write these into the target directory.
-
-#### A.5 Add the function
-
-Call `functions_template_get` with both `language` and `template`:
-
-```
-Tool: functions_template_get
-language: <chosen language, e.g. typescript>
-template: <chosen returned template ID, e.g. http-trigger-typescript-azd>
-runtime-version: <optional, e.g. 22>
-output: <optional, "New" (default) or "Add" for existing projects>
+```bash
+npx -y @azure/functions-skills@latest template apply --language <language> --template <returned-template-id> --mode new --dir <absolute-target-directory>
 ```
 
-Returns the full function source code plus any required app settings and additional package dependencies. Write the returned file(s) into the project and merge any extra settings into `local.settings.json` and any extra packages into the dependency manifest.
+When the user selected a runtime version, also pass `--runtime-version <version>`. Do not add `--force` unless the user explicitly approves overwriting conflicts.
 
-> ⚠️ **Large template output**: Some templates (especially `*-azd` variants that include infrastructure files) can produce very large output (100KB+). If the tool output is truncated or saved to a temporary file, read the file, parse the JSON `files` array, and write each file individually. After writing files, run `npm install` (or the equivalent package manager command) to generate lock files rather than relying on lock files from the template output.
+The command downloads and writes the template locally, performs runtime placeholder substitution, and prints only a concise file summary. Do not read every generated file back into the conversation. Inspect only files needed for user-requested customization or verification.
 
-#### A.6 Verify
+Tailor the generated project to the user's requested trigger and business logic. Remove unrelated demo functions or sample data that the selected repository template included.
+
+#### A.3 Add to an existing project
+
+When `host.json` already exists, apply the selected template in add mode:
+
+```bash
+npx -y @azure/functions-skills@latest template apply --language <language> --template <returned-template-id> --mode add --dir <absolute-existing-project-directory>
+```
+
+Add `--runtime-version <version>` when selected. Add mode preserves root project files and existing conflicts by default. Never use `--force` without explicit confirmation.
+
+Review the concise apply summary. When dependency or settings files such as `package.json`, `requirements.txt`, or `local.settings.json` are skipped, apply the same template with `--mode new` into an isolated temporary directory. Compare only the skipped dependency/settings files, merge required entries into the existing project, then delete the temporary directory. This keeps template source local while ensuring the added trigger has every required package and setting.
+
+Keep only the requested function and its supporting code. Remove repository-level documentation, licenses, changelogs, and unrelated demo files that the apply summary shows as newly added to the existing project; never remove files that existed before the command.
+
+If the CLI rejects a nested full-project template in add mode, run `template list` again and choose an add-compatible template. If none exists, use Path B rather than forcing or reinitializing the project.
+
+#### A.4 Install dependencies and verify
+
+Run the appropriate dependency restore in the target directory (`npm install`, `pip install -r requirements.txt`, `dotnet restore`, or `mvn package` as applicable). Generate lock files through the package manager rather than asking the model to recreate them.
 
 For TypeScript and other compiled-language projects, build first:
 
@@ -140,50 +144,25 @@ After the host reports the function endpoints/listeners:
 
 ### Path B — Composition algorithm fallback
 
-Use this path **only when the Azure MCP tools are not available**. When falling back, show this notice to the user verbatim (translate to the user's language if needed):
+Use this path only after the CLI command produces an actual error and retrying discovery cannot resolve it. Do not treat a long-running download as failure without waiting for the command result.
 
-> ℹ️ Azure MCP tools were not found; using the manifest-based fallback path. Enabling the Azure MCP Server unlocks dynamic template discovery and composition. Run `azure-functions-setup` to configure it.
+When falling back, show this notice to the user verbatim (translate to the user's language if needed):
+
+> ℹ️ The manifest-backed template CLI could not complete, so I am using the public template manifest directly. I will keep template content handling local.
 
 #### B.1 Fallback algorithm
 
-Follow this manifest-based fallback algorithm:
+Prefer the direct manifest path before Azure MCP because the MCP template tool depends on the same manifest:
 
-```
-1. FETCH MANIFEST
-   GET https://cdn.functions.azure.com/public/templates-manifest/manifest.json
-   If fetch fails → fall back to:
-     https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json
-   If both fail → fall back to known-good Azure-Samples/functions-quickstart-* repos
-   If all fail → report error and ask user to retry later
+1. Fetch `https://cdn.functions.azure.com/public/templates-manifest/manifest.json`.
+2. If the CDN manifest fails, fetch its raw GitHub mirror at `https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json`.
+3. Select the exact template entry and download its `repositoryUrl` / `folderPath` locally with a ZIP download or shallow clone.
+4. For a new project, use the selected template as the base. For an existing project, copy only the required function/binding files and merge dependencies/settings without replacing user-owned files.
+5. For requests that combine multiple triggers or bindings, use one project template as the base, extract only the additional binding patterns, and merge required IaC resources, RBAC roles, app settings, and dependencies.
+6. Only if direct manifest/repository retrieval fails and Azure MCP `functions_template_get` is available, use it for the selected template. Write returned files directly and avoid echoing their contents in the final response.
+7. If all sources fail, report the exact errors and ask the user to retry later.
 
-2. FILTER TEMPLATES
-   Filter by: language, resource, iac
-
-3. CHECK SINGLE-TEMPLATE MATCH
-   If one template covers ALL requirements → use it alone
-
-4. SELECT TEMPLATES
-   - Trigger template (REQUIRED) — base project with IaC
-   - Binding templates (OPTIONAL) — extract patterns only
-
-5. DOWNLOAD TEMPLATES
-   For each template:
-   - If folderPath == "." → ZIP download + unzip
-   - If folderPath != "." → fetch tree + raw github url file downloads
-   - Fallback: git clone --depth 1
-
-6. COMPOSE
-   - Use trigger template as BASE
-   - EXTRACT binding patterns from binding templates
-   - MERGE IaC resources, RBAC roles and settings
-   - ADD user's custom business logic
-
-7. TRIM unused demo code (keep AzureWebJobsStorage)
-
-8. WRITE all files
-
-9. DEPLOY: azd up --no-prompt
-```
+Do not deploy automatically as part of creation. Deployment remains the responsibility of **azure-functions-deploy**.
 
 #### B.2 Quick code reference
 
@@ -217,8 +196,8 @@ Tell the user up front that **Go support on Azure Functions is in public preview
 
 If `host.json` already exists, do **not** re-initialize. Instead:
 
-- **MCP path**: call `functions_template_get` with the same language as the existing project and specify the desired template name. Write the returned file.
-- **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
+- **CLI path**: run `template list` for the existing language, then `template apply` with the exact returned ID, `--mode add`, and the absolute project directory.
+- **Fallback path**: only after an actual CLI error, retrieve the selected template through Azure MCP or the manifest and merge function files, dependencies, and settings without replacing user-owned files.
 - **Go path**: `func new` is not supported for Go. Edit `main.go`, add another `app.*` registration and, for an extension trigger, the blank import. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
 
 ## After Creation
