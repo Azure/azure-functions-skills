@@ -103,7 +103,7 @@ jobs:
         run: npx -y @azure/mcp@latest server --help >/dev/null
 
       - name: Pre-warm Azure Functions Skills CLI cache
-        run: npx -y @azure/functions-skills@0.0.6-preview --version >/dev/null
+        run: npx -y @azure/functions-skills@latest --version >/dev/null
 
       - name: Validate eval specs (vally lint)
         env:

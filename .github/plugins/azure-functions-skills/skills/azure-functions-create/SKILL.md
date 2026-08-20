@@ -14,11 +14,12 @@ Guide the user through creating a new Azure Functions project or adding a functi
 
 Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest running **azure-functions-setup** first.
 
-Template discovery and application use the manifest-backed CLI released in
-`@azure/functions-skills@0.0.6-preview`. Invoke it with:
+Template discovery and application use the manifest-backed Azure Functions
+Skills CLI. Request the `latest` dist-tag explicitly so `npx` does not reuse
+an older locally installed package:
 
 ```bash
-npx -y @azure/functions-skills@0.0.6-preview
+npx -y @azure/functions-skills@latest
 ```
 
 ## Workflow
@@ -65,7 +66,7 @@ The Azure Functions Skills CLI writes official templates directly to disk. This 
 List matching template metadata:
 
 ```bash
-npx -y @azure/functions-skills@0.0.6-preview template list --language <language>
+npx -y @azure/functions-skills@latest template list --language <language>
 ```
 
 Add `--resource <resource>` or `--iac <iac>` when the user supplied those constraints. Use `--json` only when structured metadata is needed for filtering; the default text list consumes fewer tokens. Neither format contains the full template payload. Use the result to confirm language support, available runtime choices, and the exact template ID. Present relevant matches and let the user choose when intent is ambiguous.
@@ -88,7 +89,7 @@ If apply reports "template not found", immediately run `template list` again wit
 For a new project, apply the chosen template directly into the absolute target directory:
 
 ```bash
-npx -y @azure/functions-skills@0.0.6-preview template apply --language <language> --template <returned-template-id> --mode new --dir <absolute-target-directory>
+npx -y @azure/functions-skills@latest template apply --language <language> --template <returned-template-id> --mode new --dir <absolute-target-directory>
 ```
 
 When the user selected a runtime version, also pass `--runtime-version <version>`. Do not add `--force` unless the user explicitly approves overwriting conflicts.
@@ -102,7 +103,7 @@ Tailor the generated project to the user's requested trigger and business logic.
 When `host.json` already exists, apply the selected template in add mode:
 
 ```bash
-npx -y @azure/functions-skills@0.0.6-preview template apply --language <language> --template <returned-template-id> --mode add --dir <absolute-existing-project-directory>
+npx -y @azure/functions-skills@latest template apply --language <language> --template <returned-template-id> --mode add --dir <absolute-existing-project-directory>
 ```
 
 Add `--runtime-version <version>` when selected. Add mode preserves root project files and existing conflicts by default. Never use `--force` without explicit confirmation.
@@ -147,17 +148,19 @@ Use this path only after the CLI command produces an actual error and retrying d
 
 When falling back, show this notice to the user verbatim (translate to the user's language if needed):
 
-> ℹ️ The manifest-backed template CLI could not complete, so I am using a higher-token fallback path. I will keep template content handling local where possible.
+> ℹ️ The manifest-backed template CLI could not complete, so I am using the public template manifest directly. I will keep template content handling local.
 
 #### B.1 Fallback algorithm
 
-Prefer the first available fallback:
+Prefer the direct manifest path before Azure MCP because the MCP template tool depends on the same manifest:
 
-1. If Azure MCP `functions_template_get` is available, use it only for the selected template after CLI failure. Write returned files directly and avoid echoing their contents in the final response.
-2. Otherwise fetch the public manifest, select the exact entry, and download its repository/folder locally with a ZIP download or shallow clone.
-3. For a new project, use the selected template as the base. For an existing project, copy only the required function/binding files and merge dependencies/settings without replacing user-owned files.
-4. For requests that combine multiple triggers or bindings, use one project template as the base, extract only the additional binding patterns, and merge required IaC resources, RBAC roles, app settings, and dependencies.
-5. If all sources fail, report the exact errors and ask the user to retry later.
+1. Fetch `https://cdn.functions.azure.com/public/templates-manifest/manifest.json`.
+2. If the CDN manifest fails, fetch its raw GitHub mirror at `https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json`.
+3. Select the exact template entry and download its `repositoryUrl` / `folderPath` locally with a ZIP download or shallow clone.
+4. For a new project, use the selected template as the base. For an existing project, copy only the required function/binding files and merge dependencies/settings without replacing user-owned files.
+5. For requests that combine multiple triggers or bindings, use one project template as the base, extract only the additional binding patterns, and merge required IaC resources, RBAC roles, app settings, and dependencies.
+6. Only if direct manifest/repository retrieval fails and Azure MCP `functions_template_get` is available, use it for the selected template. Write returned files directly and avoid echoing their contents in the final response.
+7. If all sources fail, report the exact errors and ask the user to retry later.
 
 Do not deploy automatically as part of creation. Deployment remains the responsibility of **azure-functions-deploy**.
 
