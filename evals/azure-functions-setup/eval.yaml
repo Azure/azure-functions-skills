@@ -21,7 +21,7 @@ tags:
   type: integration
   skill: azure-functions-setup
 
-config:
+defaults:
   runs: 3
   timeout: "5m"
   executor: copilot-sdk
@@ -30,10 +30,11 @@ config:
 scoring:
   threshold: 0.8
   weights:
-    skill-invocation: 2.0
-    output-matches: 1.0
-    output-not-matches: 1.5
-    completed: 1.0
+    skill-invocation: 0.3077
+    output-contains: 0.1538
+    output-matches: 0.1538
+    output-not-matches: 0.2308
+    completed: 0.1539
 
 stimuli:
   # ─────────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ tags:
   type: integration
   skill: azure-functions-agents
 
-config:
+defaults:
   runs: 1
   timeout: "15m"
   executor: copilot-sdk
@@ -20,12 +20,12 @@ config:
 scoring:
   threshold: 0.8
   weights:
-    skill-invocation: 2.0
-    file-exists: 1.0
-    file-matches: 1.0
-    output-matches: 1.0
-    output-not-matches: 1.5
-    completed: 1.0
+    skill-invocation: 0.2667
+    file-exists: 0.1333
+    file-matches: 0.1333
+    output-matches: 0.1333
+    output-not-matches: 0.2
+    completed: 0.1334
 
 stimuli:
   - name: "Routing - scaffold chat UI and scheduled blog summary agent"

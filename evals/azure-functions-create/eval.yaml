@@ -40,7 +40,7 @@ tags:
   type: integration
   skill: azure-functions-create
 
-config:
+defaults:
   runs: 3
   timeout: "10m"
   executor: copilot-sdk
@@ -49,15 +49,15 @@ config:
 scoring:
   threshold: 0.8
   weights:
-    skill-invocation: 2.0
-    tool-calls: 2.0
-    run-command: 2.0
-    file-exists: 1.0
-    file-not-exists: 1.5
-    output-contains: 0.5
-    output-matches: 1.0
-    output-not-matches: 1.5
-    completed: 1.0
+    skill-invocation: 0.16
+    tool-calls: 0.16
+    run-command: 0.16
+    file-exists: 0.08
+    file-not-exists: 0.12
+    output-contains: 0.04
+    output-matches: 0.08
+    output-not-matches: 0.12
+    completed: 0.08
 
 stimuli:
   # ─────────────────────────────────────────────────────────────────

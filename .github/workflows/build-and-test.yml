@@ -12,6 +12,8 @@ on:
       - 'src/**'
       - 'templates/**'
       - 'tests/**'
+      - 'evals/**'
+      - '.vally.yaml'
       - 'eslint.config.js'
       - 'package.json'
       - 'package-lock.json'
@@ -29,6 +31,8 @@ on:
       - 'src/**'
       - 'templates/**'
       - 'tests/**'
+      - 'evals/**'
+      - '.vally.yaml'
       - 'eslint.config.js'
       - 'package.json'
       - 'package-lock.json'
@@ -51,6 +55,9 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Validate eval specs
+        run: npm run eval:lint
 
       - name: Run lint
         run: npm run lint
