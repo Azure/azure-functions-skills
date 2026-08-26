@@ -39,11 +39,16 @@ describe('simplified distribution', () => {
     expect(existsSync(join(root, '.mcp.json'))).toBe(true);
     expect(existsSync(join(root, 'hooks', 'copilot-hooks.json'))).toBe(true);
     expect(existsSync(join(root, 'hooks', 'hooks.json'))).toBe(true);
+    const hookRegistration = JSON.parse(
+      readFileSync(join(root, 'hooks', 'copilot-hooks.json'), 'utf-8'),
+    ) as { hooks: { PostToolUse: Array<{ timeoutSec?: number }> } };
+    expect(hookRegistration.hooks.PostToolUse[0].timeoutSec).toBe(30);
     const telemetryScript = readFileSync(
       join(root, 'hooks', 'scripts', 'track-telemetry.sh'),
       'utf-8',
     );
-    expect(telemetryScript).toContain('@azure/functions-skills@latest');
+    expect(telemetryScript).toContain('@azure/functions-skills@1.2.3');
+    expect(telemetryScript).not.toContain('@latest');
     expect(telemetryScript).toContain(' telemetry');
     expect(telemetryScript).not.toContain('@azure/mcp');
     expect(existsSync(join(root, 'agents'))).toBe(false);
@@ -77,8 +82,13 @@ describe('simplified distribution', () => {
         join(targetRoot, hookRoot, 'hooks', 'scripts', 'track-telemetry.sh'),
         'utf-8',
       );
-      expect(telemetryScript).toContain('@azure/functions-skills@latest');
+      expect(telemetryScript).toContain('@azure/functions-skills@1.2.3');
+      expect(telemetryScript).not.toContain('@latest');
       expect(telemetryScript).not.toContain('@azure/mcp');
+      const hookRegistrationContent = readFileSync(join(targetRoot, hookPath), 'utf-8');
+      expect(hookRegistrationContent).toContain(
+        target === 'ghcp' ? '"timeoutSec": 30' : '"timeout": 30',
+      );
       expect(existsSync(join(targetRoot, 'AGENTS.md'))).toBe(false);
       expect(existsSync(join(targetRoot, 'CLAUDE.md'))).toBe(false);
       expect(existsSync(join(targetRoot, '.github', 'agents'))).toBe(false);

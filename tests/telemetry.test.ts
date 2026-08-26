@@ -18,6 +18,8 @@ const EVENT: TelemetryEvent = {
   eventType: 'skill_invocation',
   clientName: 'copilot-cli',
   pluginName: 'azure-functions-skills',
+  correlationId: '11111111-1111-4111-8111-111111111111',
+  pluginVersion: '1.2.3',
   sessionId: 'session-123',
   skillName: 'azure-functions-help',
 };
@@ -78,6 +80,7 @@ describe('sendTelemetryEventWithDependencies', () => {
       connectionString: 'InstrumentationKey=test-key',
       createClient,
       environment: {},
+      packageVersion: '1.2.3',
       timeoutMs: 100,
     });
 
@@ -88,8 +91,11 @@ describe('sendTelemetryEventWithDependencies', () => {
       name: 'AzureFunctionsSkillsPluginExecuted',
       properties: {
         Plugin_ClientName: 'copilot-cli',
+        Plugin_CorrelationId: '11111111-1111-4111-8111-111111111111',
         Plugin_EventType: 'skill_invocation',
+        Plugin_PackageVersion: '1.2.3',
         Plugin_PluginName: 'azure-functions-skills',
+        Plugin_PluginVersion: '1.2.3',
         Plugin_SessionId: 'session-123',
         Plugin_SkillName: 'azure-functions-help',
         Plugin_Timestamp: '2026-07-17T20:00:00Z',
@@ -105,6 +111,7 @@ describe('sendTelemetryEventWithDependencies', () => {
       connectionString: 'InstrumentationKey=test-key',
       createClient,
       environment: { AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'false' },
+      packageVersion: '1.2.3',
       timeoutMs: 100,
     })).resolves.toEqual({ status: 'disabled' });
 
@@ -112,6 +119,7 @@ describe('sendTelemetryEventWithDependencies', () => {
       connectionString: '__APPLICATIONINSIGHTS_CONNECTION_STRING__',
       createClient,
       environment: {},
+      packageVersion: '1.2.3',
       timeoutMs: 100,
     })).resolves.toEqual({ status: 'not-configured' });
 
@@ -126,6 +134,7 @@ describe('sendTelemetryEventWithDependencies', () => {
       connectionString: 'InstrumentationKey=test-key',
       createClient,
       environment: {},
+      packageVersion: '1.2.3',
       timeoutMs: 10,
     })).rejects.toThrow('Telemetry delivery timed out after 10ms');
 
@@ -142,12 +151,73 @@ describe('sendTelemetryEventWithDependencies', () => {
       connectionString: 'InstrumentationKey=test-key',
       createClient,
       environment: {},
+      packageVersion: '1.2.3',
       timeoutMs: 100,
-    })).rejects.toThrow('Telemetry delivery failed: network unavailable');
+    })).rejects.toThrow('Telemetry delivery failed.');
 
     expect(client.trackEvent).toHaveBeenCalledOnce();
     expect(client.flush).toHaveBeenCalledOnce();
     expect(createClient).toHaveBeenCalledOnce();
+  });
+
+  it('treats a structured all-items-accepted SDK response as success', async () => {
+    const response = JSON.stringify({
+      itemsReceived: 1,
+      itemsAccepted: 1,
+      appId: null,
+      errors: [],
+    });
+    const client = makeClient(({ callback }) => callback(response));
+
+    await expect(sendTelemetryEventWithDependencies(EVENT, {
+      connectionString: 'InstrumentationKey=test-key',
+      createClient: () => client,
+      environment: {},
+      packageVersion: '1.2.3',
+      timeoutMs: 100,
+    })).resolves.toEqual({ status: 'sent' });
+  });
+
+  it('rejects partial ingestion without logging the raw SDK response', async () => {
+    const response = JSON.stringify({
+      itemsReceived: 2,
+      itemsAccepted: 1,
+      errors: [{ index: 1, statusCode: 400, message: 'secret backend detail' }],
+    });
+    const client = makeClient(({ callback }) => callback(response));
+
+    await expect(sendTelemetryEventWithDependencies(EVENT, {
+      connectionString: 'InstrumentationKey=test-key',
+      createClient: () => client,
+      environment: {},
+      packageVersion: '1.2.3',
+      timeoutMs: 100,
+    })).rejects.toThrow('Telemetry ingestion rejected 1 of 2 item(s)');
+  });
+
+  it('retries once for transient ingestion failures', async () => {
+    const first = makeClient(({ callback }) => callback(JSON.stringify({
+      itemsReceived: 1,
+      itemsAccepted: 0,
+      errors: [{ index: 0, statusCode: 503, message: 'temporarily unavailable' }],
+    })));
+    const second = makeClient(({ callback }) => callback(JSON.stringify({
+      itemsReceived: 1,
+      itemsAccepted: 1,
+      errors: [],
+    })));
+    const createClient = vi.fn()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(second);
+
+    await expect(sendTelemetryEventWithDependencies(EVENT, {
+      connectionString: 'InstrumentationKey=test-key',
+      createClient,
+      environment: {},
+      packageVersion: '1.2.3',
+      timeoutMs: 100,
+    })).resolves.toEqual({ status: 'sent' });
+    expect(createClient).toHaveBeenCalledTimes(2);
   });
 
   it('delivers through the isolated Application Insights client', async () => {
@@ -176,6 +246,7 @@ describe('sendTelemetryEventWithDependencies', () => {
         connectionString,
         createClient: value => new applicationInsights.TelemetryClient(value),
         environment: {},
+        packageVersion: '1.2.3',
         timeoutMs: 1_000,
       })).resolves.toEqual({ status: 'sent' });
     } finally {

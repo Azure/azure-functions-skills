@@ -17,6 +17,7 @@ Commands:
   template list     List Azure Functions templates
   template apply    Apply an Azure Functions template
   build             Build local and plugin artifacts
+  telemetry doctor  Safely test telemetry configuration and ingestion
 
 Plugin installation is managed by the host coding agent, not this package.
 `;
@@ -92,6 +93,27 @@ if (command === 'install' || command === 'update') {
 }
 
 async function runTelemetryCommand() {
+  if (args[1] === 'doctor' || args[1] === 'test') {
+    try {
+      const { diagnoseTelemetry } = await import('../lib/telemetry/index.js');
+      const report = await diagnoseTelemetry(process.env);
+      if (args.includes('--json')) console.log(JSON.stringify(report, null, 2));
+      else {
+        console.log('Azure Functions Skills telemetry diagnostic');
+        console.log(`  Package: resolved (${report.packageVersion})`);
+        console.log(`  Telemetry: ${report.telemetryEnabled ? 'enabled' : 'disabled'}`);
+        console.log(`  Configuration: ${report.configurationStatus}`);
+        console.log(`  Transport: ${report.transportStatus}`);
+        console.log(`  Ingestion accepted: ${report.ingestionAccepted ? 'yes' : 'no'}`);
+        console.log(`  Correlation ID: ${report.correlationId}`);
+        console.log(`  Debug diagnostics: ${report.diagnosticsEnabled ? `enabled (${report.logDirectory})` : 'disabled'}`);
+      }
+      process.exit(report.transportStatus === 'failed' ? 1 : 0);
+    } catch (error) {
+      console.error(`Telemetry diagnostic failed: ${errorMessage(error)}`);
+      process.exit(1);
+    }
+  }
   try {
     const rawInput = await readStdin(16 * 1024);
     if (rawInput.trim().length === 0) {

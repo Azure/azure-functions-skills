@@ -3,7 +3,69 @@
 
 $ErrorActionPreference = "SilentlyContinue"
 
+$packageVersion = "0.0.6-preview"
+$debugEnabled = $env:AZURE_FUNCTIONS_SKILLS_TELEMETRY_DEBUG -and
+    $env:AZURE_FUNCTIONS_SKILLS_TELEMETRY_DEBUG.ToLowerInvariant() -eq "true"
+
+function Write-TelemetryDebug {
+    param(
+        [string] $Action,
+        [string] $Status,
+        [string] $Reason,
+        [string] $RegistryUrl,
+        [object] $NpxExitCode,
+        $Event
+    )
+    if (-not $debugEnabled) { return }
+    try {
+        $directory = $env:AZURE_FUNCTIONS_SKILLS_TELEMETRY_LOG_DIR
+        if ([string]::IsNullOrWhiteSpace($directory)) {
+            $directory = Join-Path ([IO.Path]::GetTempPath()) "azure-functions-skills-telemetry"
+        }
+        [IO.Directory]::CreateDirectory($directory) | Out-Null
+        $path = Join-Path $directory "telemetry-debug.jsonl"
+        $backupPath = "$path.1"
+        $record = [ordered]@{
+            timestamp = [DateTime]::UtcNow.ToString("o")
+            component = "hook"
+            action = $Action
+            status = $Status
+            packageVersion = $packageVersion
+        }
+        if ($Reason) { $record.reason = $Reason }
+        if ($RegistryUrl) { $record.registryUrl = $RegistryUrl }
+        if ($null -ne $NpxExitCode) { $record.npxExitCode = [int]$NpxExitCode }
+        if ($null -ne $Event) { $record.event = $Event }
+        $line = ($record | ConvertTo-Json -Compress -Depth 5) + [Environment]::NewLine
+        if ((Test-Path $path) -and
+            ((Get-Item $path).Length + [Text.Encoding]::UTF8.GetByteCount($line) -gt 1MB)) {
+            Remove-Item -Force -ErrorAction SilentlyContinue $backupPath
+            Move-Item -Force $path $backupPath
+        }
+        [IO.File]::AppendAllText($path, $line, [Text.UTF8Encoding]::new($false))
+    } catch { }
+}
+
+function Get-SafeRegistryUrl {
+    try {
+        $registry = (& npm config get registry 2>$null | Select-Object -First 1)
+        $uri = [Uri]$registry
+        if ($uri.Scheme -ne "https" -and $uri.Scheme -ne "http") { return $null }
+        $builder = [UriBuilder]$uri
+        $builder.UserName = ""
+        $builder.Password = ""
+        $builder.Query = ""
+        $builder.Fragment = ""
+        return $builder.Uri.AbsoluteUri
+    } catch {
+        return $null
+    }
+}
+
+Write-TelemetryDebug -Action "start" -Status "started"
+
 if ($env:AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY -eq "false" -or $env:AZURE_MCP_COLLECT_TELEMETRY -eq "false") {
+    Write-TelemetryDebug -Action "decision" -Status "skipped" -Reason "disabled"
     Write-Output '{"continue":true}'
     exit 0
 }
@@ -13,6 +75,7 @@ if (Test-Path $telemetryConfigPath) {
     try {
         $telemetryConfig = Get-Content -Raw -Path $telemetryConfigPath | ConvertFrom-Json
         if ($telemetryConfig.enabled -eq $false) {
+            Write-TelemetryDebug -Action "decision" -Status "skipped" -Reason "disabled"
             Write-Output '{"continue":true}'
             exit 0
         }
@@ -33,6 +96,7 @@ try {
 }
 
 if ([string]::IsNullOrWhiteSpace($rawInput)) {
+    Write-TelemetryDebug -Action "decision" -Status "skipped" -Reason "invalid-input"
     Write-Success
 }
 
@@ -83,6 +147,7 @@ if ($env:COPILOT_CLI -eq "1") {
 }
 
 if (-not $toolName) {
+    Write-TelemetryDebug -Action "decision" -Status "skipped" -Reason "no-tool-name"
     Write-Success
 }
 
@@ -190,22 +255,46 @@ if (-not $filePath -and -not $skillName) {
 }
 
 if ($shouldTrack) {
+    $correlationId = [guid]::NewGuid().ToString()
     $event = [ordered]@{
         timestamp = $timestamp
         eventType = $eventType
         clientName = $clientName
         pluginName = "azure-functions-skills"
+        pluginVersion = $packageVersion
     }
+    if ($correlationId) { $event.correlationId = $correlationId }
     if ($sessionId) { $event.sessionId = $sessionId }
     if ($skillName) { $event.skillName = $skillName }
     if ($azureToolName) { $event.toolName = $azureToolName }
     if ($filePath) { $event.fileReference = ($filePath -replace '/', '\') }
 
     try {
+        $registryUrl = $null
+        if ($debugEnabled) {
+            $registryUrl = Get-SafeRegistryUrl
+            Write-TelemetryDebug -Action "decision" -Status "tracked" -RegistryUrl $registryUrl -Event $event
+            & npm view "@azure/functions-skills@0.0.6-preview" version *> $null
+            if ($LASTEXITCODE -eq 0 -or ($null -eq $LASTEXITCODE -and $?)) {
+                Write-TelemetryDebug -Action "package-resolution" -Status "resolved" -RegistryUrl $registryUrl
+            } else {
+                Write-TelemetryDebug -Action "package-resolution" -Status "failed" -Reason "npm-resolution" -RegistryUrl $registryUrl
+            }
+        }
+        $global:LASTEXITCODE = $null
         $event | ConvertTo-Json -Compress |
-            & npx -y "@azure/functions-skills@latest" telemetry 2>&1 |
+            & npx -y "@azure/functions-skills@0.0.6-preview" telemetry 2>&1 |
             Out-Null
-    } catch { }
+        $npxExitCode = $LASTEXITCODE
+        if ($null -eq $npxExitCode) {
+            $npxExitCode = if ($?) { 0 } else { 1 }
+        }
+        Write-TelemetryDebug -Action "complete" -Status "completed" -RegistryUrl $registryUrl -NpxExitCode $npxExitCode
+    } catch {
+        Write-TelemetryDebug -Action "complete" -Status "completed" -RegistryUrl $registryUrl -NpxExitCode 1
+    }
+} else {
+    Write-TelemetryDebug -Action "decision" -Status "skipped" -Reason "filtered"
 }
 
 Write-Success

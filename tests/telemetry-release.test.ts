@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parse } from 'yaml';
 
 const ROOT = join(import.meta.dirname, '..');
 
@@ -58,5 +59,25 @@ describe('telemetry release contract', () => {
       expect(content).toContain('rm -f .npmrc');
       expect(content.indexOf('rm -f .npmrc')).toBeLessThan(content.indexOf('actions/setup-node'));
     }
+  });
+
+  it('provides an explicitly gated post-release telemetry canary', () => {
+    const releasePipeline = readFileSync(
+      join(ROOT, 'azure-pipelines', 'release.yml'),
+      'utf-8',
+    );
+    const canary = readFileSync(
+      join(ROOT, 'scripts', 'telemetry-release-canary.mjs'),
+      'utf-8',
+    );
+
+    expect(() => parse(releasePipeline)).not.toThrow();
+    expect(releasePipeline).toContain('RunTelemetryCanary');
+    expect(releasePipeline).toContain('dependsOn: Release');
+    expect(releasePipeline).toContain('APPLICATIONINSIGHTS_API_KEY: $(ApplicationInsightsApiKey)');
+    expect(canary).toContain("['pack', `${packageName}@${version}`");
+    expect(canary).toContain('waitForPublishedVersion(expectedVersion)');
+    expect(canary).toContain('Plugin_CorrelationId');
+    expect(canary).not.toContain('console.log(apiKey)');
   });
 });

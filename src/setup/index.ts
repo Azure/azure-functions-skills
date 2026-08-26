@@ -22,6 +22,7 @@ import {
   telemetryConfigPath,
 } from './workspace-assets.js';
 import type { BuildData, CliAgentName } from '../types.js';
+import { PACKAGE_VERSION } from '../telemetry/version.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
@@ -107,6 +108,7 @@ function loadBuildData(): BuildData {
     skills: loadSkills(join(TEMPLATES_DIR, 'skills')),
     mcpServers: loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')),
     hooks: loadHooks(join(TEMPLATES_DIR, 'hooks')),
+    packageVersion: PACKAGE_VERSION,
   };
 }
 

@@ -7,6 +7,10 @@ parameters:
       displayName: 'Dry Run'
       type: boolean
       default: true
+    - name: RunTelemetryCanary
+      displayName: 'Run telemetry canary after publish'
+      type: boolean
+      default: false
 
 trigger: none
 pr: none
@@ -66,3 +70,24 @@ extends:
                             publishMethod: esrp
                             esrpNpmTag: ${{ parameters.NpmPublishTag }}
                             approvers: '$(EsrpManualApprovers)'
+            - ${{ if and(eq(parameters.NpmPublishDryRun, false), eq(parameters.RunTelemetryCanary, true)) }}:
+                - stage: TelemetryCanary
+                  displayName: 'Verify published telemetry ingestion'
+                  dependsOn: Release
+                  pool:
+                      name: 1es-pool-azfunc
+                      image: 1es-ubuntu-22.04
+                      os: linux
+                  jobs:
+                      - job: VerifyTelemetry
+                        steps:
+                            - task: NodeTool@0
+                              inputs:
+                                  versionSpec: 22.x
+                              displayName: 'Install Node.js'
+                            - script: node scripts/telemetry-release-canary.mjs
+                              displayName: 'Download published tarball and verify ingestion'
+                              env:
+                                  NPM_PUBLISH_TAG: ${{ parameters.NpmPublishTag }}
+                                  APPLICATIONINSIGHTS_APP_ID: $(ApplicationInsightsAppId)
+                                  APPLICATIONINSIGHTS_API_KEY: $(ApplicationInsightsApiKey)
