@@ -1,8 +1,15 @@
 import applicationInsights from 'applicationinsights';
+import { randomUUID } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APPLICATION_INSIGHTS_CONNECTION_STRING } from './config.js';
+import {
+  writeTelemetryDiagnostic,
+  type SafeIngestionDiagnostic,
+  type TelemetryDiagnosticEnvironment,
+} from './diagnostics.js';
+import { PACKAGE_VERSION } from './version.js';
 
 const EVENT_NAME = 'AzureFunctionsSkillsPluginExecuted';
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -13,6 +20,8 @@ const ALLOWED_PROPERTIES = new Set([
   'eventType',
   'clientName',
   'pluginName',
+  'correlationId',
+  'pluginVersion',
   'sessionId',
   'skillName',
   'toolName',
@@ -22,6 +31,7 @@ const EVENT_TYPES = new Set<TelemetryEventType>([
   'skill_invocation',
   'tool_invocation',
   'reference_file_read',
+  'telemetry_diagnostic',
 ]);
 const CLIENT_NAMES = new Set([
   'copilot-cli',
@@ -48,13 +58,16 @@ export const BUNDLED_SKILL_NAMES = new Set([
 export type TelemetryEventType =
   | 'skill_invocation'
   | 'tool_invocation'
-  | 'reference_file_read';
+  | 'reference_file_read'
+  | 'telemetry_diagnostic';
 
 export interface TelemetryEvent {
   readonly timestamp: string;
   readonly eventType: TelemetryEventType;
   readonly clientName: string;
   readonly pluginName: 'azure-functions-skills';
+  readonly correlationId?: string;
+  readonly pluginVersion?: string;
   readonly sessionId?: string;
   readonly skillName?: string;
   readonly toolName?: string;
@@ -75,7 +88,7 @@ export interface ApplicationInsightsClient {
   flush(options: { readonly callback: (response?: string) => void }): void;
 }
 
-interface TelemetryEnvironment {
+export interface TelemetryEnvironment extends TelemetryDiagnosticEnvironment {
   readonly AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY?: string;
   readonly AZURE_MCP_COLLECT_TELEMETRY?: string;
 }
@@ -84,6 +97,7 @@ export interface TelemetryDependencies {
   readonly connectionString: string;
   readonly createClient: (connectionString: string) => ApplicationInsightsClient;
   readonly environment: TelemetryEnvironment;
+  readonly packageVersion: string;
   readonly timeoutMs: number;
 }
 
@@ -118,9 +132,19 @@ export function parseTelemetryEvent(value: unknown): TelemetryEvent {
   }
 
   const sessionId = optionalString(value, 'sessionId', 256);
+  const correlationId = optionalString(value, 'correlationId', 64);
+  const pluginVersion = optionalString(value, 'pluginVersion', 64);
   const skillName = optionalString(value, 'skillName', 128);
   const toolName = optionalString(value, 'toolName', 256);
   const fileReference = optionalString(value, 'fileReference', 512);
+
+  if (correlationId !== undefined
+    && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(correlationId)) {
+    throw new Error('Invalid telemetry correlation ID.');
+  }
+  if (pluginVersion !== undefined && !/^[0-9A-Za-z][0-9A-Za-z.+-]*$/.test(pluginVersion)) {
+    throw new Error('Invalid telemetry plugin version.');
+  }
 
   if (skillName !== undefined && !BUNDLED_SKILL_NAMES.has(skillName)) {
     throw new Error(`Unsupported skill name: ${skillName}`);
@@ -147,6 +171,8 @@ export function parseTelemetryEvent(value: unknown): TelemetryEvent {
     eventType,
     clientName,
     pluginName: 'azure-functions-skills',
+    ...(correlationId === undefined ? {} : { correlationId }),
+    ...(pluginVersion === undefined ? {} : { pluginVersion }),
     ...(sessionId === undefined ? {} : { sessionId }),
     ...(skillName === undefined ? {} : { skillName }),
     ...(toolName === undefined ? {} : { toolName }),
@@ -159,27 +185,97 @@ export async function sendTelemetryEventWithDependencies(
   dependencies: TelemetryDependencies,
 ): Promise<TelemetrySendResult> {
   const parsedEvent = parseTelemetryEvent(event);
-  if (isOptedOut(dependencies.environment)) {
+  const enrichedEvent = {
+    ...parsedEvent,
+    correlationId: parsedEvent.correlationId || randomUUID(),
+    pluginVersion: parsedEvent.pluginVersion || dependencies.packageVersion,
+  };
+  writeTelemetryDiagnostic(dependencies.environment, {
+    component: 'sender',
+    action: 'start',
+    status: 'started',
+    correlationId: enrichedEvent.correlationId,
+    packageVersion: dependencies.packageVersion,
+    pluginVersion: enrichedEvent.pluginVersion,
+    event: enrichedEvent,
+  });
+  if (isTelemetryOptedOut(dependencies.environment)) {
+    writeTelemetryDiagnostic(dependencies.environment, {
+      component: 'sender',
+      action: 'decision',
+      status: 'skipped',
+      reason: 'disabled',
+      correlationId: enrichedEvent.correlationId,
+    });
     return { status: 'disabled' };
   }
-  if (!isConfiguredConnectionString(dependencies.connectionString)) {
+  if (!isTelemetryConfigured(dependencies.connectionString)) {
+    writeTelemetryDiagnostic(dependencies.environment, {
+      component: 'sender',
+      action: 'decision',
+      status: 'skipped',
+      reason: 'not-configured',
+      correlationId: enrichedEvent.correlationId,
+    });
     return { status: 'not-configured' };
   }
 
-  const client = dependencies.createClient(dependencies.connectionString);
-  client.trackEvent({
-    name: EVENT_NAME,
-    properties: telemetryProperties(parsedEvent),
-  });
-  await flushWithTimeout(client, dependencies.timeoutMs);
-  return { status: 'sent' };
+  const deadline = Date.now() + dependencies.timeoutMs;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const client = dependencies.createClient(dependencies.connectionString);
+      client.trackEvent({
+        name: EVENT_NAME,
+        properties: telemetryProperties(
+          enrichedEvent,
+          dependencies.packageVersion,
+        ),
+      });
+      const ingestion = await flushWithTimeout(
+        client,
+        remainingTime(deadline),
+        dependencies.timeoutMs,
+      );
+      writeTelemetryDiagnostic(dependencies.environment, {
+        component: 'sender',
+        action: 'delivery',
+        status: 'accepted',
+        correlationId: enrichedEvent.correlationId,
+        packageVersion: dependencies.packageVersion,
+        pluginVersion: enrichedEvent.pluginVersion,
+        attempt,
+        ingestion,
+      });
+      return { status: 'sent' };
+    } catch (error) {
+      const deliveryError = toDeliveryError(error);
+      writeTelemetryDiagnostic(dependencies.environment, {
+        component: 'sender',
+        action: 'delivery',
+        status: 'failed',
+        reason: 'transport',
+        correlationId: enrichedEvent.correlationId,
+        packageVersion: dependencies.packageVersion,
+        pluginVersion: enrichedEvent.pluginVersion,
+        attempt,
+        ingestion: deliveryError.ingestion,
+      });
+      if (attempt === 1 && deliveryError.transient && Date.now() < deadline) continue;
+      throw deliveryError;
+    }
+  }
+  throw new Error('Telemetry delivery failed.');
 }
 
-export async function sendTelemetryEvent(event: TelemetryEvent): Promise<TelemetrySendResult> {
+export async function sendTelemetryEvent(
+  event: TelemetryEvent,
+  environment: TelemetryEnvironment = process.env,
+): Promise<TelemetrySendResult> {
   return sendTelemetryEventWithDependencies(event, {
     connectionString: APPLICATION_INSIGHTS_CONNECTION_STRING,
     createClient: createApplicationInsightsClient,
-    environment: process.env,
+    environment,
+    packageVersion: PACKAGE_VERSION,
     timeoutMs: DEFAULT_TIMEOUT_MS,
   });
 }
@@ -188,11 +284,17 @@ function createApplicationInsightsClient(connectionString: string): ApplicationI
   return new applicationInsights.TelemetryClient(connectionString);
 }
 
-function telemetryProperties(event: TelemetryEvent): Record<string, string> {
+function telemetryProperties(
+  event: TelemetryEvent & { readonly correlationId: string; readonly pluginVersion: string },
+  packageVersion: string,
+): Record<string, string> {
   return {
     Plugin_ClientName: event.clientName,
+    Plugin_CorrelationId: event.correlationId,
     Plugin_EventType: event.eventType,
+    Plugin_PackageVersion: packageVersion,
     Plugin_PluginName: event.pluginName,
+    Plugin_PluginVersion: event.pluginVersion,
     Plugin_Timestamp: event.timestamp,
     ...(event.sessionId === undefined ? {} : { Plugin_SessionId: event.sessionId }),
     ...(event.skillName === undefined ? {} : { Plugin_SkillName: event.skillName }),
@@ -201,19 +303,27 @@ function telemetryProperties(event: TelemetryEvent): Record<string, string> {
   };
 }
 
-function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number): Promise<void> {
+function flushWithTimeout(
+  client: ApplicationInsightsClient,
+  timeoutMs: number,
+  totalTimeoutMs: number,
+): Promise<SafeIngestionDiagnostic> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error(`Telemetry delivery timed out after ${timeoutMs}ms`));
+      reject(new TelemetryDeliveryError(
+        `Telemetry delivery timed out after ${totalTimeoutMs}ms`,
+        false,
+        { category: 'timeout' },
+      ));
     }, timeoutMs);
     try {
       client.flush({
         callback: response => {
           clearTimeout(timeout);
-          if (response) {
-            reject(new Error(`Telemetry delivery failed: ${response}`));
-          } else {
-            resolve();
+          try {
+            resolve(parseIngestionResponse(response));
+          } catch (error) {
+            reject(error);
           }
         },
       });
@@ -224,14 +334,99 @@ function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number):
   });
 }
 
-function isConfiguredConnectionString(connectionString: string): boolean {
+export function isTelemetryConfigured(connectionString: string): boolean {
   return connectionString.trim().length > 0
     && connectionString !== CONNECTION_STRING_PLACEHOLDER;
 }
 
-function isOptedOut(environment: TelemetryEnvironment): boolean {
+export function isTelemetryOptedOut(environment: TelemetryEnvironment): boolean {
   return environment.AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY?.toLowerCase() === 'false'
     || environment.AZURE_MCP_COLLECT_TELEMETRY?.toLowerCase() === 'false';
+}
+
+class TelemetryDeliveryError extends Error {
+  readonly transient: boolean;
+  readonly ingestion: SafeIngestionDiagnostic;
+
+  constructor(message: string, transient: boolean, ingestion: SafeIngestionDiagnostic) {
+    super(message);
+    this.name = 'TelemetryDeliveryError';
+    this.transient = transient;
+    this.ingestion = ingestion;
+  }
+}
+
+function parseIngestionResponse(response?: string): SafeIngestionDiagnostic {
+  if (!response) return { category: 'empty-response' };
+
+  let value: unknown;
+  try {
+    value = JSON.parse(response);
+  } catch {
+    const transient = /\b(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|429|5\d\d)\b/i
+      .test(response);
+    throw new TelemetryDeliveryError(
+      transient ? 'Telemetry delivery failed due to a transient network error.' : 'Telemetry delivery failed.',
+      transient,
+      { category: transient ? 'network' : 'unknown' },
+    );
+  }
+  if (!isRecord(value)
+    || typeof value.itemsReceived !== 'number'
+    || typeof value.itemsAccepted !== 'number'
+    || !Array.isArray(value.errors)) {
+    throw new TelemetryDeliveryError(
+      'Telemetry delivery returned an unrecognized response.',
+      false,
+      { category: 'unknown' },
+    );
+  }
+
+  const itemsReceived = value.itemsReceived;
+  const itemsAccepted = value.itemsAccepted;
+  if (itemsReceived === itemsAccepted && value.errors.length === 0) {
+    return { category: 'accepted', itemsReceived, itemsAccepted };
+  }
+
+  const statusCodes = value.errors
+    .filter(isRecord)
+    .map(error => error.statusCode)
+    .filter((statusCode): statusCode is number => typeof statusCode === 'number');
+  const statusCode = statusCodes[0];
+  const transient = statusCodes.some(code => code === 429 || (code >= 500 && code <= 599));
+  throw new TelemetryDeliveryError(
+    `Telemetry ingestion rejected ${itemsReceived - itemsAccepted} of ${itemsReceived} item(s).`,
+    transient,
+    {
+      category: 'partial',
+      itemsReceived,
+      itemsAccepted,
+      ...(statusCode === undefined ? {} : { statusCode }),
+    },
+  );
+}
+
+function toDeliveryError(error: unknown): TelemetryDeliveryError {
+  if (error instanceof TelemetryDeliveryError) return error;
+  const message = error instanceof Error ? error.message : '';
+  const transient = /\b(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN)\b/i.test(message);
+  return new TelemetryDeliveryError(
+    transient ? 'Telemetry delivery failed due to a transient network error.' : 'Telemetry delivery failed.',
+    transient,
+    { category: transient ? 'network' : 'unknown' },
+  );
+}
+
+function remainingTime(deadline: number): number {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    throw new TelemetryDeliveryError(
+      'Telemetry delivery timed out.',
+      false,
+      { category: 'timeout' },
+    );
+  }
+  return remaining;
 }
 
 function isFunctionsToolName(toolName: string): boolean {

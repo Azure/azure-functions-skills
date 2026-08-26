@@ -449,3 +449,5 @@ FodyWeavers.xsd
 # Vally eval output
 vally-results/
 results/
+
+plans/

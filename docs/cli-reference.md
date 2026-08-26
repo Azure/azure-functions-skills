@@ -60,3 +60,16 @@ npm run build:plugin-payload
 ```
 
 The plugin payload always contains skills, MCP configuration, and telemetry hooks. There are no payload profiles.
+
+## Telemetry diagnostics
+
+```bash
+npx @azure/functions-skills telemetry doctor
+npx @azure/functions-skills telemetry doctor --json
+```
+
+The command reports package resolution, opt-out and release configuration state, transport
+status, ingestion acceptance, and a correlation ID. Set
+`AZURE_FUNCTIONS_SKILLS_TELEMETRY_DEBUG=true` to write safe JSON Lines diagnostics. Use
+`AZURE_FUNCTIONS_SKILLS_TELEMETRY_LOG_DIR` to select the directory; otherwise diagnostics
+use the operating system temporary directory. Debugging remains disabled by default.

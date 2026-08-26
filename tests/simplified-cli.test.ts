@@ -79,7 +79,29 @@ describe('simplified CLI', () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).not.toMatch(/^\s+telemetry(?:\s|$)/m);
+    expect(result.stdout).toContain('telemetry doctor');
+  });
+
+  it('reports telemetry diagnostic state without exposing configuration secrets', () => {
+    const result = spawnSync(process.execPath, [CLI_PATH, 'telemetry', 'doctor', '--json'], {
+      cwd: ROOT_DIR,
+      encoding: 'utf-8',
+      env: {
+        ...process.env,
+        AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'false',
+        APPLICATIONINSIGHTS_CONNECTION_STRING: 'InstrumentationKey=must-not-appear',
+      },
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      packageResolved: true,
+      telemetryEnabled: false,
+      configurationStatus: 'disabled',
+      transportStatus: 'not-attempted',
+      ingestionAccepted: false,
+    });
+    expect(`${result.stdout}${result.stderr}`).not.toContain('must-not-appear');
   });
 
   it('accepts one sanitized telemetry event over stdin', () => {

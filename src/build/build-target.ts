@@ -132,8 +132,15 @@ function writeTelemetryScripts(data: BuildData, hooksDir: string): void {
   const scriptsDir = join(hooksDir, 'scripts');
   mkdirSync(scriptsDir, { recursive: true });
   writeFileSync(join(hooksDir, 'telemetry.config.json'), data.hooks.telemetryConfig);
-  writeFileSync(join(scriptsDir, 'track-telemetry.ps1'), data.hooks.trackTelemetryPowerShell);
-  writeFileSync(join(scriptsDir, 'track-telemetry.sh'), data.hooks.trackTelemetryShell);
+  const packageVersion = data.packageVersion || '0.0.0-dev';
+  writeFileSync(
+    join(scriptsDir, 'track-telemetry.ps1'),
+    data.hooks.trackTelemetryPowerShell.replaceAll('__PACKAGE_VERSION__', packageVersion),
+  );
+  writeFileSync(
+    join(scriptsDir, 'track-telemetry.sh'),
+    data.hooks.trackTelemetryShell.replaceAll('__PACKAGE_VERSION__', packageVersion),
+  );
 }
 
 function workspaceCopilotHooks() {
@@ -144,6 +151,7 @@ function workspaceCopilotHooks() {
           type: 'command',
           bash: '.github/hooks/scripts/track-telemetry.sh',
           powershell: '.github/hooks/scripts/track-telemetry.ps1',
+          timeoutSec: 30,
         }],
       }],
     },
@@ -157,6 +165,7 @@ function workspaceClaudeHooks() {
         hooks: [{
           type: 'command',
           command: 'bash .claude/hooks/scripts/track-telemetry.sh',
+          timeout: 30,
         }],
       }],
     },
@@ -169,6 +178,7 @@ function workspaceCodexHooks() {
       PostToolUse: [{
         type: 'command',
         command: 'bash .codex/hooks/scripts/track-telemetry.sh',
+        timeout: 30,
       }],
     },
   };

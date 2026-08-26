@@ -51,6 +51,7 @@
     "validate:skills": "npm run compile && node lib/build/validate-skills.js",
     "verify:plugin-payload": "npm run compile && node lib/build/verify-plugin-payload.js",
     "release:local": "node scripts/release-local.mjs",
+    "telemetry:canary": "node scripts/telemetry-release-canary.mjs",
     "eval:lint": "vally lint",
     "eval:smoke": "vally eval --suite smoke",
     "eval:full": "vally eval --suite full",
@@ -66,7 +67,8 @@
     "eslint": "^10.3.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.1",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "yaml": "^2.9.0"
   },
   "keywords": [
     "azure-functions",

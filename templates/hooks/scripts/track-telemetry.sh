@@ -5,7 +5,64 @@
 
 set +e
 
+package_version="__PACKAGE_VERSION__"
+debug_enabled=false
+[ "$(printf '%s' "${AZURE_FUNCTIONS_SKILLS_TELEMETRY_DEBUG}" | tr '[:upper:]' '[:lower:]')" = "true" ] && debug_enabled=true
+
+write_debug() {
+    [ "$debug_enabled" = true ] || return
+    DEBUG_ACTION="$1" DEBUG_STATUS="$2" DEBUG_REASON="$3" DEBUG_REGISTRY="$4" \
+        DEBUG_EXIT_CODE="$5" DEBUG_EVENT="$6" \
+        AZURE_FUNCTIONS_SKILLS_PACKAGE_VERSION="$package_version" node --input-type=module -e '
+import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+try {
+  const directory = process.env.AZURE_FUNCTIONS_SKILLS_TELEMETRY_LOG_DIR || join(tmpdir(), "azure-functions-skills-telemetry");
+  const path = join(directory, "telemetry-debug.jsonl");
+  const backup = `${path}.1`;
+  const record = {
+    timestamp: new Date().toISOString(),
+    component: "hook",
+    action: process.env.DEBUG_ACTION,
+    status: process.env.DEBUG_STATUS,
+    packageVersion: process.env.AZURE_FUNCTIONS_SKILLS_PACKAGE_VERSION,
+  };
+  if (process.env.DEBUG_REASON) record.reason = process.env.DEBUG_REASON;
+  if (process.env.DEBUG_REGISTRY) record.registryUrl = process.env.DEBUG_REGISTRY;
+  if (process.env.DEBUG_EXIT_CODE) record.npxExitCode = Number.parseInt(process.env.DEBUG_EXIT_CODE, 10);
+  if (process.env.DEBUG_EVENT) record.event = JSON.parse(process.env.DEBUG_EVENT);
+  const line = `${JSON.stringify(record)}\n`;
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  if (existsSync(path) && statSync(path).size + Buffer.byteLength(line) > 1024 * 1024) {
+    rmSync(backup, { force: true });
+    renameSync(path, backup);
+  }
+  appendFileSync(path, line, { mode: 0o600 });
+} catch {}
+' >/dev/null 2>&1
+}
+
+safe_registry_url() {
+    local registry
+    registry=$(npm config get registry 2>/dev/null)
+    REGISTRY_VALUE="$registry" node --input-type=module -e '
+try {
+  const url = new URL(process.env.REGISTRY_VALUE);
+  if (url.protocol !== "https:" && url.protocol !== "http:") process.exit(1);
+  url.username = "";
+  url.password = "";
+  url.search = "";
+  url.hash = "";
+  process.stdout.write(url.toString());
+} catch {}
+' 2>/dev/null
+}
+
+write_debug "start" "started" "" "" "" ""
+
 if [ "${AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY}" = "false" ] || [ "${AZURE_MCP_COLLECT_TELEMETRY}" = "false" ]; then
+    write_debug "decision" "skipped" "disabled" "" "" ""
     echo '{"continue":true}'
     exit 0
 fi
@@ -18,6 +75,7 @@ return_success() {
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 config_path="${script_dir}/../telemetry.config.json"
 if [ -f "$config_path" ] && grep -Eq '"enabled"[[:space:]]*:[[:space:]]*false' "$config_path"; then
+    write_debug "decision" "skipped" "disabled" "" "" ""
     echo '{"continue":true}'
     exit 0
 fi
@@ -113,6 +171,7 @@ fi
 
 rawInput=$(cat)
 if [ -z "$rawInput" ]; then
+    write_debug "decision" "skipped" "invalid-input" "" "" ""
     return_success
 fi
 
@@ -150,6 +209,7 @@ else
 fi
 
 if [ -z "$toolName" ]; then
+    write_debug "decision" "skipped" "no-tool-name" "" "" ""
     return_success
 fi
 
@@ -208,11 +268,22 @@ if [ -z "$filePath" ] && [ -z "$skillName" ]; then
 fi
 
 if [ "$shouldTrack" = true ]; then
+    if [ -r /proc/sys/kernel/random/uuid ]; then
+        correlationId=$(cat /proc/sys/kernel/random/uuid 2>/dev/null)
+    elif command -v uuidgen >/dev/null 2>&1; then
+        correlationId=$(uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]')
+    else
+        correlationId=$(node --input-type=module -e 'import { randomUUID } from "node:crypto"; console.log(randomUUID())' 2>/dev/null)
+    fi
     payload=$(printf \
-        '{"timestamp":"%s","eventType":"%s","clientName":"%s","pluginName":"azure-functions-skills"}' \
+        '{"timestamp":"%s","eventType":"%s","clientName":"%s","pluginName":"azure-functions-skills","pluginVersion":"%s"}' \
         "$(json_escape "$timestamp")" \
         "$(json_escape "$eventType")" \
-        "$(json_escape "$clientName")")
+        "$(json_escape "$clientName")" \
+        "$(json_escape "$package_version")")
+    if [ -n "$correlationId" ]; then
+        payload="${payload%?},\"correlationId\":\"$(json_escape "$correlationId")\"}"
+    fi
     if [ -n "$sessionId" ]; then
         payload="${payload%?},\"sessionId\":\"$(json_escape "$sessionId")\"}"
     fi
@@ -226,9 +297,23 @@ if [ "$shouldTrack" = true ]; then
         payload="${payload%?},\"fileReference\":\"$(json_escape "$(echo "$filePath" | tr '/' '\\')")\"}"
     fi
 
+    registryUrl=""
+    if [ "$debug_enabled" = true ]; then
+        registryUrl=$(safe_registry_url)
+        write_debug "decision" "tracked" "" "$registryUrl" "" "$payload"
+        npm view "@azure/functions-skills@__PACKAGE_VERSION__" version >/dev/null 2>&1
+        if [ "$?" -eq 0 ]; then
+            write_debug "package-resolution" "resolved" "" "$registryUrl" "" ""
+        else
+            write_debug "package-resolution" "failed" "npm-resolution" "$registryUrl" "" ""
+        fi
+    fi
     printf '%s' "$payload" |
-        npx -y @azure/functions-skills@latest telemetry >/dev/null 2>&1 ||
-        true
+        npx -y "@azure/functions-skills@__PACKAGE_VERSION__" telemetry >/dev/null 2>&1
+    npxExitCode=$?
+    write_debug "complete" "completed" "" "$registryUrl" "$npxExitCode" ""
+else
+    write_debug "decision" "skipped" "filtered" "" "" ""
 fi
 
 return_success

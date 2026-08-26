@@ -132,6 +132,21 @@ For host-managed plugin installs, opt out by setting either
 in the environment. Workspace-local installs can also use `--no-telemetry`; that preference
 is stored in the installed `telemetry.config.json` and preserved by local updates.
 
+To diagnose telemetry without exposing user content, enable safe JSON Lines logging and run
+the telemetry diagnostic:
+
+```bash
+AZURE_FUNCTIONS_SKILLS_TELEMETRY_DEBUG=true \
+AZURE_FUNCTIONS_SKILLS_TELEMETRY_LOG_DIR=./telemetry-diagnostics \
+npx @azure/functions-skills telemetry doctor
+```
+
+Diagnostic logs contain only allowlisted telemetry fields, package/plugin versions, a
+credential-free npm registry URL, command status, sanitized ingestion counts, and a
+correlation ID. Logs are limited to a 1 MiB current file and one 1 MiB backup. They never
+contain connection strings, authentication values, prompts, file contents, raw hook input,
+or raw tool arguments.
+
 ## Skills
 
 For contributor guidance on the product boundary between Azure Skills and Azure Functions Skills, see [Azure Skills and Azure Functions Skills Boundary](docs/azure-skills-boundary.md).

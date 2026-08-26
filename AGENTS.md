@@ -46,8 +46,12 @@
 - Unit tests live in `tests/*.test.ts`.
 - Use `npm run test:watch` during TDD cycles.
 - Run `npm test` before every commit.
-- CLI changes require E2E verification: `node bin/azure-functions-skills.js <cmd> --dir <isolated-workspace>`.
+- CLI changes require E2E verification. Unless you are in CI pipeline, exec the CLI and verify it works.
 - When the task is not code-related (skills, CI config, documentation), TDD is not required.
+
+## Exec Plans
+
+When writing a complex feature or significant refactor, use an ExecPlan (as described in `PLANS.md`). Store each ExecPlan under `plans/` with a descriptive name, and create the directory if it does not exist.
 
 ## Security
 
@@ -91,3 +95,8 @@
 - If work stalls due to authentication or permission errors, check whether the active account matches the target repository.
 - Switch accounts with `/user switch` or `gh auth login` to match the repo's organization.
 - EMU orgs require SSO authentication; public repos use personal accounts.
+
+## Signed Commit Enforcement
+
+- During the development, commits without signed commit.
+- When you create an official PR, you need to submit signed commit. Help users to provide the signed commit.
