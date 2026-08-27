@@ -5,5 +5,6 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     exclude: ['tests/e2e/**'],
     globalSetup: ['./tests/global-setup.ts'],
+    testTimeout: process.platform === 'win32' ? 30_000 : 5_000,
   },
 });

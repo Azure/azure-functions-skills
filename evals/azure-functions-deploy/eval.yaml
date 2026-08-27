@@ -32,7 +32,7 @@ tags:
   type: integration
   skill: azure-functions-deploy
 
-config:
+defaults:
   runs: 1
   timeout: "30m"
   executor: copilot-sdk
@@ -41,11 +41,11 @@ config:
 scoring:
   threshold: 0.95
   weights:
-    skill-invocation: 2.0
-    tool-calls: 2.0
-    output-matches: 1.0
-    output-not-matches: 1.5
-    completed: 1.0
+    skill-invocation: 0.2667
+    tool-calls: 0.2667
+    output-matches: 0.1333
+    output-not-matches: 0.2
+    completed: 0.1333
 
 stimuli:
   - name: "Live — deploy TypeScript HTTP FC1 to Azure"
