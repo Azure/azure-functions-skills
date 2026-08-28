@@ -32,3 +32,5 @@ updates:
       - "ci"
     commit-message:
       prefix: "chore(actions)"
+    cooldown:
+      default-days: 7
