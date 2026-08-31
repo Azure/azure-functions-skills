@@ -40,7 +40,7 @@ export const BUNDLED_SKILL_NAMES = new Set([
   'azure-functions-feedback',
   'azure-functions-health-status',
   'azure-functions-help',
-  'azure-functions-intelligent-apps',
+  'azure-functions-hosted-skills',
   'azure-functions-inventory',
   'azure-functions-setup',
 ]);

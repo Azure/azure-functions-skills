@@ -1,6 +1,6 @@
 # Official Quickstart Template
 
-The canonical Azure Functions AI app scaffold is the Azure MCP / Azure Functions template whose
+The canonical Azure Functions Hosted Skills scaffold is the Azure MCP / Azure Functions template whose
 current catalog identifier is `ai-serverless-agents-python`, backed by:
 
 - Microsoft Learn: <https://learn.microsoft.com/azure/azure-functions/scenario-serverless-agents-runtime>
@@ -12,7 +12,7 @@ Do not use a bundled copy of the template. Retrieve the template through Azure M
 
 Use the exact template identifier `ai-serverless-agents-python` for MCP and CDN manifest lookup.
 The skill name and user-facing brand can change independently from this catalog identifier; do not
-derive or rename the lookup value from `azure-functions-intelligent-apps`.
+derive or rename the lookup value from `azure-functions-hosted-skills`.
 
 The official template includes:
 
@@ -48,7 +48,7 @@ For a new app, retrieve the template files into the project root, then tailor:
 
 The currently published Learn quickstart may still call this programming model **serverless agents
 using Azure Functions**. Treat that phrase as legacy documentation terminology; use **Azure
-Functions AI app** in user-facing guidance. The quickstart describes:
+Functions Hosted Skills** in user-facing guidance. The quickstart describes:
 
 - A chat agent with browser testing, sandboxed Python execution, and web browsing support.
 - A timer-triggered agent that gathers Microsoft blog posts, summarizes them, and can email the

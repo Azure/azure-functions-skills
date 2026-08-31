@@ -87,7 +87,7 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | --- | --- |
 | Local tools の setup または prerequisites verification | `azure-functions-setup` |
 | 新しい Functions project の作成、または既存 project への function 追加 | `azure-functions-create` |
-| interactive、scheduled、connector-triggered、background agents を含む Azure Functions AI apps の build または変更 | `azure-functions-intelligent-apps` |
+| Markdown、Functions triggers、code、tools、HTTP、MCP を使う cloud-hosted な intelligent capability、Azure Functions Hosted Skills の build または変更 | `azure-functions-hosted-skills` |
 | Functions app の deploy | `azure-functions-deploy` から Azure Skills に委譲 |
 | Function App の production readiness、best practices、security、observability、scale、cost review | `azure-functions-best-practices` |
 | Runtime errors、trigger failures、binding issues、language worker errors、telemetry、logs、Azure deployment recovery 後の deployment symptoms の診断 | `azure-functions-diagnostics` |

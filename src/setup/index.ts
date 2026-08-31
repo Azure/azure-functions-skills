@@ -25,6 +25,7 @@ import type { BuildData, CliAgentName } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', '..', 'templates');
+const LEGACY_SKILL_IDS = ['azure-functions-agents', 'azure-functions-intelligent-apps'] as const;
 
 export interface LocalInstallOptions {
   readonly targetDir: string;
@@ -112,7 +113,7 @@ function loadBuildData(): BuildData {
 
 function removeManagedAssets(targetDir: string, agent: CliAgentName, skillIds: string[]): void {
   removeLegacyAssets(targetDir, agent);
-  const skillsRoot = join(targetDir, agent === 'ghcp' ? '.github' : agent === 'claude' ? '.claude' : '.agents', 'skills');
+  const skillsRoot = skillsRootForAgent(targetDir, agent);
   for (const skillId of skillIds) {
     rmSync(join(skillsRoot, skillId), { recursive: true, force: true });
   }
@@ -124,6 +125,10 @@ function removeManagedAssets(targetDir: string, agent: CliAgentName, skillIds: s
 
 function removeLegacyAssets(targetDir: string, agent: CliAgentName): void {
   rmSync(join(targetDir, '.azure-functions-skills'), { recursive: true, force: true });
+  const skillsRoot = skillsRootForAgent(targetDir, agent);
+  for (const skillId of LEGACY_SKILL_IDS) {
+    rmSync(join(skillsRoot, skillId), { recursive: true, force: true });
+  }
   if (agent === 'ghcp') {
     rmSync(join(targetDir, '.github', 'agents', 'functions-copilot.agent.md'), { force: true });
     rmSync(join(targetDir, '.github', 'hooks', 'welcome-setup.json'), { force: true });
@@ -131,6 +136,11 @@ function removeLegacyAssets(targetDir: string, agent: CliAgentName): void {
   removeLegacyInstructionBlock(
     join(targetDir, agent === 'claude' ? 'CLAUDE.md' : 'AGENTS.md'),
   );
+}
+
+function skillsRootForAgent(targetDir: string, agent: CliAgentName): string {
+  const agentRoot = agent === 'ghcp' ? '.github' : agent === 'claude' ? '.claude' : '.agents';
+  return join(targetDir, agentRoot, 'skills');
 }
 
 function removeLegacyInstructionBlock(path: string): void {
