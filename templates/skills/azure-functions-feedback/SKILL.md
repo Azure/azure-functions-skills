@@ -5,7 +5,11 @@ description: Turn session findings into previewed issues or pull requests for th
 category: task
 ---
 
-> **Language**: Always respond in the same language the user is using.
+> **Language**:
+> - Conduct the conversation and show feedback previews in the user's language.
+> - Write all GitHub-facing artifacts in English, including issue and pull request titles, bodies, and comments.
+> - Before submission, translate the approved preview into English without changing its meaning, evidence, redactions, or proposed action.
+> - Report submission results to the user in the user's language.
 
 # azure-functions-feedback — Azure Functions Skills Feedback
 
@@ -109,4 +113,4 @@ End with:
 - Feedback must be specific, actionable, and grounded in observed evidence.
 - Prefer one issue/PR per cohesive topic.
 - Do not overgeneralize from a single failure unless the skill guidance caused or failed to recover from it.
-- Keep user language and tone.
+- Keep the user's language and tone in the conversation and preview; use clear professional English in GitHub artifacts.
