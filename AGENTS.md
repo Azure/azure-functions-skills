@@ -40,6 +40,40 @@
 - `templates/` is the canonical source; generated payloads are derived.
 - Never hand-edit files under `.github/plugins/`, `.plugin/`, or `.claude-plugin/`. Change `templates/`, then regenerate with `npm run build:plugin-payload`.
 
+## Feature Design and Approval
+
+Use the [FRD process](docs/frds/README.md) for changes that add a public CLI or
+library surface, an authoring format, discovery behavior, or a cross-module feature.
+Typos, bug fixes with a reproduction test, and small internal changes do not need
+a new FRD; explain their scope in the PR.
+
+1. Read the relevant FRD and its status before starting. New FRDs belong in
+   `docs/frds/`; preserve the historical documents and numbering in `docs/prd-docs/`.
+2. Complete all eight sections of the [template](docs/frds/_template.md), including
+   requirements, non-goals, decisions, tests, and documentation impact.
+3. Obtain a separate architecture review and explicit human sign-off on the
+   identified revision. **Do not implement a feature before its FRD is
+   `Finalized`.** Approval of a task plan is not approval of an unwritten FRD.
+   Drafting/reviewing FRDs and maintaining this documentation process are allowed
+   before feature approval.
+4. Record non-trivial decisions with alternatives, rationale, decision-maker,
+   and date. If an approved contract or scope changes, update the FRD and obtain
+   approval for the changed portion before implementing it.
+5. Link tasks, PRs, tests, and completion evidence to the FRD's requirement IDs.
+   Report what is complete, what remains, and which decisions changed at each
+   agreed checkpoint.
+6. Default to one primary implementer progressing through understandable slices,
+   not a fleet of concurrent implementation agents. Use a separate review pass
+   at meaningful checkpoints; do not expand scope ahead of human understanding.
+7. Mark an FRD `Implemented` only after its acceptance criteria and evidence are
+   complete. A benchmark or evaluation FRD requires actual approved runs and a
+   report, not just sample code. Missing approval, measurements, or cleanup
+   remain explicit blockers.
+
+FRD approval does not authorize live Azure experiments or bypass the security
+rules below. Confirm the target, budget, repetition count, and owned-resource
+cleanup policy separately before paid experiments.
+
 ## Testing
 
 - **TDD**: Write tests first. Every new function or module must have tests before implementation.
