@@ -90,6 +90,15 @@ Ask which Azure Functions workflow to use. `azure-functions-help` discovers the 
 
 > **More options?** See [CLI Reference](docs/cli-reference.md) for every command, flag, and headless example.
 
+## Experimental local workflow runner
+
+Explicitly batch already-decided commands or stdio MCP calls with
+`azure-functions-skills workflow`. The local runner supports bounded recovery and
+validated reuse of successful nodes; it does not change normal skill routing.
+See the [runner guide](docs/workflow-runner.md) and
+[create/deploy comparison samples](samples/workflow-runner/README.md).
+Token savings require real-agent measurements, not just a successful DAG.
+
 ## Local installs and VS Code extension integration
 
 `install --local` copies skill bodies, MCP settings, and telemetry hooks from the installed `@azure/functions-skills` npm package. It does not copy agent definitions, instruction files, routing files, or prompts.

@@ -43,6 +43,7 @@ export const BUNDLED_SKILL_NAMES = new Set([
   'azure-functions-help',
   'azure-functions-inventory',
   'azure-functions-setup',
+  'azure-functions-workflow',
 ]);
 
 export type TelemetryEventType =

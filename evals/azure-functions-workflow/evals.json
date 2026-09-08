@@ -1,0 +1,24 @@
+{
+  "skill_name": "azure-functions-workflow",
+  "execution_status": "Requires reviewed code and the existing reviewer-gated evaluation environment.",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have approved the local build and tests in this isolated Functions workspace. Explicitly use the workflow runner to batch those known commands, and return only their compact outcome.",
+      "expected_output": "Use a small explicit DAG only for already-decided work, validate it, run it in the isolated workspace, and avoid reading every successful artifact.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The workflow's prepare node succeeded, but deploy timed out and is marked unknown. Replan the remaining workflow without repeating prepare. Do not make any new Azure changes until you know whether deploy succeeded.",
+      "expected_output": "Inspect the failed node and read-only external state before planning another mutation. Do not automatically retry an unknown result. Explicitly reuse only verified, unchanged successes and their ancestors.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Create a TypeScript HTTP-trigger Azure Functions app in this empty workspace using the normal create skill.",
+      "expected_output": "Use the existing create route. Do not load or introduce the experimental workflow runner merely because the task contains several steps.",
+      "files": []
+    }
+  ]
+}

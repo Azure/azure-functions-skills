@@ -1,0 +1,246 @@
+name: Workflow Runner Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        type: choice
+        options: [create, deploy]
+        required: true
+      model:
+        type: string
+        required: true
+      repetitions:
+        type: choice
+        options: ["1", "3"]
+        default: "1"
+      mcp_version:
+        description: Exact reviewed Azure MCP npm version
+        type: string
+        required: true
+      azure_skills_sha:
+        description: Reviewed 40-character commit of the Azure Skills checkout
+        type: string
+        required: true
+      budget_usd:
+        description: Approved cost envelope (not an instantaneous billing hard cap)
+        type: string
+        required: true
+      minimum_token_reduction:
+        description: Predeclared minimum useful reduction, between 0 and 1
+        type: string
+        required: true
+      cache_accounting:
+        type: choice
+        options: [unknown, included-in-input, separate-input]
+        default: unknown
+      cache_evidence:
+        description: Provider/version evidence for the cache accounting choice
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: workflow-runner-benchmark
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    environment: functions-skills-live-e2e
+    timeout-minutes: 360
+    services:
+      azurite:
+        image: ${{ vars.BENCHMARK_AZURITE_IMAGE }}
+        ports: ["10000:10000", "10001:10001", "10002:10002"]
+    env:
+      GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      WORKFLOW_BENCHMARK_APPROVED_SHA: ${{ vars.BENCHMARK_APPROVED_SHA }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_LOCATION: ${{ vars.BENCHMARK_AZURE_LOCATION }}
+      AZURE_SKILLS_SUBPATH: ${{ vars.BENCHMARK_AZURE_SKILLS_SUBPATH }}
+      NODE_VERSION: ${{ vars.BENCHMARK_NODE_VERSION }}
+      WORKER_NODE_VERSION: ${{ vars.BENCHMARK_WORKER_NODE_VERSION }}
+      AZ_CLI_VERSION: ${{ vars.BENCHMARK_AZ_CLI_VERSION }}
+      AZD_VERSION: ${{ vars.BENCHMARK_AZD_VERSION }}
+      FUNC_VERSION: ${{ vars.BENCHMARK_FUNC_VERSION }}
+      SCENARIO: ${{ inputs.scenario }}
+      MODEL: ${{ inputs.model }}
+      REPETITIONS: ${{ inputs.repetitions }}
+      MCP_VERSION: ${{ inputs.mcp_version }}
+      AZURE_SKILLS_SHA: ${{ inputs.azure_skills_sha }}
+      BUDGET_USD: ${{ inputs.budget_usd }}
+      MINIMUM_REDUCTION: ${{ inputs.minimum_token_reduction }}
+      CACHE_ACCOUNTING: ${{ inputs.cache_accounting }}
+      CACHE_EVIDENCE: ${{ inputs.cache_evidence }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate approved configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            test -n "${!name}" || { echo "Missing $name" >&2; exit 1; }
+            echo "::add-mask::${!name}"
+          done
+          test "$WORKFLOW_BENCHMARK_APPROVED_SHA" = "$GITHUB_SHA" || { echo "Reviewer-maintained BENCHMARK_APPROVED_SHA must match this commit" >&2; exit 1; }
+          for name in NODE_VERSION WORKER_NODE_VERSION AZ_CLI_VERSION AZD_VERSION FUNC_VERSION; do
+            [[ "${!name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Pin $name to an exact version" >&2; exit 1; }
+          done
+          test "${NODE_VERSION%%.*}" -ge 24
+          test "${WORKER_NODE_VERSION%%.*}" -eq 22
+          test -n "$AZURE_LOCATION"
+          test -n "$AZURE_SKILLS_SUBPATH"
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ vars.BENCHMARK_AZURE_SKILLS_REPOSITORY }}
+          ref: ${{ inputs.azure_skills_sha }}
+          path: results/workflow-runner/azure-skills
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ vars.BENCHMARK_WORKER_NODE_VERSION }}
+      - name: Preserve Functions worker executables
+        run: |
+          echo "WORKFLOW_WORKER_NODE=$(command -v node)" >> "$GITHUB_ENV"
+          echo "WORKFLOW_WORKER_NPM=$(npm root -g)/npm/bin/npm-cli.js" >> "$GITHUB_ENV"
+          echo "languageWorkers__node__defaultExecutablePath=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ vars.BENCHMARK_NODE_VERSION }}
+          cache: npm
+      - name: Install pinned prerequisites
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund --registry=https://registry.npmjs.org --@types:registry=https://registry.npmjs.org
+          npm run compile
+          npm install -g "azure-functions-core-tools@$FUNC_VERSION" --unsafe-perm true
+          python -m pip install --user "azure-cli==$AZ_CLI_VERSION"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - uses: Azure/setup-azd@v2
+        with:
+          version: ${{ vars.BENCHMARK_AZD_VERSION }}
+      - name: Write experiment configuration
+        run: |
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          import {resolve} from 'node:path';
+          const e=process.env;
+          writeFileSync('results/workflow-runner/config.json', JSON.stringify({
+            version:1, model:e.MODEL, repetitions:Number(e.REPETITIONS),
+            cacheAccounting:e.CACHE_ACCOUNTING, cacheAccountingEvidence:e.CACHE_EVIDENCE || undefined,
+            mcpVersion:e.MCP_VERSION, azureSkillsSha:e.AZURE_SKILLS_SHA,
+            azureSkillsRoot:resolve('results/workflow-runner/azure-skills',e.AZURE_SKILLS_SUBPATH),
+            reviewedSha:e.GITHUB_SHA, subscriptionId:e.AZURE_SUBSCRIPTION_ID,
+            location:e.AZURE_LOCATION, budgetUsd:Number(e.BUDGET_USD),
+            minimumTokenReduction:Number(e.MINIMUM_REDUCTION)
+          }), {flag:'wx',mode:0o600});
+          NODE
+      - name: Verify reviewed inputs and record versions
+        run: |
+          node lib/workflow-evaluation/cli.js authorize --config results/workflow-runner/config.json
+          node lib/workflow-evaluation/cli.js versions --outdir results/workflow-runner
+          npx -y "@azure/mcp@$MCP_VERSION" server --help >/dev/null
+      - name: Verify actual usage capture before provisioning
+        timeout-minutes: 5
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+          WORKFLOW_USAGE_DIR: ${{ github.workspace }}/results/workflow-runner/preflight/usage
+        run: |
+          set -euo pipefail
+          base="$GITHUB_WORKSPACE/results/workflow-runner"
+          node lib/workflow-evaluation/cli.js prepare-preflight --config "$base/config.json" --outdir "$base/preflight"
+          node node_modules/@microsoft/vally-cli/dist/index.js eval \
+            --executor-plugin "$GITHUB_WORKSPACE/lib/workflow-evaluation/executor.js" \
+            --eval-spec "$base/preflight/eval.yaml" --workers 1 --max-retries 0 --output-dir "$base/preflight/vally" \
+            > "$base/preflight/private-vally.log" 2>&1
+          node lib/workflow-evaluation/cli.js check-preflight --config "$base/config.json" \
+            --input "$base/preflight/vally" --outdir "$base/preflight"
+      - uses: azure/login@v3
+        if: inputs.scenario == 'deploy'
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Authenticate azd
+        if: inputs.scenario == 'deploy'
+        run: azd auth login --client-id "$AZURE_CLIENT_ID" --federated-credential-provider github --tenant-id "$AZURE_TENANT_ID"
+      - name: Prepare isolated comparisons
+        id: prepare
+        run: node lib/workflow-evaluation/cli.js prepare --config results/workflow-runner/config.json --scenario "$SCENARIO" --outdir results/workflow-runner/prepared
+      - name: Run real agent trials serially
+        timeout-minutes: 300
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$GITHUB_WORKSPACE/results/workflow-runner"
+          runner="$GITHUB_WORKSPACE/lib/workflow-evaluation/cli.js"
+          config="$base/config.json"
+          active=""
+          cleanup_active() {
+            if [ -n "$active" ] && [ -f "$active/target.json" ] && [ ! -f "$active/cleanup.json" ]; then
+              node "$runner" cleanup --outdir "$active"
+            fi
+          }
+          trap cleanup_active EXIT
+          deadline=$((SECONDS + 250*60))
+          while IFS= read -r trial; do
+            if (( SECONDS > deadline )); then echo "Trial start deadline reached; stopping before another resource is created." >&2; exit 1; fi
+            id="$(jq -r .id <<<"$trial")"
+            arm="$(jq -r .arm <<<"$trial")"
+            pair="$(jq -r .pair <<<"$trial")"
+            active="$base/prepared/$id"
+            export WORKFLOW_USAGE_DIR="$active/usage"
+            cp "$base/versions.json" "$active/versions.json"
+            if [ "$SCENARIO" = deploy ]; then
+              node "$runner" init --config "$config" --outdir "$active" > "$active/environment.json"
+              export AZURE_RESOURCE_GROUP="$(jq -r .group "$active/environment.json")"
+              export AZURE_ENV_NAME="$(jq -r .environment "$active/environment.json")"
+              export EVAL_TRIAL_OWNER="$(jq -r .owner "$active/environment.json")"
+            fi
+            set +e
+            timeout --kill-after=10s 35m node node_modules/@microsoft/vally-cli/dist/index.js eval \
+              --executor-plugin "$GITHUB_WORKSPACE/lib/workflow-evaluation/executor.js" \
+              --eval-spec "$active/eval.yaml" --workers 1 --max-retries 0 --output-dir "$active/vally" \
+              > "$active/private-vally.log" 2>&1
+            eval_status=$?
+            set -e
+            cleanup_active
+            node "$runner" collect --config "$config" --scenario "$SCENARIO" --arm "$arm" --pair "$pair" \
+              --input "$active/vally" --outdir "$active" --preflight "$base/preflight/preflight.json"
+            active=""
+            if [ "$eval_status" -eq 124 ] || [ "$eval_status" -eq 137 ]; then
+              echo "Agent process exceeded its bound; no further trials will start." >&2
+              exit 1
+            fi
+          done < <(jq -c '.trials[]' "$base/prepared/manifest.json")
+      - name: Verify cleanup after interrupted trials
+        if: always() && steps.prepare.outcome == 'success' && inputs.scenario == 'deploy'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in results/workflow-runner/prepared/*/target.json; do
+            [ -f "$target" ] || continue
+            dir="$(dirname "$target")"
+            [ -f "$dir/cleanup.json" ] || node lib/workflow-evaluation/cli.js cleanup --outdir "$dir"
+          done
+      - name: Produce measured or explicitly incomplete reports
+        if: always() && steps.prepare.outcome == 'success'
+        run: node lib/workflow-evaluation/cli.js report --config results/workflow-runner/config.json --scenario "$SCENARIO" --input results/workflow-runner/prepared --outdir results/workflow-runner/report
+      - name: Upload sanitized records only
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: workflow-runner-${{ inputs.scenario }}
+          path: |
+            results/workflow-runner/prepared/*/trial.json
+            results/workflow-runner/preflight/preflight.json
+            results/workflow-runner/report/*
+          retention-days: 14

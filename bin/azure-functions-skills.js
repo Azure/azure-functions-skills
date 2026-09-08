@@ -16,6 +16,7 @@ Commands:
   doctor            Analyze an Azure Functions project
   template list     List Azure Functions templates
   template apply    Apply an Azure Functions template
+  workflow          Execute an explicit local command/MCP DAG (experimental)
   build             Build local and plugin artifacts
 
 Plugin installation is managed by the host coding agent, not this package.
@@ -74,6 +75,9 @@ if (command === 'install' || command === 'update') {
   await runLocalInstall(command);
 } else if (command === 'template') {
   await runTemplateCommand();
+} else if (command === 'workflow') {
+  const { runWorkflowCommand } = await import('./workflow.js');
+  process.exitCode = await runWorkflowCommand(args.slice(1));
 } else if (command === 'build') {
   const { execFileSync } = await import('node:child_process');
   execFileSync(
