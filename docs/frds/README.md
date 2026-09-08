@@ -10,10 +10,7 @@ framework or a requirement to launch multiple agents.
 
 | ID | Feature | Status | Depends on |
 | --- | --- | --- | --- |
-
-No FRDs have been authored yet. Use `_template.md` to write the first one as
-`0001-kebab-case-title.md`, add a row to the table above, and keep the index and
-the document's status in sync as it moves through the lifecycle below.
+| [FRD-0001](0001-local-skill-evaluation.md) | Local skill evaluation, model suitability, and improvement reporting | Draft | None |
 
 [Historical F1-F21 specifications](../prd-docs/README.md) remain in `docs/prd-docs/`.
 Do not move, renumber, or silently reinterpret them. Refer to old features as
@@ -94,9 +91,10 @@ If a contract changes after approval, identify the affected requirements, append
 the decision, and return that scope to review before implementing it.
 
 For multi-stage work, distinguish core implementation from sample development
-and experiments. Split dependent stages into separate FRDs (using `Depends on`)
-so that completing one stage cannot silently close a dependent experiment or
-follow-on stage.
+and experiments. Split stages into separate FRDs (using `Depends on`) when they
+have distinct user-facing contracts or independent acceptance criteria. Keep
+ordinary scenarios and rollout milestones in the owning FRD's implementation
+plan so that completing one milestone cannot silently close a follow-on stage.
 
 ## Delivery discipline
 
@@ -118,3 +116,11 @@ different gates. Confirm the approved code revision, target, identity, budget,
 repetition count, and cleanup policy. Existing reviewer-gated evaluation and
 untrusted-code restrictions still apply. An experiment is complete only when its
 required runs, measurements, report, and resource disposition are recorded.
+
+## Evaluation handoff
+
+Read FRD-0001, the [technical design](../internal/skill-evaluation-design.md), and the
+[implementation plan](../internal/skill-evaluation-implementation-plan.md), in
+that order. The FRD owns feature requirements and acceptance criteria. The design
+defines technical contracts, while the plan owns staged implementation and the
+`azure-functions-create` and hosted-agents evaluation scenarios.
