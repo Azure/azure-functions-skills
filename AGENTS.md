@@ -42,13 +42,19 @@
 
 ## Feature Design and Approval
 
-Use the [FRD process](docs/frds/README.md) for changes that add a public CLI or
-library surface, an authoring format, discovery behavior, or a cross-module feature.
-Typos, bug fixes with a reproduction test, and small internal changes do not need
-a new FRD; explain their scope in the PR.
+Use the [FRD process](docs/frds/README.md) for changes that add or materially
+change a public CLI or library surface, an authoring format, discovery or routing
+behavior, shared infrastructure, or a canonical skill. Typos, documentation-only
+clarifications, bug fixes with a reproduction test, and small internal changes do
+not need a new FRD; explain their scope in the PR.
 
 1. Read the relevant FRD and its status before starting. New FRDs belong in
    `docs/frds/`; preserve the historical documents and numbering in `docs/prd-docs/`.
+   Maintain one lifecycle FRD per canonical skill rather than creating an FRD for
+   each skill enhancement. Generated payload copies and aliases do not get their
+   own FRDs. Give cross-skill mechanisms a separate shared-infrastructure FRD.
+   Add a new skill's FRD before implementation; introduce an FRD for an existing
+   skill when its contract next changes materially.
 2. Complete all eight sections of the [template](docs/frds/_template.md), including
    requirements, non-goals, decisions, tests, and documentation impact.
 3. Obtain a separate architecture review and explicit human sign-off on the

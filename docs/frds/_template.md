@@ -8,6 +8,7 @@
 | Updated | YYYY-MM-DD |
 | Author | Human or agent identity |
 | Depends on | FRD links or None |
+| Component | CLI, Library, Shared infrastructure, or Skill: canonical-skill-name |
 
 ## 1. Summary
 
@@ -36,6 +37,11 @@ State what will not be built or changed.
 Describe public commands/formats, examples, module ownership, data flow,
 compatibility, failure behavior, and trust boundaries. Explain the smallest
 solution and why existing helpers cannot meet any new requirement.
+
+For a skill FRD, identify the canonical source path and describe the purpose,
+trigger contract, inputs and outputs, tool dependencies, recommended transitions,
+safety constraints, and evaluation criteria. Keep one lifecycle FRD for the skill;
+update it for substantive behavior changes instead of creating one per enhancement.
 
 For experiments, define controls, inputs, measurement semantics, success
 criteria, resource ownership, and separate execution authorization.

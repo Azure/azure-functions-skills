@@ -34,6 +34,25 @@ If a bug fix changes an approved public contract, record and review that contrac
 change even if the code patch is small. Pure FRD/process documentation can be
 written before feature approval.
 
+## Choose FRD ownership
+
+| Area | FRD ownership |
+| --- | --- |
+| CLI or library | One FRD per coherent public feature or contract; update it as that feature evolves |
+| Canonical skill | One lifecycle FRD per skill; update the same document for substantive behavior changes |
+| Shared skill infrastructure | A separate FRD for cross-skill routing, metadata, generation, evaluation, or other shared contracts |
+
+A canonical skill is the authored source skill, not each generated payload copy,
+target-specific rendering, or alias. Those derived forms are covered by the
+canonical skill's FRD and the relevant shared-infrastructure FRD.
+
+New canonical skills require an FRD before implementation. Existing skills do
+not need placeholder FRDs created in bulk; add one when the skill next receives a
+substantive contract change. Update the skill's FRD when its purpose, triggering,
+inputs or outputs, tool chain, transitions, safety boundary, or acceptance criteria
+change. Typos, reference refreshes, and editorial clarifications do not require an
+FRD revision unless they alter the skill's behavior or contract.
+
 ## Authoring
 
 Use `_template.md` and the next available `NNNN-kebab-case-title.md` name.
@@ -43,6 +62,11 @@ Keep all eight sections: summary, motivation, goals/non-goals, proposed design,
 decisions log, test plan, docs impact, and status/sign-off. Use stable requirement
 IDs such as `XX-001`, and link each to acceptance evidence. A test name, fixture,
 or report link is more useful than a statement that something was "verified."
+
+For a skill FRD, identify the canonical skill path and cover its purpose, trigger
+contract, inputs and outputs, tool dependencies, recommended transitions, safety
+constraints, and evaluation criteria. Extend this document as the skill evolves
+instead of creating a new FRD for each enhancement.
 
 Use English for committed documents. User-facing explanations and temporary
 review summaries may use the user's language.
