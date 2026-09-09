@@ -1,16 +1,43 @@
 ---
-name: azure-functions-agents
-description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions serverless agents and event-driven AI agents using the Azure Functions serverless agents runtime. Use when the user says serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, event-driven AI automation, HTTP/chat agent, webhook-style agent, or Azure Functions hosted agent."
-argument-hint: "Describe the agent, trigger, tools, model needs, and deployment target"
+name: azure-functions-hosted-skills
+description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, or Azure Functions hosted agent."
+argument-hint: "Describe the Hosted Skill, triggers, instructions, tools, model needs, and deployment target"
 ---
 
 
-# Azure Functions Agents
+# Azure Functions Hosted Skills
 
-Use this skill to build serverless agents on Azure Functions with the Azure Functions serverless
-agents runtime. Align terminology and flows with the Microsoft Learn quickstart "Build serverless
-agents using Azure Functions": agents are defined in markdown files, runtime defaults live in
-`agents.config.yaml`, remote MCP servers live in `mcp.json`, and deployment uses `azd`.
+Azure Functions Hosted Skills are a medium-code programming model for building cloud-hosted,
+event-driven intelligent capabilities on Azure Functions. Start with Markdown, natural-language
+instructions, and declarative configuration, then add code, tools, functions, bindings, business
+logic, and Azure integrations when the scenario needs more control.
+
+Each Hosted Skill runs within an Azure Functions application and can react to HTTP requests,
+messages, schedules, data changes, and other Functions triggers. It uses the Functions foundation
+for deployment, event-driven scale, identity, networking, monitoring, and operations, and can expose
+capabilities through HTTP or MCP for applications, agents, and agent harnesses.
+
+Azure Functions hosts and manages the skill in the cloud, so it remains available after deployment
+instead of depending on a developer laptop or local process. Lead customer conversations with this
+programming model and the customer's end-to-end scenario and success criteria, rather than trying
+to categorize the product. Hosted Skills complement other Microsoft AI offerings and can be used
+with them.
+
+Hosted Skills are for developers, cloud application teams, and non-professional developers. The
+approachable starting point supports straightforward intelligent functionality, while the path to
+custom code and Azure integrations supports increasingly specialized requirements.
+
+The current implementation uses the Azure Functions agents runtime. Skill definitions live in
+Markdown `.agent.md` files, runtime defaults live in `agents.config.yaml`, remote MCP servers live
+in `mcp.json`, and deployment uses `azd`.
+
+## Terminology
+
+- **This authoring skill** is the `SKILL.md` guidance used by a coding agent to build Hosted Skills.
+- **Hosted Skill** is the cloud-deployed intelligent capability built on Azure Functions.
+- **Agent definition** is a `*.agent.md` implementation file that configures one runtime capability.
+- **Agent Skill** is reusable instruction or domain knowledge under `src/skills/` that an agent
+  definition can consume; it is not the Hosted Skills product or this authoring skill.
 
 ## Current Defaults
 
@@ -62,7 +89,7 @@ Load only the files needed for the task:
 | Bicep, azd, deployment, local development | [infra-and-deployment.md](./references/infra-and-deployment.md) |
 | Azure resource naming abbreviations used by the Bicep assets | [abbreviations.json](./references/abbreviations.json) |
 | Diagnostics and common failures | [troubleshooting.md](./references/troubleshooting.md) |
-| Official serverless agents quickstart template and Learn article | [quickstart-reference.md](./references/quickstart-reference.md) |
+| Official Azure Functions Hosted Skills quickstart template and Learn article | [quickstart-reference.md](./references/quickstart-reference.md) |
 
 ## Assess the Workspace
 
@@ -88,10 +115,12 @@ server configs are `connectorGateways/<gateway>/mcpserverconfigs`, and trigger c
 `connectorGateways/<gateway>/triggerconfigs`. Do not search for legacy top-level
 `Microsoft.Web/connections` to find Connector Namespace connections.
 
-## Discuss and Plan the Agent
+## Discuss and Plan the Hosted Skill
 
-When the user says they want to create an agent, do not jump straight to files unless the request
-already contains enough detail. First learn enough to shape the app and discuss a short plan.
+When the user wants to create a Hosted Skill or describes an agentic or tool-driven capability, do
+not jump straight to files unless the request already contains enough detail. First understand the
+end-to-end scenario, what they have already tried, and how they will measure success. Then learn
+enough to shape the app and discuss a short plan.
 
 Ask only the questions needed to move forward, usually covering:
 
@@ -141,7 +170,7 @@ Use **manifest discovery + MCP primary retrieval** when Azure MCP tools are avai
 1. Fetch the Azure Functions template manifest from
    `https://cdn.functions.azure.com/public/templates-manifest/manifest.json` and find
    `ai-serverless-agents-python`. Use its catalog metadata (`priority`, `categories`, `tags`,
-   `whatsIncluded`) to explain why this is the correct serverless agents scaffold. Keep
+   `whatsIncluded`) to explain why this is the correct Azure Functions Hosted Skills scaffold. Keep
    `repositoryUrl`, `folderPath`, and `gitRef` for fallback.
 2. Call Azure MCP `functions_template_get` with `language: python` and
    `template: ai-serverless-agents-python`. This is the primary source for the complete project
@@ -157,7 +186,7 @@ When Azure MCP tools are not available, skip directly to the manifest/GitHub fal
 invent a project structure from memory.
 
 Do not use bundled template files as a scaffold source. This skill intentionally does not include a
-full copy of the serverless agents template because the template evolves independently; always
+full copy of the Azure Functions Hosted Skills template because the template evolves independently; always
 retrieve it from MCP first or from the manifest GitHub coordinates as fallback.
 
 After scaffolding from MCP or GitHub, tailor the app to the user's agent.
@@ -174,7 +203,7 @@ Baseline structure:
     app/
       api.bicep
       connector-gateway.bicep
-      trigger-config.bicep        # if using connector triggers
+      trigger-config.bicep        # copy from this skill's supplemental asset if using connector triggers
       foundry.bicep
       rbac.bicep
       session-pool.bicep

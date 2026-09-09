@@ -125,6 +125,34 @@ describe('simplified distribution', () => {
   });
 
   it.each([
+    ['ghcp', join('.github', 'skills')],
+    ['claude', join('.claude', 'skills')],
+    ['codex', join('.agents', 'skills')],
+  ] as const)('removes renamed skills from %s workspaces during replacement', async (agent, skillsPath) => {
+    const root = makeTempDir(`af-skills-renamed-${agent}-`);
+    const skillsRoot = join(root, skillsPath);
+    const userSkill = join(skillsRoot, 'azure-functions-internal-runbook', 'SKILL.md');
+    for (const legacySkillId of ['azure-functions-agents', 'azure-functions-intelligent-apps']) {
+      const legacySkill = join(skillsRoot, legacySkillId, 'SKILL.md');
+      mkdirSync(join(legacySkill, '..'), { recursive: true });
+      writeFileSync(legacySkill, 'stale bundled content');
+    }
+    mkdirSync(join(userSkill, '..'), { recursive: true });
+    writeFileSync(userSkill, 'user-owned');
+
+    await installLocalSkills({
+      targetDir: root,
+      agents: [agent],
+      checkForUpdates: false,
+    });
+
+    expect(existsSync(join(skillsRoot, 'azure-functions-agents'))).toBe(false);
+    expect(existsSync(join(skillsRoot, 'azure-functions-intelligent-apps'))).toBe(false);
+    expect(existsSync(join(skillsRoot, 'azure-functions-hosted-skills', 'SKILL.md'))).toBe(true);
+    expect(readFileSync(userSkill, 'utf-8')).toBe('user-owned');
+  });
+
+  it.each([
     ['ghcp', join('.github', 'hooks', 'scripts', 'custom-hook.js')],
     ['claude', join('.claude', 'hooks', 'custom-hook.json')],
     ['codex', join('.codex', 'hooks', 'custom-hook.json')],
