@@ -1,6 +1,6 @@
 # Local skill evaluation: technical design
 
-Status: proposed, revision 3, 2026-09-08. Requirements:
+Status: proposed, revision 4, 2026-09-08. Requirements:
 [FRD-0001](../frds/0001-local-skill-evaluation.md). Staged implementation and
 skill-specific evaluation scenarios are defined in the implementation plan.
 This document and all commands/types below describe future contracts, not existing
@@ -9,10 +9,13 @@ functionality. FRDs take precedence; incompatible changes require renewed review
 ## 1. Baseline and architecture
 
 Repository baseline: `4bfa24af92ee735dcd5fed377f27ee73ba9fa69b`.
-`package-lock.json` pins Vally CLI/core `0.7.0` and Copilot SDK `1.0.5`.
+`package-lock.json` currently pins Vally CLI/core `0.7.0` and Copilot SDK `1.0.5`.
 `evals/README.md` describes Node 22+ for Vally, existing specs and JSONL results.
-Recheck engine constraints of the locked tools before choosing a supported LTS;
-do not raise the published CLI's runtime minimum solely for development tooling.
+Treat these as the reproducible inspection baseline, not a requirement to retain
+Vally `0.7.0`. A Vally upgrade is acceptable after reviewing its changelog/source
+for material breaking changes and running targeted existing-suite regressions.
+Pin the approved version. Recheck engine constraints before choosing a supported
+LTS; do not raise the published CLI's runtime minimum solely for development tooling.
 
 ```text
 Matrix + existing Vally specs + reviewed fixture revisions
@@ -71,7 +74,8 @@ The manifest has a schema version, benchmark ID, stable skill ID, canonical/disp
 names and aliases, scenario complexity, capability-tier catalog, explicit
 executor/model IDs and reasoning settings, spec/stimulus references, fixture and
 skill-bundle revisions, variants, repetition count, deterministic order,
-concurrency (1 in v1), tool/MCP allowlist, timeout and limits. It references Vally
+instruction-set hashes, concurrency (1 in v1), tool/MCP allowlist, timeout and
+limits. It references Vally
 prompts/graders instead of creating a competing prompt DSL. Unknown selectors,
 automatic model aliases, unsupported effort, duplicate trials and unsupported
 executors fail preflight.
@@ -272,12 +276,16 @@ common unit exists, show lowest adequate tier and within-provider/native costs,
 mark cross-provider cost not comparable, and do not infer it from tier labels or
 external API token pricing.
 
-Match A/B on all controls except the declared skill bundle. Match historical
-comparisons on the same controls while allowing the explicitly compared skill
-revision to differ. Record changed controls (including tool/model/grader updates)
-and suppress direct regression claims when incompatible. Alternate A/B execution
-order to reduce warming/order bias. A zero baseline supports an absolute delta
-but not a percentage. Report association, not causal proof.
+Match A/B on all controls except the declared skill bundle. In particular, reuse
+the exact user task instruction and runtime/system instruction set, fixtures,
+tools/MCP endpoints, model/effort, limits, environment profile, and graders. Record
+their hashes in both variants; the without-skill variant removes only the declared
+bundle and must not rediscover it. Match historical comparisons on the same
+controls while allowing the explicitly compared skill revision to differ. Record
+changed controls (including instruction/tool/model/grader updates) and suppress
+direct regression claims when incompatible. Alternate A/B execution order to
+reduce warming/order bias. A zero baseline supports an absolute delta but not a
+percentage. Report association, not causal proof.
 
 ## 6. Improvement analysis
 
@@ -376,7 +384,10 @@ paid capability probe. Inspect how Vally isolates homes/skills, chooses models,
 allows tools and captures transcripts; enumerate every user/project/plugin/skill/
 instruction/memory discovery source and prove the isolated-home design. Default
 content policy must hold even for temporary files. Unsupported required
-capabilities block the plan or require a reviewed version/adapter decision.
+capabilities block the plan or require a reviewed version/adapter decision. A
+Vally upgrade may be that decision when existing suite configuration, grader
+behavior, result schemas, and CLI contracts have no material unmitigated breaking
+change and targeted regression tests pass.
 
 Current upstream references are discovery aids, not proof of locked-version support:
 

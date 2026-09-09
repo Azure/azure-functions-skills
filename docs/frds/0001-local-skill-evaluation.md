@@ -3,7 +3,7 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Draft |
-| Revision | 3 |
+| Revision | 4 |
 | Created | 2026-09-08 |
 | Updated | 2026-09-08 |
 | Author | GitHub Copilot, agent proposal based on maintainer discussion |
@@ -48,7 +48,7 @@ measured agent.
 | SE-002 | Preserve versioned local results independently of reporting and Azure | Each planned trial has a terminal or interrupted record; reports and upload can run from saved results without another model call; interrupted batches are visibly incomplete |
 | SE-003 | Measure consumption, latency, and agent activity with explicit semantics | Record input/output tokens, model calls, tool calls, agent duration, and available cache, skill-activation, and subagent measurements; missing/partial values are not zero or complete totals |
 | SE-004 | Separate correctness from skill invocation and measurement coverage | Mandatory deterministic checks determine task success; invocation is a separate metric; failures, skips, timeouts, and coverage denominators are visible |
-| SE-005 | Support fair baseline and historical comparisons | Compare matched controls; show sample count, success count, median and range; incompatible histories and zero-denominator percentage deltas are labeled rather than silently compared |
+| SE-005 | Support fair without-skill baseline and historical comparisons | For the without-skill variant, keep the user task instruction, runtime/system instructions, fixtures, tools, limits, and graders identical while removing only the declared skill bundle; show sample count, success count, median and range; incompatible histories and zero-denominator percentage deltas are labeled rather than silently compared |
 | SE-006 | Generate a safe public static HTML summary | Local file and Pages-hosted views work without an API/backend; filter by skill/scenario/model/variant; show versions, dates, limitations, activity and quality metrics; export only an allowlisted public schema |
 | SE-007 | Generate a separate evidence-based improvement report | Markdown findings identify trial/event evidence, observed behavior, hypothesis, suggested skill change, and a re-evaluation check; no finding asserts causality or guaranteed savings |
 | SE-008 | Detect a small set of inefficiency candidates deterministically | Versioned repeated-read, repeated-failure, search-without-progress, input-growth, and matched-regression rules have positive, negative, and insufficient-evidence fixtures |
@@ -85,10 +85,14 @@ private Markdown/JSON findings. A separate uploader exports numeric measurements
 controlled identifiers, and finding counts to Application Insights. Use the same
 trial IDs for retries and deduplicate in Workbook queries.
 
-The adapter must prove compatibility with the repository-pinned Vally/SDK versions.
+The adapter must start from the repository-pinned Vally/SDK versions and prove
+compatibility with the selected versions. A Vally upgrade is allowed when source
+and changelog review finds no material breaking change for existing suites and
+targeted regression tests pass; pin the approved version and record the decision.
 Do not assume upstream main's optional usage or billing fields exist in `0.7.0`.
-A capability gap must result in an explicit unsupported/partial measurement or a
-reviewed adapter/version decision, not invented numbers or a replacement engine.
+A remaining capability gap must result in an explicit unsupported/partial
+measurement or a reviewed adapter/version decision, not invented numbers or a
+replacement engine.
 Use supported Azure Monitor instrumentation for new evaluation telemetry rather
 than expanding the existing legacy invocation sender's contract.
 
@@ -156,6 +160,7 @@ later skill rollout order.
 | D-007 | Two representative models vs capability-tier catalog | Replace the two-model proposal with lightweight, versatile, and powerful configurations, including separate Astra effort levels, so users can identify the least expensive observed-fit option per scenario | GitHub Copilot (agent proposal, reflecting maintainer feedback) | 2026-09-08 |
 | D-008 | Temporarily remove user plugins vs isolate evaluation state | Use an evaluation-owned home/profile, an external trial root, explicit user/project discovery roots, inventory/hash checks, and a disposable-profile fallback; never mutate user-level installations | GitHub Copilot (agent proposal, reflecting maintainer feedback) | 2026-09-08 |
 | D-009 | One broad run vs staged skill milestones | Run `azure-functions-create` first, then hosted agents under separate execution approvals; add doctor, diagnostics, setup, and help later through plan revisions based on evidence and usage priority | GitHub Copilot (agent proposal, reflecting maintainer feedback) | 2026-09-08 |
+| D-010 | Keep Vally `0.7.0` fixed vs permit an upgrade | Permit a reviewed upgrade when it introduces no material breaking change for existing suites and targeted regressions pass; the lockfile remains the reproducible source of the selected version | GitHub Copilot (agent proposal, reflecting maintainer feedback) | 2026-09-08 |
 
 ## 6. Test plan
 
@@ -167,7 +172,7 @@ and repository validation commands. No new test framework.
 | SE-001, SE-011 | `benchmark-runner.test.ts`: fake executor and isolation configuration | Exact matrix, independent session/workspace per trial, no personal tools, explicit model failure instead of fallback |
 | SE-002 | `benchmark-storage.test.ts`: termination, duplicate IDs, truncated line, unsupported schema | Durable partial results; explicit recovery/error; no silent loss or overwritten trials |
 | SE-003 | `benchmark-normalize.test.ts`: real-schema sanitized fixtures, nested usage, absent fields | No double-counting, correct units and timing boundaries, missing/partial coverage surfaced |
-| SE-004, SE-005 | `benchmark-aggregate.test.ts`: mixed status, mandatory failures, incompatible controls | Correct denominators and medians, no false skill uplift or invented percentages |
+| SE-004, SE-005 | `benchmark-aggregate.test.ts`: mixed status, mandatory failures, incompatible controls, and matched with-skill/without-skill instruction hashes | Correct denominators and medians; only the declared skill bundle differs; no false skill uplift or invented percentages |
 | SE-006, SE-010 | `benchmark-report.test.ts`: hostile labels, paths, transcript fields | Standalone escaped HTML, exact public allowlist, no private content; browser walkthrough recorded |
 | SE-007, SE-008 | `benchmark-analyze.test.ts`: each detector and benign lookalikes | Stable evidence IDs and suggestions; rereads after writes and unknown progress do not become proven waste |
 | SE-009, SE-010 | `benchmark-upload.test.ts`: fake transport, flush timeout, ambiguous delivery, dedup fixture | Explicit opt-in, no credentials in artifacts, retry-safe IDs, truthful failure, correct unique-trial query results |

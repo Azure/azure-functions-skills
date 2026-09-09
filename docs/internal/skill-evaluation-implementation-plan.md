@@ -34,8 +34,8 @@ These activities are source/document inspection, not permission for paid probes:
 | Task | Deliverable / exit condition |
 | --- | --- |
 | Recheck repository baseline | Record HEAD, lockfile versions, current eval specs and relevant helper locations; design baseline is `4bfa24af92ee735dcd5fed377f27ee73ba9fa69b` |
-| Inspect Vally/SDK compatibility | Field/capability map with pinned source references for usage, calls, tool status, timing, content capture, all user/project discovery roots and parent walking, isolated homes/profiles, explicit model/effort, account-wide comparable billing metadata and cancellation; label unavailable vs unverified |
-| Resolve compatibility gaps | Choose supported adapter paths or propose a narrowly scoped upgrade; do not start a second engine or assume upstream main matches the lockfile |
+| Inspect Vally/SDK compatibility | Field/capability map with pinned source references for usage, calls, tool status, timing, content capture, all user/project discovery roots and parent walking, isolated homes/profiles, explicit model/effort, account-wide comparable billing metadata and cancellation; compare the current pin with candidate Vally releases; label unavailable vs unverified |
+| Resolve compatibility gaps | Choose supported adapter paths or a reviewed Vally upgrade; inspect changelog/source for material breaking changes, run targeted existing-suite regressions, and pin the selected version; do not start a second engine or assume upstream main matches a released version |
 | Resolve local authorization policy | Maintainer explains how the existing reviewer-gated policy applies to local execution; no PR-code evals or implicit waiver |
 | Resolve telemetry transport | Supported Azure Monitor Node integration, auth, event mapping, sampling and flush semantics; keep new telemetry separate from legacy hooks |
 | Independent architecture review | Review the FRD, design, and staged plan; document findings/resolutions; leave human approval pending |
@@ -120,8 +120,11 @@ observations, not universal recommendations.
 ### 4.2 M2: `azure-functions-create` scenario catalog
 
 The enabled bundle is `azure-functions-create`, `azure-functions-common`, and
-`azure-functions-setup`. The control removes that bundle while holding prompts,
-fixtures, tools, MCP endpoints, limits, and graders constant.
+`azure-functions-setup`. The without-skill control removes only that bundle while
+holding the exact user task instruction, runtime/system instructions, fixtures,
+tools, MCP endpoints, model/effort, limits, environment profile, and graders
+constant. Store matching instruction-set hashes for both variants and fail the
+comparison if the baseline rediscovers any removed skill.
 
 | Complexity | Scenario ID | Task | Mandatory evidence |
 | --- | --- | --- | --- |
@@ -162,7 +165,7 @@ or restarting under a new authorized plan.
 | P1. Freeze milestone contract | SE-001, SE-004, SE-013 | Resolve scenarios, bundle/controls, catalog, mandatory graders, and stable identity; independently review an identified plan revision |
 | P2. Author reviewed inputs | SE-004, SE-010, SE-013, SE-014 | Create deterministic graders/fixtures and conflicting user/project-install cases; lint statically; review exact revisions |
 | P3. Authorize execution | SE-001, SE-009, SE-014 | Record account/policy, gate evidence, exact models/efforts, shared Copilot billing unit or non-comparability, trial count, numeric budget, time/call caps, external root, isolated profile ownership, retention, and cleanup |
-| P4. Inspect dry plan | SE-001 through SE-005, SE-013, SE-014 | Account for every catalog slot; confirm trial arithmetic, concurrency 1, balanced order, controls, bundle/hash, external root, and isolation; hash the plan |
+| P4. Inspect dry plan | SE-001 through SE-005, SE-013, SE-014 | Account for every catalog slot; confirm trial arithmetic, concurrency 1, balanced order, identical with-skill/without-skill instruction-set hashes and controls, bundle/hash as the only treatment difference, external root, and isolation; hash the plan |
 | P5. Execute bounded batch | SE-001 through SE-005, SE-013, SE-014 | Retain every unavailable/terminal/interrupted trial, actual usage/coverage, effective inventory/hash, and before/after user-state evidence; no invisible retries |
 | P6. Review improvement report | SE-007, SE-008 | Resolve evidence links, distinguish missing telemetry from no findings, and record maintainer dispositions; do not automatically edit skills |
 | P7. Approve and publish | SE-006, SE-010 | Review exact public artifact, fit/cost presentation, and disclosure; publish only public files; record URL/hash and rendered-page evidence |
