@@ -30,6 +30,7 @@
     "lib/",
     "dist/plugin/",
     "templates/",
+    "docs/workflow-runner.md",
     "README.md"
   ],
   "publishConfig": {
@@ -61,7 +62,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@microsoft/vally": "0.7.0",
     "@microsoft/vally-cli": "^0.7.0",
+    "@types/cross-spawn": "6.0.6",
     "@types/node": "^26.1.0",
     "eslint": "^10.3.0",
     "typescript": "^6.0.3",
@@ -79,6 +82,9 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "applicationinsights": "1.8.10"
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "applicationinsights": "1.8.10",
+    "cross-spawn": "7.0.6",
+    "zod": "3.25.76"
   }
 }

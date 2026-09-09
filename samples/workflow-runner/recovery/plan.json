@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "prepare",
+      "action": {
+        "kind": "exec",
+        "command": "node",
+        "args": ["--input-type=module", "-e", "import{appendFileSync}from'node:fs';appendFileSync('execution-count.txt','x');console.log('{\"prepared\":true}')"],
+        "output": "json"
+      },
+      "exports": {"prepared": "/prepared"}
+    },
+    {
+      "id": "finish",
+      "dependsOn": ["prepare"],
+      "action": {"kind": "exec", "command": "node", "args": ["-e", "process.exit(75)"]}
+    }
+  ]
+}

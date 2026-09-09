@@ -2,6 +2,11 @@
 
 Individual feature specs broken out from the Draft Spec. Each FRD is self-contained and can be implemented independently.
 
+> **Historical specifications:** New FRDs use the [FRD process and index](../frds/README.md)
+> in `docs/frds/`. These F1-F21 documents retain their existing paths and numbering;
+> their descriptions and statuses are not a substitute for the current CLI
+> reference or approval of a new feature.
+
 ## Vision
 
 `azure-functions-skills` is the **canonical repository** for Azure Functions skills, agents, hooks, MCP integrations, and references. It generates plugin artifacts and repo templates targeting GHCP, Claude Code, and Codex from a single knowledge base.

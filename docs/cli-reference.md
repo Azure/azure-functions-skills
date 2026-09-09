@@ -52,6 +52,20 @@ npx @azure/functions-skills template apply --dir ./app --template <template-id>
 
 Use `template list --json` for structured discovery. `template apply` supports `--language`, `--runtime-version`, `--mode auto|new|add`, `--dry-run`, `--force`, `--json`, and `--manifest-url`.
 
+## Experimental workflow runner
+
+`workflow` executes explicit JSON DAGs of commands and stdio MCP calls, with
+bounded output, conservative retry/fallback, and explicit reuse of recorded
+successes. It does not call an LLM or replace existing skill approval paths.
+
+```powershell
+azure-functions-skills workflow validate --plan .\plan.json --dir .\app
+azure-functions-skills workflow run --plan .\plan.json --dir .\app
+```
+
+See [Workflow runner](workflow-runner.md) for configuration, trust boundaries,
+failure handling, limits, and status/inspect commands.
+
 ## Contributor build
 
 ```bash
