@@ -123,4 +123,9 @@ Read FRD-0001, the [technical design](../internal/skill-evaluation-design.md), a
 [implementation plan](../internal/skill-evaluation-implementation-plan.md), in
 that order. The FRD owns feature requirements and acceptance criteria. The design
 defines technical contracts, while the plan owns staged implementation and the
-`azure-functions-create` and hosted-agents evaluation scenarios.
+`azure-functions-create` and hosted-skills evaluation scenarios.
+Revision 5 starts with canonical-container feasibility and one real-model,
+full-installed/uninstalled HTTP-create pair with local JSONL/HTML. Broader model
+catalogs, private analysis, telemetry/history, live deployment and scheduled CI
+are later independent gates, not dependencies of the first usable local output.
+FRD-0001 remains Draft; design agreement does not authorize implementation or runs.
