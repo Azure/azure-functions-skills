@@ -6,6 +6,19 @@ and [FRD template](https://github.com/Azure/azure-functions-agents-runtime/blob/
 to this TypeScript CLI and skill repository. It does not introduce a new execution
 framework or a requirement to launch multiple agents.
 
+## Opt-in only
+
+FRDs are optional and used only when the user explicitly requests FRD work.
+Use the repository-local [frd skill](../../.github/skills/frd/SKILL.md) for requests
+such as "Create an FRD for this feature" or "Draft a Feature Requirement Document."
+Ordinary implementation, new skills, bug fixes, refactoring, and general planning
+requests do not opt in, regardless of feature size or public contract impact.
+An incidental FRD mention is not an opt-in request.
+
+The authoring, ownership, review, and delivery gates below apply only to the
+feature or document selected by the user. They are not repository-wide
+prerequisites for development.
+
 ## Index
 
 | ID | Feature | Status | Depends on |
@@ -20,19 +33,17 @@ Do not move, renumber, or silently reinterpret them. Refer to old features as
 `F21`, for example, and new features as `FRD-0001`; these are separate sequences.
 The current CLI contract is documented in [CLI Reference](../cli-reference.md).
 
-## Choose the development lane
+## Choose the development lane after opt-in
 
-| Scope | Examples | Process |
+| User intent | Examples | Process |
 | --- | --- | --- |
-| Nit | Typo, formatting, comment correction | Change, appropriate checks, PR |
-| Bug | Incorrect behavior or regression | Reproduction test, fix, checks, PR |
-| Small internal feature | One module, no public contract change | Short design note in PR, tests, implementation, docs |
-| Medium or larger feature | Public CLI/library surface, new authoring format, discovery behavior, cross-module feature | FRD, independent review, human sign-off, implementation, evidence |
+| No explicit FRD request | Any feature, skill, bug fix, refactoring, or general design task | Follow normal development standards; no FRD gate |
+| Explicit FRD request | Create, draft, or revise an FRD for a selected feature | FRD, independent review, human sign-off; implementation and evidence when requested |
 
 Update a related FRD rather than creating one for every module or test case.
-If a bug fix changes an approved public contract, record and review that contract
-change even if the code patch is small. Pure FRD/process documentation can be
-written before feature approval.
+Within the opted-in scope, if a bug fix changes an approved public contract,
+record and review that contract change even if the code patch is small. Pure
+FRD/process documentation can be written before feature approval.
 
 ## Choose FRD ownership
 
@@ -46,9 +57,10 @@ A canonical skill is the authored source skill, not each generated payload copy,
 target-specific rendering, or alias. Those derived forms are covered by the
 canonical skill's FRD and the relevant shared-infrastructure FRD.
 
-New canonical skills require an FRD before implementation. Existing skills do
-not need placeholder FRDs created in bulk; add one when the skill next receives a
-substantive contract change. Update the skill's FRD when its purpose, triggering,
+When the user opts into an FRD for a new canonical skill, draft it before
+implementing that skill. Do not create placeholder FRDs for existing skills in
+bulk or automatically start FRDs for substantive contract changes.
+Within the opted-in scope, update the skill's FRD when its purpose, triggering,
 inputs or outputs, tool chain, transitions, safety boundary, or acceptance criteria
 change. Typos, reference refreshes, and editorial clarifications do not require an
 FRD revision unless they alter the skill's behavior or contract.
@@ -84,7 +96,8 @@ proposed by an agent. Do not present an agent proposal as human approval.
 | Finalized | Identified revision explicitly approved by a human | Approver, date, revision, scope, approval reference |
 | Implemented | Approved scope delivered, documented, and evidenced | Accepted tests/results and implementation reference |
 
-Implementation starts only after `Finalized`. A general task-plan approval does
+For the opted-in scope, implementation starts only after `Finalized` and a user
+request to implement. A general task-plan approval does
 not finalize a document that the human has not reviewed. The agent may record an
 explicit human approval; it may not approve its own FRD.
 
