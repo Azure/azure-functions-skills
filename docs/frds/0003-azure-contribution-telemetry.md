@@ -3,7 +3,7 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Draft |
-| Revision | 5 |
+| Revision | 6 |
 | Created | 2026-09-08 |
 | Updated | 2026-09-10 |
 | Author | GitHub Copilot, based on the user's requirements and scope feedback |
@@ -66,7 +66,7 @@ attempt would obscure the management question.
 | --- | --- | --- |
 | AC-001 | Add one contribution event while preserving existing usage event names and application properties. | One accepted contribution emits `azure_contribution`; existing custom properties remain compatible. Removing hostname-derived SDK envelope context is an intentional privacy change shared by both event paths. |
 | AC-002 | Limit attribution to the two supported canonical skills and azd/Bicep provisioning. | Delegated Functions and direct agents paths can call the collector; plain CLI create, Terraform, and unrelated skill use do not emit. |
-| AC-003 | Require successful command completion and current ARM deployment success. | Failed/cancelled commands, nonterminal/failed ARM states, no qualifying recent successful deployment, preview, validation, and code-only deploy produce no event. |
+| AC-003 | Require successful command completion and current ARM deployment success. | Failed/cancelled commands, nonterminal/failed ARM states, a named deployment that is absent or outside the recency window, preview, validation, and code-only deploy produce no event. |
 | AC-004 | Count one supported successful command, not its resources or modules. | A single-layer azd invocation with multiple nested modules emits at most one event per collector call; failed attempts emit zero. |
 | AC-005 | Collect types from the exact ARM deployment and its nested operations. | Subscription and resource-group roots, pagination, and nested modules yield a sorted, distinct resource-type set, without deployment-wrapper types. |
 | AC-006 | Send only the categorical event contract and nonidentifying SDK metadata. | The captured HTTP envelope contains no customer names, identifiers, secrets, logs, source, host identity, or inherited correlation identifiers. |
@@ -131,10 +131,14 @@ azure-functions-skills telemetry contribution
 ```
 
 The subcommand accepts a bounded JSON object on stdin, limited to 16 KiB, with
-`skill`, `operation`, `agent`, `skillsVersion`, and optional `environmentName`.
+`skill`, `operation`, `agent`, `skillsVersion`, and `environmentName`.
 `operation` is `deploy` for `azd up` and `provision` for standalone
-`azd provision`. `environmentName` is the local azd environment name, used only
-to choose which deployment to inspect. Reject unknown fields; do not accept
+`azd provision`. `environmentName` is the local azd environment name. It is
+required for a usable observation because it identifies the deployment to
+inspect (section 4.3), and that requirement is enforced at collection time
+rather than at parse time: input without it parses, then skips before any Azure
+query, so the caller gets the precise skip reason instead of a generic failure.
+Reject unknown fields; do not accept
 templates, environment dumps, transcripts, tool output, or executable paths.
 The original `telemetry` stdin contract stays unchanged.
 
@@ -168,24 +172,39 @@ anti-fraud or hostile-local-user protection.
 
 ### 4.3 Deployment selection
 
-The collector chooses the deployment to inspect from Azure Resource Manager
+The collector identifies the deployment to inspect from Azure Resource Manager
 itself, reusing the Azure CLI authentication already available to the workflow:
 
-1. List deployments at the current subscription scope through a structured,
-   injectable query adapter. Never parse azd or CLI human-readable output.
-2. Keep only entries whose `provisioningState` is `Succeeded` and whose
+1. Require `environmentName`. azd derives its subscription-scope deployment name
+   from the environment name, so the name is the deployment identifier. Validate
+   it against the ARM deployment-name shape before use. A missing or invalid
+   value skips the observation before any Azure query is issued.
+2. Look the deployment up directly by that name at the current subscription
+   scope through a structured, injectable query adapter. Never list the
+   subscription's deployment history, and never parse azd or CLI human-readable
+   output.
+3. Accept the deployment only when `provisioningState` is `Succeeded` and its
    completion timestamp falls inside a bounded recency window of 30 minutes.
-3. If `environmentName` is supplied, prefer entries whose deployment name
-   contains it; azd derives its subscription-scope deployment name from the
-   environment name.
-4. Select the single most recent remaining entry. No candidate means no event.
+   Anything else means no event.
 
-Accepted imprecision: an unrelated successful deployment running concurrently in
-the same subscription can be selected, and a deployment that finished before the
-window opened is skipped. Both affect which resource-type breakdown is attached
-to an observation rather than whether Skills-driven deployment activity is
-broadly visible, which is why section 1 uses an "observed", non-exact reporting
-label. Exact per-attempt attribution is a deferred Phase 2 option.
+Lookup by name replaced an earlier design that listed subscription deployments
+and selected the most recent successful entry. Live measurement showed the
+listing approach is not merely slow but incorrect: ARM does not return
+deployments newest-first, and `$top` acts as a per-page hint rather than a global
+cap, so a bounded first page can omit the deployment that just completed.
+Exhaustive pagination is not a viable substitute. See D-013.
+
+Accepted imprecision: re-running the collector after a later deployment reusing
+the same environment name refers to the newest deployment of that name, and a
+deployment that finished before the window opened is skipped. Both affect which
+resource-type breakdown is attached to an observation rather than whether
+Skills-driven deployment activity is broadly visible, which is why section 1 uses
+an "observed", non-exact reporting label. Exact per-attempt attribution is a
+deferred Phase 2 option.
+
+Scope limitation: the lookup resolves subscription-scope deployments, which is
+what `azd provision` creates. A resource-group-scope deployment is not found and
+is skipped rather than misattributed.
 
 Deployment names, deployment IDs, subscription, and resource-group values are
 needed locally to run these queries. They are never analytics properties, are
@@ -224,8 +243,9 @@ types are included in Phase 1; unknown/custom providers are outside scope.
 The value is read from `resourceType`, never reconstructed from resource IDs.
 No qualifying types means no event.
 
-Bound collection to 15 seconds overall, 50 ARM requests, nesting depth 10, and
-100 distinct types. The request bound counts every ARM HTTP request, including
+Bound collection to 20 seconds overall, 50 ARM requests, nesting depth 10, and
+100 distinct types. The time bound is injectable so it can be tightened in tests
+and by callers. The request bound counts every ARM HTTP request, including
 each pagination page, not one per deployment. The time bound covers subprocess
 execution, so a stalled CLI invocation must be terminated rather than awaited.
 A denied query, unsupported child scope, exhausted bound, or malformed required
@@ -389,16 +409,20 @@ or Azure resource is created by this documentation task.
 | D-010 | Exact per-attempt capture (`AZD_DEPLOYMENT_ID_FILE` recipe) versus post-success ARM deployment selection | Choose post-success selection. The recipe required owning the azd process, which the delegating deploy skill cannot do, so it would have covered only one skill while adding a wrapper, temporary files, and exit-code plumbing. Selection covers both skills with a one-line call and accepts bounded misattribution of the resource-type breakdown, consistent with the "observed", non-exact reporting label. Exact capture is deferred to Phase 2. | User (scope decision), Copilot (revision 3 proposal) | 2026-09-09 |
 | D-011 | Rebase onto merged `main` versus keep the pre-merge naming | Rebase and adopt the merged state. PR #244's governance index replaces the provisional index, and PR #218's rename makes `azure-functions-hosted-skills` the only canonical name. Keeping both names or a forked index would create ambiguity in the allowlist and `deploymentKind` mapping. | Copilot (revision 4 maintenance) | 2026-09-10 |
 | D-012 | Disposition of the independent implementation review | Fix all seven findings in the implementation rather than relax the specification. Six were drifts from contract text this document already stated (fail-closed bounds, fail-closed malformed fields, derived deploymentKind, opt-out that must not be bypassed, subprocess time bound). Only the envelope allowlist needed a specification clarification, because removing four known SDK tags was verified insufficient on Application Insights 1.8.10. Sections 4.4 and 4.5 are clarified accordingly; no acceptance criterion is weakened. | Copilot (revision 5), GPT-5.6 independent review | 2026-09-10 |
+| D-013 | Deployment selection by recency scan versus lookup by name | Switch to direct lookup by deployment name. A live run against a real subscription showed the recency scan is incorrect, not just slow: ARM does not return deployments newest-first (a deployment completed seconds earlier appeared at index 51 of the first page), and `$top` behaves as a per-page hint rather than a global cap (`$top=100` returned 9 entries and excluded that deployment), so a bounded scan silently drops real contributions. Exhaustive pagination measured 58 s over 20 pages for 151 deployments and cannot fit any acceptable bound, whereas lookup by name is one request at 2.4 s and does not degrade as history grows. The cost is that `environmentName` becomes required and resource-group-scope deployments are out of scope; both are acceptable because azd names its subscription-scope deployment after the environment. | Copilot (revision 6), live execution evidence | 2026-09-10 |
+| D-014 | Disposition of defects found only by live execution | Fix in the implementation; keep the specification's intent unchanged. Live execution exposed three defects that injected-dependency tests structurally could not catch: the Azure CLI could not be spawned at all on Windows (`execFile` does not resolve PATHEXT, and Node refuses to spawn `.cmd` without a shell), a successful Application Insights ingestion response was classified as a delivery failure in a helper shared with the pre-existing usage path, and the deployment selection defect recorded in D-013. Section 4.4's time bound moves from 15 s to 20 s and becomes injectable. This is why section 8 now requires live-execution evidence, not only automated tests, before sign-off. | Copilot (revision 6), live execution evidence | 2026-09-10 |
 ## 6. Test plan
 
-All entries are planned, not completed acceptance evidence. Use existing Vitest,
+All entries were planned before implementation. Automated entries now exist and
+pass in the implementation PRs, and a live execution has been performed; see
+section 8. Use existing Vitest,
 CLI fixture, local HTTP capture, and isolated install/update infrastructure.
 
 | Requirement | Test / fixture / experiment | Expected evidence |
 | --- | --- | --- |
 | AC-001 | Extend `tests/telemetry.test.ts` and `tests/simplified-cli.test.ts` | New event exact shape; unchanged legacy stdin/event behavior |
 | AC-002, AC-011 | Skill contract fixtures and isolated CLI invocation with a fake ARM query adapter | Only supported explicit entry points collect; external delegation has one owner; no customer `azure.yaml` modifications |
-| AC-003 | New contribution fixtures: no recent successful deployment, ARM Running/Failed, stale timestamp outside the window, preview, validation-only | Zero contribution sends and no fallback to unrelated deployment history |
+| AC-003 | New contribution fixtures: missing or invalid `environmentName`, deployment not found, ARM Running/Failed, stale timestamp outside the window, preview, validation-only | Zero contribution sends; a missing or invalid environment name skips before any Azure query is issued |
 | AC-004 | Failed attempt then successful attempt; nested modules; deliberate double collector call | 0 then 1 for normal retry; one event for nested modules; duplicate-call limitation documented, not falsely claimed solved |
 | AC-005 | New ARM fixtures: subscription root, RG root, nested modules/pages, Create/Read/Delete, malformed type, repeated type, unsupported child, empty type set | Complete normalized type set or explicit skip, never wrapper-type counting or partial silent success |
 | AC-005, AC-008 | Deadline/request/depth/type caps, cycle, denied read, invalid pagination origin | Bounded termination, no arbitrary URL request, no raw diagnostic data |
@@ -409,6 +433,7 @@ CLI fixture, local HTTP capture, and isolated install/update infrastructure.
 | AC-009 | Installed version differs from npx sender; missing metadata; rename variant | Correct asset version or unknown; one canonical skill name, no double emission |
 | AC-010 | Documented query examples against a small synthetic dataset | Resource expansion does not change headline event count; no success-rate or full-inventory claim |
 | AC-011 | Canonical payload generation and isolated workspace CLI integration | No durable ledger, global hook interception, Azure tags, or new service introduced |
+| AC-003, AC-005, AC-006, AC-008 | Live execution against a real Azure subscription and a real Application Insights resource, exercising the published command path rather than injected fakes | Successful send and event arrival with the specified properties; skip and opt-out paths return a single categorical word and exit 0 without querying Azure; the ingested envelope carries no host, user, correlation, or application-version identity. This class of evidence is required because injected-dependency tests cannot exercise process spawning, real ARM response ordering, or ingestion responses (D-014). |
 
 At implementation time, run the targeted tests first, then the repository's
 required lint/typecheck/tests and canonical build/payload verification before
@@ -454,8 +479,8 @@ applicable skill-authoring instructions; this draft does not execute the skills.
 | Governance integration | Follows merged FRD governance (`a430a5b`); index row added in `docs/frds/README.md` |
 | Number allocation | FRD-0003 unused among remote main and all open PRs checked on 2026-09-08; rechecked against the merged governance index on 2026-09-10 |
 | Implementation reference | Phase 1 implemented as stacked draft PRs at the user's direction while this document is still Draft: #259 (telemetry core) and #260 (skill and docs wiring), stacked above this document's PR #247 |
-| Acceptance evidence | Partial: automated coverage from section 6 exists in the implementation PRs and passes locally. No live Azure deployment or production telemetry send has been exercised. |
-| Live execution authorization | Not requested or granted |
+| Acceptance evidence | Automated coverage from section 6 exists in the implementation PRs and passes locally, plus a live end-to-end run against real Azure Resource Manager and a real Application Insights resource on 2026-09-10. The live run confirmed a `sent` result, arrival of a single `azure_contribution` custom event with the specified properties, and the section 4.5 privacy boundary on the actual ingested envelope. It also exposed three defects invisible to automated tests, recorded as D-013 and D-014. |
+| Live execution authorization | Granted by the user on 2026-09-10 for a dedicated test subscription. Test resources are retained by the user for verification queries. |
 
 ### Independent review disposition
 
