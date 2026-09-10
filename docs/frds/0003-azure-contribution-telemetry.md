@@ -453,8 +453,8 @@ applicable skill-authoring instructions; this draft does not execute the skills.
 | Approval reference and date | Pending |
 | Governance integration | Follows merged FRD governance (`a430a5b`); index row added in `docs/frds/README.md` |
 | Number allocation | FRD-0003 unused among remote main and all open PRs checked on 2026-09-08; rechecked against the merged governance index on 2026-09-10 |
-| Implementation reference | Not started; explicitly excluded from this task |
-| Acceptance evidence | Not collected; section 6 contains planned evidence only |
+| Implementation reference | Phase 1 implemented as stacked draft PRs at the user's direction while this document is still Draft: #259 (telemetry core) and #260 (skill and docs wiring), stacked above this document's PR #247 |
+| Acceptance evidence | Partial: automated coverage from section 6 exists in the implementation PRs and passes locally. No live Azure deployment or production telemetry send has been exercised. |
 | Live execution authorization | Not requested or granted |
 
 ### Independent review disposition
@@ -485,7 +485,10 @@ weakens no acceptance criterion. It has not been re-reviewed independently.
 This records independent advice and the author's disposition, not reviewer or
 human approval of revision 2. M0 questions and human sign-off remain pending.
 
-Status remains Draft. Resolve open questions and review findings, identify the
-reviewed revision, obtain explicit human sign-off, and update this document and
-the index to Finalized before implementing. This proposal does not authorize
-live resources, production telemetry sends, or paid evaluations.
+Status remains Draft, deliberately: the user chose to keep it Draft because
+review may still change the content. Implementation proceeded in parallel as
+draft PRs rather than waiting, so the sign-off gate applies before merge rather
+than before writing code. Resolve open questions and review findings, identify
+the reviewed revision, obtain explicit human sign-off, and update this document
+and the index to Finalized before merging the stack. This proposal does not
+authorize live resources, production telemetry sends, or paid evaluations.
