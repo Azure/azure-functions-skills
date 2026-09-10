@@ -162,6 +162,26 @@ Do not kill and restart the `azd up` process based solely on lack of terminal ou
 
 > ✅ Your app is deployed through Azure Skills. Consider running `azure-functions-best-practices` for a production readiness review.
 
+## Report a successful deployment (internal telemetry)
+
+After the delegated Azure Skills deployment (`azure-deploy`) reports success, run the one-time internal deployment-observation collector **exactly once**. It records a categorical "observed successful Azure deployment" signal and is best-effort: it independently reads the named Azure Resource Manager deployment (by the environment name) to confirm success and never changes the deployment outcome.
+
+- This skill is the **sole owner** of the collection step for the delegated deployment path. The `azure-functions-hosted-skills` skill must not also emit it for the same work.
+- Run it once, and only after the delegated deployment reports success. Never run it after a failed, cancelled, preview, or validation-only run, and never re-run it to "retry" a telemetry failure.
+- Run it only when the command that succeeded was a complete `azd up` or a standalone `azd provision`. Do not run it after a code-only `azd deploy`, a Terraform deployment, a direct `az deployment` command, or a fallback publish such as Azure Functions Core Tools. These paths do not create the azd provisioning deployment that the collector confirms.
+- Replace `<operation>` with `deploy` for a full deployment (`azd up`), or `provision` if only a standalone `azd provision` was delegated.
+- Replace `<agent>` with the current host (`copilot-cli`, `claude-code`, `codex`, or `Visual Studio Code`); unrecognized hosts are normalized automatically.
+- `environmentName` is required for a usable observation: set it to the azd environment name (the ARM deployment name used for the deployment). The collector looks the deployment up by this name. If the name is missing or invalid, the collector accepts the input and returns `skipped` before any Azure query. This is a valid skip, not an error. Never guess or invent a value; if the name is genuinely unavailable, skip the collector. The collector sends the name to Azure Resource Manager only to look up the deployment. The name is not included in the telemetry event and is not printed.
+- `startedAt` is **optional**: if you captured an ISO-8601 UTC instant immediately before you started the deployment command, include it as a lower bound on which deployment can be selected. It is used only locally to select the deployment. It is not sent to Azure, not included in the telemetry event, and not printed. If you did not capture it, omit it; a missing or malformed value must never cause a retry or an error.
+- Pass `--dir "<workspace-root>"` with the project's workspace root so the workspace telemetry opt-out is resolved correctly. Without it the flag defaults to the current working directory, so running from a subdirectory such as `infra/` could miss a workspace opt-out.
+- Suppress all output and ignore failures. A telemetry error must never trigger a redeploy or change the reported result.
+- Older published versions do not have this subcommand. In that case doing nothing is the correct outcome. Never install, upgrade, reinstall, or work around the package, never try an alternative invocation, and never report a telemetry problem to the user.
+
+```bash
+printf '%s' '{"skill":"azure-functions-deploy","operation":"<operation>","agent":"<agent>","environmentName":"<azd-env-name>","startedAt":"<iso-8601-utc-before-deploy>"}' \
+  | npx -y @azure/functions-skills@latest telemetry deployment-observed --dir "<workspace-root>" >/dev/null 2>&1 || true
+```
+
 ## Next steps
 
 - On missing Azure Skills, suggest `azure-functions-setup` to install or configure the Azure Skills plugin.
