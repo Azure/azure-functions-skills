@@ -43,14 +43,45 @@ $env:VALLY_RUN_ROOT = 'Q:\'
 $env:VALLY_OUTPUT_ROOT = 'C:\private\benchmarks'
 # Explicit acknowledgment of reviewed local code, not spending approval.
 $env:VALLY_TRUSTED = '1'
-# Supply COPILOT_GITHUB_TOKEN, GH_TOKEN or GITHUB_TOKEN through your approved environment.
 
 # Free: stage isolated inputs and resolve the native four-cell plan.
 npm run eval -- --all --dry-run
+```
 
+Before a paid run, supply `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN`
+through your approved environment. With GitHub CLI installed and authenticated
+to an account with Copilot access, capture its token directly into the current
+PowerShell process's environment without displaying it:
+
+```powershell
+$env:COPILOT_GITHUB_TOKEN = gh auth token --hostname github.com
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOKEN)) {
+    $env:COPILOT_GITHUB_TOKEN = $null
+    throw 'Could not obtain a GitHub token. Run gh auth login --hostname github.com for an account with Copilot access, then retry.'
+}
+
+# Acquiring a token does not authorize inference spending.
 # Paid: ONLY after approving the models, four trials, budget and cleanup policy.
 npm run eval -- --all
 ```
+
+For multiple authenticated accounts, replace the assignment with the following,
+substituting the intended account for `<github-user>`, and retain the failure
+check before running an evaluation:
+
+```powershell
+$env:COPILOT_GITHUB_TOKEN = gh auth token --hostname github.com --user '<github-user>'
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOKEN)) {
+    $env:COPILOT_GITHUB_TOKEN = $null
+    throw 'Could not obtain the selected account token. Run gh auth login --hostname github.com for that account, then retry with its --user value.'
+}
+```
+
+Do **not** run `gh auth token` by itself: it prints the token to the terminal.
+Keep the assignment above, do not echo the environment variable, and never put
+the token in configuration files, logs or command-line arguments. Token
+acquisition is a manual environment-preparation step; the wrapper itself still
+does not read credential stores, and dry-runs do not need a token.
 
 Choose `--all` **or** `--skill <registered-id>`. Omitting the selection is an
 error, not implicit permission to run everything. Repeat `--models` to select
