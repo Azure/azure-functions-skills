@@ -3,11 +3,11 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Draft |
-| Revision | 3 |
+| Revision | 4 |
 | Created | 2026-09-08 |
-| Updated | 2026-09-09 |
+| Updated | 2026-09-10 |
 | Author | GitHub Copilot, based on the user's requirements and scope feedback |
-| Depends on | [FRD governance, PR #244](https://github.com/Azure/azure-functions-skills/pull/244), revision `aff24690ae7dae787ad521b4bce718121647ffa7` |
+| Depends on | [FRD governance](README.md), merged as `a430a5b` (PR #244) |
 | Component | Shared infrastructure: contribution telemetry and narrow skill integration |
 
 ## 1. Summary
@@ -39,7 +39,7 @@ Current repository evidence:
 | [Hidden CLI](../../bin/azure-functions-skills.js) | `telemetry` reads one sanitized JSON event from stdin; reuse this command family without changing that contract. |
 | [Hook scripts](../../templates/hooks/scripts) | PostToolUse records skill reads/invocations and MCP usage, not deployment success. Do not add shell-output inference here. |
 | [Deployment skill](../../templates/skills/azure-functions-deploy/SKILL.md) | Delegates to external `azure-prepare`, `azure-validate`, and `azure-deploy`. This repository does not control that deployment engine. |
-| [Agents skill](../../templates/skills/azure-functions-agents/SKILL.md) | Uses azd directly; integrate separately with the same collector. |
+| [Hosted skills skill](../../templates/skills/azure-functions-hosted-skills/SKILL.md) | Uses azd directly; integrate separately with the same collector. |
 | [Workspace preferences](../../src/setup/workspace-assets.ts) | Local installs retain per-host telemetry opt-out settings, in addition to environment-variable opt-out. |
 | [Release transport](../internal/telemetry-release.md) | The existing release pipeline injects the destination into the npm runtime. No new destination, credential, or service is needed. |
 
@@ -48,13 +48,14 @@ produce one event, with a resource-type set such as Functions, Storage, and
 Application Insights. Counting each resource, nested deployment, or failed
 attempt would obscure the management question.
 
-### Related unmerged work
+### Related work
 
 | PR | Integration rule |
 | --- | --- |
-| [#235: telemetry reliability](https://github.com/Azure/azure-functions-skills/pull/235) | Reuse its sender, diagnostics, package resolution, and version metadata if merged. Do not reproduce its delivery retry, doctor, canary, or hook overhaul here. |
-| [#240: Application Insights SDK update](https://github.com/Azure/azure-functions-skills/pull/240) | Do not bundle an SDK migration. Verify the actual outbound envelope against whichever version is merged. |
-| [#218: hosted skills rename](https://github.com/Azure/azure-functions-skills/pull/218) | Current canonical name is `azure-functions-agents`; if the rename lands, integrate `azure-functions-hosted-skills` instead and update paths/allowlists. Never emit both for one operation. |
+| [#244: FRD governance](https://github.com/Azure/azure-functions-skills/pull/244) | Merged as `a430a5b`. This document follows its index, lifecycle, and sign-off rules; do not restate or fork that process here. |
+| [#218: hosted skills rename](https://github.com/Azure/azure-functions-skills/pull/218) | Merged as `b173701`. The canonical name is `azure-functions-hosted-skills`; all paths, allowlists, and `deploymentKind` mappings use it. Never emit both names for one operation. |
+| [#235: telemetry reliability](https://github.com/Azure/azure-functions-skills/pull/235) | Still open. Reuse its sender, diagnostics, package resolution, and version metadata if merged. Do not reproduce its delivery retry, doctor, canary, or hook overhaul here. |
+| [#240: Application Insights SDK update](https://github.com/Azure/azure-functions-skills/pull/240) | Still open. Do not bundle an SDK migration. Verify the actual outbound envelope against whichever version is merged. |
 | [#241](https://github.com/Azure/azure-functions-skills/pull/241), [#245](https://github.com/Azure/azure-functions-skills/pull/245) | Reserve FRD numbers 0001 and 0002. No dependency on their workflow runner, evaluation framework, or telemetry events. |
 
 ## 3. Goals / non-goals
@@ -242,11 +243,11 @@ properties:
 
 | Property | Source / allowed values |
 | --- | --- |
-| `skill` | Executing canonical skill allowlist: deploy or agents/hosted-skills, depending on the merged rename |
+| `skill` | Executing canonical skill allowlist: `azure-functions-deploy` or `azure-functions-hosted-skills` |
 | `operation` | `deploy` or `provision` |
 | `result` | Constant `success`, constructed only after verification |
 | `resourceTypes` | JSON-encoded array of normalized resource types; string-valued Application Insights custom property |
-| `deploymentKind` | Fixed mapping: deploy skill -> `function-app`; agents/hosted-skills -> `hosted-agent` |
+| `deploymentKind` | Fixed mapping: `azure-functions-deploy` -> `function-app`; `azure-functions-hosted-skills` -> `hosted-agent` |
 | `agent` | Existing normalized client categories, plus explicit `codex`; otherwise `unknown` |
 | `skillsVersion` | Version of executing installed Skills assets, or `unknown` |
 
@@ -334,7 +335,7 @@ or attempt denominator from success-only events.
 
 | Slice | Requirements / planned work | Review boundary |
 | --- | --- | --- |
-| M0: Design approval | Reconcile #244, number allocation, related PRs, and open questions; resolve independent review findings | Obtain human approval of the identified revision; no implementation before Finalized |
+| M0: Design approval | Reconcile governance, number allocation, related PRs, and open questions; resolve independent review findings | Obtain human approval of the identified revision; no implementation before Finalized |
 | M1: Event and privacy contract | AC-001, AC-006, AC-007, AC-009; tests first, narrow sender/schema changes | Inspect an entirely local captured envelope and confirm compatibility/privacy scope |
 | M2: Collector | AC-003 through AC-005, AC-008, AC-010; fixtures first, selection/ARM adapter/CLI | Review counting, bounds, skip behavior, and lack of durable tracking |
 | M3: Skill wiring and documentation | AC-002, AC-007, AC-009 through AC-011; post-success step, delegation ownership, local install/plugin assets | Review both skill paths, limitations, and requirement-linked acceptance evidence |
@@ -352,14 +353,15 @@ or Azure resource is created by this documentation task.
 ### Open questions
 
 - Maintainer: confirm that narrow invocation instrumentation is owned by this
-  shared-infrastructure FRD under the final #244 policy. It does not redefine
+  shared-infrastructure FRD under the merged governance policy. It does not redefine
   either skill's purpose or general deployment contract; if lifecycle FRDs are
   required for the tool-chain addition, link those before implementing M3.
 - Maintainer: approve the draft's single-layer azd boundary and skip-on-incomplete
   resource breakdown. These are proposed implementation details, not an already
   approved contract.
-- Implementer/reviewer at M0: recheck which of #218, #235, and #240 have merged,
-  then select the concrete canonical paths and metadata/preference resolver.
+- Implementer/reviewer at M0: #218 and #244 have merged and revision 4 reflects
+  them; recheck #235 and #240 before publication and re-verify the outbound
+  envelope against whichever Application Insights SDK version is then in the tree.
 
 ## 5. Decisions log
 
@@ -375,6 +377,7 @@ or Azure resource is created by this documentation task.
 | D-008 | Reuse 0001/0002 versus next unused number | Use FRD-0003 after checking open PR filenames; leave the existing 0001 collision to its owners. | Copilot (allocation proposal) | 2026-09-08 |
 | D-009 | Architecture review: compatibility and delegated feasibility | Clarify that hostname removal intentionally affects SDK envelopes, not usage application properties; make delegated capture an M0 gate with human-approved scope reduction if needed. | Copilot (revision 2 proposal, responding to independent review) | 2026-09-08 |
 | D-010 | Exact per-attempt capture (`AZD_DEPLOYMENT_ID_FILE` recipe) versus post-success ARM deployment selection | Choose post-success selection. The recipe required owning the azd process, which the delegating deploy skill cannot do, so it would have covered only one skill while adding a wrapper, temporary files, and exit-code plumbing. Selection covers both skills with a one-line call and accepts bounded misattribution of the resource-type breakdown, consistent with the "observed", non-exact reporting label. Exact capture is deferred to Phase 2. | User (scope decision), Copilot (revision 3 proposal) | 2026-09-09 |
+| D-011 | Rebase onto merged `main` versus keep the pre-merge naming | Rebase and adopt the merged state. PR #244's governance index replaces the provisional index, and PR #218's rename makes `azure-functions-hosted-skills` the only canonical name. Keeping both names or a forked index would create ambiguity in the allowlist and `deploymentKind` mapping. | Copilot (revision 4 maintenance) | 2026-09-10 |
 
 ## 6. Test plan
 
@@ -406,8 +409,8 @@ Record any unevaluated host as unverified, not supported by assertion.
 
 ## 7. Docs impact
 
-This documentation change adds only this FRD and its provisional index.
-Do not copy or modify #244's governance files in this branch.
+This documentation change adds this FRD and one index row to the merged
+governance index. Do not otherwise modify the governance files.
 
 Implementation would update:
 
@@ -419,10 +422,9 @@ Implementation would update:
   without advertising the collector as a supported deployment command.
 - `templates/skills/azure-functions-deploy/SKILL.md`: a single post-success
   collection owner after the delegated deployment completes.
-- `templates/skills/azure-functions-agents/SKILL.md` and its
-  `references/infra-and-deployment.md`, or the renamed equivalents from #218:
-  the same post-success collection step and explicit exclusions for connector
-  follow-up work.
+- `templates/skills/azure-functions-hosted-skills/SKILL.md` and its
+  `references/infra-and-deployment.md`: the same post-success collection step and
+  explicit exclusions for connector follow-up work.
 - `docs/frds/README.md` and this FRD: synchronized lifecycle, reviews, decision
   changes, and requirement-linked implementation evidence.
 
@@ -439,8 +441,8 @@ applicable skill-authoring instructions; this draft does not execute the skills.
 | Human approval | Pending; prior scope agreement is not approval of this written revision |
 | Approved revision and scope | Pending; record commit SHA or content hash after explicit approval |
 | Approval reference and date | Pending |
-| Governance integration | Pending PR #244 and reconciliation of its final process |
-| Number allocation | FRD-0003 unused among remote main and all open PRs checked on 2026-09-08; recheck before publication/merge |
+| Governance integration | Follows merged FRD governance (`a430a5b`); index row added in `docs/frds/README.md` |
+| Number allocation | FRD-0003 unused among remote main and all open PRs checked on 2026-09-08; rechecked against the merged governance index on 2026-09-10 |
 | Implementation reference | Not started; explicitly excluded from this task |
 | Acceptance evidence | Not collected; section 6 contains planned evidence only |
 | Live execution authorization | Not requested or granted |
@@ -459,6 +461,11 @@ Revision 3 records the user's scope decision to prefer breadth and simplicity
 over exact per-attempt attribution. It changes sections 4.1 through 4.4, AC-003,
 AC-010, D-003, the M0 boundary, the open questions, the test plan, and the docs
 impact list. It has not been re-reviewed independently.
+
+Revision 4 rebases the document onto merged `main`: it adopts the merged FRD
+governance index instead of a provisional one and replaces every
+`azure-functions-agents` reference with `azure-functions-hosted-skills` (D-011).
+It has not been re-reviewed independently.
 
 This records independent advice and the author's disposition, not reviewer or
 human approval of revision 2. M0 questions and human sign-off remain pending.
