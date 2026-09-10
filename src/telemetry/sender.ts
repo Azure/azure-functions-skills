@@ -36,6 +36,7 @@ const CONTRIBUTION_AGENTS = new Set([...CLIENT_NAMES, 'codex']);
 const CONTRIBUTION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-hosted-skills']);
 const CONTRIBUTION_OPERATIONS = new Set(['deploy', 'provision']);
 const CONTRIBUTION_DEPLOYMENT_KINDS = new Set(['function-app', 'hosted-agent']);
+const SKILLS_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9a-z][0-9a-z.]{0,20})?$/;
 const CONTRIBUTION_PROPERTIES = new Set([
   'skill',
   'operation',
@@ -234,11 +235,15 @@ export function parseContributionEvent(value: unknown): ContributionEvent {
   if (!CONTRIBUTION_DEPLOYMENT_KINDS.has(deploymentKind)) {
     throw new Error(`Unsupported contribution deployment kind: ${deploymentKind}`);
   }
+  const expectedDeploymentKind = skill === 'azure-functions-deploy' ? 'function-app' : 'hosted-agent';
+  if (deploymentKind !== expectedDeploymentKind) {
+    throw new Error('Contribution deploymentKind does not match skill.');
+  }
   const agent = requiredString(value, 'agent');
   if (!CONTRIBUTION_AGENTS.has(agent)) {
     throw new Error(`Unsupported contribution agent: ${agent}`);
   }
-  const skillsVersion = requiredString(value, 'skillsVersion');
+  const skillsVersion = normalizeSkillsVersion(requiredString(value, 'skillsVersion'));
 
   const resourceTypesValue = value.resourceTypes;
   if (!Array.isArray(resourceTypesValue) || resourceTypesValue.length === 0) {
@@ -264,6 +269,13 @@ export function parseContributionEvent(value: unknown): ContributionEvent {
 
 export function normalizeContributionAgent(agent: string): string {
   return CONTRIBUTION_AGENTS.has(agent) ? agent : 'unknown';
+}
+
+export function normalizeSkillsVersion(value: string | undefined): string {
+  if (typeof value !== 'string') return 'unknown';
+  const trimmed = value.trim();
+  if (trimmed === 'unknown') return 'unknown';
+  return SKILLS_VERSION_PATTERN.test(trimmed) ? trimmed : 'unknown';
 }
 
 export async function sendContributionEventWithDependencies(
@@ -311,7 +323,29 @@ function contributionProperties(event: ContributionEvent): Record<string, string
 export function createApplicationInsightsClient(connectionString: string): ApplicationInsightsClient {
   const client = new applicationInsights.TelemetryClient(connectionString);
   stripHostContextTags(client);
+  installEnvelopeTagAllowlist(client);
   return client;
+}
+
+function installEnvelopeTagAllowlist(client: unknown): void {
+  if (!isRecord(client)) return;
+  const addProcessor = client.addTelemetryProcessor;
+  if (typeof addProcessor !== 'function') return;
+  const context = isRecord(client.context) ? client.context : {};
+  const keys = isRecord(context.keys) ? context.keys : {};
+  const sdkVersionKey = typeof keys.internalSdkVersion === 'string'
+    ? keys.internalSdkVersion
+    : 'ai.internal.sdkVersion';
+  const allowed = new Set<string>([sdkVersionKey]);
+  addProcessor.call(client, (envelope: unknown): boolean => {
+    if (isRecord(envelope) && isRecord(envelope.tags)) {
+      const tags = envelope.tags as Record<string, unknown>;
+      for (const key of Object.keys(tags)) {
+        if (!allowed.has(key)) delete tags[key];
+      }
+    }
+    return true;
+  });
 }
 
 function stripHostContextTags(client: unknown): void {

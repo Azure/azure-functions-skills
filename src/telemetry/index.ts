@@ -28,7 +28,12 @@ export {
   type ArmDeploymentSummary,
   type ArmDeploymentOperation,
   type ArmCliRunner,
+  type ArmRequestBudget,
   type ResourceTypeResult,
   type ResourceTypeCollectionOptions,
   type ArmSkipReason,
 } from './arm-deployments.js';
+export {
+  readWorkspaceTelemetryState,
+  type WorkspaceTelemetryState,
+} from './workspace-optout.js';

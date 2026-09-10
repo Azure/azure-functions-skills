@@ -203,6 +203,15 @@ describe('sendTelemetryEventWithDependencies', () => {
     expect(envelope).not.toContain(`${type()} ${release()}`);
     expect(envelope).not.toContain('ai.cloud.roleInstance');
     expect(envelope).not.toContain('ai.device.osVersion');
+
+    for (const line of envelope.trim().split('\n')) {
+      const parsed = JSON.parse(line) as { tags?: Record<string, string> };
+      for (const key of Object.keys(parsed.tags ?? {})) {
+        expect(key).toBe('ai.internal.sdkVersion');
+      }
+      expect(parsed.tags?.['ai.application.ver']).toBeUndefined();
+      expect(parsed.tags?.['ai.operation.id']).toBeUndefined();
+    }
   });
 });
 
