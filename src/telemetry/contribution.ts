@@ -27,11 +27,11 @@ const CONTRIBUTION_INPUT_PROPERTIES = new Set([
   'skillsVersion',
   'environmentName',
 ]);
-const CONTRIBUTION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-agents']);
+const CONTRIBUTION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-hosted-skills']);
 const CONTRIBUTION_OPERATIONS = new Set(['deploy', 'provision']);
 
 export interface ContributionInput {
-  readonly skill: 'azure-functions-deploy' | 'azure-functions-agents';
+  readonly skill: 'azure-functions-deploy' | 'azure-functions-hosted-skills';
   readonly operation: 'deploy' | 'provision';
   readonly agent: string;
   readonly skillsVersion?: string;

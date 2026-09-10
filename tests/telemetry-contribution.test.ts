@@ -269,10 +269,10 @@ describe('parseContributionInput', () => {
 
   it('accepts a minimal input without optional fields', () => {
     expect(parseContributionInput({
-      skill: 'azure-functions-agents',
+      skill: 'azure-functions-hosted-skills',
       operation: 'provision',
       agent: 'codex',
-    })).toEqual({ skill: 'azure-functions-agents', operation: 'provision', agent: 'codex' });
+    })).toEqual({ skill: 'azure-functions-hosted-skills', operation: 'provision', agent: 'codex' });
   });
 
   it('rejects unknown fields', () => {
@@ -436,7 +436,7 @@ describe('collectContributionWithDependencies', () => {
     });
 
     await collectContributionWithDependencies({
-      skill: 'azure-functions-agents',
+      skill: 'azure-functions-hosted-skills',
       operation: 'provision',
       agent: 'codex',
     }, baseDeps({ query, createClient: () => client }));

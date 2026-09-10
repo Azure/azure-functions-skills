@@ -33,7 +33,7 @@ const CLIENT_NAMES = new Set([
   'unknown',
 ]);
 const CONTRIBUTION_AGENTS = new Set([...CLIENT_NAMES, 'codex']);
-const CONTRIBUTION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-agents']);
+const CONTRIBUTION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-hosted-skills']);
 const CONTRIBUTION_OPERATIONS = new Set(['deploy', 'provision']);
 const CONTRIBUTION_DEPLOYMENT_KINDS = new Set(['function-app', 'hosted-agent']);
 const CONTRIBUTION_PROPERTIES = new Set([
@@ -77,7 +77,7 @@ export interface TelemetryEvent {
 }
 
 export interface ContributionEvent {
-  readonly skill: 'azure-functions-deploy' | 'azure-functions-agents';
+  readonly skill: 'azure-functions-deploy' | 'azure-functions-hosted-skills';
   readonly operation: 'deploy' | 'provision';
   readonly result: 'success';
   readonly resourceTypes: readonly string[];
