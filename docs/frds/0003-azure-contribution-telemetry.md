@@ -3,7 +3,7 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Draft |
-| Revision | 4 |
+| Revision | 5 |
 | Created | 2026-09-08 |
 | Updated | 2026-09-10 |
 | Author | GitHub Copilot, based on the user's requirements and scope feedback |
@@ -225,10 +225,13 @@ The value is read from `resourceType`, never reconstructed from resource IDs.
 No qualifying types means no event.
 
 Bound collection to 15 seconds overall, 50 ARM requests, nesting depth 10, and
-100 distinct types. A denied query, unsupported child scope, exhausted bound,
-or malformed required field skips the whole observation rather than emitting
-a silently truncated breakdown. These are collector safety limits, not limits
-on what the user can deploy.
+100 distinct types. The request bound counts every ARM HTTP request, including
+each pagination page, not one per deployment. The time bound covers subprocess
+execution, so a stalled CLI invocation must be terminated rather than awaited.
+A denied query, unsupported child scope, exhausted bound, or malformed required
+field skips the whole observation rather than emitting a silently truncated
+breakdown. These are collector safety limits, not limits on what the user can
+deploy.
 
 Operations indicate provisioning activity, not proof that every resource
 materially changed. Idempotent ARM reapplication can count. Conversely, cached
@@ -270,7 +273,10 @@ Example of the actual string-valued properties contract:
 
 Use existing installed metadata when available; do not overhaul distribution
 only to eliminate `unknown`. A newer npx sender version is not the Skills
-version. Derive deploymentKind in code rather than accepting a free-text label.
+version. Validate `skillsVersion` against an expected short version shape and
+substitute `unknown` otherwise, so the field cannot become a free-text channel.
+Derive deploymentKind from the skill in code rather than accepting a free-text
+label, and reject a skill/kind pair that contradicts the fixed mapping.
 
 The telemetry boundary constructs a new allowlisted object; never spread local
 input or ARM responses into it. No subscription/tenant/resource/deployment
@@ -279,9 +285,13 @@ prompts, endpoints, keys, logs, or errors are sent, even hashed.
 
 Envelope-level privacy is mandatory, not deferred. The currently pinned
 Application Insights 1.8.10 [Context implementation](https://github.com/microsoft/ApplicationInsights-node.js/blob/1.8.10/Library/Context.ts)
-adds the hostname as cloudRoleInstance. Suppress customer/host-derived tags and
-automatic collection; permit only transport-required fields, event timestamp,
-and fixed/nonidentifying SDK metadata. Do not inherit operation/session/user
+adds the hostname as cloudRoleInstance. Removing individual known tags is not
+sufficient: on that version the SDK also derives `ai.application.ver` from the
+host package and injects `ai.operation.*` correlation tags when the envelope is
+built, after client-level cleanup runs. Apply an explicit allowlist to the
+finished envelope instead. Suppress customer/host-derived tags and automatic
+collection; permit only transport-required fields, event timestamp, and
+fixed/nonidentifying SDK metadata. Do not inherit operation/session/user
 correlation from usage telemetry. Cover the full serialized HTTP envelope, not
 just trackEvent arguments. Remove hostname context in the shared client without
 redesigning existing usage properties. This intentionally removes hostname from
@@ -378,7 +388,7 @@ or Azure resource is created by this documentation task.
 | D-009 | Architecture review: compatibility and delegated feasibility | Clarify that hostname removal intentionally affects SDK envelopes, not usage application properties; make delegated capture an M0 gate with human-approved scope reduction if needed. | Copilot (revision 2 proposal, responding to independent review) | 2026-09-08 |
 | D-010 | Exact per-attempt capture (`AZD_DEPLOYMENT_ID_FILE` recipe) versus post-success ARM deployment selection | Choose post-success selection. The recipe required owning the azd process, which the delegating deploy skill cannot do, so it would have covered only one skill while adding a wrapper, temporary files, and exit-code plumbing. Selection covers both skills with a one-line call and accepts bounded misattribution of the resource-type breakdown, consistent with the "observed", non-exact reporting label. Exact capture is deferred to Phase 2. | User (scope decision), Copilot (revision 3 proposal) | 2026-09-09 |
 | D-011 | Rebase onto merged `main` versus keep the pre-merge naming | Rebase and adopt the merged state. PR #244's governance index replaces the provisional index, and PR #218's rename makes `azure-functions-hosted-skills` the only canonical name. Keeping both names or a forked index would create ambiguity in the allowlist and `deploymentKind` mapping. | Copilot (revision 4 maintenance) | 2026-09-10 |
-
+| D-012 | Disposition of the independent implementation review | Fix all seven findings in the implementation rather than relax the specification. Six were drifts from contract text this document already stated (fail-closed bounds, fail-closed malformed fields, derived deploymentKind, opt-out that must not be bypassed, subprocess time bound). Only the envelope allowlist needed a specification clarification, because removing four known SDK tags was verified insufficient on Application Insights 1.8.10. Sections 4.4 and 4.5 are clarified accordingly; no acceptance criterion is weakened. | Copilot (revision 5), GPT-5.6 independent review | 2026-09-10 |
 ## 6. Test plan
 
 All entries are planned, not completed acceptance evidence. Use existing Vitest,
@@ -466,6 +476,11 @@ Revision 4 rebases the document onto merged `main`: it adopts the merged FRD
 governance index instead of a provisional one and replaces every
 `azure-functions-agents` reference with `azure-functions-hosted-skills` (D-011).
 It has not been re-reviewed independently.
+
+Revision 5 records the disposition of an independent implementation review of
+the telemetry core (D-012). It clarifies the request/time bounds in section 4.4
+and the envelope allowlist and `skillsVersion` validation in section 4.5. It
+weakens no acceptance criterion. It has not been re-reviewed independently.
 
 This records independent advice and the author's disposition, not reviewer or
 human approval of revision 2. M0 questions and human sign-off remain pending.
