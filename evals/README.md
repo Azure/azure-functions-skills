@@ -6,9 +6,14 @@ single skill and contains an `eval.yaml` defining stimuli, graders, and configur
 
 > Source / docs: <https://aka.ms/vally> · npm: [`@microsoft/vally-cli`](https://www.npmjs.com/package/@microsoft/vally-cli)
 
+For the native, target-only local benchmark proof, use the
+[isolated TypeScript HTTP scenario](azure-functions-create/typescript-http/README.md).
+Its isolation protocol replaces the repository-root invocation below; do not use
+the older routing suites as a clean skill-off baseline.
+
 ## Prerequisites
 
-- **Node.js 22+** (required by Vally; the rest of the repo targets Node 18+ but Vally
+- **Node.js 22.12+** (required by Vally; the rest of the repo targets Node 18+ but Vally
   itself does not get bundled into the published package — it is dev-only).
 - **GitHub Copilot CLI authentication**:
   - Local: `gh auth login` (Vally reuses your `gh` session).

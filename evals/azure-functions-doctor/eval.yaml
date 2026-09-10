@@ -93,15 +93,15 @@ stimuli:
         config:
           required:
             - azure-functions-doctor
-      - name: reports_blocking_http_in_async_handler
+      - name: reports-blocking-http-in-async-handler
         type: output-matches
         config:
           pattern: "(?i)(urlopen|urllib|synchronous|blocking).{0,80}(async|event loop)|(?:async|event loop).{0,80}(urlopen|urllib|synchronous|blocking)"
-      - name: does_not_report_registered_blueprint
+      - name: does-not-report-registered-blueprint
         type: output-not-matches
         config:
           pattern: "(?i)blueprint.{0,80}(unregistered|not registered|registration.{0,20}missing)"
-      - name: does_not_require_python_pins_or_lockfile
+      - name: does-not-require-python-pins-or-lockfile
         type: output-not-matches
         config:
           pattern: "(?i)(requirements?.{0,40}(unpinned|not pinned|pin exact)|missing.{0,30}(lockfile|requirements\\.lock)|requirements\\.lock.{0,30}(missing|required))"

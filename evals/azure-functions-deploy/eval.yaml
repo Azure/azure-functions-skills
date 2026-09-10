@@ -201,36 +201,36 @@ stimuli:
       # mention a Windows plan" is unusable here, because the required
       # guidance itself says "do not select a Windows-hosted plan" and would
       # match its own prohibition.
-      - name: go_flex_consumption_only
+      - name: go-flex-consumption-only
         type: output-matches
         config:
           pattern: "(?i)flex consumption"
-      - name: go_linux_only_stated
+      - name: go-linux-only-stated
         type: output-matches
         config:
           pattern: "(?i)linux[^.\\n]{0,40}\\bonly\\b|\\bonly\\b[^.\\n]{0,40}linux|windows[^.\\n]{0,60}(?:not supported|unsupported|isn't supported|not available|cannot)|(?:do not|don't|never|avoid)[^.\\n]{0,40}windows"
 
       # Core Tools owns the build and packaging.
-      - name: go_core_tools_packaging
+      - name: go-core-tools-packaging
         type: output-matches
         config:
           pattern: "func\\s+pack|func\\s+azure\\s+functionapp\\s+publish"
 
       # Cross-compilation must be presented as the --no-build case, not
       # as the default workflow.
-      - name: go_cross_compile_scoped
+      - name: go-cross-compile-scoped
         type: output-not-matches
         config:
           pattern: "(?i)you must (always )?(manually )?cross-compile"
 
       # Native worker runtime.
-      - name: go_native_runtime
+      - name: go-native-runtime
         type: output-matches
         config:
           pattern: "(?i)FUNCTIONS_WORKER_RUNTIME[^\\n]{0,40}native"
 
       # Planning only: nothing should actually be deployed.
-      - name: go_no_actual_deploy
+      - name: go-no-actual-deploy
         type: tool-calls
         config:
           disallowed:
