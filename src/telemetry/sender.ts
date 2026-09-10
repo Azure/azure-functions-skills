@@ -390,10 +390,10 @@ function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number):
       client.flush({
         callback: response => {
           clearTimeout(timeout);
-          if (response) {
-            reject(new Error(`Telemetry delivery failed: ${response}`));
-          } else {
+          if (isAcceptedIngestionResponse(response)) {
             resolve();
+          } else {
+            reject(new Error(`Telemetry delivery failed: ${response}`));
           }
         },
       });
@@ -402,6 +402,24 @@ function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number):
       reject(error);
     }
   });
+}
+
+function isAcceptedIngestionResponse(response: string | undefined): boolean {
+  if (response === undefined || response.length === 0) return true;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(response);
+  } catch {
+    return false;
+  }
+  if (!isRecord(parsed)) return false;
+  const { itemsReceived, itemsAccepted, errors } = parsed;
+  return Array.isArray(errors)
+    && errors.length === 0
+    && typeof itemsAccepted === 'number'
+    && itemsAccepted >= 1
+    && typeof itemsReceived === 'number'
+    && itemsAccepted === itemsReceived;
 }
 
 export function isConfiguredConnectionString(connectionString: string): boolean {
