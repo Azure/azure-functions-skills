@@ -3,6 +3,7 @@ import {
   ARM_COLLECTION_DEADLINE_MS,
   collectResourceTypes,
   createAzureCliDeploymentQuery,
+  isValidDeploymentName,
   type ArmDeploymentQuery,
   type ArmDeploymentSummary,
 } from './arm-deployments.js';
@@ -55,6 +56,7 @@ export interface ContributionDependencies {
   readonly query: ArmDeploymentQuery;
   readonly now: () => number;
   readonly workspaceTelemetryEnabled: boolean | undefined;
+  readonly armDeadlineMs?: number;
 }
 
 export function parseContributionInput(value: unknown): ContributionInput {
@@ -122,20 +124,32 @@ export async function collectContributionWithDependencies(
     return { status: 'not-configured' };
   }
 
+  // Phase 1 locates the deployment by name (the environment name that azd/az use to
+  // name the deployment). Without a usable name there is no discovery path, so skip
+  // before any subprocess or network call.
+  const environmentName = input.environmentName;
+  if (environmentName === undefined || !isValidDeploymentName(environmentName)) {
+    return { status: 'skipped', reason: 'no-environment-name' };
+  }
+
   const start = dependencies.now();
-  let deployments: readonly ArmDeploymentSummary[];
+  const armDeadlineMs = dependencies.armDeadlineMs ?? ARM_COLLECTION_DEADLINE_MS;
+  let deployment: ArmDeploymentSummary | undefined;
   try {
-    deployments = await dependencies.query.listSubscriptionDeployments();
+    deployment = await dependencies.query.getDeploymentByName(environmentName);
   } catch {
     return { status: 'skipped', reason: 'deployment-query-failed' };
   }
+  if (deployment === undefined) {
+    return { status: 'skipped', reason: 'no-recent-deployment' };
+  }
 
-  const selected = selectDeployment(deployments, input.environmentName, dependencies.now());
+  const selected = selectDeployment([deployment], undefined, dependencies.now());
   if (selected === undefined) {
     return { status: 'skipped', reason: 'no-recent-deployment' };
   }
 
-  const remainingMs = ARM_COLLECTION_DEADLINE_MS - (dependencies.now() - start);
+  const remainingMs = armDeadlineMs - (dependencies.now() - start);
   if (remainingMs <= 0) {
     return { status: 'skipped', reason: 'deadline-exceeded' };
   }
@@ -165,16 +179,21 @@ export async function collectContributionWithDependencies(
 
 export async function collectContribution(
   input: ContributionInput,
-  options: { readonly workspaceTelemetryEnabled?: boolean | undefined } = {},
+  options: {
+    readonly workspaceTelemetryEnabled?: boolean | undefined;
+    readonly armDeadlineMs?: number;
+  } = {},
 ): Promise<ContributionResult> {
+  const armDeadlineMs = options.armDeadlineMs ?? ARM_COLLECTION_DEADLINE_MS;
   return collectContributionWithDependencies(input, {
     connectionString: APPLICATION_INSIGHTS_CONNECTION_STRING,
     createClient: createApplicationInsightsClient,
     environment: process.env,
     timeoutMs: DEFAULT_TIMEOUT_MS,
-    query: createAzureCliDeploymentQuery(),
+    query: createAzureCliDeploymentQuery(undefined, armDeadlineMs),
     now: () => Date.now(),
     workspaceTelemetryEnabled: options.workspaceTelemetryEnabled,
+    armDeadlineMs,
   });
 }
 

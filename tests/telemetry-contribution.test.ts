@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   collectResourceTypes,
   createAzureCliDeploymentQuery,
+  buildRunnerInvocation,
   type ArmDeploymentOperation,
   type ArmDeploymentQuery,
   type ArmDeploymentSummary,
@@ -28,7 +29,8 @@ function makeQuery(
   operations: Readonly<Record<string, readonly ArmDeploymentOperation[]>>,
 ): ArmDeploymentQuery {
   return {
-    listSubscriptionDeployments: vi.fn(async () => deployments),
+    getDeploymentByName: vi.fn(async (name: string) =>
+      deployments.find(deployment => deployment.name === name) ?? deployments[0]),
     listDeploymentOperations: vi.fn(async (id: string) => {
       if (!(id in operations)) throw new Error('not found');
       return operations[id];
@@ -162,7 +164,7 @@ describe('collectResourceTypes', () => {
 
   it('skips when the ARM query fails', async () => {
     const query: ArmDeploymentQuery = {
-      listSubscriptionDeployments: async () => [],
+      getDeploymentByName: async () => undefined,
       listDeploymentOperations: async () => {
         throw new Error('access denied');
       },
@@ -234,7 +236,7 @@ describe('collectResourceTypes', () => {
 
   it('skips when a single in-flight request exceeds the remaining budget', async () => {
     const query: ArmDeploymentQuery = {
-      listSubscriptionDeployments: async () => [],
+      getDeploymentByName: async () => undefined,
       listDeploymentOperations: () => new Promise(resolve => {
         setTimeout(() => resolve([
           createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' }),
@@ -303,17 +305,73 @@ describe('createAzureCliDeploymentQuery', () => {
     await expect(query.listDeploymentOperations(ROOT)).rejects.toThrow();
   });
 
-  it('parses subscription deployment summaries', async () => {
-    const runner = vi.fn(async () => JSON.stringify([
-      { id: ROOT, name: 'root', properties: { provisioningState: 'Succeeded', timestamp: '2026-09-09T10:00:00Z' } },
-    ]));
+  it('looks up a deployment by name via az deployment sub show', async () => {
+    const calls: string[][] = [];
+    const runner = vi.fn(async (args: readonly string[]) => {
+      calls.push([...args]);
+      return JSON.stringify({
+        id: ROOT,
+        name: 'afs-e2e-rzug8t',
+        properties: { provisioningState: 'Succeeded', timestamp: '2026-09-09T10:00:00Z' },
+      });
+    });
 
     const query = createAzureCliDeploymentQuery(runner);
-    const deployments = await query.listSubscriptionDeployments();
+    const deployment = await query.getDeploymentByName('afs-e2e-rzug8t');
 
-    expect(deployments).toEqual([
-      { id: ROOT, name: 'root', provisioningState: 'Succeeded', timestamp: '2026-09-09T10:00:00Z' },
-    ]);
+    expect(deployment).toEqual({
+      id: ROOT,
+      name: 'afs-e2e-rzug8t',
+      provisioningState: 'Succeeded',
+      timestamp: '2026-09-09T10:00:00Z',
+    });
+    expect(calls[0]).toEqual(['deployment', 'sub', 'show', '--name', 'afs-e2e-rzug8t', '-o', 'json']);
+  });
+
+  it('returns undefined when the deployment lookup fails (e.g. not found)', async () => {
+    const runner = vi.fn(async () => {
+      throw new Error('DeploymentNotFound');
+    });
+    const query = createAzureCliDeploymentQuery(runner);
+    await expect(query.getDeploymentByName('missing-env')).resolves.toBeUndefined();
+  });
+
+  it('rejects an invalid deployment name without invoking the runner', async () => {
+    const runner = vi.fn(async () => '{}');
+    const query = createAzureCliDeploymentQuery(runner);
+    await expect(query.getDeploymentByName('bad name & rm -rf')).rejects.toThrow();
+    expect(runner).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildRunnerInvocation', () => {
+  const URL_ARG = 'https://management.azure.com/subscriptions/s/providers/Microsoft.Resources/deployments?api-version=2021-04-01&$top=100';
+
+  it('passes az with raw args on non-Windows platforms', () => {
+    const invocation = buildRunnerInvocation('linux', ['rest', '--url', URL_ARG], 5_000);
+    expect(invocation.file).toBe('az');
+    expect(invocation.args).toEqual(['rest', '--url', URL_ARG]);
+    expect(invocation.options.windowsVerbatimArguments).toBeUndefined();
+    expect(invocation.options.timeout).toBe(5_000);
+    expect(invocation.options.killSignal).toBe('SIGKILL');
+  });
+
+  it('routes through ComSpec with quoted args and verbatim arguments on Windows', () => {
+    const invocation = buildRunnerInvocation('win32', ['rest', '--url', URL_ARG], 5_000, 'C:/cmd.exe');
+    expect(invocation.file).toBe('C:/cmd.exe');
+    expect(invocation.args[0]).toBe('/d');
+    expect(invocation.args[1]).toBe('/s');
+    expect(invocation.args[2]).toBe('/c');
+    const commandLine = invocation.args[3] ?? '';
+    expect(commandLine.startsWith('"az ')).toBe(true);
+    // The `&` in the ARM URL must be inside quotes so cmd.exe does not treat it as a separator.
+    expect(commandLine).toContain(`"${URL_ARG}"`);
+    expect(invocation.options.windowsVerbatimArguments).toBe(true);
+  });
+
+  it('rejects arguments containing a double quote or control character', () => {
+    expect(() => buildRunnerInvocation('win32', ['rest', 'a"b'], 1_000)).toThrow();
+    expect(() => buildRunnerInvocation('win32', ['rest', 'a\u0001b'], 1_000)).toThrow();
   });
 });
 
@@ -424,7 +482,7 @@ describe('collectContributionWithDependencies', () => {
       environment: { AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'false' },
     }));
     expect(result).toEqual({ status: 'disabled' });
-    expect(query.listSubscriptionDeployments).not.toHaveBeenCalled();
+    expect(query.getDeploymentByName).not.toHaveBeenCalled();
   });
 
   it('short-circuits on workspace opt-out before any ARM query', async () => {
@@ -434,7 +492,7 @@ describe('collectContributionWithDependencies', () => {
       workspaceTelemetryEnabled: false,
     }));
     expect(result).toEqual({ status: 'disabled' });
-    expect(query.listSubscriptionDeployments).not.toHaveBeenCalled();
+    expect(query.getDeploymentByName).not.toHaveBeenCalled();
   });
 
   it('returns not-configured for the placeholder connection string without querying ARM', async () => {
@@ -444,14 +502,84 @@ describe('collectContributionWithDependencies', () => {
       connectionString: '__APPLICATIONINSIGHTS_CONNECTION_STRING__',
     }));
     expect(result).toEqual({ status: 'not-configured' });
-    expect(query.listSubscriptionDeployments).not.toHaveBeenCalled();
+    expect(query.getDeploymentByName).not.toHaveBeenCalled();
   });
 
-  it('skips when there is no recent successful deployment', async () => {
+  it('skips before any query when environmentName is absent', async () => {
+    const query = makeQuery([RECENT_DEPLOYMENT], {});
+    const result = await collectContributionWithDependencies({
+      skill: 'azure-functions-deploy',
+      operation: 'deploy',
+      agent: 'copilot-cli',
+    }, baseDeps({ query }));
+    expect(result).toEqual({ status: 'skipped', reason: 'no-environment-name' });
+    expect(query.getDeploymentByName).not.toHaveBeenCalled();
+  });
+
+  it('skips before any query when environmentName is not a valid ARM name', async () => {
+    const query = makeQuery([RECENT_DEPLOYMENT], {});
+    const result = await collectContributionWithDependencies({
+      skill: 'azure-functions-deploy',
+      operation: 'deploy',
+      agent: 'copilot-cli',
+      environmentName: 'bad name & rm -rf',
+    }, baseDeps({ query }));
+    expect(result).toEqual({ status: 'skipped', reason: 'no-environment-name' });
+    expect(query.getDeploymentByName).not.toHaveBeenCalled();
+  });
+
+  it('looks up the deployment by the environment name', async () => {
+    const client = makeClient();
+    const query = makeQuery([{ ...RECENT_DEPLOYMENT, name: 'my-env' }], {
+      [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
+    });
+    await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+      query,
+      createClient: () => client,
+    }));
+    expect(query.getDeploymentByName).toHaveBeenCalledWith('my-env');
+  });
+
+  it('skips with no-recent-deployment when the lookup returns nothing (404)', async () => {
     const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
       query: makeQuery([], {}),
     }));
     expect(result).toEqual({ status: 'skipped', reason: 'no-recent-deployment' });
+  });
+
+  it('skips when the looked-up deployment is outside the 30-minute window', async () => {
+    const stale: ArmDeploymentSummary = {
+      ...RECENT_DEPLOYMENT,
+      name: 'my-env',
+      timestamp: '2026-09-09T09:00:00Z',
+    };
+    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+      query: makeQuery([stale], {}),
+    }));
+    expect(result).toEqual({ status: 'skipped', reason: 'no-recent-deployment' });
+  });
+
+  it('skips when the looked-up deployment is not Succeeded', async () => {
+    const failed: ArmDeploymentSummary = {
+      ...RECENT_DEPLOYMENT,
+      name: 'my-env',
+      provisioningState: 'Failed',
+    };
+    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+      query: makeQuery([failed], {}),
+    }));
+    expect(result).toEqual({ status: 'skipped', reason: 'no-recent-deployment' });
+  });
+
+  it('maps a thrown lookup error to deployment-query-failed', async () => {
+    const query: ArmDeploymentQuery = {
+      getDeploymentByName: vi.fn(async () => {
+        throw new Error('boom');
+      }),
+      listDeploymentOperations: vi.fn(async () => []),
+    };
+    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({ query }));
+    expect(result).toEqual({ status: 'skipped', reason: 'deployment-query-failed' });
   });
 
   it('skips when the selected deployment has no qualifying resource types', async () => {
@@ -502,6 +630,7 @@ describe('collectContributionWithDependencies', () => {
       skill: 'azure-functions-hosted-skills',
       operation: 'provision',
       agent: 'codex',
+      environmentName: 'root',
     }, baseDeps({ query, createClient: () => client }));
 
     const call = (client.trackEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
@@ -520,6 +649,7 @@ describe('collectContributionWithDependencies', () => {
       skill: 'azure-functions-deploy',
       operation: 'deploy',
       agent: 'some-unlisted-agent',
+      environmentName: 'root',
     }, baseDeps({ query, createClient: () => client }));
 
     const call = (client.trackEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
@@ -537,6 +667,7 @@ describe('collectContributionWithDependencies', () => {
       operation: 'deploy',
       agent: 'copilot-cli',
       skillsVersion: '/etc/passwd',
+      environmentName: 'root',
     }, baseDeps({ query, createClient: () => client }));
 
     const call = (client.trackEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
@@ -555,6 +686,23 @@ describe('collectContributionWithDependencies', () => {
     }));
 
     expect(result).toEqual({ status: 'failed', reason: 'delivery-failed' });
+  });
+
+  it('honours an injected armDeadlineMs when the lookup consumes the budget', async () => {
+    const query = makeQuery([RECENT_DEPLOYMENT], {
+      [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
+    });
+    const base = Date.parse('2026-09-09T10:30:00Z');
+    const clock = [base, base, base + 100];
+    const now = () => (clock.length > 1 ? (clock.shift() as number) : clock[0]);
+
+    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+      query,
+      now,
+      armDeadlineMs: 50,
+    }));
+
+    expect(result).toEqual({ status: 'skipped', reason: 'deadline-exceeded' });
   });
 });
 

@@ -159,6 +159,30 @@ describe('sendTelemetryEventWithDependencies', () => {
     expect(createClient).toHaveBeenCalledOnce();
   });
 
+  it('treats a full-acceptance ingestion response body as success', async () => {
+    const client = makeClient(({ callback }) =>
+      callback('{"itemsReceived":1,"itemsAccepted":1,"appId":null,"errors":[]}'));
+
+    await expect(sendTelemetryEventWithDependencies(EVENT, {
+      connectionString: 'InstrumentationKey=test-key',
+      createClient: () => client,
+      environment: {},
+      timeoutMs: 100,
+    })).resolves.toEqual({ status: 'sent' });
+  });
+
+  it('rejects a partial-acceptance ingestion response body', async () => {
+    const client = makeClient(({ callback }) =>
+      callback('{"itemsReceived":2,"itemsAccepted":1,"errors":[{"index":1,"statusCode":400}]}'));
+
+    await expect(sendTelemetryEventWithDependencies(EVENT, {
+      connectionString: 'InstrumentationKey=test-key',
+      createClient: () => client,
+      environment: {},
+      timeoutMs: 100,
+    })).rejects.toThrow('Telemetry delivery failed');
+  });
+
   it('delivers through the isolated Application Insights client', async () => {
     let receivedBytes = 0;
     let requestPath = '';

@@ -11,7 +11,7 @@ const MAX_RESOURCE_TYPE_LENGTH = 256;
 const MAX_PAGES = 20;
 
 const DEFAULT_DEADLINE_MS = 15_000;
-export const ARM_COLLECTION_DEADLINE_MS = DEFAULT_DEADLINE_MS;
+export const ARM_COLLECTION_DEADLINE_MS = 20_000;
 const DEFAULT_MAX_REQUESTS = 50;
 const DEFAULT_MAX_DEPTH = 10;
 const DEFAULT_MAX_TYPES = 100;
@@ -31,7 +31,7 @@ export interface ArmDeploymentOperation {
 }
 
 export interface ArmDeploymentQuery {
-  listSubscriptionDeployments(): Promise<readonly ArmDeploymentSummary[]>;
+  getDeploymentByName(name: string): Promise<ArmDeploymentSummary | undefined>;
   listDeploymentOperations(
     deploymentId: string,
     budget?: ArmRequestBudget,
@@ -207,11 +207,24 @@ export function createAzureCliDeploymentQuery(
   const deadline = startDeadline(deadlineMs);
   const callTimeout = (): number => Math.max(1, Math.ceil(deadline.remainingMs()));
   return {
-    async listSubscriptionDeployments(): Promise<readonly ArmDeploymentSummary[]> {
-      const raw = await runner(['deployment', 'sub', 'list', '-o', 'json'], callTimeout());
-      const parsed: unknown = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.map(toDeploymentSummary).filter((entry): entry is ArmDeploymentSummary => entry !== undefined);
+    async getDeploymentByName(name: string): Promise<ArmDeploymentSummary | undefined> {
+      if (!isValidDeploymentName(name)) {
+        throw new Error('Invalid ARM deployment name.');
+      }
+      let raw: string;
+      try {
+        raw = await runner(['deployment', 'sub', 'show', '--name', name, '-o', 'json'], callTimeout());
+      } catch {
+        // Not found (DeploymentNotFound) or a transient failure: treat as no deployment.
+        return undefined;
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return undefined;
+      }
+      return toDeploymentSummary(parsed);
     },
 
     async listDeploymentOperations(
@@ -313,14 +326,70 @@ function isSameOriginArmUrl(value: string): boolean {
   }
 }
 
-function defaultRunner(args: readonly string[], timeoutMs: number = DEFAULT_DEADLINE_MS): Promise<string> {
-  const command = process.platform === 'win32' ? 'az.cmd' : 'az';
+export interface RunnerInvocation {
+  readonly file: string;
+  readonly args: readonly string[];
+  readonly options: {
+    readonly maxBuffer: number;
+    readonly windowsHide: boolean;
+    readonly timeout: number;
+    readonly killSignal: 'SIGKILL';
+    readonly windowsVerbatimArguments?: boolean;
+  };
+}
+
+const RUNNER_MAX_BUFFER = 8 * 1024 * 1024;
+
+function quoteForCmd(arg: string): string {
+  if (hasUnsafeCmdCharacter(arg)) {
+    throw new Error('Refusing to pass an unsafe argument to the Azure CLI.');
+  }
+  return `"${arg}"`;
+}
+
+function hasUnsafeCmdCharacter(value: string): boolean {
+  return [...value].some(character => {
+    if (character === '"') return true;
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && codePoint <= 0x1f;
+  });
+}
+
+export function buildRunnerInvocation(
+  platform: NodeJS.Platform,
+  args: readonly string[],
+  timeoutMs: number = DEFAULT_DEADLINE_MS,
+  comSpec: string = process.env.ComSpec ?? 'cmd.exe',
+): RunnerInvocation {
   const timeout = Math.max(1, Math.floor(timeoutMs));
+  const baseOptions = {
+    maxBuffer: RUNNER_MAX_BUFFER,
+    windowsHide: true,
+    timeout,
+    killSignal: 'SIGKILL' as const,
+  };
+  if (platform !== 'win32') {
+    return { file: 'az', args: [...args], options: baseOptions };
+  }
+  // `az` on Windows is `az.cmd`; Node >= 18.20.2 refuses to spawn `.cmd` without a
+  // shell, and execFile with `shell: true` does not quote arguments (our nextLink
+  // URLs contain `&`). Route through cmd.exe with each argument quoted, keeping the
+  // program name unquoted so az.cmd's `%~dp0` interpreter resolution still works.
+  const commandLine = `"az ${args.map(quoteForCmd).join(' ')}"`;
+  return {
+    file: comSpec,
+    args: ['/d', '/s', '/c', commandLine],
+    options: { ...baseOptions, windowsVerbatimArguments: true },
+  };
+}
+
+function defaultRunner(args: readonly string[], timeoutMs: number = DEFAULT_DEADLINE_MS): Promise<string> {
+  const invocation = buildRunnerInvocation(process.platform, args, timeoutMs);
   return new Promise((resolve, reject) => {
     execFile(
-      command,
-      [...args],
-      { maxBuffer: 8 * 1024 * 1024, windowsHide: true, timeout, killSignal: 'SIGKILL' },
+      invocation.file,
+      [...invocation.args],
+      invocation.options,
       (error, stdout) => {
         if (error) {
           reject(new Error('Azure CLI request failed.'));
@@ -330,6 +399,10 @@ function defaultRunner(args: readonly string[], timeoutMs: number = DEFAULT_DEAD
       },
     );
   });
+}
+
+export function isValidDeploymentName(value: string): boolean {
+  return /^[A-Za-z0-9._()-]{1,64}$/.test(value);
 }
 
 function asString(value: unknown): string | undefined {
