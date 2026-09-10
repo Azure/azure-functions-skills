@@ -3,9 +3,9 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Draft |
-| Revision | 2 |
+| Revision | 3 |
 | Created | 2026-09-08 |
-| Updated | 2026-09-08 |
+| Updated | 2026-09-09 |
 | Author | GitHub Copilot, based on the user's requirements and scope feedback |
 | Depends on | [FRD governance, PR #244](https://github.com/Azure/azure-functions-skills/pull/244), revision `aff24690ae7dae787ad521b4bce718121647ffa7` |
 | Component | Shared infrastructure: contribution telemetry and narrow skill integration |
@@ -65,14 +65,14 @@ attempt would obscure the management question.
 | --- | --- | --- |
 | AC-001 | Add one contribution event while preserving existing usage event names and application properties. | One accepted contribution emits `azure_contribution`; existing custom properties remain compatible. Removing hostname-derived SDK envelope context is an intentional privacy change shared by both event paths. |
 | AC-002 | Limit attribution to the two supported canonical skills and azd/Bicep provisioning. | Delegated Functions and direct agents paths can call the collector; plain CLI create, Terraform, and unrelated skill use do not emit. |
-| AC-003 | Require successful command completion and current ARM deployment success. | Failed/cancelled commands, nonterminal/failed ARM states, missing evidence, preview, validation, and code-only deploy produce no event. |
+| AC-003 | Require successful command completion and current ARM deployment success. | Failed/cancelled commands, nonterminal/failed ARM states, no qualifying recent successful deployment, preview, validation, and code-only deploy produce no event. |
 | AC-004 | Count one supported successful command, not its resources or modules. | A single-layer azd invocation with multiple nested modules emits at most one event per collector call; failed attempts emit zero. |
 | AC-005 | Collect types from the exact ARM deployment and its nested operations. | Subscription and resource-group roots, pagination, and nested modules yield a sorted, distinct resource-type set, without deployment-wrapper types. |
 | AC-006 | Send only the categorical event contract and nonidentifying SDK metadata. | The captured HTTP envelope contains no customer names, identifiers, secrets, logs, source, host identity, or inherited correlation identifiers. |
 | AC-007 | Honor opt-out before extra collection or transmission. | Either existing opt-out environment variable or the applicable installed telemetry config disables ARM telemetry queries and sending. |
-| AC-008 | Do not change deployment outcomes for telemetry-only failures. | Query denial, timeout, malformed evidence, missing package, and ingestion failure never trigger a deployment retry or change the captured deployment exit status. |
+| AC-008 | Do not change deployment outcomes for telemetry-only failures. | Query denial, timeout, malformed input, missing package, and ingestion failure never trigger a deployment retry or change the deployment result the agent already observed. |
 | AC-009 | Preserve truthful client/version attribution. | Client values are normalized, not guessed; Skills version comes from the executing asset's metadata or is `unknown`, never inferred from a newer sender. |
-| AC-010 | Keep delivery deliberately best-effort. | Documentation discloses unsupported paths, skipped observations, possible duplicate collector calls, and absence of exact-once/funnel guarantees. |
+| AC-010 | Keep delivery deliberately best-effort. | Documentation discloses unsupported paths, deployment-selection imprecision, skipped observations, possible duplicate collector calls, and absence of exact-once/funnel guarantees. |
 | AC-011 | Keep integration small and nonpersistent. | No installed customer `azure.yaml` telemetry hooks, durable operation database, ARM tags, new server, or global tool interception is introduced. |
 
 ### Non-goals
@@ -113,89 +113,86 @@ do not send. This is flow discipline, not durable deduplication. Repeated
 collector calls, separate successful reprovisioning, or ambiguous delivery can
 duplicate observations; that limitation is accepted for Phase 1.
 
-If a retry skips provisioning from azd's cache, there is no new deployment
-evidence and no event. Do not search older attempts for a success. Types describe
-qualifying operations in the final observed deployment, not a union of all
-resources touched by failed attempts or a full workload inventory.
+If a retry skips provisioning from azd's cache, no new successful deployment
+appears in the recency window and no event is emitted. Do not search older
+attempts for a success. Types describe qualifying operations in the selected
+deployment, not a union of all resources touched by failed attempts or a full
+workload inventory.
 
-### 4.2 Explicit capture and post-command collection
+### 4.2 Post-command collection
 
-Keep azd execution with the existing agent/deployment workflow. Add a small
-internal collector, provisionally:
+Keep azd execution exactly as both skills perform it today. Do not wrap,
+re-run, intercept, or re-order the deployment. After a supported command reports
+success, the executing agent invokes one small internal collector, provisionally:
 
 ```text
-azure-functions-skills telemetry contribution --dir <workspace>
+azure-functions-skills telemetry contribution
 ```
 
-The new subcommand accepts a bounded JSON object on stdin with:
-`skill`, `operation`, `agent`, `skillsVersion`, `deploymentIdFile`, and `exitCode`.
-`operation` is `deploy` for azd up and `provision` for standalone azd provision.
-This local evidence object is NOT the outbound telemetry event. Reject unknown
-fields; do not accept a template, environment dump, arbitrary executable, or
-tool transcript. The original `telemetry` stdin contract remains unchanged.
+The subcommand accepts a bounded JSON object on stdin, limited to 16 KiB, with
+`skill`, `operation`, `agent`, `skillsVersion`, and optional `environmentName`.
+`operation` is `deploy` for `azd up` and `provision` for standalone
+`azd provision`. `environmentName` is the local azd environment name, used only
+to choose which deployment to inspect. Reject unknown fields; do not accept
+templates, environment dumps, transcripts, tool output, or executable paths.
+The original `telemetry` stdin contract stays unchanged.
 
-The invocation recipe belongs to the canonical skill instructions and uses the
-same package-resolution convention as existing telemetry. It must:
+Phase 1 deliberately drops the earlier capture-recipe design
+(`AZD_DEPLOYMENT_ID_FILE`, per-attempt temporary files, exit-code plumbing, and a
+process-scoped wrapper). That design gave exact per-attempt attribution but
+required owning the azd process, which `azure-functions-deploy` cannot do because
+it delegates execution to the external Azure Skills executor. Removing it makes
+both skills supportable through the same one-line post-success call, deletes the
+delegated-capture gate, and keeps the change small. The cost is deployment
+selection precision, addressed in section 4.3.
 
-1. Resolve telemetry preference before capture. If disabled or the collector
-   is unavailable, run the original deployment without telemetry instrumentation.
-2. Create a fresh, private temporary directory outside the project, with a new
-   deployment-ID file path for this attempt. Do not reuse a previous attempt's
-   file or commit it to the workspace.
-3. Set `AZD_DEPLOYMENT_ID_FILE` only for the azd process. Do not persist it in
-   `azure.yaml`, azd environment state, or global shell configuration.
-4. Run the original approved azd command, preserving arguments, interactive
-   behavior, and working directory. Capture its actual exit code immediately.
-5. After termination, invoke the collector with that exit code and file path.
-   The collector performs independent ARM verification, not stdout parsing.
-6. Clean up the temporary directory in the capture recipe's `finally`/trap path
-   and preserve the deployment result. The collector must not recursively delete
-   arbitrary paths supplied on stdin. Abrupt host termination can leave local
-   scratch data; no durable recovery or startup scan is added.
+Because the collector runs only after a reported success, there is no exit code
+to plumb and no failed-attempt bookkeeping. Section 4.4's independent ARM check
+remains the authoritative success signal, so a mistaken invocation after a
+failure still emits nothing.
 
-Use native PowerShell/Bash process-scoped capture recipes, with the substantive
-validation, ARM traversal, and sender logic in TypeScript. Do not build a generic
-azd wrapper or retry engine. Capture failures must fall back to the original
-deployment before it starts, or skip collection after it finishes; never rerun
-an already-started deployment to repair telemetry.
+Call the collector once per successful supported command: once after `azd up`,
+or once after a standalone `azd provision`, and never in both the delegating and
+the delegated skill. This is flow discipline, not durable deduplication.
+Repeated calls, separate successful reprovisioning, or ambiguous delivery can
+duplicate observations; that limitation is accepted for Phase 1.
 
-For `azure-functions-deploy`, pass the recipe as deployment context to the
-external Azure Skills executor; that executor owns command completion and the
-single collection call. The parent does not call it again. If the host or
-external skill cannot preserve this context, skip rather than guess.
-For agents, the executing agent uses the same recipe directly.
+If a retry completes without provisioning because azd reuses cached
+infrastructure, ARM shows no new successful deployment in the recency window and
+no event is emitted.
 
-Delegated capture feasibility is an M0 gate, not assumed support. Before
-Finalized status, identify a concrete host/tool handoff that can preserve the
-process-scoped variable, actual exit code, and single collector ownership without
-modifying the external plugin. If that cannot be established, obtain human
-approval to narrow AC-002 to the direct agents path and mark the Functions
-deployment path deferred. Do not claim both paths delivered from recipe fixtures
-alone; actual host coverage evidence remains an M3 acceptance requirement.
+This is trusted local workflow evidence, not attested attribution: a caller able
+to invoke the internal CLI can supply misleading input. Phase 1 does not attempt
+anti-fraud or hostile-local-user protection.
 
-This is trusted local workflow evidence, not cryptographically attested
-attribution: a caller able to invoke the internal CLI can supply misleading
-evidence. Phase 1 does not attempt anti-fraud or hostile-local-user protection.
+### 4.3 Deployment selection
 
-### 4.3 Exact azd evidence
+The collector chooses the deployment to inspect from Azure Resource Manager
+itself, reusing the Azure CLI authentication already available to the workflow:
 
-azd added `AZD_DEPLOYMENT_ID_FILE` in 1.25.1. During Bicep provisioning it emits
-NDJSON records with `deploymentId` and `layer`. Evidence:
-[release history](https://github.com/Azure/azure-dev/blob/5455d41a91625569182d168d5eacac2e79d02b68/cli/azd/CHANGELOG.md),
-[file implementation](https://github.com/Azure/azure-dev/blob/5455d41a91625569182d168d5eacac2e79d02b68/cli/azd/pkg/infra/provisioning/bicep/deployment_id_file.go).
+1. List deployments at the current subscription scope through a structured,
+   injectable query adapter. Never parse azd or CLI human-readable output.
+2. Keep only entries whose `provisioningState` is `Succeeded` and whose
+   completion timestamp falls inside a bounded recency window of 30 minutes.
+3. If `environmentName` is supplied, prefer entries whose deployment name
+   contains it; azd derives its subscription-scope deployment name from the
+   environment name.
+4. Select the single most recent remaining entry. No candidate means no event.
 
-File creation occurs before completion and is not proof of success. The
-collector requires `exitCode = 0`, one record from a fresh attempt file, an empty
-layer name, and a supported deployment resource ID. Missing/empty evidence,
-multiple records, a named layer, unsupported azd, and malformed input all skip
-collection. Unknown additional NDJSON fields are ignored locally, never sent.
-Do not infer deployment names from timestamps, environment names, a latest
-deployment listing, or human-readable logs.
+Accepted imprecision: an unrelated successful deployment running concurrently in
+the same subscription can be selected, and a deployment that finished before the
+window opened is skipped. Both affect which resource-type breakdown is attached
+to an observation rather than whether Skills-driven deployment activity is
+broadly visible, which is why section 1 uses an "observed", non-exact reporting
+label. Exact per-attempt attribution is a deferred Phase 2 option.
 
-Use a 64 KiB evidence-file limit and a 16 KiB stdin limit. Do not print the
-records. Although IDs are temporarily needed locally to query ARM, they are not
-analytics properties and are never forwarded to Application Insights.
+Deployment names, deployment IDs, subscription, and resource-group values are
+needed locally to run these queries. They are never analytics properties, are
+never forwarded to Application Insights, and are not printed by the collector.
 
+Out of scope for Phase 1: management-group and tenant roots, custom Azure
+clouds, deployment stacks, Terraform, and any root scope azd does not create for
+these two skills.
 ### 4.4 ARM verification and type extraction
 
 Use Azure CLI authentication already available to the workflow and structured
@@ -203,15 +200,15 @@ ARM JSON responses, with a small injectable query adapter. No new Azure SDK or
 credential store is needed. Invoke Azure CLI with an argument array, not a
 shell-interpolated command. Query only the supported public Azure ARM endpoint.
 
-The adapter reads the exact root's `provisioningState`, then its deployment
-operations. Do not read deployment parameters, outputs, request/response bodies,
-or error details into the event model. CLI subprocess output is consumed locally
-and not printed by the collector. Query failure bodies are discarded, not logged.
+The adapter reads the selected root's deployment operations. Do not read
+deployment parameters, outputs, request/response bodies, or error details into
+the event model. CLI subprocess output is consumed locally and not printed by
+the collector. Query failure bodies are discarded, not logged.
 
 Walk subscription/resource-group nested deployment IDs returned by ARM; handle
 every page and keep an in-memory visited set. Follow only valid ARM deployment
 IDs and same-origin ARM pagination URLs. Do not query arbitrary URLs supplied
-through an evidence file or response.
+through stdin or a response body.
 
 Include `targetResource.resourceType` for successful `Create` operations.
 ARM's provisioning-operation enum does not provide a separate `Update` value;
@@ -275,7 +272,7 @@ only to eliminate `unknown`. A newer npx sender version is not the Skills
 version. Derive deploymentKind in code rather than accepting a free-text label.
 
 The telemetry boundary constructs a new allowlisted object; never spread local
-evidence or ARM responses into it. No subscription/tenant/resource/deployment
+input or ARM responses into it. No subscription/tenant/resource/deployment
 IDs, names, user/email/session IDs, absolute paths, environment values, source,
 prompts, endpoints, keys, logs, or errors are sent, even hashed.
 
@@ -301,13 +298,13 @@ service-side metadata.
 
 Reuse the two existing opt-out environment variables. Resolve the applicable
 installed plugin/workspace `telemetry.config.json` using the executing host and
-asset location, not arbitrary ancestor scanning. Both capture recipe and
-collector check preference. If its location or contents cannot be safely
+asset location, not arbitrary ancestor scanning. The collector checks preference
+before any ARM query or send. If its location or contents cannot be safely
 resolved, skip collection rather than bypass an opt-out.
 
 The collector returns a local categorical result: `sent`, `disabled`,
 `not-configured`, `skipped`, or `failed`, with a fixed reason code when relevant.
-Neither result nor diagnostics includes evidence values or raw exception text.
+Neither result nor diagnostics includes input values or raw exception text.
 Do not introduce another diagnostics subsystem; use PR #235's bounded diagnostics
 if available, otherwise a short local categorical notice.
 
@@ -320,11 +317,11 @@ permissions, or trigger reprovisioning. If ARM read access is absent, skip.
 
 | Surface | Planned responsibility |
 | --- | --- |
-| `src/telemetry/contribution.ts` (new) | Local evidence validation, success policy, normalized event construction |
+| `src/telemetry/contribution.ts` (new) | Stdin input validation, deployment selection policy, normalized event construction |
 | `src/telemetry/arm-deployments.ts` (new) | Injectable bounded structured ARM query/traversal |
-| Existing sender and `src/telemetry/index.ts` | Reuse transport and privacy-safe client; keep raw ARM evidence out of the package's telemetry-event API |
+| Existing sender and `src/telemetry/index.ts` | Reuse transport and privacy-safe client; keep raw ARM responses out of the package's telemetry-event API |
 | `bin/azure-functions-skills.js` | Small internal subcommand dispatcher; no deployment orchestration |
-| Two canonical skill instructions / one shared reference | Capture recipe and delegation ownership, not generic PostToolUse detection |
+| Two canonical skill instructions | One post-success collection step each, not generic PostToolUse detection |
 
 Report event count over time and by skill/deploymentKind. Expand resourceTypes
 only for the breakdown; expanding the array must not inflate the headline count.
@@ -337,10 +334,10 @@ or attempt denominator from success-only events.
 
 | Slice | Requirements / planned work | Review boundary |
 | --- | --- | --- |
-| M0: Design approval | Reconcile #244, number allocation, related PRs, and open questions; resolve independent review and delegated capture feasibility | Approve a concrete delegation contract or explicitly defer that path, then obtain human approval of the identified revision; no implementation before Finalized |
+| M0: Design approval | Reconcile #244, number allocation, related PRs, and open questions; resolve independent review findings | Obtain human approval of the identified revision; no implementation before Finalized |
 | M1: Event and privacy contract | AC-001, AC-006, AC-007, AC-009; tests first, narrow sender/schema changes | Inspect an entirely local captured envelope and confirm compatibility/privacy scope |
-| M2: Collector | AC-003 through AC-005, AC-008, AC-010; fixtures first, evidence/ARM adapter/CLI | Review counting, bounds, skip behavior, and lack of durable tracking |
-| M3: Skill wiring and documentation | AC-002, AC-007, AC-009 through AC-011; recipe, delegation, local install/plugin assets | Review both host/script paths, limitations, and requirement-linked acceptance evidence |
+| M2: Collector | AC-003 through AC-005, AC-008, AC-010; fixtures first, selection/ARM adapter/CLI | Review counting, bounds, skip behavior, and lack of durable tracking |
+| M3: Skill wiring and documentation | AC-002, AC-007, AC-009 through AC-011; post-success step, delegation ownership, local install/plugin assets | Review both skill paths, limitations, and requirement-linked acceptance evidence |
 
 Use one primary implementer and separate review at these checkpoints. Prefer one
 small implementation PR if these slices remain reviewable. If telemetry
@@ -362,10 +359,7 @@ or Azure resource is created by this documentation task.
   resource breakdown. These are proposed implementation details, not an already
   approved contract.
 - Implementer/reviewer at M0: recheck which of #218, #235, and #240 have merged,
-  select the concrete canonical paths and metadata/preference resolver, and
-  identify how the direct and delegated execution flows preserve capture context.
-  The delegated flow is the explicit M0 gate in section 4.2; if it cannot do this,
-  revise AC-002 with human approval rather than promising unsupported coverage.
+  then select the concrete canonical paths and metadata/preference resolver.
 
 ## 5. Decisions log
 
@@ -373,13 +367,14 @@ or Azure resource is created by this documentation task.
 | --- | --- | --- | --- | --- |
 | D-001 | Overview versus exact accounting | User accepted a small Phase 1 focused on contribution trends; defer strict deduplication and broad coverage. This is direction approval, not FRD sign-off. | User, conversation scope agreement | 2026-09-08 |
 | D-002 | Existing transport versus new service | Reuse Application Insights sender; no SDK migration, backend, or new credential. | Copilot (proposal) | 2026-09-08 |
-| D-003 | Generic hook inference, persistent azd hooks, wrapper engine, or explicit collection | Explicit fresh-file capture plus post-command collector; preserve deployment ownership and avoid command/log parsing. | Copilot (proposal) | 2026-09-08 |
+| D-003 | Generic hook inference, persistent azd hooks, wrapper engine, or explicit collection | Explicit post-success collector call; preserve deployment ownership and avoid command/log parsing. | Copilot (proposal) | 2026-09-08 |
 | D-004 | Global workload identity versus per-command observation | No durable ID; one successful supported invocation is one observation. Failed attempts emit nothing; exact-once remains out of scope. | Copilot (proposal) | 2026-09-08 |
 | D-005 | Provision success alone versus full azd up result | Require full up success for up, provision success for standalone provision; always verify current ARM evidence. | Copilot (proposal) | 2026-09-08 |
 | D-006 | Top-level-only versus nested resource types | Keep bounded nested traversal because Bicep modules are normal, not an optional precision enhancement. | Copilot (proposal) | 2026-09-08 |
 | D-007 | Properties-only filtering versus full envelope privacy | Full outbound-envelope filtering is mandatory even in the small PR. | Copilot (proposal) | 2026-09-08 |
 | D-008 | Reuse 0001/0002 versus next unused number | Use FRD-0003 after checking open PR filenames; leave the existing 0001 collision to its owners. | Copilot (allocation proposal) | 2026-09-08 |
 | D-009 | Architecture review: compatibility and delegated feasibility | Clarify that hostname removal intentionally affects SDK envelopes, not usage application properties; make delegated capture an M0 gate with human-approved scope reduction if needed. | Copilot (revision 2 proposal, responding to independent review) | 2026-09-08 |
+| D-010 | Exact per-attempt capture (`AZD_DEPLOYMENT_ID_FILE` recipe) versus post-success ARM deployment selection | Choose post-success selection. The recipe required owning the azd process, which the delegating deploy skill cannot do, so it would have covered only one skill while adding a wrapper, temporary files, and exit-code plumbing. Selection covers both skills with a one-line call and accepts bounded misattribution of the resource-type breakdown, consistent with the "observed", non-exact reporting label. Exact capture is deferred to Phase 2. | User (scope decision), Copilot (revision 3 proposal) | 2026-09-09 |
 
 ## 6. Test plan
 
@@ -389,15 +384,15 @@ CLI fixture, local HTTP capture, and isolated install/update infrastructure.
 | Requirement | Test / fixture / experiment | Expected evidence |
 | --- | --- | --- |
 | AC-001 | Extend `tests/telemetry.test.ts` and `tests/simplified-cli.test.ts` | New event exact shape; unchanged legacy stdin/event behavior |
-| AC-002, AC-011 | Skill contract fixtures and isolated capture recipes with fake azd/az/package commands | Only supported explicit entry points collect; external delegation has one owner; no customer azure.yaml modifications |
-| AC-003 | New contribution fixtures: exit failure/cancel, ARM Running/Failed, missing/fresh empty/stale-looking file, preview, publish failure | Zero contribution sends and no fallback to deployment history |
+| AC-002, AC-011 | Skill contract fixtures and isolated CLI invocation with a fake ARM query adapter | Only supported explicit entry points collect; external delegation has one owner; no customer `azure.yaml` modifications |
+| AC-003 | New contribution fixtures: no recent successful deployment, ARM Running/Failed, stale timestamp outside the window, preview, validation-only | Zero contribution sends and no fallback to unrelated deployment history |
 | AC-004 | Failed attempt then successful attempt; nested modules; deliberate double collector call | 0 then 1 for normal retry; one event for nested modules; duplicate-call limitation documented, not falsely claimed solved |
-| AC-005 | New ARM fixtures: subscription root, RG root, nested modules/pages, Create/Read/Delete, malformed type, repeated type, unsupported child/layer, empty type set | Complete normalized type set or explicit skip, never wrapper-type counting or partial silent success |
+| AC-005 | New ARM fixtures: subscription root, RG root, nested modules/pages, Create/Read/Delete, malformed type, repeated type, unsupported child, empty type set | Complete normalized type set or explicit skip, never wrapper-type counting or partial silent success |
 | AC-005, AC-008 | Deadline/request/depth/type caps, cycle, denied read, invalid pagination origin | Bounded termination, no arbitrary URL request, no raw diagnostic data |
-| AC-006 | Local HTTP server captures/decompresses the entire serialized SDK request; seed evidence with sentinel names/secrets | No forbidden sentinel, hostname, environment-derived tag, source, endpoint, or correlation identity anywhere in the envelope |
+| AC-006 | Local HTTP server captures/decompresses the entire serialized SDK request; seed input with sentinel names/secrets | No forbidden sentinel, hostname, environment-derived tag, source, endpoint, or correlation identity anywhere in the envelope |
 | AC-006, AC-009 | Invalid skill/client/version, unknown fields, oversized input/type set | Reject or normalize per contract; no free-text outbound dimensions |
 | AC-007 | Both environment opt-outs; each host's local and plugin config; missing/malformed preference context | No additional ARM read or send when disabled/unresolved; original deployment still runs |
-| AC-008 | Fake azd exit codes, missing collector, query/send failures, cleanup failure, interrupted capture | No cloud retry caused by telemetry; preserve original deployment result; delete only caller-owned temporary data when possible |
+| AC-008 | Missing Azure CLI, denied or failing ARM query, send failure, malformed stdin | No cloud retry caused by telemetry; the deployment result the agent already observed is never reclassified |
 | AC-009 | Installed version differs from npx sender; missing metadata; rename variant | Correct asset version or unknown; one canonical skill name, no double emission |
 | AC-010 | Documented query examples against a small synthetic dataset | Resource expansion does not change headline event count; no success-rate or full-inventory claim |
 | AC-011 | Canonical payload generation and isolated workspace CLI integration | No durable ledger, global hook interception, Azure tags, or new service introduced |
@@ -422,13 +417,12 @@ Implementation would update:
   simple reporting examples; preserve the existing release destination model.
 - `docs/cli-reference.md`: clarify internal telemetry behavior and privacy
   without advertising the collector as a supported deployment command.
-- `templates/skills/azure-functions-deploy/SKILL.md`: delegation capture context
-  and a single post-command collection owner.
+- `templates/skills/azure-functions-deploy/SKILL.md`: a single post-success
+  collection owner after the delegated deployment completes.
 - `templates/skills/azure-functions-agents/SKILL.md` and its
   `references/infra-and-deployment.md`, or the renamed equivalents from #218:
-  direct capture flow and explicit exclusions for connector follow-up work.
-- `templates/skills/azure-functions-common/references/contribution-telemetry.md`
-  (new): shared small PowerShell/Bash recipes and failure/opt-out behavior.
+  the same post-success collection step and explicit exclusions for connector
+  follow-up work.
 - `docs/frds/README.md` and this FRD: synchronized lifecycle, reviews, decision
   changes, and requirement-linked implementation evidence.
 
@@ -459,7 +453,12 @@ recommended human design review after two clarifications. Revision 2 addresses:
 | Finding | Resolution |
 | --- | --- |
 | AC-001 could be read to prohibit shared hostname suppression | AC-001 and section 4.5 explicitly distinguish preserved application properties from intentionally removed SDK hostname context. |
-| Delegated capture was only a general open question | Section 4.2 and M0 now require a concrete delegation contract or an explicitly approved narrowing of AC-002 before Finalized status. |
+| Delegated capture was only a general open question | Superseded in revision 3: D-010 replaces per-attempt capture with post-success ARM deployment selection, so the delegated path needs no process ownership and the M0 capture gate is removed. |
+
+Revision 3 records the user's scope decision to prefer breadth and simplicity
+over exact per-attempt attribution. It changes sections 4.1 through 4.4, AC-003,
+AC-010, D-003, the M0 boundary, the open questions, the test plan, and the docs
+impact list. It has not been re-reviewed independently.
 
 This records independent advice and the author's disposition, not reviewer or
 human approval of revision 2. M0 questions and human sign-off remain pending.
