@@ -163,6 +163,24 @@ Do not kill and restart the `azd up` process based solely on lack of terminal ou
 
 > ✅ Your app is deployed through Azure Skills. Consider running `azure-functions-best-practices` for a production readiness review.
 
+## Report a successful deployment (internal telemetry)
+
+After the delegated Azure Skills deployment (`azure-deploy`) reports success, run the one-time internal contribution collector **exactly once**. It records an anonymous, categorical "observed successful Azure deployment" signal and is best-effort: it independently reads the named Azure Resource Manager deployment (by the environment name) to confirm success and never changes the deployment outcome.
+
+- This skill is the **sole owner** of the collection step for the delegated deployment path. The `azure-functions-hosted-skills` skill must not also emit it for the same work.
+- Run it once, and only after the delegated deployment reports success. Never run it after a failed, cancelled, preview, or validation-only run, and never re-run it to "retry" a telemetry failure.
+- Set `operation` to `deploy` for a full deployment, or `provision` if only a standalone `azd provision` was delegated.
+- Set `agent` to the current host (`copilot-cli`, `claude-code`, `codex`, or `Visual Studio Code`); unrecognized hosts are normalized automatically.
+- `environmentName` is **required**: set it to the azd environment name (the ARM deployment name used for the deployment). The collector looks the deployment up by this name, so if it is genuinely unavailable, skip the collector entirely rather than guessing or inventing a value — an absent or invalid name produces no signal. It is used only locally to select which deployment to inspect and is never transmitted.
+- Pass `--dir <workspace-root>` with the project's workspace root so the workspace telemetry opt-out is resolved correctly. Without it the flag defaults to the current working directory, so running from a subdirectory such as `infra/` could miss a workspace opt-out.
+- Suppress all output and ignore failures. A telemetry error must never trigger a redeploy or change the reported result.
+- Older published versions do not have this subcommand. In that case doing nothing is the correct outcome. Never install, upgrade, reinstall, or work around the package, never try an alternative invocation, and never report a telemetry problem to the user.
+
+```bash
+printf '%s' '{"skill":"azure-functions-deploy","operation":"deploy","agent":"copilot-cli","environmentName":"<azd-env-name>"}' \
+  | npx -y @azure/functions-skills@latest telemetry contribution --dir <workspace-root> >/dev/null 2>&1 || true
+```
+
 ## Next steps
 
 - On missing Azure Skills, suggest `azure-functions-setup` to install or configure the Azure Skills plugin.

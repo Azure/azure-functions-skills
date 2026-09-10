@@ -130,6 +130,22 @@ The result includes installed agents, files written, planned files, dry-run stat
 
 Azure Functions Skills collects usage telemetry to understand which bundled skills and Azure Functions MCP tools are used. Events include allowlisted skill/tool names, relative allowlisted Azure Functions skill-file paths, client name, session id, and timestamp. Telemetry does **not** include file contents, prompts, raw tool arguments, credentials, or absolute paths. Events are sent by the `@azure/functions-skills` package directly to the Azure Functions team's Application Insights resource; the package does not use Azure MCP as a telemetry destination or transport.
 
+### Contribution event
+
+A second event, `azure_contribution`, records an approximate, categorical view of successful Azure deployment work observed through the `azure-functions-deploy` and `azure-functions-hosted-skills` skills after a supported `azd up` or standalone `azd provision`. It carries only seven categorical properties: `skill`, `operation` (`deploy` or `provision`), `result` (constant `success`), `resourceTypes` (a sorted, de-duplicated list of Microsoft resource-provider types such as `microsoft.web/sites`), `deploymentKind` (`function-app` or `hosted-agent`), `agent` (normalized client, or `unknown`), and `skillsVersion` (or `unknown`).
+
+To confirm success and derive the resource-type breakdown, the collector reads the named Azure Resource Manager deployment's state locally using your existing Azure CLI sign-in. Subscription, resource-group, deployment names, and deployment IDs are used **only locally** for those queries; they are never attached to the event, printed, or transmitted. The event contains no customer names, identifiers, secrets, paths, environment values, or correlation IDs.
+
+The same opt-out mechanisms apply unchanged (see below); when telemetry is disabled the collector performs no ARM queries and sends nothing.
+
+This is an adoption/contribution trend, not exact accounting. Phase 1 limitations are intentional and disclosed:
+
+- The collector looks up the subscription-scope ARM deployment by the required environment name and validates it against a bounded 30-minute recency window. A missing or invalid environment name, a deployment older than the window, or a resource-group-scope deployment records nothing. Selecting by name makes cross-deployment misattribution unlikely, but re-running after another deployment that reuses the same environment name still refers to the newest deployment of that name.
+- Duplicate collector calls are possible; there is no exactly-once delivery, no durable de-duplication, and no exact funnel or conversion rate.
+- Only supported `azd`/Bicep paths for the two canonical skills emit; plain CLI create, Terraform, and unrelated skill use do not.
+
+Application telemetry content is categorical, but HTTPS necessarily exposes the client's network address to the receiving service. This does not promise anonymous transport; the receiving Application Insights service's privacy policy and IP handling apply.
+
 For host-managed plugin installs, opt out by setting either
 `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or `AZURE_MCP_COLLECT_TELEMETRY=false`
 in the environment. Workspace-local installs can also use `--no-telemetry`; that preference

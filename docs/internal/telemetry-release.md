@@ -109,6 +109,51 @@ Users can opt out by setting either
 `AZURE_MCP_COLLECT_TELEMETRY=false`. Workspace-local installs also honor
 `telemetry.config.json` with `"enabled": false`.
 
+## Contribution collector
+
+The two canonical deployment skills invoke a second hidden subcommand exactly
+once after a supported command reports success:
+
+```text
+npx -y @azure/functions-skills@latest telemetry contribution
+```
+
+It reads one bounded JSON object on stdin (16 KiB max) with `skill`,
+`operation`, `agent`, optional `skillsVersion`, and a required `environmentName`
+(see selection below); unknown properties are rejected. It prints exactly one
+categorical word (`sent`, `disabled`, `not-configured`, `skipped`, or `failed`)
+and always exits `0`, so a telemetry-only failure never affects the deployment.
+The original `telemetry` stdin contract is unchanged.
+
+The collector looks up the subscription-scope ARM deployment **by name**, using
+`environmentName` as the deployment name (`az deployment sub show --name
+<environmentName>`), then confirms success and derives the resource-type
+breakdown from that single deployment. Lookup by name is one request and does
+not degrade as deployment history grows; it replaced an earlier recency-scan
+approach because ARM does not return deployments newest-first and `$top` is a
+per-page hint rather than a global cap, so a full scan was both slow and
+unreliable. If `environmentName` is absent or fails ARM deployment-name
+validation, the collector returns `skipped` (reason `no-environment-name`)
+before any Azure query, so nothing is recorded. It honors the same opt-out
+preferences before any ARM query or send. Subscription, resource-group,
+deployment names, and deployment IDs are used only locally for those queries and
+are never sent.
+
+### Rollout ordering
+
+The skill snippets may ship before a published `@azure/functions-skills` CLI
+that supports `telemetry contribution`. During that window the command is a
+verified silent no-op that emits nothing. A published bin without the
+subcommand matches `command === 'telemetry'`, ignores the `contribution`
+argument, and pipes stdin into the old `parseTelemetryEvent`, whose strict
+property allowlist rejects our payload's first key (`skill`) with
+`Unsupported telemetry property: skill` and exit `1`; a version predating the
+`telemetry` command prints `Unknown command` and exits `1`. Either way no
+usage event is sent, `environmentName` is never transmitted, and the snippets'
+`>/dev/null 2>&1 || true` swallows the stderr and non-zero exit. This is
+intended behavior — do not "fix" the snippets or the old parser to make the
+subcommand appear to run on older releases.
+
 ## Events and expected dimensions
 
 | Event type | Trigger | Dimensions |
@@ -116,6 +161,36 @@ Users can opt out by setting either
 | `skill_invocation` | `skill`/`Skill` invokes a bundled Azure Functions skill, or its `SKILL.md` is read from a recognized plugin path. | `timestamp`, `client-name`, `session-id`, `skill-name` |
 | `tool_invocation` | Azure Functions MCP tool names such as `functions_template_get`, `functions_project_get`, or host-prefixed equivalents are called. | `timestamp`, `client-name`, `session-id`, `tool-name` |
 | `reference_file_read` | A non-`SKILL.md` file is read under a bundled Azure Functions skill directory. | `timestamp`, `client-name`, `session-id`, `file-reference` |
+| `azure_contribution` | The `azure-functions-deploy` or `azure-functions-hosted-skills` skill collects once after a supported `azd up` / standalone `azd provision` succeeds and a current ARM deployment confirms it. | `skill`, `operation`, `result`, `resourceTypes`, `deploymentKind`, `agent`, `skillsVersion` |
+
+The `azure_contribution` properties are all categorical strings:
+
+| Property | Value |
+| --- | --- |
+| `skill` | `azure-functions-deploy` or `azure-functions-hosted-skills` |
+| `operation` | `deploy` (from `azd up`) or `provision` (standalone `azd provision`) |
+| `result` | Constant `success`, constructed only after ARM verification |
+| `resourceTypes` | JSON-encoded, sorted, de-duplicated array of Microsoft resource-provider types |
+| `deploymentKind` | `function-app` (deploy skill) or `hosted-agent` (hosted-skills skill) |
+| `agent` | Normalized client (`copilot-cli`, `claude-code`, `codex`, `Visual Studio Code`, …) or `unknown` |
+| `skillsVersion` | Installed Skills asset version, or `unknown` |
+
+Example serialized event:
+
+```json
+{
+  "name": "azure_contribution",
+  "properties": {
+    "skill": "azure-functions-deploy",
+    "operation": "deploy",
+    "result": "success",
+    "resourceTypes": "[\"microsoft.storage/storageaccounts\",\"microsoft.web/sites\"]",
+    "deploymentKind": "function-app",
+    "agent": "copilot-cli",
+    "skillsVersion": "unknown"
+  }
+}
+```
 
 These dimensions should support analysis such as:
 
@@ -126,3 +201,36 @@ These dimensions should support analysis such as:
 - MCP template/scaffold usage (`tool-name` for `functions_*` tools);
 - versioned package rollout correlation by comparing blob package version with
   release timing.
+
+Simple contribution reporting examples (KQL against the custom event):
+
+```kusto
+// Observed successful deployments per day by skill and deploymentKind
+customEvents
+| where name == "azure_contribution"
+| summarize count() by bin(timestamp, 1d),
+    tostring(customDimensions.skill), tostring(customDimensions.deploymentKind)
+```
+
+```kusto
+// Resource-type breakdown. Expanding the array must not inflate the headline
+// count: a type's count means "observations containing this type", not resource
+// count. Do not compute an exact funnel or conversion rate from these
+// success-only events.
+customEvents
+| where name == "azure_contribution"
+| extend types = todynamic(tostring(customDimensions.resourceTypes))
+| mv-expand type = types to typeof(string)
+| summarize observations = count() by type
+```
+
+These counts are an approximate contribution trend, not exact accounting.
+Deployment selection is by name (the required `environmentName`) against
+subscription-scope ARM deployments, validated by a bounded 30-minute recency
+window: a named deployment older than the window, a resource-group-scope
+deployment (`az deployment group create`), or a missing or invalid name is
+skipped and records nothing. Selecting by name makes cross-deployment
+misattribution unlikely, but re-running the collector after a second deployment
+that reuses the same environment name still refers to the newest deployment of
+that name. Duplicate collector calls are possible, and there is no exactly-once
+delivery.

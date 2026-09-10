@@ -60,3 +60,12 @@ npm run build:plugin-payload
 ```
 
 The plugin payload always contains skills, MCP configuration, and telemetry hooks. There are no payload profiles.
+
+## Internal telemetry commands
+
+The package exposes two hidden `telemetry` subcommands that are **not** user-facing deployment commands and are not part of the supported CLI surface above. They are invoked internally — by the telemetry hooks and by the deployment skills — never as a way to deploy or provision anything:
+
+- `telemetry` reads one sanitized usage event on stdin and sends it.
+- `telemetry contribution [--dir <workspace-root>]` is called once by `azure-functions-deploy` or `azure-functions-hosted-skills` only after a supported `azd up` / standalone `azd provision` has already succeeded. It reads a bounded JSON object on stdin, independently confirms success against Azure Resource Manager using your existing Azure CLI sign-in, and emits the categorical `azure_contribution` event. It prints one status word and always exits `0`, so it never provisions resources, changes a deployment outcome, or triggers a redeploy. `--dir` selects the workspace whose telemetry opt-out configuration (`telemetry.config.json`) applies and defaults to the current working directory; pass the workspace root explicitly so a workspace opt-out is honored even when the command runs from a subdirectory.
+
+Both honor the same opt-out mechanisms described in the project [README](../README.md#telemetry); when telemetry is disabled they perform no work.
