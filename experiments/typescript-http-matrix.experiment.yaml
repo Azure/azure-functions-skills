@@ -1,0 +1,23 @@
+name: typescript-http-model-skill-matrix
+evals:
+  - ../evals/azure-functions-create/typescript-http/eval.yaml
+overrides:
+  runs: 1
+  timeout: 10m
+execution:
+  workers: 1
+baseline:
+  skill: off
+  model: claude-sonnet-5
+matrix:
+  skill:
+    path: /environment/skills
+    values:
+      - off: []
+      - on:
+          - ../templates/skills/azure-functions-create
+  model:
+    path: /defaults/model
+    values:
+      - claude-sonnet-5
+      - gpt-6-astra

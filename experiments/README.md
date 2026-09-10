@@ -1,0 +1,216 @@
+# Native local comparisons
+
+These Vally **0.16.0** experiments reuse the
+[TypeScript HTTP scenario](../evals/azure-functions-create/typescript-http/README.md).
+They compare the same objective task, not whether the agent invoked a skill.
+No dashboard, custom runner, LLM judge, Azure resources, or CI is involved.
+Run only reviewed, trusted local code with an approved inference budget.
+Never run these from PR-triggered CI or on untrusted contributor content.
+
+| Definition | Conditions | Paid scenario trials |
+| --- | --- | --- |
+| `typescript-http-pair.experiment.yaml` | Sonnet 5, skill OFF/ON | 2 |
+| `typescript-http-matrix.experiment.yaml` | Sonnet 5 and GPT-6 Astra, each OFF/ON | 4 |
+
+Each cell has `runs: 1`, one worker, a ten-minute native timeout and
+`max_duration`, and the same three native graders. OFF replaces the skill array
+with `[]`; ON replaces it with only `azure-functions-create` and its bundled
+references. Prompt, empty application fixture, MCP configuration (none), builtin
+skill disabling, and grading are unchanged between each model's OFF/ON arms.
+Neither model nor reasoning effort is silently substituted; reasoning effort is
+left at the runtime/model default in both arms.
+
+The experiment command does **not** accept `--max-retries`. In this pinned
+version, `experiment-runner.js` does not supply a retry override and native
+`pipeline/trial-runner.js` resolves `ctx.maxRetries ?? 0`: zero trial retries.
+Do not add the unsupported eval-only flag. These limits are not token or money
+caps; `max_turns` and `max_tokens` are not execution limits in 0.16.0.
+
+## Prepare an isolated execution
+
+Do not execute these commands from a developer checkout or normal profile.
+Follow the scenario's **Isolation protocol**, including its environment
+allowlist, empty HOME/USERPROFILE/config/temp directories, ancestry checks,
+bundled runtime, and native ON/OFF discovery checks. Both conditions must show
+the expected **enabled** inventory before spending inference.
+
+Stage only these trusted inputs under a new external root, preserving this
+relative layout:
+
+```text
+inputs/
+  experiments/<chosen-definition>.experiment.yaml
+  evals/azure-functions-create/typescript-http/eval.yaml
+  templates/skills/azure-functions-create/
+```
+
+Copy only the selected YAML files and the target skill's files. Do not copy the
+repository, its `.vally.yaml`, AGENTS.md, other skills, plugins, or user config.
+This matters because `experiment run` resolves project configuration from the
+experiment file's directory, not merely the shell cwd. The staged inputs must
+also have clean discovery ancestors. Keep the input tree separate from trial
+workspaces and the empty shell cwd.
+
+Use an absolute path to the installed Vally entrypoint (`$vally`), the staged
+definition (`$experiment`), unused workspace root (`$freshWorkspaces`), and a
+private output directory (`$results`). Unlike `vally eval`, this command has no
+`--work-dir`: the staged definition plus `--workspace` provide the separation.
+
+```powershell
+node $vally experiment run $experiment --dry-run
+node $vally experiment run $experiment --workspace $freshWorkspaces `
+  --output-dir $results --workers 1 --require-pass
+```
+
+The second command spends two or four trials depending on the selected file.
+Inspect the dry-run's exact models and number of plans first. Confirm model
+availability with the same runtime/account without sending an inference prompt.
+**Do not pipe `/model` to Copilot stdin**: CLI 1.0.80 treats redirected stdin as a
+noninteractive prompt, not an interactive slash command.
+
+Never add `--compare`: it invokes an additional LLM judge. Native graders,
+summaries, and deterministic arithmetic are sufficient here.
+
+## Sequential matrix without repeating the Sonnet pair
+
+The fixed matrix also supports a budget-saving native continuation. Declare
+both models before execution, but execute only the Sonnet pair first. With
+this exact matrix, native `by-stimulus` sorts the variants into OFF/Sonnet,
+OFF/Astra, ON/Sonnet, ON/Astra. Shard 1/2 therefore selects both Sonnet cells;
+shard 2/2 selects both Astra cells. This mapping depends on the variant names:
+recheck native selection if changing the definition.
+
+Keep one unchanged staged matrix/eval/skill tree and the same run ID throughout.
+Use distinct, unused workspace roots for the two shards. A new isolated profile
+may be used, but configuration values, tools, and environment policy must match.
+
+```powershell
+$runId = [guid]::NewGuid().ToString()
+node $vally experiment run $experiment --dry-run
+node $vally experiment run $experiment --shard 1/2 --run-id $runId `
+  --shard-strategy by-stimulus --workspace $freshSonnetWorkspaces `
+  --output-dir $results --workers 1 --require-pass
+```
+
+Stop and inspect both Sonnet trial records, their individual grader verdicts,
+effective workspace/skill isolation, and owned-process cleanup before continuing.
+A shard's console verdict is partial, not a four-cell result. A failed baseline
+is a measured outcome, not permission to tune only that arm or retry indefinitely.
+Proceed to Astra only after the paired stage is accepted:
+
+```powershell
+node $vally experiment run $experiment --shard 2/2 --run-id $runId `
+  --shard-strategy by-stimulus --workspace $freshAstraWorkspaces `
+  --output-dir $results --workers 1 --require-pass
+node $vally experiment merge `
+  (Join-Path $results "$runId\shard-1-of-2") `
+  (Join-Path $results "$runId\shard-2-of-2") `
+  --output-dir $mergedResults --require-pass
+```
+
+`$mergedResults` must be outside both input shard directories. Merge performs no
+inference: Vally checks run identity, experiment/config/eval hashes, full-plan
+digest, identical plan snapshots, and an exhaustive, nonoverlapping partition.
+It preserves the native trial records and regenerates summaries/reporting.
+Do not manually combine records or reuse an unrelated standalone pair as matrix
+samples. There is no configured deterministic model seed.
+
+Preserve native outputs privately before deleting owned trial applications,
+profiles, and caches. Inspect surviving processes using owned PID **and creation
+time**, not names or PID alone; never stop shared hosts or emulators.
+
+## Native artifact contract
+
+The observed sharded run writes:
+
+```text
+<run-id>/shard-1-of-2/
+  shard-manifest.json
+  plan-snapshot.json
+  <variant>/
+    results.jsonl
+    run-summary.jsonl
+    <eval>/<stimulus>/<model>/0/
+      events.jsonl
+      metadata.json
+      workspace.patch
+```
+
+The second shard has the same structure. The merged directory contains
+`experiment-manifest.json`, `plan-snapshot.json`, `report.md`, and each variant's
+`results.jsonl` and `run-summary.jsonl`. Merge does not copy per-session logs;
+keep the original shard directories too.
+
+`results.jsonl` contains native `trial-result` records. Use their `variant`,
+`model`, `evalName`, `stimulus`, `status`, `gradeResult.passed`,
+`gradeResult.score`, `gradeResult.details`, and `trajectory.metrics`.
+`experiment` carries run/variant/baseline identity plus eval/config hashes.
+`shardKey` is the native unique sample identity. The observed one-run records
+omit top-level `trialIndex` and `totalTrials`; do not require those fields or
+invent values for missing metrics.
+
+**Unlike standalone `vally eval`, experiment `run-summary.jsonl` is provenance,
+not a verdict.** Its record type is `experiment-run-summary`, with
+`experiment`, `runId`, `variant`, `evalFile`, `evalHash`, `configHash`,
+`resolvedDefaults`, `resolvedEnvironment`, `experimentFile`, `experimentHash`,
+`vallyVersion`, and `timestamp`. Environment values are redacted; skill paths can
+still be absolute/private. Native graded verdicts are in the trial records;
+the authoritative whole-run aggregation is rendered by native merge in
+`report.md`.
+
+Shards write empty result files and configuration summaries even for unselected
+variants. The console can label these unexecuted cells "grader(s) failed" and
+show `0/2` for the other model. Do **not** turn that console text or a provenance
+record into failed samples. Inspect `selectedShardKeys`, `completedShardKeys`,
+and actual trial records; distinguish unexecuted, execution-error, and graded
+failure. Never count both original shard and merged copies of the same sample.
+
+The matrix's native global `baseline` is Sonnet/OFF. A same-model skill comparison
+must pair each model's OFF with that model's ON, not compare Astra against the
+global Sonnet baseline.
+
+Use only native metrics. `totalTokens = inputTokens + outputTokens`; do not add
+cache reads/writes again. Native `cost` uses provider `github-copilot` and unit
+`nano-aiu`, not currency. `durationMs` includes the whole trial;
+`trajectory.metrics.wallTimeMs` is trajectory wall time. See the scenario's
+metric reference for units and discovery caveats.
+
+In particular, `trajectory.metadata.skillsLoaded` includes disabled builtin
+names and is not an effective skill inventory. Native CLI discovery through
+`COPILOT_SKILLS_DIRS` also splits comma-containing matrix workspace paths. A
+temporary comma-free junction to the **same actual target directory**, with
+the same per-trial settings, permits a read-only native listing on Windows.
+Remove that diagnostic junction afterward. Vally's executor passes the actual
+paths as a `skillDirectories` **array**, not through this environment variable;
+do not pass the diagnostic override into paid trials.
+
+## Local observation (2026-09-10)
+
+The native two-shard execution and native merge completed all four scenario
+trials with Copilot 1.0.80, Node 24.18.1, and Functions Core Tools 4.10.0.
+Each cell passed all three graders with score **1**, including the independent
+build and both real HTTP requests. No trial was retried.
+
+| Model | Skill | Total tokens | Turns | Tool calls | Wall time (ms) | Activations |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| claude-sonnet-5 | OFF | 409257 | 21 | 20 | 123694 | 0 |
+| claude-sonnet-5 | ON | 835663 | 32 | 31 | 245884 | 1 |
+| gpt-6-astra | OFF | 116376 | 9 | 8 | 85939 | 0 |
+| gpt-6-astra | ON | 281764 | 13 | 17 | 137202 | 1 |
+
+All four native `errorCount` values were 0. Both ON activations were the target
+skill. ON used more tokens and wall time for both models in this observation.
+With one trial per cell, these results do not establish statistical superiority
+or reliability. The separate first-layer standalone proof is not an additional
+sample in this comparison.
+
+One accidental model-discovery invocation preceded these experiments: piping
+`/model` and `/exit` into the CLI caused a noninteractive inference, reported as
+5.53 AI credits. It is recorded separately in the private execution record, not
+hidden in the budget or included in the four benchmark samples. Model availability
+was then checked with a temporary, read-only call to the already-installed SDK's
+`listModels` (no session creation or prompt). No SDK runner was added.
+
+Native originals, including the merged report, remain private because they
+contain prompts, local paths, and command output. Only the native metric values
+above are reproduced here.
