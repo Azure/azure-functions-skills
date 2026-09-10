@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <title>Azure Functions Skills | Benchmarks</title>
+  <style>
+    :root{--ink:#172b48;--muted:#64738a;--line:#e3e8f0;--accent:#087f78;--accent-light:#e8f6f2;--base:#8494ac;--blue:#365be1;--paper:#fff;--bg:#f5f7fb;--orange:#a45b12}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.65 "Segoe UI","Yu Gothic UI",Meiryo,sans-serif}
+    a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}button,select,input{font:inherit}a:focus-visible,select:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #7489ed;outline-offset:4px}
+    .topbar{background:var(--paper);border-bottom:1px solid var(--line)}.nav{max-width:1240px;margin:auto;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .brand{display:flex;align-items:center;gap:12px;color:var(--ink);font-weight:750;font-size:16px}.logo{display:block;width:59px;height:37.5px;object-fit:contain;flex:none}.brand small{display:block;font-size:10px;letter-spacing:1.8px;font-weight:600;color:var(--muted)}
+    .nav-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:flex-end}.nav-link{font-weight:600;font-size:13px}.badge{display:inline-block;padding:4px 10px;border-radius:6px;background:#fff4d9;color:#865b07;font-size:11px;font-weight:750;letter-spacing:.7px}
+    .language{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px}.language select{padding:6px 9px;border:1px solid #d6deea;border-radius:7px;background:white;color:var(--ink)}.brand{flex-shrink:0}
+    main{max-width:1240px;margin:auto;padding:36px 28px 56px}.eyebrow{color:var(--blue);font-size:11px;letter-spacing:2px;font-weight:750;margin-bottom:8px}h1{font-size:31px;line-height:1.4;letter-spacing:-.8px;margin:0 0 10px}h2,h3,p{margin:0}.lead{color:var(--muted);font-size:15px;max-width:780px}.sample{margin-top:19px;padding:11px 15px;border:1px solid #eadfbd;border-radius:9px;color:#796022;background:#fffcf4;font-size:12px}
+    .intro{display:flex;justify-content:space-between;align-items:center;gap:20px}.intro-aside{color:var(--muted);font-size:12px;white-space:nowrap;text-align:right}.intro-aside strong{display:block;color:var(--ink);font-size:13px}
+    .overview{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:25px 0}.stat{background:var(--paper);border:1px solid var(--line);padding:17px 22px;border-radius:12px;display:flex;align-items:center;gap:16px}.stat-value{font-size:29px;line-height:1.2;font-weight:730;letter-spacing:-1px}.stat p{color:var(--muted);font-size:12px}.stat strong{display:block;font-size:13px}
+    .toolbar{display:flex;align-items:end;gap:14px;margin:25px 0 18px;flex-wrap:wrap}.field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--muted);font-weight:650}.field select,.field input{border:1px solid #d6deea;background:white;border-radius:7px;padding:9px 12px;color:var(--ink);min-width:210px;font-size:13px}.search{flex:1}.search input{width:100%}
+    .legend{display:flex;gap:15px;align-items:center;color:var(--muted);font-size:12px;padding-bottom:9px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--base)}.dot.on{background:var(--accent)}
+    .section-line{display:flex;justify-content:space-between;align-items:center;margin:8px 0 14px}.section-line h2{font-size:16px}.section-line span{color:var(--muted);font-size:12px}
+    .skill-card{background:white;border:1px solid var(--line);border-radius:13px;margin-bottom:18px;overflow:hidden;box-shadow:0 2px 4px #1d355705}
+    .skill-head{padding:19px 22px 16px;display:flex;justify-content:space-between;gap:20px;align-items:center}.skill-title{display:flex;align-items:center;gap:13px}.skill-icon{height:40px;width:40px;flex:none;border-radius:10px;display:grid;place-items:center;background:#eef1fc;color:#4b64ba;font-size:17px;font-weight:700}.skill-title h3{font-size:16px;line-height:1.35}.skill-title p{font-size:12px;color:var(--muted);margin-top:4px}.skill-id{font-size:10px;color:#8190a5;letter-spacing:.3px}.scenario-chip{color:var(--muted);background:#f5f7fb;border:1px solid #edf0f5;font-size:11px;padding:4px 9px;border-radius:5px;white-space:nowrap}
+    .table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th{text-align:left;font-weight:600;font-size:11px;color:var(--muted);background:#f8fafd;padding:10px 18px;border-top:1px solid #edf0f5;border-bottom:1px solid #edf0f5}td{padding:13px 18px;border-bottom:1px solid #edf0f5;vertical-align:middle}th:first-child,td:first-child{padding-left:22px;width:25%}th:last-child,td:last-child{padding-right:22px}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#fbfcff}.model{font-size:13px;font-weight:650;color:var(--ink)}.sub{display:block;font-size:10px;color:var(--muted);margin-top:2px;font-weight:400}
+    .pair{display:grid;grid-template-columns:70px 70px;gap:8px}.pair.wide{grid-template-columns:88px 88px}.on-value{color:var(--accent);font-weight:700}.off-value{color:#77879d;font-weight:550}.pair-label{font-size:9px;display:block;color:var(--muted);font-weight:500;letter-spacing:.5px}.mini-track{background:#edf1f5;height:4px;width:56px;border-radius:5px;overflow:hidden;margin-top:5px}.mini-fill{height:100%;background:var(--accent)}.mini-fill.off{background:#b0bbca}.comparison{font-size:11px;font-weight:650;border-radius:5px;padding:4px 7px;white-space:nowrap;background:var(--accent-light);color:var(--accent)}.comparison.worse{background:#fff3e7;color:var(--orange)}.comparison.neutral{background:#f0f3f7;color:var(--muted)}.detail-link{white-space:nowrap;font-weight:650;font-size:12px}
+    .card-foot{padding:9px 22px;background:#fcfdff;border-top:1px solid #edf0f5;color:#7a889a;font-size:10px}
+    .note{padding:19px 22px;background:#eef2fa;border-radius:11px;margin-top:26px;color:#536781;font-size:12px}.note h3{font-size:13px;margin-bottom:6px;color:var(--ink)}.footer{border-top:1px solid var(--line);padding-top:22px;margin-top:28px;display:flex;justify-content:space-between;gap:16px;color:#8390a3;font-size:11px}.empty{border:1px dashed #c4cede;text-align:center;padding:50px 20px;color:var(--muted);border-radius:12px}
+    .crumb{font-size:12px;margin-bottom:22px;color:var(--muted)}.crumb span{margin:0 10px;color:#a8b1c1}.detail-select{margin:20px 0;display:flex;align-items:center;gap:16px;justify-content:space-between}.detail-select .legend{padding:0}
+    .metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:18px 0 24px}.metric-card{border:1px solid var(--line);background:white;border-radius:12px;padding:22px}.metric-card h2{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:20px}.metric-values{display:flex;align-items:baseline;justify-content:space-between;gap:10px}.metric-values .big{font-size:32px;font-weight:720;line-height:1.25;letter-spacing:-.7px}.metric-values small{font-size:11px;font-weight:400;color:var(--muted)}.bar-row{display:grid;grid-template-columns:30px 1fr 53px;align-items:center;gap:8px;margin-top:13px;font-size:10px;color:var(--muted)}.bar{height:8px;background:#eef2f7;overflow:hidden;border-radius:4px}.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}.bar i.off{background:#b0bbca}.metric-bottom{margin-top:19px;display:flex;align-items:center;justify-content:space-between}.metric-bottom small{color:var(--muted);font-size:10px}
+    .detail-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:18px}.panel{border:1px solid var(--line);background:white;border-radius:12px;padding:22px}.panel h2{font-size:16px;margin-bottom:16px}.check{display:flex;align-items:start;gap:9px;padding:9px 0;border-bottom:1px solid #f1f3f7;font-size:12px}.check:last-child{border:0}.check .mark{color:var(--accent);font-weight:700}.definition{display:grid;grid-template-columns:115px 1fr;font-size:12px;gap:10px 14px}.definition dt{color:var(--muted)}.definition dd{margin:0;overflow-wrap:anywhere}.internal{margin-top:18px;background:white;border:1px solid var(--line);border-radius:12px}.internal summary{cursor:pointer;padding:17px 22px;font-size:13px;font-weight:650}.internal div{padding:0 22px 20px;font-size:12px;color:var(--muted)}
+    .bar-row{grid-template-columns:46px 1fr 68px}.metric-bottom{gap:8px;flex-wrap:wrap}.metric-bottom small{overflow-wrap:anywhere}.legend>span{display:inline-block}
+    [hidden]{display:none!important}
+    @media(max-width:850px){.intro-aside{display:none}.pair{grid-template-columns:60px 60px}.pair.wide{grid-template-columns:75px 75px}th,td{padding-left:12px;padding-right:12px}.detail-grid{grid-template-columns:1fr}.metric-grid{gap:10px}.metric-card{padding:17px}.metric-values .big{font-size:25px}.scenario-chip{display:none}}
+    @media(max-width:620px){main{padding:25px 16px}.nav{padding:14px 16px;flex-wrap:wrap}.nav-right{width:100%;justify-content:space-between;gap:8px}.brand{font-size:13px}.nav-link{display:none}h1{font-size:25px}.overview{gap:8px}.stat{padding:13px 10px;display:block}.stat-value{font-size:25px}.stat strong{font-size:11px;margin-top:5px}.stat p{font-size:10px}.toolbar{align-items:stretch;gap:10px}.field{flex:1}.field select,.field input{min-width:0;width:100%}.legend{width:100%;padding:2px 0}.skill-head{padding:17px 15px}.skill-title p{font-size:11px}table{min-width:760px}.metric-grid{grid-template-columns:1fr}.metric-values{justify-content:start;gap:40px}.detail-select{align-items:start}.detail-select .legend{width:auto;display:block;line-height:2}.footer{display:block}.note{padding:16px}.metric-card h2{margin-bottom:12px}}
+  </style>
+</head>
+<body>
+  <header class="topbar"><nav class="nav" aria-label="Main navigation">
+    <a class="brand" href="index.html"><img class="logo" src="azure-functions-skills-logo.png" alt="" width="236" height="150"><span>Azure Functions Skills<small>BENCHMARK EXPLORER</small></span></a>
+    <div class="nav-right"></div>
+  </nav></header>
+  <main id="app"></main>
+  <noscript>This static report requires JavaScript. No external requests.</noscript>
+  <script id="benchmark-data" type="application/json">/* BENCHMARK_DATA */ null</script>
+  <script type="module">
+    // URL state preserves language, model and search across file:// navigation.
+    const data = JSON.parse(document.querySelector('#benchmark-data').textContent);
+    const params = new URLSearchParams(location.search);
+    const lang = params.get('lang') === 'ja' ? 'ja' : 'en';
+    const t = (en,ja) => lang === 'ja' ? ja : en;
+    const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const number = value => value == null ? '—' : value.toLocaleString('en-US',{maximumFractionDigits:3});
+    const percent = value => value == null ? '—' : `${number(value)}%`;
+    const compact = value => value == null ? '—' : `${(value/1000).toFixed(1)}k`;
+    const seconds = value => value == null ? '—' : `${number(value/1000)} s`;
+    const app = document.querySelector('#app');
+    document.documentElement.lang = lang;
+    const models = [...new Set(data.comparisons.map(c=>c.model))];
+    const skills = [...new Map(data.comparisons.map(c=>[c.id,c])).values()];
+    const modelName = id => ({'claude-sonnet-5':'Claude Sonnet 5','gpt-6-astra':'GPT-6 Astra'}[id] ?? id);
+    const skillName = c => c.skill === 'azure-functions-create' ? t('Create an app','アプリを作成') : c.skill;
+    const scenarioName = c => c.scenario === 'typescript-http' ? t('Create a TypeScript HTTP API','TypeScript HTTP API の新規作成') : c.scenario;
+    const withSkills = t('Target skill enabled','対象スキルあり'), withoutSkills = t('Target skill disabled','対象スキルなし');
+    const onLabel = t('Enabled','あり'), offLabel = t('Disabled','なし');
+    const missing = t('Not collected / not executed','未取得 / 未実行');
+    const difference = t('Enabled − disabled, same model','あり − なし、同じモデル');
+    const average = t('Arithmetic mean / executed trials','算術平均 / 実行済み試行');
+    const sample = `<div class="sample"><strong>${t('Small-sample observations, not statistical superiority.','少数試行の観測値であり、統計的優位性は示しません。')}</strong> ${t('See actual sample counts for each arm. Missing metrics are not zero.','各条件の実サンプル数を確認してください。欠損は 0 ではありません。')}</div>`;
+    const legend = `<div class="legend"><span><i class="dot on"></i>${withSkills}</span><span><i class="dot"></i>${withoutSkills}</span></div>`;
+    const footer = `<footer class="footer"><span>Azure Functions Skills · Benchmark Explorer</span><span>Vally ${esc(data.provenance.vallyVersion)} · ${t('Native results / No external requests','実測結果 / 外部通信なし')}</span></footer>`;
+    const method = t('Success rate = successful execution with a passing native grader verdict / executed trials. Execution errors are included; skipped and unexecuted trials are not. Grader score is separate. Metrics and score use arithmetic means over executed trials only when every value is present; otherwise —. Tokens use native totalTokens without adding cache tokens. Wall time uses wallTimeMs, not whole-trial durationMs.','成功率 = 実行成功かつ native grader PASS / 実行済み試行。実行エラーを含み、スキップと未実行は除外します。Grader スコアは別の指標です。指標とスコアは実行済み試行の全値がある場合のみ算術平均を表示し、欠損があれば — とします。トークンは native totalTokens で、キャッシュを再加算しません。実行時間は wallTimeMs で、試行全体の durationMs ではありません。');
+    const url = (skill,model) => {
+      const query = new URLSearchParams({lang});
+      if(skill)query.set('skill',skill);
+      if(model && model!=='all')query.set('model',model);
+      const search = document.querySelector('#search')?.value ?? params.get('q');
+      if(search)query.set('q',search);
+      return `index.html?${query}`;
+    };
+    const modelOptions = (selected,available=models) => available.map(model=>`<option value="${esc(model)}" ${selected===model?'selected':''}>${esc(modelName(model))}</option>`).join('');
+    const counts = arm => arm ? `${arm.samples}/${arm.planned}` : '—';
+    const metric = (arm,key) => arm?.metrics[key] ?? null;
+    function delta(on,off,unit='',lower=false){
+      if(on==null||off==null)return `<span class="comparison neutral">${t('Not comparable','比較できません')}</span>`;
+      const value=on-off, good=lower?value<0:value>0;
+      return `<span class="comparison ${value===0?'neutral':good?'':'worse'}">${value>0?'+':value<0?'−':''}${number(Math.abs(value))}${unit}</span>`;
+    }
+    function paired(on,off,format,wide=false,bars=false){
+      return `<div class="pair ${wide?'wide':''}">${[on,off].map((v,i)=>`<div class="${i?'off-value':'on-value'}"><span class="pair-label">${i?offLabel:onLabel}</span><span title="${v==null?missing:number(v)}">${format(v)}</span>${bars&&v!=null?`<div class="mini-track"><div class="mini-fill ${i?'off':''}" style="width:${v}%"></div></div>`:''}</div>`).join('')}</div>`;
+    }
+    document.querySelector('.brand').href=url(null,params.get('model'));
+    document.querySelector('.nav-right').innerHTML=`<a class="nav-link" href="${esc(url(null,params.get('model')))}">${t('Dashboard','ダッシュボード')}</a><span class="badge">${t('NATIVE MEASUREMENTS','実測結果')}</span><label class="language">${t('Language','言語')}<select id="language"><option value="en">English</option><option value="ja">日本語</option></select></label>`;
+    document.querySelector('#language').value=lang;
+    document.querySelector('#language').addEventListener('change',event=>{
+      const query=new URLSearchParams(url(params.get('skill'),document.querySelector('#model')?.value ?? params.get('model')).split('?')[1]);
+      query.set('lang',event.target.value);
+      location.href=`index.html?${query}`;
+    });
+    function card(skill,selectedModel){
+      const comparisons=data.comparisons.filter(c=>c.id===skill.id&&(selectedModel==='all'||c.model===selectedModel));
+      if(!comparisons.length)return '';
+      const rows=comparisons.map(c=>{
+        const href=url(c.id,c.model);
+        return `<tr><td><a class="model" href="${esc(href)}">${esc(modelName(c.model))}</a><span class="sub">${t('Executed / planned','実行済み / 計画')}: ${onLabel} ${counts(c.on)} · ${offLabel} ${counts(c.off)}</span></td>
+          <td>${paired(c.on?.successRate,c.off?.successRate,percent,false,true)}</td><td>${paired(metric(c.on,'totalTokens'),metric(c.off,'totalTokens'),compact,true)}</td><td>${paired(metric(c.on,'turnCount'),metric(c.off,'turnCount'),number)}</td>
+          <td>${delta(c.on?.successRate,c.off?.successRate,' pp')}</td><td><a class="detail-link" href="${esc(href)}">${t('Details','詳細')} →</a></td></tr>`;
+      }).join('');
+      return `<section class="skill-card"><header class="skill-head"><div class="skill-title"><span class="skill-icon" aria-hidden="true">＋</span><div><div class="skill-id">${esc(skill.skill)}</div><h3>${esc(skillName(skill))}</h3><p>${esc(scenarioName(skill))}</p></div></div><span class="scenario-chip">${esc(skill.scenario)}</span></header>
+        <div class="table-wrap"><table><thead><tr><th>${t('Model','モデル')}</th><th>${t('Success rate','成功率')}</th><th>${t('Token consumption','トークン消費')}<span class="sub">${average}</span></th><th>${t('Turns','ターン数')}<span class="sub">${average}</span></th><th>${t('Success rate delta','成功率の差')}<span class="sub">${difference}</span></th><th>${t('Explore comparison','比較の詳細')}</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="card-foot">${t('Actual sample counts per model and condition. — means missing, not zero.','モデル・条件ごとの実サンプル数を表示。— は欠損で、0 ではありません。')}</div></section>`;
+    }
+    function dashboard(){
+      document.title=t('Azure Functions Skills | Benchmarks','Azure Functions Skills | ベンチマーク');
+      const initial=models.includes(params.get('model'))?params.get('model'):'all';
+      const samples=data.comparisons.reduce((sum,c)=>sum+(c.on?.samples??0)+(c.off?.samples??0),0);
+      app.innerHTML=`<div class="intro"><div><div class="eyebrow">SKILL PERFORMANCE</div><h1>${t('Compare skill impact across models.','スキルの効果を、モデルごとに比較。')}</h1><p class="lead">${t('Compare target skill ON and OFF within the same model and scenario.','同じモデル・シナリオで対象スキルあり・なしを比較します。')}</p></div><div class="intro-aside"><strong>${t('Vally native experiment','Vally native 実験')}</strong>${esc(data.provenance.runId)}</div></div>${sample}
+        <div class="overview">${[[new Set(skills.map(c=>c.skill)).size,t('Skills','対象スキル'),`${skills.length} ${t('scenarios','シナリオ')}`],[models.length,t('Models','比較モデル'),t('Same-model ON / OFF','同じモデルのあり / なし')],[samples,t('Executed trials','実行済み試行'),t('Successes and errors included','成功と実行エラーを含む')]].map(([value,title,caption])=>`<div class="stat"><span class="stat-value">${value}</span><div><strong>${title}</strong><p>${caption}</p></div></div>`).join('')}</div>
+        <div class="toolbar"><label class="field search">${t('Find a skill','スキルを探す')}<input id="search" type="search" placeholder="${t('Search by skill or scenario','スキル名・シナリオで検索')}" autocomplete="off"></label><label class="field">${t('Model','モデル')}<select id="model"><option value="all">${t('All models','すべてのモデル')}</option>${modelOptions(initial)}</select></label>${legend}</div>
+        <div class="section-line"><h2>${t('Compare by skill','スキル別の比較')}</h2><span id="count" role="status" aria-live="polite"></span></div><div id="cards"></div><aside class="note"><h3>${t('How to read this comparison','この比較の読み方')}</h3><p>${method}</p></aside>${footer}`;
+      const modelSelect=document.querySelector('#model');
+      document.querySelector('#search').value=params.get('q')??'';
+      function update(){
+        const query=document.querySelector('#search').value.toLowerCase().trim();
+        const visible=skills.filter(c=>`${skillName(c)} ${c.skill} ${scenarioName(c)} ${c.scenario}`.toLowerCase().includes(query));
+        const cards=visible.map(c=>card(c,modelSelect.value)).filter(Boolean);
+        document.querySelector('#cards').innerHTML=cards.length?cards.join(''):`<div class="empty">${t('No matching skills. Try a different search.','一致するスキルがありません。検索条件を変更してください。')}</div>`;
+        const count=data.comparisons.filter(c=>visible.some(s=>s.id===c.id)&&(modelSelect.value==='all'||c.model===modelSelect.value)).length;
+        document.querySelector('#count').textContent=t(`${cards.length} scenarios · ${count} model comparisons`,`${cards.length} シナリオ · ${count} モデル比較`);
+        for(const link of document.querySelectorAll('.brand,.nav-link'))link.href=url(null,modelSelect.value);
+      }
+      document.querySelector('#search').addEventListener('input',update);
+      modelSelect.addEventListener('change',update);
+      update();
+    }
+    function metricCard(title,on,off,format,change,caption,fixedScale=null){
+      const scale=fixedScale??Math.max(on??0,off??0,1);
+      return `<section class="metric-card"><h2>${title}</h2><div class="metric-values"><div><span class="pair-label">${withSkills}</span><span class="big on-value">${format(on)}</span></div><div><span class="pair-label">${withoutSkills}</span><span class="big off-value">${format(off)}</span></div></div>
+        ${[on,off].map((v,i)=>`<div class="bar-row"><span>${i?offLabel:onLabel}</span><div class="bar">${v==null?'':`<i class="${i?'off':''}" style="width:${v/scale*100}%"></i>`}</div><span>${v==null?missing:format(v)}</span></div>`).join('')}
+        <div class="metric-bottom">${change}<small>${caption}</small></div></section>`;
+    }
+    function detail(c){
+      const available=data.comparisons.filter(item=>item.id===c.id).map(item=>item.model);
+      const metrics=[['totalTokens',t('Token consumption','トークン消費'),compact],['turnCount',t('Turns','ターン数'),number],['toolCallCount',t('Tool calls','ツール呼び出し'),number],['wallTimeMs',t('Wall time','実行時間'),seconds],['errorCount',t('Errors','エラー数'),number],['skillActivationCount',t('Skill activations','スキル activation'),number]];
+      const breakdown=(title,get)=>`<tr><td>${title}</td>${[c.on,c.off].map(arm=>`<td>${arm?get(arm):'—'}</td>`).join('')}</tr>`;
+      const result = trial => trial.status==='skipped'?t('Skipped','スキップ'):trial.status==='error'?t('Execution error','実行エラー'):trial.passed===true?'PASS':trial.passed===false?t('Grader failure','Grader 不合格'):missing;
+      const trials=[c.on,c.off].flatMap((arm,i)=>(arm?.trials??[]).map(trial=>`<div class="check"><span class="mark">${i?offLabel:onLabel}</span><span>${esc(trial.id)} · ${result(trial)} · ${t('Score','スコア')} ${number(trial.score)}<br>${trial.graders.map(g=>`${esc(g.name)}: ${g.passed===true?'PASS':g.passed===false?'FAIL':'—'} (${number(g.score)})`).join(' · ')}</span></div>`)).join('');
+      document.title=`${skillName(c)} · ${modelName(c.model)} | Benchmarks`;
+      app.innerHTML=`<div class="crumb"><a href="${esc(url(null,c.model))}">${t('Dashboard','ダッシュボード')}</a><span>/</span>${esc(skillName(c))}<span>/</span>${esc(modelName(c.model))}</div>
+        <div class="eyebrow">${esc(c.skill)}</div><h1>${esc(skillName(c))}</h1><p class="lead">${esc(scenarioName(c))}</p>${sample}
+        <div class="detail-select"><label class="field">${t('Model to compare','比較するモデル')}<select id="detail-model">${modelOptions(c.model,available)}</select></label>${legend}</div>
+        <div class="metric-grid">${metricCard(t('Success rate','成功率'),c.on?.successRate,c.off?.successRate,percent,delta(c.on?.successRate,c.off?.successRate,' pp'),`${onLabel}: ${c.on?.passed??'—'}/${c.on?.samples??'—'} · ${offLabel}: ${c.off?.passed??'—'}/${c.off?.samples??'—'}`,100)}
+        ${metricCard(t('Grader score · Mean','Grader スコア · 平均'),c.on?.score,c.off?.score,number,delta(c.on?.score,c.off?.score),average)}
+        ${metrics.map(([key,title,format])=>{
+          const on=metric(c.on,key),off=metric(c.off,key);
+          const tokenChange=on===null||off===null||off===0?null:(on-off)/off*100;
+          return metricCard(`${title} · ${t('Mean','平均')}`,on,off,format,key==='totalTokens'?delta(tokenChange,0,'%',true):delta(on,off,key==='wallTimeMs'?' ms':'',key!=='skillActivationCount'),average);
+        }).join('')}</div>
+        <div class="detail-grid"><section class="panel"><h2>${t('Native grader results','Native grader の結果')}</h2><p class="sub">${t('Per-trial verdicts and scores; no raw evidence or logs.','試行ごとの判定とスコア。生の証拠・ログは公開しません。')}</p>${trials}</section>
+        <section class="panel"><h2>${t('Comparison conditions','比較条件')}</h2><dl class="definition"><dt>${t('Model','モデル')}</dt><dd>${esc(modelName(c.model))}</dd><dt>${t('Sample count','サンプル数')}</dt><dd>${onLabel}: ${counts(c.on)} · ${offLabel}: ${counts(c.off)} (${t('executed / planned','実行済み / 計画')})</dd><dt>${t('Comparison','比較')}</dt><dd>${difference}</dd><dt>${t('Data source','データソース')}</dt><dd>Vally results.jsonl<br>experiment-manifest.json / plan-snapshot.json<br>run-summary.jsonl: ${t('provenance only, not verdicts','出自情報のみ、判定ではありません')}</dd></dl></section></div>
+        <section class="skill-card" style="margin-top:20px"><div class="skill-head"><h2>${t('Result breakdown','結果の内訳')}</h2></div><div class="table-wrap"><table><thead><tr><th>${t('Metric','指標')}</th><th>${withSkills}</th><th>${withoutSkills}</th></tr></thead><tbody>
+        ${[['planned',t('Planned','計画')],['samples',t('Executed','実行済み')],['unexecuted',t('Unexecuted','未実行')],['skipped',t('Skipped','スキップ')],['executionErrors',t('Execution errors','実行エラー')],['failed',t('Grader failures','Grader 不合格')],['passed',t('Passed','合格')],['score',t('Grader score · Mean','Grader スコア · 平均')]].map(([key,title])=>breakdown(title,arm=>number(arm[key]))).join('')}
+        ${metrics.map(([key,title])=>breakdown(`${title} · ${t('Mean','平均')}<span class="sub">${key}</span>`,arm=>number(arm.metrics[key]))).join('')}</tbody></table></div></section>
+        <details class="internal"><summary>${t('Methodology and reproducibility','評価方法・再現性について')}</summary><div>${method}<br><br>${Object.entries(data.provenance).map(([key,value])=>`${esc(key)}: ${esc(value)}`).join('<br>')}<br>${t('Trial IDs are SHA-256 prefixes of native shard keys. Private paths and traces are not published.','試行 ID は native shard key の SHA-256 接頭辞です。非公開パスとトレースは公開しません。')}</div></details>
+        <aside class="note"><h3>${t('Read consumption alongside success rate','消費量だけではなく、成功率と一緒に見る')}</h3><p>${t('Adding skills can increase tokens and time. Colors indicate numerical direction only, not quality or a model recommendation. Activation counts are native metrics, not inferred from loaded skill names.','スキル追加でトークン数と時間が増える場合があります。色は数値の方向だけを示し、品質やモデルの推奨を意味しません。Activation 数は native 指標であり、ロードされたスキル名から推測しません。')}</p></aside>${footer}`;
+      document.querySelector('#detail-model').addEventListener('change',event=>{location.href=url(c.id,event.target.value);});
+    }
+    const skillId=params.get('skill');
+    if(skillId){
+      const available=data.comparisons.filter(c=>c.id===skillId);
+      const selected=params.get('model')??available[0]?.model;
+      const comparison=available.find(c=>c.model===selected);
+      if(comparison)detail(comparison);
+      else app.innerHTML=`<h1>${t('Comparison not found','比較条件が見つかりません')}</h1><p><a href="${esc(url(null,null))}">${t('Back to dashboard','ダッシュボードに戻る')} →</a></p>`;
+    }else dashboard();
+  </script>
+</body>
+</html>
