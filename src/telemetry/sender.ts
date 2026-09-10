@@ -3,9 +3,11 @@ import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APPLICATION_INSIGHTS_CONNECTION_STRING } from './config.js';
+import { isNormalizedResourceType } from './arm-deployments.js';
 
 const EVENT_NAME = 'AzureFunctionsSkillsPluginExecuted';
-const DEFAULT_TIMEOUT_MS = 5_000;
+export const CONTRIBUTION_EVENT_NAME = 'azure_contribution';
+export const DEFAULT_TIMEOUT_MS = 5_000;
 const CONNECTION_STRING_PLACEHOLDER = '__APPLICATIONINSIGHTS_CONNECTION_STRING__';
 const BUNDLED_SKILLS_ROOT = fileURLToPath(new URL('../../templates/skills/', import.meta.url));
 const ALLOWED_PROPERTIES = new Set([
@@ -29,6 +31,19 @@ const CLIENT_NAMES = new Set([
   'Visual Studio Code',
   'Visual Studio Code - Insiders',
   'unknown',
+]);
+const CONTRIBUTION_AGENTS = new Set([...CLIENT_NAMES, 'codex']);
+const CONTRIBUTION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-agents']);
+const CONTRIBUTION_OPERATIONS = new Set(['deploy', 'provision']);
+const CONTRIBUTION_DEPLOYMENT_KINDS = new Set(['function-app', 'hosted-agent']);
+const CONTRIBUTION_PROPERTIES = new Set([
+  'skill',
+  'operation',
+  'result',
+  'resourceTypes',
+  'deploymentKind',
+  'agent',
+  'skillsVersion',
 ]);
 export const BUNDLED_SKILL_NAMES = new Set([
   'azure-functions-best-practices',
@@ -61,6 +76,16 @@ export interface TelemetryEvent {
   readonly fileReference?: string;
 }
 
+export interface ContributionEvent {
+  readonly skill: 'azure-functions-deploy' | 'azure-functions-agents';
+  readonly operation: 'deploy' | 'provision';
+  readonly result: 'success';
+  readonly resourceTypes: readonly string[];
+  readonly deploymentKind: 'function-app' | 'hosted-agent';
+  readonly agent: string;
+  readonly skillsVersion: string;
+}
+
 export type TelemetrySendStatus = 'sent' | 'disabled' | 'not-configured';
 
 export interface TelemetrySendResult {
@@ -75,7 +100,7 @@ export interface ApplicationInsightsClient {
   flush(options: { readonly callback: (response?: string) => void }): void;
 }
 
-interface TelemetryEnvironment {
+export interface TelemetryEnvironment {
   readonly AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY?: string;
   readonly AZURE_MCP_COLLECT_TELEMETRY?: string;
 }
@@ -184,8 +209,129 @@ export async function sendTelemetryEvent(event: TelemetryEvent): Promise<Telemet
   });
 }
 
-function createApplicationInsightsClient(connectionString: string): ApplicationInsightsClient {
-  return new applicationInsights.TelemetryClient(connectionString);
+export function parseContributionEvent(value: unknown): ContributionEvent {
+  if (!isRecord(value)) {
+    throw new Error('Contribution event must be a JSON object.');
+  }
+  for (const property of Object.keys(value)) {
+    if (!CONTRIBUTION_PROPERTIES.has(property)) {
+      throw new Error(`Unsupported contribution event property: ${property}`);
+    }
+  }
+
+  const skill = requiredString(value, 'skill');
+  if (!CONTRIBUTION_SKILLS.has(skill)) {
+    throw new Error(`Unsupported contribution skill: ${skill}`);
+  }
+  const operation = requiredString(value, 'operation');
+  if (!CONTRIBUTION_OPERATIONS.has(operation)) {
+    throw new Error(`Unsupported contribution operation: ${operation}`);
+  }
+  if (requiredString(value, 'result') !== 'success') {
+    throw new Error('Contribution result must be success.');
+  }
+  const deploymentKind = requiredString(value, 'deploymentKind');
+  if (!CONTRIBUTION_DEPLOYMENT_KINDS.has(deploymentKind)) {
+    throw new Error(`Unsupported contribution deployment kind: ${deploymentKind}`);
+  }
+  const agent = requiredString(value, 'agent');
+  if (!CONTRIBUTION_AGENTS.has(agent)) {
+    throw new Error(`Unsupported contribution agent: ${agent}`);
+  }
+  const skillsVersion = requiredString(value, 'skillsVersion');
+
+  const resourceTypesValue = value.resourceTypes;
+  if (!Array.isArray(resourceTypesValue) || resourceTypesValue.length === 0) {
+    throw new Error('Contribution resourceTypes must be a non-empty array.');
+  }
+  const resourceTypes = resourceTypesValue.map(entry => {
+    if (typeof entry !== 'string' || !isNormalizedResourceType(entry)) {
+      throw new Error('Invalid contribution resource type.');
+    }
+    return entry;
+  });
+
+  return {
+    skill: skill as ContributionEvent['skill'],
+    operation: operation as ContributionEvent['operation'],
+    result: 'success',
+    resourceTypes,
+    deploymentKind: deploymentKind as ContributionEvent['deploymentKind'],
+    agent,
+    skillsVersion,
+  };
+}
+
+export function normalizeContributionAgent(agent: string): string {
+  return CONTRIBUTION_AGENTS.has(agent) ? agent : 'unknown';
+}
+
+export async function sendContributionEventWithDependencies(
+  event: ContributionEvent,
+  dependencies: TelemetryDependencies,
+): Promise<TelemetrySendResult> {
+  const parsedEvent = parseContributionEvent(event);
+  if (isOptedOut(dependencies.environment)) {
+    return { status: 'disabled' };
+  }
+  if (!isConfiguredConnectionString(dependencies.connectionString)) {
+    return { status: 'not-configured' };
+  }
+
+  const client = dependencies.createClient(dependencies.connectionString);
+  client.trackEvent({
+    name: CONTRIBUTION_EVENT_NAME,
+    properties: contributionProperties(parsedEvent),
+  });
+  await flushWithTimeout(client, dependencies.timeoutMs);
+  return { status: 'sent' };
+}
+
+export async function sendContributionEvent(event: ContributionEvent): Promise<TelemetrySendResult> {
+  return sendContributionEventWithDependencies(event, {
+    connectionString: APPLICATION_INSIGHTS_CONNECTION_STRING,
+    createClient: createApplicationInsightsClient,
+    environment: process.env,
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+  });
+}
+
+function contributionProperties(event: ContributionEvent): Record<string, string> {
+  return {
+    skill: event.skill,
+    operation: event.operation,
+    result: event.result,
+    resourceTypes: JSON.stringify([...event.resourceTypes]),
+    deploymentKind: event.deploymentKind,
+    agent: event.agent,
+    skillsVersion: event.skillsVersion,
+  };
+}
+
+export function createApplicationInsightsClient(connectionString: string): ApplicationInsightsClient {
+  const client = new applicationInsights.TelemetryClient(connectionString);
+  stripHostContextTags(client);
+  return client;
+}
+
+function stripHostContextTags(client: unknown): void {
+  if (!isRecord(client)) return;
+  const context = client.context;
+  if (!isRecord(context)) return;
+  const tags = context.tags;
+  if (!isRecord(tags)) return;
+  const keys = isRecord(context.keys) ? context.keys : {};
+  const derivedKeys = [
+    keys.cloudRoleInstance,
+    keys.deviceOSVersion,
+    'ai.cloud.roleInstance',
+    'ai.device.osVersion',
+    'ai.device.osArchitecture',
+    'ai.device.osPlatform',
+  ];
+  for (const key of derivedKeys) {
+    if (typeof key === 'string') delete tags[key];
+  }
 }
 
 function telemetryProperties(event: TelemetryEvent): Record<string, string> {
@@ -224,12 +370,12 @@ function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number):
   });
 }
 
-function isConfiguredConnectionString(connectionString: string): boolean {
+export function isConfiguredConnectionString(connectionString: string): boolean {
   return connectionString.trim().length > 0
     && connectionString !== CONNECTION_STRING_PLACEHOLDER;
 }
 
-function isOptedOut(environment: TelemetryEnvironment): boolean {
+export function isOptedOut(environment: TelemetryEnvironment): boolean {
   return environment.AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY?.toLowerCase() === 'false'
     || environment.AZURE_MCP_COLLECT_TELEMETRY?.toLowerCase() === 'false';
 }
