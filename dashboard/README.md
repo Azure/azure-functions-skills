@@ -2,6 +2,8 @@
 
 Generate the supplied Benchmark Explorer design from **existing** Vally 0.16.0
 experiment output. This command never runs an agent, calls a model, or regrades.
+For an approved new evaluation followed by this report, use the
+[isolated local workflow](../experiments/README.md#local-convenience-commands).
 
 ```powershell
 npm run eval:report -- --input C:\private\native-merged --output C:\reports\benchmark-site
@@ -15,8 +17,9 @@ files can later be hosted as a static site.
 
 ## Input contract
 
-Use **one** canonical experiment directory, usually the output of
-`vally experiment merge`. Never combine the merged output with its source shards.
+Use **one** canonical experiment directory: `native/` in the local wrapper's
+private bundle, or the output of `vally experiment merge`. Never combine the
+merged output with its source shards.
 It must contain `experiment-manifest.json`, `plan-snapshot.json` and each
 manifest variant's `results.jsonl` and `run-summary.jsonl`. Standalone `vally eval`
 and raw shard manifests are deliberately not supported.

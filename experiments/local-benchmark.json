@@ -1,0 +1,13 @@
+{
+  "models": ["claude-sonnet-5", "gpt-6-astra"],
+  "skills": {
+    "azure-functions-create": {
+      "evals": ["evals/azure-functions-create/typescript-http/eval.yaml"],
+      "files": [
+        "templates/skills/azure-functions-create/SKILL.md",
+        "templates/skills/azure-functions-create/references/go-project.md",
+        "templates/skills/azure-functions-create/references/language-snippets.md"
+      ]
+    }
+  }
+}
