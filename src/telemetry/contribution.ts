@@ -1,5 +1,6 @@
 import { APPLICATION_INSIGHTS_CONNECTION_STRING } from './config.js';
 import {
+  ARM_COLLECTION_DEADLINE_MS,
   collectResourceTypes,
   createAzureCliDeploymentQuery,
   type ArmDeploymentQuery,
@@ -11,6 +12,7 @@ import {
   isConfiguredConnectionString,
   isOptedOut,
   normalizeContributionAgent,
+  normalizeSkillsVersion,
   sendContributionEventWithDependencies,
   type ApplicationInsightsClient,
   type ContributionEvent,
@@ -120,6 +122,7 @@ export async function collectContributionWithDependencies(
     return { status: 'not-configured' };
   }
 
+  const start = dependencies.now();
   let deployments: readonly ArmDeploymentSummary[];
   try {
     deployments = await dependencies.query.listSubscriptionDeployments();
@@ -132,7 +135,14 @@ export async function collectContributionWithDependencies(
     return { status: 'skipped', reason: 'no-recent-deployment' };
   }
 
-  const types = await collectResourceTypes(selected.id, dependencies.query, { now: dependencies.now });
+  const remainingMs = ARM_COLLECTION_DEADLINE_MS - (dependencies.now() - start);
+  if (remainingMs <= 0) {
+    return { status: 'skipped', reason: 'deadline-exceeded' };
+  }
+  const types = await collectResourceTypes(selected.id, dependencies.query, {
+    now: dependencies.now,
+    deadlineMs: remainingMs,
+  });
   if (types.status === 'skip') {
     return { status: 'skipped', reason: types.reason };
   }
@@ -179,7 +189,7 @@ function buildContributionEvent(
     resourceTypes,
     deploymentKind: input.skill === 'azure-functions-deploy' ? 'function-app' : 'hosted-agent',
     agent: normalizeContributionAgent(input.agent),
-    skillsVersion: input.skillsVersion ?? 'unknown',
+    skillsVersion: normalizeSkillsVersion(input.skillsVersion),
   };
 }
 

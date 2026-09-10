@@ -98,13 +98,22 @@ if (command === 'install' || command === 'update') {
 async function runContributionTelemetryCommand() {
   try {
     const dir = getFlag('--dir') || process.cwd();
-    const { resolveTelemetryEnabled } = await import('../lib/setup/workspace-assets.js');
+    const { resolveTelemetryEnabled, telemetryConfigPath } = await import('../lib/setup/workspace-assets.js');
+    const {
+      parseContributionInput,
+      collectContribution,
+      readWorkspaceTelemetryState,
+    } = await import('../lib/telemetry/index.js');
     const rawInput = await readStdin(16 * 1024);
     if (rawInput.trim().length === 0) {
       throw new Error('Contribution telemetry input is required on stdin.');
     }
-    const { parseContributionInput, collectContribution } = await import('../lib/telemetry/index.js');
     const input = parseContributionInput(JSON.parse(rawInput));
+    const configPaths = ['ghcp', 'claude', 'codex'].map(agent => telemetryConfigPath(dir, agent));
+    if (readWorkspaceTelemetryState(configPaths) !== 'active') {
+      process.stdout.write('disabled\n');
+      return;
+    }
     const workspaceTelemetryEnabled = resolveTelemetryEnabled(dir, undefined);
     const result = await collectContribution(input, { workspaceTelemetryEnabled });
     process.stdout.write(`${result.status}\n`);

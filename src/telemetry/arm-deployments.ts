@@ -5,10 +5,13 @@ const OPERATIONS_API_VERSION = '2021-04-01';
 const DEPLOYMENTS_WRAPPER_TYPE = 'microsoft.resources/deployments';
 const RESOURCE_TYPE_PATTERN =
   /^microsoft\.[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
+const GENERAL_RESOURCE_TYPE_PATTERN =
+  /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
 const MAX_RESOURCE_TYPE_LENGTH = 256;
 const MAX_PAGES = 20;
 
 const DEFAULT_DEADLINE_MS = 15_000;
+export const ARM_COLLECTION_DEADLINE_MS = DEFAULT_DEADLINE_MS;
 const DEFAULT_MAX_REQUESTS = 50;
 const DEFAULT_MAX_DEPTH = 10;
 const DEFAULT_MAX_TYPES = 100;
@@ -29,10 +32,17 @@ export interface ArmDeploymentOperation {
 
 export interface ArmDeploymentQuery {
   listSubscriptionDeployments(): Promise<readonly ArmDeploymentSummary[]>;
-  listDeploymentOperations(deploymentId: string): Promise<readonly ArmDeploymentOperation[]>;
+  listDeploymentOperations(
+    deploymentId: string,
+    budget?: ArmRequestBudget,
+  ): Promise<readonly ArmDeploymentOperation[]>;
 }
 
-export type ArmCliRunner = (args: readonly string[]) => Promise<string>;
+export interface ArmRequestBudget {
+  tryConsume(): boolean;
+}
+
+export type ArmCliRunner = (args: readonly string[], timeoutMs?: number) => Promise<string>;
 
 export interface ResourceTypeCollectionOptions {
   readonly deadlineMs?: number;
@@ -48,8 +58,45 @@ export type ArmSkipReason =
   | 'depth-limit-exceeded'
   | 'type-limit-exceeded'
   | 'incomplete-child'
+  | 'malformed-operation'
   | 'query-failed'
   | 'no-types';
+
+class ArmDeadlineError extends Error {}
+class ArmRequestBudgetError extends Error {}
+
+function createRequestBudget(max: number): ArmRequestBudget {
+  let remaining = max;
+  return {
+    tryConsume(): boolean {
+      if (remaining <= 0) return false;
+      remaining -= 1;
+      return true;
+    },
+  };
+}
+
+function startDeadline(totalMs: number, now: () => number = Date.now): { remainingMs(): number } {
+  const start = now();
+  return { remainingMs: () => totalMs - (now() - start) };
+}
+
+function withDeadline<T>(promise: Promise<T>, remainingMs: number): Promise<T> {
+  if (remainingMs <= 0) return Promise.reject(new ArmDeadlineError());
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new ArmDeadlineError()), remainingMs);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error('ARM query failed.'));
+      },
+    );
+  });
+}
 
 export type ResourceTypeResult =
   | { readonly status: 'ok'; readonly resourceTypes: readonly string[] }
@@ -69,10 +116,10 @@ export async function collectResourceTypes(
   const start = now();
   const visited = new Set<string>();
   const types = new Set<string>();
+  const budget = createRequestBudget(maxRequests);
   const stack: Array<{ readonly id: string; readonly depth: number }> = [
     { id: rootDeploymentId, depth: 0 },
   ];
-  let requests = 0;
 
   while (stack.length > 0) {
     if (now() - start > deadlineMs) {
@@ -85,15 +132,28 @@ export async function collectResourceTypes(
     if (visited.has(current.id)) continue;
     visited.add(current.id);
 
-    if (requests >= maxRequests) {
+    if (!budget.tryConsume()) {
       return { status: 'skip', reason: 'request-limit-exceeded' };
     }
-    requests += 1;
+
+    const remainingMs = deadlineMs - (now() - start);
+    if (remainingMs <= 0) {
+      return { status: 'skip', reason: 'deadline-exceeded' };
+    }
 
     let operations: readonly ArmDeploymentOperation[];
     try {
-      operations = await query.listDeploymentOperations(current.id);
-    } catch {
+      operations = await withDeadline(
+        Promise.resolve(query.listDeploymentOperations(current.id, budget)),
+        remainingMs,
+      );
+    } catch (error) {
+      if (error instanceof ArmDeadlineError) {
+        return { status: 'skip', reason: 'deadline-exceeded' };
+      }
+      if (error instanceof ArmRequestBudgetError) {
+        return { status: 'skip', reason: 'request-limit-exceeded' };
+      }
       return { status: 'skip', reason: 'query-failed' };
     }
 
@@ -119,11 +179,18 @@ export async function collectResourceTypes(
         continue;
       }
 
-      if (normalizedType === undefined) continue;
-      types.add(normalizedType);
-      if (types.size > maxTypes) {
-        return { status: 'skip', reason: 'type-limit-exceeded' };
+      if (normalizedType !== undefined) {
+        types.add(normalizedType);
+        if (types.size > maxTypes) {
+          return { status: 'skip', reason: 'type-limit-exceeded' };
+        }
+        continue;
       }
+
+      if (isValidResourceTypeSyntax(operation.targetResourceType)) {
+        continue;
+      }
+      return { status: 'skip', reason: 'malformed-operation' };
     }
   }
 
@@ -133,25 +200,36 @@ export async function collectResourceTypes(
   return { status: 'ok', resourceTypes: [...types].sort() };
 }
 
-export function createAzureCliDeploymentQuery(runner: ArmCliRunner = defaultRunner): ArmDeploymentQuery {
+export function createAzureCliDeploymentQuery(
+  runner: ArmCliRunner = defaultRunner,
+  deadlineMs: number = DEFAULT_DEADLINE_MS,
+): ArmDeploymentQuery {
+  const deadline = startDeadline(deadlineMs);
+  const callTimeout = (): number => Math.max(1, Math.ceil(deadline.remainingMs()));
   return {
     async listSubscriptionDeployments(): Promise<readonly ArmDeploymentSummary[]> {
-      const raw = await runner(['deployment', 'sub', 'list', '-o', 'json']);
+      const raw = await runner(['deployment', 'sub', 'list', '-o', 'json'], callTimeout());
       const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
       return parsed.map(toDeploymentSummary).filter((entry): entry is ArmDeploymentSummary => entry !== undefined);
     },
 
-    async listDeploymentOperations(deploymentId: string): Promise<readonly ArmDeploymentOperation[]> {
+    async listDeploymentOperations(
+      deploymentId: string,
+      budget?: ArmRequestBudget,
+    ): Promise<readonly ArmDeploymentOperation[]> {
       if (!isArmDeploymentId(deploymentId)) {
         throw new Error('Invalid ARM deployment identifier.');
       }
       const operations: ArmDeploymentOperation[] = [];
       let url = `${ARM_ORIGIN.replace(/\/$/, '')}${deploymentId}/operations?api-version=${OPERATIONS_API_VERSION}`;
       for (let page = 0; page < MAX_PAGES; page += 1) {
-        const raw = await runner(['rest', '--method', 'get', '--url', url]);
+        if (page > 0 && budget !== undefined && !budget.tryConsume()) {
+          throw new ArmRequestBudgetError();
+        }
+        const raw = await runner(['rest', '--method', 'get', '--url', url], callTimeout());
         const parsed: unknown = JSON.parse(raw);
-        if (!isRecord(parsed)) break;
+        if (!isRecord(parsed)) return operations;
         const value = parsed.value;
         if (Array.isArray(value)) {
           for (const item of value) {
@@ -160,13 +238,13 @@ export function createAzureCliDeploymentQuery(runner: ArmCliRunner = defaultRunn
           }
         }
         const nextLink = parsed.nextLink;
-        if (typeof nextLink !== 'string' || nextLink.length === 0) break;
+        if (typeof nextLink !== 'string' || nextLink.length === 0) return operations;
         if (!isSameOriginArmUrl(nextLink)) {
           throw new Error('Refusing to follow a non-ARM pagination link.');
         }
         url = nextLink;
       }
-      return operations;
+      throw new ArmRequestBudgetError();
     },
   };
 }
@@ -206,6 +284,13 @@ function normalizeResourceType(value: string | undefined): string | undefined {
   return lowered;
 }
 
+function isValidResourceTypeSyntax(value: string | undefined): boolean {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > MAX_RESOURCE_TYPE_LENGTH) return false;
+  return GENERAL_RESOURCE_TYPE_PATTERN.test(trimmed.toLowerCase());
+}
+
 export function isNormalizedResourceType(value: string): boolean {
   return value.length > 0
     && value.length <= MAX_RESOURCE_TYPE_LENGTH
@@ -228,16 +313,22 @@ function isSameOriginArmUrl(value: string): boolean {
   }
 }
 
-function defaultRunner(args: readonly string[]): Promise<string> {
+function defaultRunner(args: readonly string[], timeoutMs: number = DEFAULT_DEADLINE_MS): Promise<string> {
   const command = process.platform === 'win32' ? 'az.cmd' : 'az';
+  const timeout = Math.max(1, Math.floor(timeoutMs));
   return new Promise((resolve, reject) => {
-    execFile(command, [...args], { maxBuffer: 8 * 1024 * 1024, windowsHide: true }, (error, stdout) => {
-      if (error) {
-        reject(new Error('Azure CLI request failed.'));
-        return;
-      }
-      resolve(stdout);
-    });
+    execFile(
+      command,
+      [...args],
+      { maxBuffer: 8 * 1024 * 1024, windowsHide: true, timeout, killSignal: 'SIGKILL' },
+      (error, stdout) => {
+        if (error) {
+          reject(new Error('Azure CLI request failed.'));
+          return;
+        }
+        resolve(stdout);
+      },
+    );
   });
 }
 

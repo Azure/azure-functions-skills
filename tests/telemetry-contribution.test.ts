@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   collectResourceTypes,
   createAzureCliDeploymentQuery,
@@ -18,6 +21,7 @@ import {
   type ApplicationInsightsClient,
   type ContributionEvent,
 } from '../src/telemetry/sender.js';
+import { readWorkspaceTelemetryState } from '../src/telemetry/workspace-optout.js';
 
 function makeQuery(
   deployments: readonly ArmDeploymentSummary[],
@@ -113,18 +117,41 @@ describe('collectResourceTypes', () => {
     expect(result).toEqual({ status: 'skip', reason: 'incomplete-child' });
   });
 
-  it('rejects malformed and non-Microsoft types', async () => {
+  it('excludes syntactically valid non-Microsoft provider types', async () => {
     const query = makeQuery([], {
       [ROOT]: [
         createOp({ targetResourceType: 'Custom.Provider/things', targetResourceId: '/r/1' }),
-        createOp({ targetResourceType: '/subscriptions/s/resourceGroups/rg', targetResourceId: '/r/2' }),
-        createOp({ targetResourceType: 'not-a-type', targetResourceId: '/r/3' }),
       ],
     });
 
     const result = await collectResourceTypes(ROOT, query);
 
     expect(result).toEqual({ status: 'skip', reason: 'no-types' });
+  });
+
+  it('fails closed on a Succeeded Create with a malformed resource type', async () => {
+    const query = makeQuery([], {
+      [ROOT]: [
+        createOp({ targetResourceType: '/subscriptions/s/resourceGroups/rg', targetResourceId: '/r/1' }),
+      ],
+    });
+
+    const result = await collectResourceTypes(ROOT, query);
+
+    expect(result).toEqual({ status: 'skip', reason: 'malformed-operation' });
+  });
+
+  it('fails closed on a Succeeded Create with a missing resource type', async () => {
+    const query = makeQuery([], {
+      [ROOT]: [
+        createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' }),
+        createOp({ targetResourceId: '/r/2' }),
+      ],
+    });
+
+    const result = await collectResourceTypes(ROOT, query);
+
+    expect(result).toEqual({ status: 'skip', reason: 'malformed-operation' });
   });
 
   it('skips with no-types when nothing qualifies', async () => {
@@ -204,6 +231,31 @@ describe('collectResourceTypes', () => {
       resourceTypes: ['microsoft.storage/storageaccounts', 'microsoft.web/sites'],
     });
   });
+
+  it('skips when a single in-flight request exceeds the remaining budget', async () => {
+    const query: ArmDeploymentQuery = {
+      listSubscriptionDeployments: async () => [],
+      listDeploymentOperations: () => new Promise(resolve => {
+        setTimeout(() => resolve([
+          createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' }),
+        ]), 200);
+      }),
+    };
+    const result = await collectResourceTypes(ROOT, query, { deadlineMs: 20 });
+    expect(result).toEqual({ status: 'skip', reason: 'deadline-exceeded' });
+  });
+
+  it('skips when pagination exhausts the shared request budget', async () => {
+    const runner = vi.fn(async () => JSON.stringify({
+      value: [{ properties: { provisioningOperation: 'Create', provisioningState: 'Succeeded', targetResource: { resourceType: 'Microsoft.Web/sites', id: '/r/1' } } }],
+      nextLink: 'https://management.azure.com/subscriptions/s/operations?$skiptoken=more',
+    }));
+    const query = createAzureCliDeploymentQuery(runner);
+
+    const result = await collectResourceTypes(ROOT, query, { maxRequests: 3 });
+
+    expect(result).toEqual({ status: 'skip', reason: 'request-limit-exceeded' });
+  });
 });
 
 describe('createAzureCliDeploymentQuery', () => {
@@ -233,6 +285,17 @@ describe('createAzureCliDeploymentQuery', () => {
     const runner = vi.fn(async () => JSON.stringify({
       value: [],
       nextLink: 'https://evil.example.com/steal',
+    }));
+
+    const query = createAzureCliDeploymentQuery(runner);
+
+    await expect(query.listDeploymentOperations(ROOT)).rejects.toThrow();
+  });
+
+  it('rejects when pagination never terminates within the page limit', async () => {
+    const runner = vi.fn(async () => JSON.stringify({
+      value: [],
+      nextLink: 'https://management.azure.com/subscriptions/s/operations?$skiptoken=next',
     }));
 
     const query = createAzureCliDeploymentQuery(runner);
@@ -463,6 +526,23 @@ describe('collectContributionWithDependencies', () => {
     expect(call.properties.agent).toBe('unknown');
   });
 
+  it('normalizes an out-of-shape skillsVersion to unknown', async () => {
+    const client = makeClient();
+    const query = makeQuery([RECENT_DEPLOYMENT], {
+      [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
+    });
+
+    await collectContributionWithDependencies({
+      skill: 'azure-functions-deploy',
+      operation: 'deploy',
+      agent: 'copilot-cli',
+      skillsVersion: '/etc/passwd',
+    }, baseDeps({ query, createClient: () => client }));
+
+    const call = (client.trackEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.properties.skillsVersion).toBe('unknown');
+  });
+
   it('reports failed without throwing when delivery fails', async () => {
     const client = makeClient(({ callback }) => callback('network down'));
     const query = makeQuery([RECENT_DEPLOYMENT], {
@@ -497,5 +577,58 @@ describe('parseContributionEvent', () => {
     expect(() => parseContributionEvent({ ...EVENT, result: 'failure' })).toThrow();
     expect(() => parseContributionEvent({ ...EVENT, resourceTypes: ['/subscriptions/s'] })).toThrow();
     expect(() => parseContributionEvent({ ...EVENT, resourceTypes: [] })).toThrow();
+  });
+
+  it('rejects a skill and deploymentKind mismatch', () => {
+    expect(() => parseContributionEvent({ ...EVENT, deploymentKind: 'hosted-agent' })).toThrow();
+    expect(() => parseContributionEvent({
+      ...EVENT,
+      skill: 'azure-functions-hosted-skills',
+      operation: 'provision',
+      deploymentKind: 'function-app',
+    })).toThrow();
+  });
+
+  it('coerces an out-of-shape skillsVersion to unknown', () => {
+    expect(parseContributionEvent({ ...EVENT, skillsVersion: '/etc/passwd' }).skillsVersion).toBe('unknown');
+    expect(parseContributionEvent({ ...EVENT, skillsVersion: '1.2.3' }).skillsVersion).toBe('1.2.3');
+  });
+});
+
+describe('readWorkspaceTelemetryState', () => {
+  function tempWorkspace(): string {
+    return mkdtempSync(join(tmpdir(), 'afs-optout-'));
+  }
+
+  function writeConfig(root: string, contents: string): string {
+    const dir = join(root, '.github', 'hooks');
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, 'telemetry.config.json');
+    writeFileSync(path, contents);
+    return path;
+  }
+
+  it('returns active when no config files exist', () => {
+    const root = tempWorkspace();
+    const path = join(root, '.github', 'hooks', 'telemetry.config.json');
+    expect(readWorkspaceTelemetryState([path])).toBe('active');
+  });
+
+  it('returns disabled when a config disables telemetry', () => {
+    const root = tempWorkspace();
+    const path = writeConfig(root, JSON.stringify({ enabled: false }));
+    expect(readWorkspaceTelemetryState([path])).toBe('disabled');
+  });
+
+  it('returns active when a config enables telemetry', () => {
+    const root = tempWorkspace();
+    const path = writeConfig(root, JSON.stringify({ enabled: true }));
+    expect(readWorkspaceTelemetryState([path])).toBe('active');
+  });
+
+  it('fails closed as unreadable when a config cannot be parsed', () => {
+    const root = tempWorkspace();
+    const path = writeConfig(root, '{ this is not valid json');
+    expect(readWorkspaceTelemetryState([path])).toBe('unreadable');
   });
 });
