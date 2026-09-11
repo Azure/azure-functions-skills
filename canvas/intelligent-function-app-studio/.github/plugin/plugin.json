@@ -1,0 +1,26 @@
+{
+  "name": "intelligent-function-app-studio",
+  "description": "Functions Hosted Skills Studio builds Hosted Skills with Timer, HTTP, Queue, and Microsoft 365 Inbox triggers locally or works with an existing Azure Function App.",
+  "version": "0.3.0",
+  "author": {
+    "name": "Cloud Foundation",
+    "url": "https://github.com/coreai-microsoft/canvases-cloud-foundation"
+  },
+  "keywords": [
+    "azure-functions",
+    "daily-digest",
+    "cron",
+    "timer-trigger",
+    "serverless-agents",
+    "event-driven",
+    "copilot-canvas",
+    "cloud-foundation",
+    "azure-functions-core-tools",
+    "application-insights"
+  ],
+  "extensions": ".",
+  "skills": [
+    "./skills/intelligent-function-app-studio-canvas/",
+    "./skills/github-daily-digest-studio/"
+  ]
+}

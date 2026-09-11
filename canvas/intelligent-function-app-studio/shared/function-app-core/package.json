@@ -1,0 +1,11 @@
+{
+  "name": "@cloud-foundation/function-app-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./arm-rest": "./src/arm-rest.mjs",
+    "./runtime": "./src/function-app-runtime.mjs",
+    "./telemetry": "./src/application-insights.mjs"
+  }
+}

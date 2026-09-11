@@ -1,0 +1,21 @@
+{
+  "name": "intelligent-function-app-studio",
+  "version": "0.3.0",
+  "type": "module",
+  "main": "extension.mjs",
+  "private": true,
+  "description": "Functions Hosted Skills Studio builds Hosted Skills with Timer, HTTP, Queue, and Microsoft 365 Inbox triggers locally or works with an existing Azure Function App.",
+  "dependencies": {
+    "@cloud-foundation/function-app-core": "file:./shared/function-app-core",
+    "@github/copilot-sdk": "latest"
+  },
+  "keywords": [
+    "azure-functions",
+    "serverless-agents",
+    "event-driven",
+    "copilot-canvas",
+    "cloud-foundation",
+    "azure-functions-core-tools",
+    "application-insights"
+  ]
+}
