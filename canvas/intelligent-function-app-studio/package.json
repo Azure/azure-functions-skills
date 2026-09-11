@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@cloud-foundation/function-app-core": "file:./shared/function-app-core",
-    "@github/copilot-sdk": "latest"
+    "@github/copilot-sdk": "1.0.11"
   },
   "devDependencies": {
     "typescript": "^6.0.3",

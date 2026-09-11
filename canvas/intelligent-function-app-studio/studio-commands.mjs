@@ -593,15 +593,14 @@ export async function prepareDeploymentProjectCopy(sourceDir, deployDir) {
 	await rm(nextDestination, { recursive: true, force: true });
 	await rm(previousDestination, { recursive: true, force: true });
 	try {
-		await cp(source, nextDestination, {
-			recursive: true,
-			filter: async (candidate) => {
-				if (candidate === source) return true;
-				const relative = path.relative(source, candidate);
-				if (DEPLOYMENT_COPY_SKIP.has(relative.split(path.sep)[0])) return false;
-				return !(await lstat(candidate)).isSymbolicLink();
-			},
-		});
+		await mkdir(nextDestination, { recursive: true });
+		for (const entry of await readdir(source, { withFileTypes: true })) {
+			if (DEPLOYMENT_COPY_SKIP.has(entry.name) || entry.isSymbolicLink()) continue;
+			await cp(path.join(source, entry.name), path.join(nextDestination, entry.name), {
+				recursive: true,
+				filter: async (candidate) => !(await lstat(candidate)).isSymbolicLink(),
+			});
+		}
 		if (await exists(existingAzure)) {
 			await rm(path.join(nextDestination, ".azure"), { recursive: true, force: true });
 			await cp(existingAzure, path.join(nextDestination, ".azure"), { recursive: true });

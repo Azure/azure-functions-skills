@@ -205,17 +205,22 @@ test("deployment copy preserves azd environment and excludes local runtime state
 	const source = path.join(root, "source");
 	const destination = path.join(root, "deployment");
 	await mkdir(path.join(source, "src"), { recursive: true });
-	await mkdir(path.join(source, ".venv"), { recursive: true });
 	await mkdir(path.join(destination, ".azure"), { recursive: true });
 	await writeFile(path.join(source, "src", "function_app.py"), "source");
-	await writeFile(path.join(source, ".venv", "runtime"), "must-not-copy");
+	const excludedDirectories = [".git", ".venv", ".azurite", "node_modules", "__pycache__"];
+	for (const directory of excludedDirectories) {
+		await mkdir(path.join(source, directory), { recursive: true });
+		await writeFile(path.join(source, directory, "runtime"), "must-not-copy");
+	}
 	await writeFile(path.join(destination, ".azure", "config.json"), "persisted");
 
 	await prepareDeploymentProjectCopy(source, destination);
 
 	assert.equal(await readFile(path.join(destination, "src", "function_app.py"), "utf8"), "source");
 	assert.equal(await readFile(path.join(destination, ".azure", "config.json"), "utf8"), "persisted");
-	await assert.rejects(readFile(path.join(destination, ".venv", "runtime"), "utf8"), /ENOENT/);
+	for (const directory of excludedDirectories) {
+		await assert.rejects(readFile(path.join(destination, directory, "runtime"), "utf8"), /ENOENT/);
+	}
 	assert.equal(await readFile(path.join(source, "src", "function_app.py"), "utf8"), "source");
 });
 
