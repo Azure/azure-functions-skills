@@ -52,6 +52,7 @@
     "verify:plugin-payload": "npm run compile && node lib/build/verify-plugin-payload.js",
     "release:local": "node scripts/release-local.mjs",
     "eval:lint": "vally lint --eval-spec evals",
+    "eval:report": "npm run compile && node lib/evaluation/report.js",
     "eval:smoke": "vally eval --suite smoke",
     "eval:full": "vally eval --suite full",
     "eval": "vally eval"
