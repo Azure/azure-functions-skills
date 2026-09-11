@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "target": "ES2022",
+    "types": ["node"]
+  },
+  "include": [
+    "*.mjs",
+    "shared/function-app-core/src/**/*.mjs"
+  ],
+  "exclude": [
+    "bootstrap-extension.mjs",
+    "extension.mjs",
+    "studio-commands.mjs",
+    "vitest.config.mjs"
+  ]
+}

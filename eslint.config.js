@@ -2,11 +2,19 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 const nodeGlobals = {
+  AbortSignal: 'readonly',
   Buffer: 'readonly',
+  clearInterval: 'readonly',
   clearTimeout: 'readonly',
   console: 'readonly',
+  fetch: 'readonly',
+  Headers: 'readonly',
   process: 'readonly',
+  queueMicrotask: 'readonly',
+  Response: 'readonly',
+  setInterval: 'readonly',
   setTimeout: 'readonly',
+  TextDecoder: 'readonly',
   URL: 'readonly',
   URLSearchParams: 'readonly',
 };
@@ -39,6 +47,13 @@ export default [
         caughtErrorsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
       }],
+    },
+  },
+  {
+    files: ['canvas/intelligent-function-app-studio/**/*.mjs'],
+    rules: {
+      'no-control-regex': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
 ];
