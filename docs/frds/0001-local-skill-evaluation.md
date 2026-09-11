@@ -3,11 +3,11 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Draft |
-| Revision | 4 |
+| Revision | 5 |
 | Created | 2026-09-08 |
-| Updated | 2026-09-08 |
+| Updated | 2026-09-09 |
 | Author | GitHub Copilot, agent proposal based on maintainer discussion |
-| Depends on | [FRD governance PR #244](https://github.com/Azure/azure-functions-skills/pull/244), revision `aff24690ae7dae787ad521b4bce718121647ffa7` |
+| Governance | [FRD governance PR #244](https://github.com/Azure/azure-functions-skills/pull/244), merged as `a430a5b8ef28b58ec59fe2fb7456d253b557e2d5`; no outstanding feature dependency |
 | Component | Skill evaluation capability |
 
 ## 1. Summary
@@ -18,9 +18,12 @@ least capable model tier that demonstrates correct behavior for each scenario,
 produce a public static HTML performance summary and a separate private Markdown
 improvement report, and optionally send allowlisted measurements to a designated
 Application Insights resource for historical analysis. This one FRD owns the
-capability and its acceptance criteria. Infrastructure delivery, the
-`azure-functions-create` pilot, and the hosted-agents pilot are sequential
-milestones in the implementation plan, not separate features or FRDs.
+capability and its acceptance criteria. First prove container feasibility, then
+deliver one usable installed/uninstalled TypeScript HTTP-create pair with real
+model execution, build, localhost HTTP checks, JSONL and small static HTML.
+Analysis, telemetry, model catalogs, hosted-skills expansion and scheduled CI
+are independently gated later stages, not prerequisites for that walking skeleton.
+Scenario additions stay in this FRD's implementation plan.
 
 ## 2. Motivation / problem
 
@@ -44,31 +47,34 @@ measured agent.
 
 | ID | Requirement | Observable acceptance criterion |
 | --- | --- | --- |
-| SE-001 | Run a declared skill/scenario/model/variant/repetition matrix through Vally, locally | A plan enumerates every trial before execution; an isolated test executor demonstrates fresh workspaces, fresh sessions, explicit models, bounded execution, and no inherited unrelated skills/MCP servers |
+| SE-001 | Run declared trials through Vally in a canonical Linux container | A digest-pinned image and declared architecture/resource profile start a fresh container/session/home/workspace/cache per trial; the first authorized smoke uses one scenario, explicit model/effort and installed/uninstalled pair; unsupported isolation/auth stops execution |
 | SE-002 | Preserve versioned local results independently of reporting and Azure | Each planned trial has a terminal or interrupted record; reports and upload can run from saved results without another model call; interrupted batches are visibly incomplete |
-| SE-003 | Measure consumption, latency, and agent activity with explicit semantics | Record input/output tokens, model calls, tool calls, agent duration, and available cache, skill-activation, and subagent measurements; missing/partial values are not zero or complete totals |
-| SE-004 | Separate correctness from skill invocation and measurement coverage | Mandatory deterministic checks determine task success; invocation is a separate metric; failures, skips, timeouts, and coverage denominators are visible |
-| SE-005 | Support fair without-skill baseline and historical comparisons | For the without-skill variant, keep the user task instruction, runtime/system instructions, fixtures, tools, limits, and graders identical while removing only the declared skill bundle; show sample count, success count, median and range; incompatible histories and zero-denominator percentage deltas are labeled rather than silently compared |
+| SE-003 | Measure consumption, latency, and agent activity with explicit semantics | Record input/output tokens, turns, model/tool calls, agent duration, and available cache, activation and subagent measurements; separate install/startup from task accounting; missing/partial values are not zero or complete totals |
+| SE-004 | Separate task correctness, cause diagnosis, operational completion, invocation and coverage | Trusted checks evaluate real build/readiness/HTTP/cleanup; a started task missing required outcomes by its deadline normally fails even with unknown cause. Exclude only evidenced unevaluable infra/provider failures, external cancellation/interruption, or never-started tasks; show per-arm operational/overall/conditional denominators and exclusions, not pooled quality as A/B |
+| SE-005 | Measure the net user effect of a normal full installation | Installed arm includes the entire reviewed normal payload and applicable install-generated instructions/config; uninstalled arm lacks that installation. User task, common harness instructions, tools/MCP, fixtures, model/effort, limits and graders match; installation-derived catalog/instructions/token overhead intentionally differ and are not subtracted. Pair all attempts; show quality, tokens, latency, turns, sample count/range even without savings |
 | SE-006 | Generate a safe public static HTML summary | Local file and Pages-hosted views work without an API/backend; filter by skill/scenario/model/variant; show versions, dates, limitations, activity and quality metrics; export only an allowlisted public schema |
 | SE-007 | Generate a separate evidence-based improvement report | Markdown findings identify trial/event evidence, observed behavior, hypothesis, suggested skill change, and a re-evaluation check; no finding asserts causality or guaranteed savings |
 | SE-008 | Detect a small set of inefficiency candidates deterministically | Versioned repeated-read, repeated-failure, search-without-progress, input-growth, and matched-regression rules have positive, negative, and insufficient-evidence fixtures |
 | SE-009 | Send optional evaluation telemetry and support a history Workbook | An explicit upload reads saved results, validates destination/configuration, sends one event per trial, flushes, reports failures, and supports retry; a Workbook deduplicates trial events and separates missing data |
-| SE-010 | Keep private execution evidence out of public and telemetry outputs | Content capture is opt-in; default evidence contains no raw prompts, code, arguments, outputs, absolute paths, or credentials; adversarial fixtures prove public/telemetry allowlisting and HTML escaping |
+| SE-010 | Separate temporary task processing from persistent private evidence and public outputs | Prompts/generated apps may be processed in bounded private ephemeral execution/grading storage, cleaned on all exit paths; unnecessary raw transcript files are suppressed by default. Persistent raw evidence requires capture opt-in; default saved metadata contains no raw content/credentials; fixtures prove lifecycle cleanup, public/telemetry allowlisting and HTML escaping |
 | SE-011 | Preserve existing behavior and leave a small extension boundary | Existing eval commands, specs, hooks, package exports, and normal invocation telemetry retain their contracts; common results identify the executor but do not require a second executor implementation |
-| SE-012 | Produce a reproducible maintainer handoff | Documentation defines commands, schema, setup, authorization, failure recovery, publication, and tests; a fixture-only end-to-end flow demonstrates all artifacts without LLM/Azure access |
+| SE-012 | Produce an incremental, reproducible maintainer handoff | M0 precedes M1; reference health and real model outputs exercise measurement/grading/storage/report/cleanup even if either arm fails the task. Auth/measurement-only errors do not prove generated-artifact E2E. Offline fixtures differ from paid E2E; later stages do not block local JSONL/HTML; CI reuses image/manifest/entrypoint/gate |
 | SE-013 | Show which model capability/cost level is sufficient for each skill scenario | The manifest supports named capability tiers and reasoning settings; reports show scenario complexity, per-configuration quality/cost, and the lowest-cost observed-fit configuration only when one Copilot billing unit is available across all compared configurations |
-| SE-014 | Isolate evaluation from user- and project-level skills, plugins, instructions, and memory | Trial workspaces live outside the source repository, use an evaluation-owned home/profile and explicit discovery roots; preflight/result evidence prove the target hash/bundle and reject conflicting user/project Azure Functions Skills installations without modifying user files |
+| SE-014 | Isolate evaluation from user/project installs and separate grading from agent execution | No host home, source checkout/.git/ancestor discovery, Docker socket or user plugin mount; per-trial HOME/COPILOT_HOME and writable/cache state are disposable. Effective full inventory/content lineage matches the plan and baseline has zero target inventory; competing host installs remain unchanged. Graders execute in a separate trusted context, not merely outside the workspace |
 
 ### Non-goals
 
-No new evaluation CI, scheduling service, database server, frontend framework,
+No new evaluation CI in the initial delivery, scheduling service, database server, frontend framework,
 OTel collector service, automatic skill rewriting, default LLM judge/analyzer,
 or per-skill feature documents for ordinary scenario additions. No Codex/Claude
 Code executor in v1. No App-session scraping,
 claim of identical App/CLI behavior, per-file attribution of all token costs,
 or vendor API-price multiplication presented as a Copilot invoice.
-No live Azure deployment scenarios, infrastructure provisioning, automatic upload,
-automatic Pages publishing, or real measurements in this documentation change.
+No live Azure deployment, infrastructure provisioning, telemetry upload or Pages
+publication in M0/M1, and no real measurements in this documentation change.
+Later live integration/deployment and scheduled CI are gated extensions, not
+implicitly authorized by this design. No claim that controlled model runs are
+fully offline, outputs identical, or Docker safe for arbitrary unreviewed code.
 
 ## 4. Proposed design
 
@@ -76,14 +82,16 @@ The [technical design](../internal/skill-evaluation-design.md) defines the propo
 contracts. Add a development-only `benchmark` entry point around Vally:
 `plan`, `run`, `report`, `analyze`, and `upload`. These commands are proposed,
 not currently available, and do not extend the published setup/chat CLI.
-Use Vally specs for prompts, environments, and graders; use a small matrix
-manifest for selection, versions, variants, and repetitions.
+Use Vally specs for prompts and supported environment contracts, with trusted
+grading outside the agent execution context. Begin with a minimal one-pair
+manifest; general selection and model-catalog expansion come later.
 
 Data flows from isolated trials to versioned JSONL and optional private evidence.
 Deterministic aggregation feeds standalone public HTML; rule-based analysis feeds
 private Markdown/JSON findings. A separate uploader exports numeric measurements,
 controlled identifiers, and finding counts to Application Insights. Use the same
-trial IDs for retries and deduplicate in Workbook queries.
+trial IDs for upload retries and deduplicate in Workbook queries. Model reruns
+receive new attempt IDs linked to the original pair; never replace bad results.
 
 The adapter must start from the repository-pinned Vally/SDK versions and prove
 compatibility with the selected versions. A Vally upgrade is allowed when source
@@ -93,8 +101,8 @@ Do not assume upstream main's optional usage or billing fields exist in `0.7.0`.
 A remaining capability gap must result in an explicit unsupported/partial
 measurement or a reviewed adapter/version decision, not invented numbers or a
 replacement engine.
-Use supported Azure Monitor instrumentation for new evaluation telemetry rather
-than expanding the existing legacy invocation sender's contract.
+Resolve supported Azure Monitor instrumentation only at the later telemetry gate,
+rather than expanding the existing invocation sender or blocking the first pair.
 
 Trust boundaries include reviewed skill code, allowed tools, disposable execution
 workspaces, private local evidence, explicit telemetry export, and explicit public
@@ -102,7 +110,7 @@ publication. A worktree alone is not a security sandbox. Existing restrictions o
 unreviewed PR evaluation remain in force. The runner must not infer permission
 from design approval.
 
-Model comparison is a first-class use case, not just a provenance field. Define a
+Model comparison is a later first-class use case, not just a provenance field. Define a
 reviewed catalog of lightweight, versatile, and powerful configurations. A
 configuration includes the exact model ID and reasoning effort, because changing
 effort changes quality, latency, and consumption. Evaluate scenarios labeled by
@@ -113,23 +121,48 @@ Copilot-account billing unit and semantics for every compared configuration.
 Otherwise show the lowest observed-fit capability tier and within-provider/native
 costs, with cross-provider cost marked not comparable.
 
-Use an evaluation-owned `COPILOT_HOME` or an equivalently proven isolated runtime
-profile. Place each trial workspace outside the repository/source checkout so
-parent-walk discovery cannot load project instructions or generated plugins.
-Populate only the reviewed skills/plugins/configuration required by the plan and
-verify user- and project-level discovery roots, effective inventory, and target
-content hash before execution. Do not temporarily delete, rename, or edit a
-maintainer's user-level plugin.
-If the pinned runtime cannot isolate every discovery source, use a disposable OS
-profile/container or block the run until an approved isolation mechanism exists.
+The canonical environment is a Linux container pinned by digest, not a host-profile
+fallback. Initial proposed profile: `linux/amd64`, 2 vCPU, 8 GiB memory,
+concurrency 1. M0 must validate that profile and pin actual compatible tool/image
+versions; these are proposed resource limits, not proven sufficient capacity.
+Every trial starts a fresh container, session, HOME, COPILOT_HOME, writable
+workspace and cache state. Admit only reviewed versioned input copies and minimal
+supported Copilot credential injection; never put credentials in images/artifacts.
+No Azure or telemetry credentials enter the initial agent environment. Never
+mutate a maintainer's user installation. Verify discovery/inventory and separate
+trusted grading from the agent's writable execution context; placing graders
+outside cwd alone does not protect them from shell tools.
+
+Two lanes share results and runner contracts. The controlled benchmark uses a
+real Copilot model and real generated files/build/localhost HTTP, but limited,
+versioned template/manifest/MCP response fixtures. Fixture responses sit at the
+retrieval-tool contract so agents still choose tools and retrieve templates; an
+empty-workspace task is not given a finished answer. Unknown requests fail
+explicitly. Pin build dependency inputs/cache policy; log residual registry/network
+limitations. The later live lane uses current external MCP/templates and eventually
+explicitly authorized deployment. Fixture-only harness tests invoke no model or
+network. Controlled conditions do not remove hardware/network/model variance.
+
+The primary treatment is normal full installation, not a skill-favorable subset.
+Resolve the normal Copilot plugin installation path against the reviewed payload;
+include all its skill metadata and applicable generated instructions/config.
+Hold external tools constant for both arms, record common instruction hashes
+separately from installation-derived differences, and retain their entire token
+overhead. Do not require resultant system prompts to be byte-identical or name a
+skill in the task prompt. Attribute effects to scenario plus installation, not to
+one skill's causal contribution. Target-bundle comparisons are later diagnostics.
 
 ### Delivery checkpoints
 
-One primary implementer delivers three independently gated milestones:
+One primary implementer follows independently gated milestones:
 
-1. evaluation infrastructure and fixture-only validation;
-2. the `azure-functions-create` pilot and reviewed public/history outputs;
-3. the hosted-agents pilot after incorporating lessons from the create pilot.
+1. M0: time-boxed container/auth/adapter/retrieval feasibility;
+2. M1: one TypeScript HTTP-create pair, durable measurements and local HTML;
+3. M2: bounded repetitions and scenario/model expansion;
+4. M3: deterministic private improvement analysis;
+5. M4: optional telemetry/history and reviewed publication;
+6. M5: hosted-skills stage-isolated scenarios, then live and composed cases;
+7. M6: scheduled CI parity after local stability.
 
 Each milestone may be implemented and reviewed without authorizing the next one.
 Obtain independent review at contract and output-boundary checkpoints. Follow the
@@ -143,7 +176,8 @@ later skill rollout order.
 | --- | --- |
 | Does the pinned Vally/SDK expose reliable per-call usage, end-of-agent timing, tool status, and isolation controls? | Implementer performs source/type inspection before finalizing adapter contracts; choose a compatible adapter or reviewed upgrade and append the decision |
 | How does a locally initiated paid run satisfy the existing reviewer-gated evaluation policy? | Repository maintainer must resolve before Finalized status; this FRD does not create a local bypass |
-| Which supported Azure Monitor SDK/exporter and authentication mode will the uploader use? | Implementer proposes the smallest supported Node-compatible option after source/docs inspection; architecture reviewer and human approve before Finalized |
+| Can container auth, full normal installation, discovery isolation and separate grading be implemented through supported Vally/SDK paths? | First time-boxed M0 gate; static evidence before relevant contract approval, separately authorized probes if needed; stop unsupported rather than use an unisolated host |
+| Which supported Azure Monitor SDK/exporter and authentication mode will the uploader use? | Deferred M4 contract; review and human approval before implementing upload, not a dependency of M1 |
 | Which exact model IDs are available for each approved capability-tier label, and what billing metadata is exposed? | Pilot owner resolves the catalog through the approved account at planning time; missing candidates remain visibly not evaluated |
 | Which budget, destination, retention, and Pages target apply to each run? | Evaluation owner; resolve in the milestone execution record, not implementation defaults |
 
@@ -161,6 +195,12 @@ later skill rollout order.
 | D-008 | Temporarily remove user plugins vs isolate evaluation state | Use an evaluation-owned home/profile, an external trial root, explicit user/project discovery roots, inventory/hash checks, and a disposable-profile fallback; never mutate user-level installations | GitHub Copilot (agent proposal, reflecting maintainer feedback) | 2026-09-08 |
 | D-009 | One broad run vs staged skill milestones | Run `azure-functions-create` first, then hosted agents under separate execution approvals; add doctor, diagnostics, setup, and help later through plan revisions based on evidence and usage priority | GitHub Copilot (agent proposal, reflecting maintainer feedback) | 2026-09-08 |
 | D-010 | Keep Vally `0.7.0` fixed vs permit an upgrade | Permit a reviewed upgrade when it introduces no material breaking change for existing suites and targeted regressions pass; the lockfile remains the reproducible source of the selected version | GitHub Copilot (agent proposal, reflecting maintainer feedback) | 2026-09-08 |
+| D-011 | Host isolation with container fallback vs canonical container | Supersedes D-008 mechanism: per-trial digest-pinned Linux containers and separate trusted grading; preserve no-user-mutation rule and prove compatibility first | Maintainer design direction, recorded by GitHub Copilot; revision approval pending | 2026-09-09 |
+| D-012 | Target bundle vs normal full installation | Primary A/B measures net installation effect, including catalog/instruction overhead; target bundles remain optional diagnostic comparisons | Maintainer design direction, recorded by GitHub Copilot; revision approval pending | 2026-09-09 |
+| D-013 | Broad framework first vs walking skeleton | Supersedes D-009 delivery granularity: M0 then one real HTTP pair/JSONL/HTML before catalogs, analysis, telemetry and hosted expansion; retain D-007 tiers for M2 | Maintainer design direction, recorded by GitHub Copilot; revision approval pending | 2026-09-09 |
+| D-014 | Fully live benchmark vs controlled then live lanes | Real model/build with minimal versioned retrieval fixtures first; current external integration and deploy later, same schema; fixture-only tests remain distinct | Maintainer design direction, recorded by GitHub Copilot; revision approval pending | 2026-09-09 |
+| D-015 | Combined agent workflow vs stage-isolated hosted scenarios | New app from empty workspace, modification from fixed app, later live deployment from fixed deployable app, then composed cases; no mailbox/Teams side effects initially | Maintainer design direction, recorded by GitHub Copilot; revision approval pending | 2026-09-09 |
+| D-016 | Separate CI engine vs local/CI parity | Later CI uses identical image digest/manifest/entrypoint; only trigger, secret injection and artifact storage change, reviewer gate retained | Maintainer design direction, recorded by GitHub Copilot; revision approval pending | 2026-09-09 |
 
 ## 6. Test plan
 
@@ -172,13 +212,14 @@ and repository validation commands. No new test framework.
 | SE-001, SE-011 | `benchmark-runner.test.ts`: fake executor and isolation configuration | Exact matrix, independent session/workspace per trial, no personal tools, explicit model failure instead of fallback |
 | SE-002 | `benchmark-storage.test.ts`: termination, duplicate IDs, truncated line, unsupported schema | Durable partial results; explicit recovery/error; no silent loss or overwritten trials |
 | SE-003 | `benchmark-normalize.test.ts`: real-schema sanitized fixtures, nested usage, absent fields | No double-counting, correct units and timing boundaries, missing/partial coverage surfaced |
-| SE-004, SE-005 | `benchmark-aggregate.test.ts`: mixed status, mandatory failures, incompatible controls, and matched with-skill/without-skill instruction hashes | Correct denominators and medians; only the declared skill bundle differs; no false skill uplift or invented percentages |
-| SE-006, SE-010 | `benchmark-report.test.ts`: hostile labels, paths, transcript fields | Standalone escaped HTML, exact public allowlist, no private content; browser walkthrough recorded |
+| SE-004, SE-005 | `benchmark-aggregate.test.ts`: unknown-cause deadline misses versus evidenced provider outage, partial usage, cancellation and common-vs-installation hashes | Deadline misses remain failures in each arm's quality denominator; justified exclusions explicit; pooled quality not presented as A/B; full-install overhead and all attempts retained |
+| SE-006, SE-010 | `benchmark-report.test.ts` and lifecycle fixtures: hostile labels/paths/transcripts, ephemeral task files and capture opt-in | Temporary prompt/app processing allowed; unnecessary transcript files suppressed, private task files cleaned on all exits, raw evidence persistence opt-in; escaped public allowlist excludes all raw content |
 | SE-007, SE-008 | `benchmark-analyze.test.ts`: each detector and benign lookalikes | Stable evidence IDs and suggestions; rereads after writes and unknown progress do not become proven waste |
 | SE-009, SE-010 | `benchmark-upload.test.ts`: fake transport, flush timeout, ambiguous delivery, dedup fixture | Explicit opt-in, no credentials in artifacts, retry-safe IDs, truthful failure, correct unique-trial query results |
-| SE-011, SE-012 | `benchmark-cli.test.ts`: fixture-only subprocess flow and existing regression tests | Saved fixture to both reports and mocked telemetry; existing commands unchanged |
+| SE-011, SE-012 | `benchmark-cli.test.ts`: fixture-only subprocess flow and existing regression tests | M1 saved fixture to local HTML; M3 adds private report and M4 mocked telemetry independently; existing commands unchanged |
 | SE-013 | `benchmark-model-catalog.test.ts`: tier, effort, unavailable model, cost coverage and fit-label fixtures | Exact configuration identity; no fallback; lowest-cost observed-fit output only when quality and cost coverage permit it |
-| SE-014 | `benchmark-isolation.test.ts`: worktree plus external trial root, conflicting user/project/evaluation installs, duplicate names, personal/project instructions and target hash mismatch | Only approved roots load; conflicting user and checkout copies cannot affect output; mismatch fails before paid execution; user files remain byte-for-byte unchanged |
+| SE-001, SE-014 | `benchmark-isolation.test.ts`: container configuration, conflicting host/project installs, cross-trial sentinels, inventory/hash mismatch, credential leaks and grader tampering | Fresh state per trial; full installed inventory vs zero target inventory; no forbidden mounts/discovery; user files unchanged; agent cannot modify trusted grader/results |
+| SE-001, SE-004, SE-012 | Capability/response fixtures plus separately authorized M1 container E2E | Healthy reference plus actual model outputs through trusted build/readiness/HTTP checks as prerequisites allow; correctly reported task failures are valid, auth/measurement-only errors are not E2E proof; interruption/cleanup and offline replay; one pair proves wiring only |
 
 Actual LLM runs and Azure ingestion/Workbook observations belong to the staged
 execution milestones in the implementation plan. Fixtures do not establish those
@@ -189,7 +230,8 @@ results.
 Create/update `docs/internal/skill-evaluation-design.md`,
 `docs/internal/skill-evaluation-implementation-plan.md`, this FRD, its index, and
 `evals/README.md`. Implementation adds `evals/benchmark/README.md` for runnable
-instructions and `docs/internal/skill-evaluation-workbook.json` for the Workbook.
+instructions in M1 and `docs/internal/skill-evaluation-workbook.json` for the
+Workbook in M4.
 Document proposed npm commands in `docs/development.md` when implemented.
 No canonical skill behavior changes, generated plugin edits, or changes to
 `templates/agents/AGENTS.md` are required. Public reports are generated artifacts,
@@ -199,7 +241,7 @@ reviewed for disclosure before publication, not automatically committed raw logs
 
 | Item | Evidence |
 | --- | --- |
-| Independent architecture review | Underlying revision 2 content reviewed on 2026-09-08 by Claude Opus 4.8 with no blockers; revision 3 consolidates the reviewed pilot content into this FRD and the implementation plan |
+| Independent architecture review | GPT-6 Astra in the parent planning session confirmed all three revision 5 corrections on 2026-09-09. See [review record and snapshot hashes](../internal/skill-evaluation-design.md#9-independent-architecture-review-record); earlier revision 2 review remains historical |
 | Human approval | Pending |
 | Approved revision and scope | Pending; record commit SHA or content hash |
 | Approval reference and date | Pending |

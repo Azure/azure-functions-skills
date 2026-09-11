@@ -8,12 +8,21 @@ single skill and contains an `eval.yaml` defining stimuli, graders, and configur
 
 ## Proposed local benchmark workflow
 
-The [draft evaluation FRDs](../docs/frds/README.md), [technical design](../docs/internal/skill-evaluation-design.md),
+The [single governing draft FRD](../docs/frds/0001-local-skill-evaluation.md), [technical design](../docs/internal/skill-evaluation-design.md),
 and [implementation plan](../docs/internal/skill-evaluation-implementation-plan.md)
-describe a proposed local benchmark workflow with public HTML summaries, separate
-private improvement reports, and optional Application Insights history.
+describe a proposed canonical-container benchmark. First prove compatibility,
+then run one TypeScript HTTP-create installed/uninstalled pair with a real Copilot
+model, versioned retrieval fixtures, real build/localhost HTTP, JSONL and local
+static HTML. A/B includes the full normal installation and its metadata/token
+overhead, not a selected skill subset. Controlled model execution is not fully
+offline; fixture-only harness tests make no model/network calls.
+Broader scenarios/models, private improvement reports, Application Insights
+history, live deployment and scheduled CI follow separate later gates.
 The proposed `benchmark` commands are not implemented. Existing commands below
 are unchanged; the draft documents do not authorize paid evaluations.
+The existing suites/workflows below are not proof of the proposed container,
+full-install isolation or benchmark capabilities. Their historical "Offline"
+workflow name does not mean that its Copilot model calls require no network.
 
 ## Prerequisites
 
