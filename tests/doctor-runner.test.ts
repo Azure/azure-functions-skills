@@ -79,19 +79,20 @@ describe('runDoctor', () => {
   it('errors when --deep is requested without --agent and no state', async () => {
     const dir = makeTmp('runner-deep-no-agent-');
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
-    const { report } = await runDoctor(defaultOpts(dir, { deep: true, acceptDeepRisk: true }));
+    const { report, exitCode } = await runDoctor(defaultOpts(dir, { deep: true, acceptDeepRisk: true }));
 
     // Tier 1 should still run; Tier 2 should be skipped with explanation
     expect(report.tiers.builtin.ran).toBe(true);
     expect(report.tiers.ai.ran).toBe(false);
     expect(report.tiers.ai.agent).toBeUndefined();
     expect(report.tiers.ai.error).toMatch(/agent/i);
+    expect(exitCode).toBe(1);
   });
 
   it('refuses to run --deep without acceptDeepRisk acknowledgement', async () => {
     const dir = makeTmp('runner-deep-no-accept-');
     writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
-    const { report } = await runDoctor(defaultOpts(dir, {
+    const { report, exitCode } = await runDoctor(defaultOpts(dir, {
       deep: true,
       agent: 'github-copilot',
       acceptDeepRisk: false,
@@ -100,6 +101,7 @@ describe('runDoctor', () => {
     expect(report.tiers.builtin.ran).toBe(true);
     expect(report.tiers.ai.ran).toBe(false);
     expect(report.tiers.ai.error).toMatch(/--accept-deep-risk|untrusted|elevated/i);
+    expect(exitCode).toBe(1);
   });
 
   it('refuses --deep when GITHUB_EVENT_NAME=pull_request (contributor PR context)', async () => {
@@ -238,6 +240,25 @@ describe('formatReport', () => {
     const md = formatReport(report, 'markdown');
     expect(md).toContain('# Azure Functions Doctor Report');
     expect(md).toContain('| Status | Check | Message |');
+  });
+
+  it('markdown format includes AI model provenance and errors', async () => {
+    const dir = makeTmp('fmt-md-ai-');
+    writeFileSync(join(dir, 'host.json'), JSON.stringify({ version: '2.0' }));
+    const { report } = await runDoctor(defaultOpts(dir));
+    report.tiers.ai = {
+      ran: true,
+      checks: [],
+      agent: 'github-copilot',
+      requestedModel: 'gpt-5.6-sol',
+      error: 'Agent rejected the requested model.',
+    };
+
+    const markdown = formatReport(report, 'markdown');
+
+    expect(markdown).toContain('github-copilot');
+    expect(markdown).toContain('gpt-5.6-sol');
+    expect(markdown).toContain('Agent rejected the requested model.');
   });
 
   it('html format has valid structure and embedded styles', async () => {

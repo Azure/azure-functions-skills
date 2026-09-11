@@ -38,10 +38,13 @@ The result contains `agents`, `filesWritten`, `plannedFiles`, `dryRun`, and npm 
 
 ```bash
 npx @azure/functions-skills doctor --dir ./my-app
-npx @azure/functions-skills doctor --dir ./my-app --deep --accept-deep-risk --agent github-copilot
+npx @azure/functions-skills doctor --dir ./my-app --deep --accept-deep-risk --agent github-copilot --model gpt-5.6-sol
 ```
 
-`doctor` writes to `.azure-functions-doctor/doctor-report.json` by default. Deep analysis installs workspace-local skill assets only when the selected agent cannot already see `azure-functions-doctor`.
+`doctor` writes to `.azure-functions-doctor/doctor-report.json` by default. Deep
+analysis installs workspace-local skill assets only when the selected agent
+cannot already see `azure-functions-doctor`. Use `--model <model-id>` for
+reproducible deep runs; omitted models are recorded as `auto`.
 
 ## Templates
 
