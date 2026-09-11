@@ -10,6 +10,8 @@ const nodeGlobals = {
   fetch: 'readonly',
   Headers: 'readonly',
   process: 'readonly',
+  queueMicrotask: 'readonly',
+  Response: 'readonly',
   setInterval: 'readonly',
   setTimeout: 'readonly',
   TextDecoder: 'readonly',

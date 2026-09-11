@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "../../../test/vitest-test.mjs";
 import assert from "node:assert/strict";
 import {
 	APPLICATION_INSIGHTS_RESOURCE,
@@ -150,5 +150,88 @@ test("structured query failures propagate with request IDs and no token material
 			assert.ok(!error.message.includes("secret-value"));
 			return true;
 		},
+	);
+});
+
+test("Application Insights discovery rejects invalid, missing, unmatched, and incomplete configuration", async () => {
+	await assert.rejects(
+		resolveApplicationInsights({ request: async () => ({ body: {} }), list: async () => [] }, {
+			subscription: "sub-1",
+			app: { id: "invalid", name: "invalid" },
+		}),
+		/no valid ARM resource ID/,
+	);
+	await assert.rejects(
+		resolveApplicationInsights({ request: async () => ({ body: { properties: {} } }), list: async () => [] }, {
+			subscription: "sub-1",
+			app,
+		}),
+		/no Application Insights connection string/,
+	);
+	const settingsArm = {
+		request: async () => ({ body: { APPINSIGHTS_INSTRUMENTATIONKEY: "instrumentation-key" } }),
+		list: async () => [],
+	};
+	await assert.rejects(
+		resolveApplicationInsights(settingsArm, { subscription: "sub-1", app }),
+		/did not match an accessible Application Insights resource/,
+	);
+	settingsArm.list = async () => [{ id: "/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Insights/components/app", properties: { InstrumentationKey: "instrumentation-key" } }];
+	await assert.rejects(
+		resolveApplicationInsights(settingsArm, { subscription: "sub-1", app }),
+		/has no query application ID/,
+	);
+});
+
+test("telemetry queries refresh a rejected token and tolerate empty tables", async () => {
+	const tokenCalls = [];
+	const telemetry = await queryApplicationInsights(
+		{
+			async accessToken(subscription, resource, force) {
+				tokenCalls.push({ subscription, resource, force });
+				return force ? "fresh-token" : { accessToken: "stale-token" };
+			},
+		},
+		{
+			subscription: "sub-1",
+			component: { applicationId: "app-query-id" },
+			fetchImpl: async (_url, init) =>
+				init.headers.Authorization === "Bearer stale-token"
+					? response(401, { error: { code: "Expired" } })
+					: response(200, {}),
+		},
+	);
+	assert.deepEqual(telemetry.summary, { total: 0, failed: 0, avgMs: 0 });
+	assert.deepEqual(telemetry.traces, []);
+	assert.equal(tokenCalls.filter((call) => call.force).length, 2);
+});
+
+test("telemetry query validation rejects missing sessions, components, tokens, and non-JSON responses", async () => {
+	await assert.rejects(queryApplicationInsights(null, { component: { applicationId: "app" } }), /requires an Azure CLI token session/);
+	await assert.rejects(
+		queryApplicationInsights({ accessToken: async () => "token" }, {}),
+		/Resolve an Application Insights component/,
+	);
+	await assert.rejects(
+		queryApplicationInsights(
+			{ accessToken: async () => null },
+			{ component: { applicationId: "app" }, fetchImpl: async () => response(200, {}) },
+		),
+		/no Application Insights access token/,
+	);
+	await assert.rejects(
+		queryApplicationInsights(
+			{ accessToken: async () => "token" },
+			{
+				component: { applicationId: "app" },
+				fetchImpl: async () => ({
+					ok: true,
+					status: 200,
+					headers: new Headers(),
+					text: async () => "<html>",
+				}),
+			},
+		),
+		/non-JSON HTTP 200/,
 	);
 });

@@ -44,6 +44,15 @@ See [`DEMO.md`](DEMO.md) for the full walkthrough.
 6. Select one of the discovered deployed functions. Unsupported trigger types remain visible with explicit guidance.
 7. Click **Load test** to run `oha` bursts for a selected HTTP function and, if desired, enable live Application Insights telemetry.
 
+## Unit tests and coverage
+
+```bash
+npm test
+npm run test:coverage
+```
+
+The coverage gate includes the canvas domain modules and shared Function App core. It enforces at least 95% line and function coverage plus 75% branch coverage. The Copilot host entrypoint, extension bootstrap, and child-process command adapter are excluded from unit coverage because they require host, packaging, and subprocess integration tests.
+
 ## Requirements for a full local run
 
 - [Azure Functions Core Tools v4](https://learn.microsoft.com/azure/azure-functions/functions-run-local) (`func`)
