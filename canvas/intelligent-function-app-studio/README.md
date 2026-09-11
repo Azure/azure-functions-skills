@@ -47,6 +47,7 @@ See [`DEMO.md`](DEMO.md) for the full walkthrough.
 ## Unit tests and coverage
 
 ```bash
+npm run typecheck
 npm test
 npm run test:coverage
 ```

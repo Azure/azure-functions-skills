@@ -7,13 +7,15 @@
   "description": "Functions Hosted Skills Studio builds Hosted Skills with Timer, HTTP, Queue, and Microsoft 365 Inbox triggers locally or works with an existing Azure Function App.",
   "scripts": {
     "test": "vitest run",
-    "test:coverage": "node --experimental-test-coverage --test-coverage-include=*.mjs --test-coverage-include=shared/function-app-core/src/*.mjs --test-coverage-exclude=bootstrap-extension.mjs --test-coverage-exclude=extension.mjs --test-coverage-exclude=studio-commands.mjs --test-coverage-exclude=vitest.config.mjs --test-coverage-branches=75 --test-coverage-functions=95 --test-coverage-lines=95 --test test/*.test.mjs shared/function-app-core/test/*.test.mjs"
+    "test:coverage": "node --experimental-test-coverage --test-coverage-include=*.mjs --test-coverage-include=shared/function-app-core/src/*.mjs --test-coverage-exclude=bootstrap-extension.mjs --test-coverage-exclude=extension.mjs --test-coverage-exclude=studio-commands.mjs --test-coverage-exclude=vitest.config.mjs --test-coverage-branches=75 --test-coverage-functions=95 --test-coverage-lines=95 --test test/*.test.mjs shared/function-app-core/test/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@cloud-foundation/function-app-core": "file:./shared/function-app-core",
     "@github/copilot-sdk": "latest"
   },
   "devDependencies": {
+    "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   },
   "keywords": [

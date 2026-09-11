@@ -301,23 +301,27 @@ async function readAppSettings(arm, { subscription, app }) {
 			method: "POST",
 		});
 	} catch (error) {
-		if (![401, 403].includes(Number(error?.status))) throw error;
-		const wrapped = new Error(
-			`Queue target resolution could not read Function App settings (HTTP ${error.status}). Grant an Azure role that can list the app's configuration, then retry.`,
+		const status = Number(Reflect.get(Object(error), "status"));
+		if (![401, 403].includes(status)) throw error;
+		throw Object.assign(
+			new Error(
+				`Queue target resolution could not read Function App settings (HTTP ${status}). Grant an Azure role that can list the app's configuration, then retry.`,
+			),
+			{ status },
 		);
-		wrapped.status = error.status;
-		throw wrapped;
 	}
 	return dictionary(response.body);
 }
 
 function keyAccessError(testKind, keyKind, action, error) {
-	if (![401, 403].includes(Number(error?.status))) return error;
-	const wrapped = new Error(
-		`${testKind} test could not read ${keyKind} (HTTP ${error.status}). Grant an Azure role that includes ${action}, then retry.`,
+	const status = Number(Reflect.get(Object(error), "status"));
+	if (![401, 403].includes(status)) return error;
+	return Object.assign(
+		new Error(
+			`${testKind} test could not read ${keyKind} (HTTP ${status}). Grant an Azure role that includes ${action}, then retry.`,
+		),
+		{ status },
 	);
-	wrapped.status = error.status;
-	return wrapped;
 }
 
 function setting(settings, name) {

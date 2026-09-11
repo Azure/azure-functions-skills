@@ -215,6 +215,7 @@ function replaceManagedPolicy(policies, type, replacement) {
 	return next;
 }
 
+/** @param {unknown} existingPolicies @param {{ tokenLimit?: number | string | null, contentSafety?: string | null }} [change] */
 export function mergeManagedPolicies(existingPolicies, { tokenLimit, contentSafety } = {}) {
 	let policies = Array.isArray(existingPolicies) ? [...existingPolicies] : [];
 	if (tokenLimit != null) policies = replaceManagedPolicy(policies, "tokenLimit", tokenLimitPolicy(tokenLimit));

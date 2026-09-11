@@ -1,5 +1,12 @@
 export const ARM_RESOURCE = "https://management.azure.com/"
 
+/**
+ * @typedef {{ accessToken(subscription: string, resource: string, force: boolean): Promise<string | { accessToken?: string }> }} ArmTokenSession
+ * @typedef {{ session?: ArmTokenSession, fetchImpl?: typeof fetch }} ArmClientOptions
+ * @typedef {{ subscription?: string, path?: string, apiVersion?: string, method?: string, body?: unknown, headers?: HeadersInit, ifMatch?: string, ifNoneMatch?: string }} ArmRequestOptions
+ * @typedef {{ subscription?: string, path?: string, apiVersion?: string, headers?: HeadersInit }} ArmListOptions
+ */
+
 const ARM_ORIGIN = new URL(ARM_RESOURCE).origin.toLowerCase()
 const REDACTED = "[redacted]"
 const SENSITIVE_KEY_RE =
@@ -186,12 +193,14 @@ function buildArmError({ method, path, response, body }) {
 	return error
 }
 
+/** @param {ArmClientOptions} [options] */
 export function createArmClient({ session, fetchImpl = fetch } = {}) {
 	if (!session || typeof session.accessToken !== "function") {
 		throw new TypeError("createArmClient requires a session with accessToken(subscription, resource, force).")
 	}
 	if (typeof fetchImpl !== "function") throw new TypeError("createArmClient requires a fetch implementation.")
 
+	/** @param {ArmRequestOptions} [options] */
 	async function request({
 		subscription = "",
 		path,
@@ -231,6 +240,7 @@ export function createArmClient({ session, fetchImpl = fetch } = {}) {
 		}
 	}
 
+	/** @param {ArmListOptions} [options] */
 	async function list({ subscription = "", path, apiVersion, headers } = {}) {
 		const items = []
 		let nextPath = path

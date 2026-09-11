@@ -10,6 +10,11 @@ export const TRACE_QUERY =
 	'(exceptions | project timestamp, eventKind="exception", severityLevel=tolong(3), message=outerMessage, operationId=operation_Id) ' +
 	"| where timestamp > ago(30m) | top 40 by timestamp desc";
 
+/**
+ * @typedef {{ accessToken(subscription: string, resource: string, force: boolean): Promise<string | { accessToken?: string }> }} TelemetryTokenSession
+ * @typedef {{ subscription?: string, component?: { applicationId?: string }, fetchImpl?: typeof fetch }} TelemetryQueryOptions
+ */
+
 function clean(value) {
 	return typeof value === "string" ? value.trim() : "";
 }
@@ -130,6 +135,7 @@ function firstTable(body) {
 	return Array.isArray(body?.tables) ? body.tables[0] : null;
 }
 
+/** @param {TelemetryTokenSession} session @param {TelemetryQueryOptions} [options] */
 export async function queryApplicationInsights(
 	session,
 	{ subscription, component, fetchImpl = fetch } = {},

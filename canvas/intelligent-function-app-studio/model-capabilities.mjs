@@ -75,9 +75,10 @@ export function requireGatewayCapability(capability) {
 	const error = new Error(
 		capability?.error || `AI Gateway management discovery is unavailable. ${AI_GATEWAY_PUBLIC_PREVIEW_FIX}`,
 	);
-	error.code = capability?.code || "GatewayCapabilityUnavailable";
-	error.status = capability?.statusCode || 0;
-	throw error;
+	throw Object.assign(error, {
+		code: capability?.code || "GatewayCapabilityUnavailable",
+		status: capability?.statusCode || 0,
+	});
 }
 
 export function configuredModelBindingIsUsable(binding) {
