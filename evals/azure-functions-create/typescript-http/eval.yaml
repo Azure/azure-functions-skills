@@ -1,0 +1,122 @@
+name: azure-functions-create-typescript-http
+description: Create and locally exercise a TypeScript HTTP app without Azure resources.
+tags:
+  skill: azure-functions-create
+  scenario: typescript-http
+  tier: local
+defaults:
+  executor: copilot-sdk
+  model: claude-sonnet-5
+  runs: 1
+  timeout: 10m
+agent_environment:
+  skills:
+    - ../../../templates/skills/azure-functions-create
+  env:
+    COPILOT_HOME_SETTINGS_JSON: '{"disabledSkills":["customize-cloud-agent","github-pr-media"]}'
+scoring:
+  threshold: 1
+stimuli:
+  - name: typescript-http
+    prompt: |
+      Create a new TypeScript Azure Functions v4 HTTP app directly in the current
+      directory, not a subdirectory. Use the Node.js v4 programming model.
+      Add an anonymous GET endpoint /api/hello that returns HTTP 200 with plain
+      text "Hello, <name>!" when the query parameter name is supplied, and
+      "Hello, world!" otherwise.
+      Actually write the app, install dependencies, and run npm run build.
+      Start the real local Functions host, request the endpoint with and without
+      name, verify both responses, and stop every process you started by its
+      owned PID before finishing. Node.js and Functions Core Tools v4 are installed.
+      This is a local-only task: never log into Azure, create resources, deploy,
+      start/install emulators, or access credentials. Use an empty
+      AzureWebJobsStorage value for this HTTP-only app. Do not install skills,
+      plugins, or MCP servers, or read configuration outside this workspace.
+    constraints:
+      max_duration: 10m
+    graders:
+      - name: completed
+        type: completed
+      - name: typescript-source
+        type: file-exists
+        config:
+          path: tsconfig.json
+      - name: build-and-http
+        type: run-command
+        config:
+          command: pwsh
+          args:
+            - -NoProfile
+            - -NonInteractive
+            - -Command
+            - |
+              $ErrorActionPreference = 'Stop'
+              npm run build
+              if ($LASTEXITCODE -ne 0) { throw 'TypeScript build failed' }
+              $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+              $listener.Start()
+              $port = $listener.LocalEndpoint.Port
+              $listener.Stop()
+              $hostProcess = $null
+              try {
+                # This child also cleans up if Vally forcibly terminates this grader.
+                $watchdog = @'
+              $ErrorActionPreference = 'Stop'
+              $owner = [System.Diagnostics.Process]::GetProcessById(__OWNER_PID__)
+              $hostProcess = $null
+              try {
+                if ($owner.HasExited) { exit 1 }
+                $hostProcess = Start-Process pwsh -ArgumentList @(
+                  '-NoProfile', '-NonInteractive', '-Command', 'func start --port __PORT__'
+                ) -PassThru -NoNewWindow
+                $deadline = [DateTime]::UtcNow.AddSeconds(200)
+                while (!$owner.HasExited -and !$hostProcess.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+                  Start-Sleep -Milliseconds 200
+                }
+              } finally {
+                if ($null -ne $hostProcess) {
+                  if (!$hostProcess.HasExited) { $hostProcess.Kill($true) }
+                  $hostProcess.WaitForExit()
+                  $hostProcess.Dispose()
+                }
+                $owner.Dispose()
+              }
+              '@
+                $watchdog = $watchdog.Replace('__OWNER_PID__', [string]$PID).Replace('__PORT__', [string]$port)
+                $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($watchdog))
+                $hostProcess = Start-Process pwsh -ArgumentList @(
+                  '-NoProfile', '-NonInteractive', '-EncodedCommand', $encoded
+                ) -PassThru -RedirectStandardOutput host.stdout.log -RedirectStandardError host.stderr.log
+                $deadline = [DateTime]::UtcNow.AddSeconds(90)
+                $ready = $false
+                while ([DateTime]::UtcNow -lt $deadline) {
+                  if ($hostProcess.HasExited) { throw 'Functions host exited before readiness' }
+                  $client = [System.Net.Sockets.TcpClient]::new()
+                  try {
+                    $client.Connect('127.0.0.1', $port)
+                    $ready = $true
+                  } catch [System.Net.Sockets.SocketException] {
+                    Start-Sleep -Milliseconds 500
+                  } finally { $client.Dispose() }
+                  if ($ready) { break }
+                }
+                if (!$ready) { throw 'Functions host did not become ready' }
+                $plain = Invoke-WebRequest "http://127.0.0.1:$port/api/hello" -TimeoutSec 20
+                if ($plain.StatusCode -ne 200 -or $plain.Content.Trim() -cne 'Hello, world!') {
+                  throw 'Missing-name HTTP response differs from the contract'
+                }
+                $named = Invoke-WebRequest "http://127.0.0.1:$port/api/hello?name=Vally" -TimeoutSec 20
+                if ($named.StatusCode -ne 200 -or $named.Content.Trim() -cne 'Hello, Vally!') {
+                  throw 'Named HTTP response differs from the contract'
+                }
+              } finally {
+                if ($null -ne $hostProcess) {
+                  if (!$hostProcess.HasExited) { $hostProcess.Kill($true) }
+                  $hostProcess.WaitForExit()
+                  $hostProcess.Dispose()
+                }
+              }
+              Write-Output 'Build and both real HTTP responses passed; owned host stopped.'
+          expected_exit_code: 0
+          stdout_contains: 'Build and both real HTTP responses passed; owned host stopped.'
+          timeout: 3m

@@ -385,21 +385,21 @@ stimuli:
           required:
             - azure-functions-create
       # Must use the native worker runtime, never "go" or "golang"
-      - name: go_uses_native_runtime
+      - name: go-uses-native-runtime
         type: output-matches
         config:
           pattern: "(?i)FUNCTIONS_WORKER_RUNTIME[^\\n]{0,40}native"
-      - name: go_not_go_runtime_value
+      - name: go-not-go-runtime-value
         type: output-not-matches
         config:
           pattern: "(?i)FUNCTIONS_WORKER_RUNTIME[\"'\\s:=]+[\"'](go|golang)[\"']"
       # Must use the lower-case module path
-      - name: go_lowercase_module_path
+      - name: go-lowercase-module-path
         type: output-contains
         config:
           substring: "github.com/azure/azure-functions-golang-worker"
       # Must register in code via the worker SDK
-      - name: go_worker_start
+      - name: go-worker-start
         type: output-matches
         config:
           pattern: "worker\\.Start|sdk\\.FunctionApp"
@@ -407,19 +407,19 @@ stimuli:
       # positively rather than by forbidding the phrase "create
       # function.json", because a proximity pattern also matches correct
       # negative guidance such as "do not create function.json".
-      - name: go_states_no_function_json
+      - name: go-states-no-function-json
         type: output-matches
         config:
           pattern: "(?i)(?:no|not|never|don't|doesn't|do not|does not|without|avoid)[^.\\n]{0,60}function\\.json|function\\.json[^.\\n]{0,60}(?:is not|isn't|are not|aren't|not used|not needed|does not|doesn't|no longer|has no|conflicts)"
       # And must not actually author one. Asserted on the workspace rather
       # than on command text, so harmless verification such as
       # `find . -name function.json` does not trip it.
-      - name: go_does_not_author_function_json
+      - name: go-does-not-author-function-json
         type: file-not-exists
         config:
           path: function.json
       # Must NOT invent an Azure MCP template ID for Go
-      - name: go_no_fabricated_template
+      - name: go-no-fabricated-template
         type: output-not-matches
         config:
           pattern: "(?i)http-trigger-go(lang)?(-azd)?"
@@ -460,22 +460,22 @@ stimuli:
             - azure-functions-create
       # The agent must actually scaffold, using the supported Core Tools
       # command or an explicit module init.
-      - name: go_scaffold_command_ran
+      - name: go-scaffold-command-ran
         type: tool-calls
         config:
           required:
             - name: "^(bash|powershell|run)$"
               command: "\\bfunc\\s+init\\b[^\\n|;&]*--worker-runtime\\s+go\\b|\\bgo\\s+mod\\s+init\\b"
       # The scaffold must produce a real module.
-      - name: go_mod_written
+      - name: go-mod-written
         type: file-exists
         config:
           path: go.mod
-      - name: go_main_written
+      - name: go-main-written
         type: file-exists
         config:
           path: main.go
-      - name: go_does_not_author_function_json
+      - name: go-build-does-not-author-function-json
         type: file-not-exists
         config:
           path: function.json
@@ -484,7 +484,7 @@ stimuli:
       # own summary of whether the build worked. This is the assertion that
       # catches a scaffold which reads correctly but does not compile, which
       # is exactly how the `go mod tidy` ordering defect shipped.
-      - name: go_scaffold_compiles
+      - name: go-scaffold-compiles
         type: run-command
         config:
           command: go
