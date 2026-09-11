@@ -5,6 +5,10 @@ comparison. It uses `@microsoft/vally-cli` **0.16.0**, `copilot-sdk`,
 `claude-sonnet-5`, and one trial. No MCP servers, other Functions skills, Azure
 credentials, deployment, or emulators are required.
 
+For the native skill OFF/ON pair and two-model matrix that reuse this scenario,
+see [Local comparisons](../../../experiments/README.md). Their discovery and
+cleanup requirements are the same; do not treat the bare commands as isolation.
+
 Use only reviewed, trusted local code. Never execute this from PR-triggered CI
 or against untrusted contributor content. GitHub Actions evaluation still
 requires the repository's reviewer-gated environment.

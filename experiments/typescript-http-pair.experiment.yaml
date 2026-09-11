@@ -1,0 +1,20 @@
+name: typescript-http-skill-pair
+evals:
+  - ../evals/azure-functions-create/typescript-http/eval.yaml
+overrides:
+  model: claude-sonnet-5
+  runs: 1
+  timeout: 10m
+execution:
+  workers: 1
+baseline: skill-off
+vary:
+  - /environment/skills
+variants:
+  skill-off:
+    environment:
+      skills: []
+  skill-on:
+    environment:
+      skills:
+        - ../templates/skills/azure-functions-create
