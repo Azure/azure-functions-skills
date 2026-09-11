@@ -6,6 +6,15 @@ single skill and contains an `eval.yaml` defining stimuli, graders, and configur
 
 > Source / docs: <https://aka.ms/vally> · npm: [`@microsoft/vally-cli`](https://www.npmjs.com/package/@microsoft/vally-cli)
 
+## Proposed local benchmark workflow
+
+The [draft evaluation FRDs](../docs/frds/README.md), [technical design](../docs/internal/skill-evaluation-design.md),
+and [implementation plan](../docs/internal/skill-evaluation-implementation-plan.md)
+describe a proposed local benchmark workflow with public HTML summaries, separate
+private improvement reports, and optional Application Insights history.
+The proposed `benchmark` commands are not implemented. Existing commands below
+are unchanged; the draft documents do not authorize paid evaluations.
+
 ## Prerequisites
 
 - **Node.js 22+** (required by Vally; the rest of the repo targets Node 18+ but Vally
