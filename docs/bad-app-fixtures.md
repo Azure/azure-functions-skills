@@ -51,12 +51,20 @@ Each fixture's report is saved to `<fixture>/doctor-result.json`. A summary tabl
 
 ```text
 ===== Summary =====
-Name                                 ExitCode Status  Critical High Medium AiChecks Duration
-----                                 -------- ------  -------- ---- ------ -------- --------
-csharp-deep-blocking-async                  1 fail           0    4      2        8     78.2
-node-deep-client-reuse                      1 fail           1    3      2        9     65.4
+Name                         ExitCode Expected Actual Expectation MissingFindings UnexpectedFindings AiChecks Duration
+----                         -------- -------- ------ ----------- --------------- ------------------ -------- --------
+01-missing-host-json                1 fail     fail   match       -               -                  -        0.8
 …
 ```
+
+`match` means the status and every minimum required Tier 1 finding match
+`expected-results.json`. `partial` means the status matches but required findings
+are missing, while `mismatch` means the status differs. Runs with `-Deep` are
+`advisory` because LLM findings are non-deterministic; deterministic differences
+remain visible in the finding columns. `unconfigured` flags a fixture missing
+from the machine-readable expectations. Additional findings are shown in
+`UnexpectedFindings` for investigation but do not change a `match` verdict
+because required findings are minimum assertions.
 
 ### 3. Generate HTML validation report
 

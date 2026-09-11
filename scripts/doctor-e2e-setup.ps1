@@ -100,8 +100,8 @@ foreach ($fixture in $fixtures) {
     Write-Host "  [+] $($fixture.Name)" -ForegroundColor Green
 }
 
-# Copy expected-results.md and README.md for reference
-foreach ($refFile in @('expected-results.md', 'README.md')) {
+# Copy expectations and fixture documentation
+foreach ($refFile in @('expected-results.json', 'expected-results.md', 'README.md')) {
     $src = Join-Path $fixturesDir $refFile
     if (Test-Path $src) {
         Copy-Item -Path $src -Destination (Join-Path $Target $refFile) -Force
@@ -122,6 +122,7 @@ param(
 )
 
 $env:AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE = '1'
+$expectationsPath = Join-Path $PSScriptRoot 'expected-results.json'
 $dirs = Get-ChildItem -Path $PSScriptRoot -Directory |
     Where-Object { $_.Name -like $Filter } |
     Sort-Object Name
@@ -155,11 +156,21 @@ foreach ($d in $dirs) {
     # Parse summary from the --output file (always JSON when $Format -eq 'json')
     $summary = $null
     $aiCount = '-'
+    $comparison = $null
     if ($Format -eq 'json' -and (Test-Path $outFile)) {
         try {
             $json = Get-Content $outFile -Raw | ConvertFrom-Json
             $summary = $json.summary
             if ($json.tiers.ai) { $aiCount = @($json.tiers.ai.checks).Count }
+
+            $compareArgs = @(
+                $COMPARE_PATH,
+                '--expectations', $expectationsPath,
+                '--fixture', $d.Name,
+                '--report', $outFile
+            )
+            if ($Deep) { $compareArgs += '--deep' }
+            $comparison = (& node @compareArgs) | ConvertFrom-Json
         } catch {
             Write-Host "  -> WARN: failed to parse $outFile : $($_.Exception.Message)" -ForegroundColor Yellow
         }
@@ -168,10 +179,15 @@ foreach ($d in $dirs) {
     $results += [PSCustomObject]@{
         Name      = $d.Name
         ExitCode  = $exitCode
-        Status    = if ($summary) { $summary.status } else { 'unknown' }
-        Critical  = if ($summary) { $summary.critical } else { '-' }
-        High      = if ($summary) { $summary.high } else { '-' }
-        Medium    = if ($summary) { $summary.medium } else { '-' }
+        Expected  = if ($comparison) { $comparison.expected } else { '-' }
+        Actual    = if ($comparison) { $comparison.actual } elseif ($summary) { $summary.status } else { 'unknown' }
+        Expectation = if ($comparison) { $comparison.expectation } else { 'unknown' }
+        MissingFindings = if ($comparison -and $comparison.missingFindings.Count -gt 0) {
+            $comparison.missingFindings -join ', '
+        } else { '-' }
+        UnexpectedFindings = if ($comparison -and $comparison.unexpectedFindings.Count -gt 0) {
+            $comparison.unexpectedFindings -join ', '
+        } else { '-' }
         AiChecks  = $aiCount
         Duration  = [Math]::Round($fixtureDuration.TotalSeconds, 1)
     }
@@ -187,8 +203,9 @@ Write-Host ""
 Write-Host "Per-fixture reports saved to <fixture>/doctor-result.json" -ForegroundColor DarkGray
 '@
 
-# Inject the CLI path after param() block
-$runAllScript = $runAllContent -replace "(?m)^(\`$env:AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE)", "`$CLI_PATH = '$cliPath'`n`$1"
+# Inject repository tool paths after param() block
+$comparePath = Join-Path $repoRoot 'scripts\doctor-e2e-compare.mjs'
+$runAllScript = $runAllContent -replace "(?m)^(\`$env:AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE)", "`$CLI_PATH = '$cliPath'`n`$COMPARE_PATH = '$comparePath'`n`$1"
 $runAllPath = Join-Path $Target 'run-all.ps1'
 Set-Content -Path $runAllPath -Value $runAllScript -Encoding utf8
 
