@@ -7,6 +7,9 @@
 
 Latest E2E status: [HTML report](https://azure.github.io/azure-functions-skills/)
 
+For contributor skill benchmarks, see the [isolated local Vally workflow](experiments/README.md#local-convenience-commands)
+and [static benchmark report](dashboard/README.md). These are separate from the installation E2E report above.
+
 ## What & why
 
 Azure Functions Skills equips your coding agent with Functions-specific knowledge — trigger/binding patterns, language anti-patterns, runtime versions, deployment best practices — so the agent gives accurate guidance instead of generic advice.

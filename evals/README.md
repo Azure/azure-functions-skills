@@ -6,17 +6,24 @@ single skill and contains an `eval.yaml` defining stimuli, graders, and configur
 
 > Source / docs: <https://aka.ms/vally> · npm: [`@microsoft/vally-cli`](https://www.npmjs.com/package/@microsoft/vally-cli)
 
-For the native, target-only local benchmark proof, use the
-[isolated TypeScript HTTP scenario](azure-functions-create/typescript-http/README.md).
-Its isolation protocol replaces the repository-root invocation below; do not use
-the older routing suites as a clean skill-off baseline.
+For the native, target-only local benchmark, use
+[`npm run eval:run`, `eval:report`, or `eval`](../experiments/README.md#local-convenience-commands).
+These commands stage the [TypeScript HTTP scenario](azure-functions-create/typescript-http/README.md)
+with isolated profiles outside the checkout. The older routing suites below are
+**not** a clean skill-off baseline.
 
-## Prerequisites
+Run evaluations only on reviewed, trusted code with approved inference spending.
+Never run them in PR-triggered CI or against untrusted contributor code. GitHub
+Actions evaluations require the existing reviewer-gated Environment.
+
+## Existing suite prerequisites
 
 - **Node.js 22.12+** (required by Vally; the rest of the repo targets Node 18+ but Vally
   itself does not get bundled into the published package — it is dev-only).
 - **GitHub Copilot CLI authentication**:
-  - Local: `gh auth login` (Vally reuses your `gh` session).
+  - Existing local suites: `gh auth login` (Vally reuses your `gh` session).
+    The isolated benchmark instead requires an explicit environment token;
+    it does not reuse credential stores.
   - CI: the workflow uses the existing `functions-skills-live-e2e`
     GitHub Environment and consumes the existing `COPILOT_CLI_TOKEN`
     secret, mapping it onto `COPILOT_GITHUB_TOKEN` (the variable name
@@ -24,15 +31,20 @@ the older routing suites as a clean skill-off baseline.
     on the eval step only, so checkout / install / pre-warm / artifact
     upload do not see it. Protected-branches policy + `azure-functions-bucees-team`
     reviewers on the environment gate every run.
-- Run from the repository root so the relative paths in `.vally.yaml` resolve.
+- These existing suites run from the repository root so `.vally.yaml` resolves.
+  That configuration exposes all template skills and normal discovery; it is
+  deliberately separate from the isolated benchmark commands.
 - For the **live (Tier 3) deploy workflow**, additional Azure setup is required —
   see [CI setup — repository / Azure side](#ci-setup--repository--azure-side) below.
 
-## Running
+## Running existing suites (not the isolated benchmark)
 
 ```bash
-# PR gate / smoke — routing checks only (cheapest)
-npx vally eval --suite smoke
+# Trusted manual smoke run — still uses paid agent inference
+npm run eval:smoke
+
+# Previous npm run eval behavior, with explicitly selected suite
+npm run eval:suites -- --suite triggers
 
 # Single skill, single spec
 npx vally eval --eval-spec evals/azure-functions-create/eval.yaml
@@ -60,7 +72,7 @@ Defined in [`.vally.yaml`](../.vally.yaml) at the repo root:
 | suite | filter | use |
 | --- | --- | --- |
 | `smoke` | `tier: smoke` | quick routing checks |
-| `pr` | `tier: smoke` | PR gate (alias of smoke) |
+| `pr` | `tier: smoke` | legacy alias of smoke; not permission to run in PR-triggered CI |
 | `triggers` | `area: routing` | all skill-invocation/routing checks |
 | `integration` | `type: integration` | LLM-backed behavior tests |
 | `full` | `tier: [smoke, full]` | everything **except** live — nightly |
@@ -252,7 +264,8 @@ az group list --tag vally-eval=true -o table
 
 - Every stimulus running through the `copilot-sdk` executor invokes the GitHub
   Copilot agent at least once, which incurs LLM cost.
-- `tier: smoke` stimuli are intentionally small (1 prompt × N runs) for PRs.
+- `tier: smoke` stimuli are intentionally small (1 prompt × N runs), but still
+  require trusted code and approved inference spending.
 - Nightly `full` runs should be gated behind workflow_dispatch or schedule.
 - `tier: live` stimuli additionally **create real Azure resources**. They run
   only from the separate [Skill Evaluation - Azure Live Deploy](../.github/workflows/skill-evaluation-azure-live-deploy.yml)
@@ -276,11 +289,11 @@ reviewer can iterate on one skill at a time:
 
 Eval specs default to `claude-sonnet-4.6` (matches the convention used by
 [`microsoft/GitHub-Copilot-for-Azure`](https://github.com/microsoft/GitHub-Copilot-for-Azure)
-and keeps PR / nightly cost and runtime stable). Override per run:
+and keeps suite cost and runtime stable). Override per run:
 
 | Layer | Model | When |
 | --- | --- | --- |
-| PR gate (`smoke`) | `claude-sonnet-4.6` | every push |
+| Trusted smoke (`smoke`) | `claude-sonnet-4.6` | manual / reviewer-gated workflow |
 | Nightly (`full`) | `claude-sonnet-4.6` | scheduled |
 | Reality check | `claude-opus-4.7` | manual via `--model claude-opus-4.7`, e.g. before a release, to mirror what GitHub Copilot CLI users typically run |
 

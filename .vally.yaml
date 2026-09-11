@@ -2,6 +2,9 @@
 # Docs: https://aka.ms/vally
 #
 # Suites filter across all evals/**/eval.yaml using stimulus tags.
+# These suites expose all template skills, not an isolated OFF baseline.
+# For the target-only benchmark use npm run eval:run (see experiments/README.md).
+# Never execute agent evaluations in PR-triggered CI or on untrusted code.
 # Run with:  npx vally eval --suite smoke
 #            npx vally eval --suite pr
 #            npx vally eval --suite full
@@ -20,7 +23,7 @@ suites:
       tier: smoke
 
   pr:
-    description: "PR gate — same scope as smoke"
+    description: "Legacy smoke alias — trusted manual/reviewer-gated runs only"
     filter:
       tier: smoke
 

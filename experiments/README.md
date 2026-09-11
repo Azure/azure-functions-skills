@@ -3,7 +3,9 @@
 These Vally **0.16.0** experiments reuse the
 [TypeScript HTTP scenario](../evals/azure-functions-create/typescript-http/README.md).
 They compare the same objective task, not whether the agent invoked a skill.
-No dashboard, custom runner, LLM judge, Azure resources, or CI is involved.
+Vally owns execution, grading and measurement; the existing static dashboard
+consumes its canonical results. No custom agent runner, LLM judge, Azure
+resources, or CI is involved.
 Run only reviewed, trusted local code with an approved inference budget.
 Never run these from PR-triggered CI or on untrusted contributor content.
 
@@ -11,6 +13,11 @@ Never run these from PR-triggered CI or on untrusted contributor content.
 | --- | --- | --- |
 | `typescript-http-pair.experiment.yaml` | Sonnet 5, skill OFF/ON | 2 |
 | `typescript-http-matrix.experiment.yaml` | Sonnet 5 and GPT-6 Astra, each OFF/ON | 4 |
+
+These two YAML files preserve the manual definitions used for the observations
+below. The convenience workflow's skill/model registration is now solely
+[`local-benchmark.json`](local-benchmark.json); it does not read either proof
+YAML or the repository's suite configuration.
 
 Each cell has `runs: 1`, one worker, a ten-minute native timeout and
 `max_duration`, and the same three native graders. OFF replaces the skill array
@@ -26,9 +33,170 @@ version, `experiment-runner.js` does not supply a retry override and native
 Do not add the unsupported eval-only flag. These limits are not token or money
 caps; `max_turns` and `max_tokens` are not execution limits in 0.16.0.
 
-## Prepare an isolated execution
+## Local convenience commands
 
-Do not execute these commands from a developer checkout or normal profile.
+Configure the environment once, then run one noninteractive npm command from
+this checkout. The output parent must already exist:
+
+```powershell
+$env:VALLY_RUN_ROOT = 'Q:\'
+$env:VALLY_OUTPUT_ROOT = 'C:\private\benchmarks'
+# Explicit acknowledgment of reviewed local code, not spending approval.
+$env:VALLY_TRUSTED = '1'
+
+# Free: stage isolated inputs and resolve the native four-cell plan.
+npm run eval -- --all --dry-run
+```
+
+Before a paid run, supply `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN`
+through your approved environment. With GitHub CLI installed and authenticated
+to an account with Copilot access, capture its token directly into the current
+PowerShell process's environment without displaying it:
+
+```powershell
+$env:COPILOT_GITHUB_TOKEN = gh auth token --hostname github.com
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOKEN)) {
+    $env:COPILOT_GITHUB_TOKEN = $null
+    throw 'Could not obtain a GitHub token. Run gh auth login --hostname github.com for an account with Copilot access, then retry.'
+}
+
+# Acquiring a token does not authorize inference spending.
+# Paid: ONLY after approving the models, four trials, budget and cleanup policy.
+npm run eval -- --all
+```
+
+For multiple authenticated accounts, replace the assignment with the following,
+substituting the intended account for `<github-user>`, and retain the failure
+check before running an evaluation:
+
+```powershell
+$env:COPILOT_GITHUB_TOKEN = gh auth token --hostname github.com --user '<github-user>'
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOKEN)) {
+    $env:COPILOT_GITHUB_TOKEN = $null
+    throw 'Could not obtain the selected account token. Run gh auth login --hostname github.com for that account, then retry with its --user value.'
+}
+```
+
+Do **not** run `gh auth token` by itself: it prints the token to the terminal.
+Keep the assignment above, do not echo the environment variable, and never put
+the token in configuration files, logs or command-line arguments. Token
+acquisition is a manual environment-preparation step; the wrapper itself still
+does not read credential stores, and dry-runs do not need a token.
+
+Choose `--all` **or** `--skill <registered-id>`. Omitting the selection is an
+error, not implicit permission to run everything. Repeat `--models` to select
+a registered subset; do not supply a comma-separated model list:
+
+```powershell
+# Alternative to --all: one skill, both configured models (four trials).
+npm run eval -- --skill azure-functions-create --models claude-sonnet-5 --models gpt-6-astra
+
+# Run without HTML: this subset has only two trials, Astra OFF/ON.
+npm run eval:run -- --skill azure-functions-create --models gpt-6-astra
+
+# Later render the printed canonical path without inference.
+npm run eval:report -- --input C:\private\benchmarks\<printed-bundle>\native --output C:\reports\benchmark-site
+```
+
+Unknown/empty selections, repeated model IDs, or combining `--all` and `--skill`
+are rejected before native launch. No model flags means all **registered**
+models for the explicitly selected skill set. Selection preserves configuration
+order; the first selected model's OFF arm is the native baseline. The initial
+registration has exactly one skill/scenario and two models: `--all` means four
+trials, not the legacy full/live suites.
+
+`--run-root` (or `VALLY_RUN_ROOT`) is an **existing, clean external parent** for a fresh temporary
+directory, not a previously staged trial. Choose a writable parent outside the
+checkout with no discovery configuration in its ancestors (for example `/tmp`
+on Linux, when clean). `VALLY_OUTPUT_ROOT` is an existing private parent for
+automatically named, fresh `benchmark-<uuid>` bundles. Alternatively, `--output`
+specifies one **new private bundle**, with an existing parent, outside the
+checkout. Explicit flags override environment defaults. Paths are resolved
+through existing links before checks; an existing bundle is never reused.
+Node 24+, PowerShell 7,
+npm and Functions Core Tools v4 must already be on PATH. The wrapper is Node/ESM
+and cross-platform; the scenario's existing grader requires `pwsh`.
+
+`--trusted` (or exactly `VALLY_TRUSTED=1`) acknowledges review of the checked-out configuration, eval, target
+skill and executable tools. It is **not a sandbox or a budget authorization**.
+Agents retain local file/shell access: use only trusted content and approve
+inference spending separately. PR-triggered execution is refused. The wrapper
+does not acquire tokens, copy credential stores, log tokens, provision Azure,
+or configure CI. It normalizes the first available token in the order above to
+`COPILOT_GITHUB_TOKEN`; a dry-run receives no token at all.
+
+The central JSON registers model IDs, eval paths and the required files for each
+skill. Its initial file list is target `SKILL.md` plus two own references
+(`go-project.md`, `language-snippets.md`); no fixture is needed for this empty-app
+scenario. Selected evals must follow `evals/<skill>/<scenario>/eval.yaml`.
+Explicit file entries are restricted to that target's skill/references and the
+declared scenarios' fixture directories; path traversal and links leaving the
+repository are rejected. Registration is reviewed code, not arbitrary ingestion.
+
+The wrapper stages only the selected evals/files and creates one temporary
+native experiment definition, encoded as JSON (valid YAML). Its native model
+matrix contains only selected models. The ON path uses Vally's
+`${eval.grandparent}` interpolation to resolve each eval's own target skill;
+OFF remains `[]`. This supports multiple registered skills without adding a
+target axis or executing a custom model/skill loop. No new skill scenarios are
+registered automatically when templates or legacy suites change.
+
+The wrapper checks discovery ancestors, creates
+separate empty cwd/home/config/appdata/cache/temp directories, and constructs an
+OS/executable environment allowlist. It excludes inherited SSH agents, Azure
+credentials, Copilot overrides, plugins/MCP settings and npm configuration.
+Both arms disable the two builtin skills using the scenario's native settings;
+Vally supplies fresh per-trial workspaces/config and the OFF/ON skill arrays.
+These controls prevent ambient discovery, not malicious code from escaping.
+
+Dependency installation inside trials defaults to the public HTTPS npm registry
+with empty user/global npm config and a fresh cache. If an approved registry is
+required, explicitly set `VALLY_NPM_REGISTRY` or add
+`--registry https://your-approved-registry/` to either run command;
+credential-bearing URLs are rejected. Normal `.npmrc` files and
+registry credentials are not inherited.
+
+The wrapper executes the **selected native matrix once** as shard `1/1` with a
+fresh UUID, one worker and `--require-pass`. Native `experiment merge` then
+converts that single complete shard into the canonical experiment output used
+by `eval:report`. This is necessary because even an unsharded 0.16.0 run writes
+`shard-manifest.json`, not `experiment-manifest.json`. There is no model loop,
+custom merge, retry, comparison judge or additional inference in reporting.
+
+```text
+<private-bundle>/
+  raw/<run-id>/shard-1-of-1/   Native originals, including session logs/patches
+  native/                    Native merged canonical results
+  site/                      index.html + logo (only with npm run eval)
+```
+
+**Only `site/` is a publication candidate**, after review. Never publish the
+bundle, `raw/`, `native/` or native `report.md`: these contain private prompts,
+paths and logs. `eval:run` prints the canonical path for later `eval:report`.
+Completed native grader failures can still produce a dashboard, but the
+command preserves the nonzero run/merge exit. Missing manifests, launch errors
+or invalid report input fail explicitly and retain the native partial files;
+they never produce an empty success dashboard.
+
+The wrapper removes only its freshly owned staging/profile/trial directory in
+`finally` after native return, not the private bundle or the parent directory.
+Vally and the existing grader own agent/host cleanup; no shared processes are
+stopped. A filesystem cleanup failure is reported with the abandoned directory
+and private output paths; it makes the workflow nonzero without replacing a
+primary native error or discarding valid results. Native run/merge exits remain
+separate from the overall workflow exit. A forced process/OS termination can bypass `finally`: inspect owned
+process identities before manually removing the abandoned `vally-local-*`
+directory. Never delete other sessions' roots or stop hosts by name.
+
+A dry-run generates **no bundle, trial measurement or dashboard**. It validates
+native resolution and wrapper wiring, not inference, model access or grading.
+The four real observations below predate this wrapper; they were not rerun to
+validate these convenience commands.
+
+## Manual native isolation protocol
+
+The commands in this section are advanced manual operations, not replacements
+for the wrapper's isolation. Do not execute them from a developer checkout or normal profile.
 Follow the scenario's **Isolation protocol**, including its environment
 allowlist, empty HOME/USERPROFILE/config/temp directories, ancestry checks,
 bundled runtime, and native ON/OFF discovery checks. Both conditions must show
@@ -214,3 +382,21 @@ was then checked with a temporary, read-only call to the already-installed SDK's
 Native originals, including the merged report, remain private because they
 contain prompts, local paths, and command output. Only the native metric values
 above are reproduced here.
+
+## Evaluation asset classification
+
+Inspection found no obsolete custom evaluation framework to delete.
+
+| Classification | Assets | Reason |
+| --- | --- | --- |
+| REUSE | `local-benchmark.json`, TypeScript HTTP eval/grader | Central registration plus native objective local grading; no independent runner. |
+| REUSE | Matrix/pair YAML | Historical manual proof definitions, not configuration read by the convenience workflow. |
+| REUSE | `src/evaluation/report.ts`, `dashboard/`, report tests | Small deterministic native-result adapter and static UI; no backend or database. |
+| REUSE | Other `evals/` YAML, fixtures and `_base/common-graders.yaml` | Existing routing/behavior/live coverage and reference graders, distinct from this target-only benchmark. |
+| REUSE | `.vally.yaml`, `eval:suites`, `eval:smoke`, `eval:full`, existing evaluation/cleanup workflows | Preserve existing suite scope and reviewer-gated live behavior; not an isolated OFF baseline. |
+| REUSE | `src/telemetry/` and generated hook assets | Product telemetry, not a custom evaluation measurement system. |
+| DELETE | None | No custom SDK runner, model loop, trajectory parser, result DB or dashboard service was found. |
+| UNKNOWN | None in the inspected evaluation assets | No speculative removal or compatibility layer is needed. |
+
+The old `npm run eval` root-suite alias is now named `npm run eval:suites`.
+Existing smoke/full commands and workflow invocations are unchanged.

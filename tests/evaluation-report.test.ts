@@ -143,6 +143,46 @@ describe('native benchmark report', () => {
     expect(arm?.metrics.totalTokens).toBeNull();
   });
 
+  it('keeps multiple skills with the same scenario separate when only Astra is selected', () => {
+    const f = fixture();
+    f.experiment.variantNames.splice(0, 2);
+    f.experiment.baseline = f.experiment.variantNames[0];
+    f.cells.splice(0, 2);
+    f.snapshot.evals.splice(0, 2);
+    f.save();
+    for (const cell of f.cells) {
+      const other = structuredClone(cell);
+      const evalFile = cell.plan.evalFile.replace('azure-functions-create', 'another-skill');
+      const replaceSkill = (value: string) => value.replace('azure-functions-create', 'another-skill');
+      other.plan.evalFile = evalFile;
+      other.plan.environment.skills = other.plan.environment.skills.map(replaceSkill);
+      other.plan.stimuli[0].environment.skills = other.plan.environment.skills;
+      other.summary.evalFile = evalFile;
+      other.summary.resolvedEnvironment = other.plan.environment;
+      other.trial.experiment.evalFile = evalFile;
+      other.trial.shardKey = other.trial.shardKey.replace(cell.plan.evalFile, evalFile);
+      f.snapshot.evals.push(other.plan);
+      const dir = join(f.input, cell.plan.variant);
+      writeFileSync(join(dir, 'run-summary.jsonl'), [cell.summary, other.summary].map(v => JSON.stringify(v)).join('\n'));
+      writeFileSync(join(dir, 'results.jsonl'), [cell.trial, other.trial].map(v => JSON.stringify(v)).join('\n'));
+    }
+    writeFileSync(join(f.input, 'plan-snapshot.json'), JSON.stringify(f.snapshot));
+    const comparisons = readBenchmark(f.input).comparisons;
+    expect(comparisons.map(c => c.skill).sort()).toEqual(['another-skill', 'azure-functions-create']);
+    expect(new Set(comparisons.map(c => c.id)).size).toBe(2);
+    for (const c of comparisons) {
+      expect(c.model).toBe('gpt-6-astra');
+      expect(c.on?.samples).toBe(1);
+      expect(c.off?.samples).toBe(1);
+    }
+    const html = readFileSync(generateReport(f.input, join(f.root, 'subset-site')), 'utf8');
+    for (const c of comparisons) {
+      const view = render(html, `?skill=${c.id}`);
+      expect(view.node('#app').innerHTML).toContain(c.skill);
+      expect(view.node('#app').innerHTML).toContain('281,764');
+    }
+  });
+
   it('separates execution errors, grader failures, and actual grader score', () => {
     const f = fixture();
     f.cells[0].trial.status = 'error';

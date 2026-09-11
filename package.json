@@ -53,9 +53,11 @@
     "release:local": "node scripts/release-local.mjs",
     "eval:lint": "vally lint --eval-spec evals",
     "eval:report": "npm run compile && node lib/evaluation/report.js",
+    "eval:run": "npm run compile && node lib/evaluation/run.js",
     "eval:smoke": "vally eval --suite smoke",
     "eval:full": "vally eval --suite full",
-    "eval": "vally eval"
+    "eval:suites": "vally eval",
+    "eval": "npm run compile && node lib/evaluation/run.js --report"
   },
   "engines": {
     "node": ">=18"
