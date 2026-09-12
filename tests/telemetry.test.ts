@@ -3,15 +3,24 @@ import { readdirSync } from 'node:fs';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { hostname, release, type } from 'node:os';
 import { join } from 'node:path';
-import applicationInsights from 'applicationinsights';
+import { gunzipSync } from 'node:zlib';
 import {
   BUNDLED_SKILL_NAMES,
+  createApplicationInsightsClient,
   parseTelemetryEvent,
   sendTelemetryEventWithDependencies,
   type ApplicationInsightsClient,
   type TelemetryEvent,
 } from '../src/telemetry/sender.js';
+
+interface InspectableContext {
+  readonly context: {
+    readonly tags: Record<string, string>;
+    readonly keys: Record<string, string>;
+  };
+}
 
 const EVENT: TelemetryEvent = {
   timestamp: '2026-07-17T20:00:00Z',
@@ -150,13 +159,40 @@ describe('sendTelemetryEventWithDependencies', () => {
     expect(createClient).toHaveBeenCalledOnce();
   });
 
+  it('treats a full-acceptance ingestion response body as success', async () => {
+    const client = makeClient(({ callback }) =>
+      callback('{"itemsReceived":1,"itemsAccepted":1,"appId":null,"errors":[]}'));
+
+    await expect(sendTelemetryEventWithDependencies(EVENT, {
+      connectionString: 'InstrumentationKey=test-key',
+      createClient: () => client,
+      environment: {},
+      timeoutMs: 100,
+    })).resolves.toEqual({ status: 'sent' });
+  });
+
+  it('rejects a partial-acceptance ingestion response body', async () => {
+    const client = makeClient(({ callback }) =>
+      callback('{"itemsReceived":2,"itemsAccepted":1,"errors":[{"index":1,"statusCode":400}]}'));
+
+    await expect(sendTelemetryEventWithDependencies(EVENT, {
+      connectionString: 'InstrumentationKey=test-key',
+      createClient: () => client,
+      environment: {},
+      timeoutMs: 100,
+    })).rejects.toThrow('Telemetry delivery failed');
+  });
+
   it('delivers through the isolated Application Insights client', async () => {
     let receivedBytes = 0;
     let requestPath = '';
+    const bodyChunks: Buffer[] = [];
     const server = createServer((request, response) => {
       requestPath = request.url || '';
       request.on('data', chunk => {
-        receivedBytes += Buffer.byteLength(chunk);
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        receivedBytes += buffer.length;
+        bodyChunks.push(buffer);
       });
       request.on('end', () => {
         response.writeHead(200);
@@ -174,7 +210,7 @@ describe('sendTelemetryEventWithDependencies', () => {
     try {
       await expect(sendTelemetryEventWithDependencies(EVENT, {
         connectionString,
-        createClient: value => new applicationInsights.TelemetryClient(value),
+        createClient: createApplicationInsightsClient,
         environment: {},
         timeoutMs: 1_000,
       })).resolves.toEqual({ status: 'sent' });
@@ -185,5 +221,42 @@ describe('sendTelemetryEventWithDependencies', () => {
 
     expect(requestPath).toBe('/v2/track');
     expect(receivedBytes).toBeGreaterThan(0);
+
+    const envelope = decodeEnvelope(Buffer.concat(bodyChunks));
+    expect(envelope).not.toContain(hostname());
+    expect(envelope).not.toContain(`${type()} ${release()}`);
+    expect(envelope).not.toContain('ai.cloud.roleInstance');
+    expect(envelope).not.toContain('ai.device.osVersion');
+
+    for (const line of envelope.trim().split('\n')) {
+      const parsed = JSON.parse(line) as { tags?: Record<string, string> };
+      for (const key of Object.keys(parsed.tags ?? {})) {
+        expect(key).toBe('ai.internal.sdkVersion');
+      }
+      expect(parsed.tags?.['ai.application.ver']).toBeUndefined();
+      expect(parsed.tags?.['ai.operation.id']).toBeUndefined();
+    }
+  });
+});
+
+function decodeEnvelope(body: Buffer): string {
+  try {
+    return gunzipSync(body).toString('utf-8');
+  } catch {
+    return body.toString('utf-8');
+  }
+}
+
+describe('createApplicationInsightsClient', () => {
+  it('clears host-derived envelope context tags', () => {
+    const client = createApplicationInsightsClient(
+      'InstrumentationKey=00000000-0000-4000-8000-000000000002',
+    ) as unknown as InspectableContext;
+    const { tags, keys } = client.context;
+
+    expect(tags[keys.cloudRoleInstance]).toBeUndefined();
+    expect(tags[keys.deviceOSVersion]).toBeUndefined();
+    expect(tags['ai.device.osArchitecture']).toBeUndefined();
+    expect(tags['ai.device.osPlatform']).toBeUndefined();
   });
 });

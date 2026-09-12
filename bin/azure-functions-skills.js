@@ -84,11 +84,44 @@ if (command === 'install' || command === 'update') {
 } else if (command === 'doctor') {
   await runDoctorCommand();
 } else if (command === 'telemetry') {
-  await runTelemetryCommand();
+  if (args[1] === 'contribution') {
+    await runContributionTelemetryCommand();
+  } else {
+    await runTelemetryCommand();
+  }
 } else {
   console.error(`Unknown command: ${command}`);
   console.error(HELP.trim());
   process.exit(1);
+}
+
+async function runContributionTelemetryCommand() {
+  try {
+    const dir = getFlag('--dir') || process.cwd();
+    const { resolveTelemetryEnabled, telemetryConfigPath } = await import('../lib/setup/workspace-assets.js');
+    const {
+      parseContributionInput,
+      collectContribution,
+      readWorkspaceTelemetryState,
+    } = await import('../lib/telemetry/index.js');
+    const rawInput = await readStdin(16 * 1024);
+    if (rawInput.trim().length === 0) {
+      throw new Error('Contribution telemetry input is required on stdin.');
+    }
+    const input = parseContributionInput(JSON.parse(rawInput));
+    const configPaths = ['ghcp', 'claude', 'codex'].map(agent => telemetryConfigPath(dir, agent));
+    if (readWorkspaceTelemetryState(configPaths) !== 'active') {
+      process.stdout.write('disabled\n');
+      return;
+    }
+    const workspaceTelemetryEnabled = resolveTelemetryEnabled(dir, undefined);
+    const result = await collectContribution(input, { workspaceTelemetryEnabled });
+    process.stdout.write(`${result.status}\n`);
+  } catch {
+    process.stdout.write('failed\n');
+  } finally {
+    process.exit(0);
+  }
 }
 
 async function runTelemetryCommand() {
