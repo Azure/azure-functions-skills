@@ -23,7 +23,7 @@ prerequisites for development.
 
 | ID | Feature | Status | Depends on |
 | --- | --- | --- | --- |
-| [FRD-0003](0003-azure-contribution-telemetry.md) | Azure contribution telemetry: observed successful Azure deployments | Draft | — |
+| [FRD-0003](0003-azure-deployment-observation-telemetry.md) | Azure deployment observation telemetry: observed successful Azure deployment operations | Draft | — |
 
 FRD numbers 0001 and 0002 are reserved by pull requests that were open when this
 index was written; check the index and open pull requests for collisions before
