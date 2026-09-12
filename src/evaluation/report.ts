@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const metricNames = ['totalTokens', 'turnCount', 'toolCallCount', 'wallTimeMs', 'errorCount', 'skillActivationCount'] as const;
+const repository = fileURLToPath(new URL('../../', import.meta.url));
 type Metrics = Record<typeof metricNames[number], number | null>;
 type ObjectValue = Record<string, unknown>;
 
@@ -27,6 +28,7 @@ interface Arm {
   passed: number;
   successRate: number | null;
   score: number | null;
+  graderScores: Record<string, number | null>;
   metrics: Metrics;
   trials: TrialView[];
 }
@@ -36,6 +38,7 @@ interface Comparison {
   skill: string;
   scenario: string;
   model: string;
+  prompt: string | null;
   on: Arm | null;
   off: Arm | null;
 }
@@ -107,6 +110,7 @@ export function relativeChange(on: number | null, off: number | null): number | 
 function summarize(planned: number, trials: TrialView[]): Arm {
   const executed = trials.filter(trial => trial.status !== 'skipped');
   const passed = executed.filter(trial => trial.status === 'success' && trial.passed === true).length;
+  const graderNames = [...new Set(executed.flatMap(trial => trial.graders.map(grader => grader.name)))];
   return {
     planned, samples: executed.length, unexecuted: planned - trials.length,
     skipped: trials.length - executed.length,
@@ -116,15 +120,52 @@ function summarize(planned: number, trials: TrialView[]): Arm {
     successRate: executed.length === 0 || executed.some(trial => trial.status === 'success' && trial.passed === null)
       ? null : passed / executed.length * 100,
     score: mean(executed.map(trial => trial.score)),
+    // A grader absent from one trial makes its arm mean incomparable, so mean()
+    // reports null rather than silently shrinking the denominator.
+    graderScores: Object.fromEntries(graderNames.map(name => [name, mean(executed.map(trial =>
+      trial.graders.find(grader => grader.name === name)?.score ?? null))])),
     metrics: Object.fromEntries(metricNames.map(key => [key, mean(executed.map(trial => trial.metrics[key]))])) as Metrics,
     trials,
   };
 }
 
-function skillFromFile(file: string): string {
+function skillFromFile(file: string): { skill: string; directory: string } {
   const parts = file.replaceAll('\\', '/').split('/');
   check(parts.at(-1) === 'eval.yaml' && parts.at(-4) === 'evals', 'expected evals/<skill>/<scenario>/eval.yaml.');
-  return identifier(parts.at(-3));
+  return { skill: identifier(parts.at(-3)), directory: identifier(parts.at(-2)) };
+}
+
+const prompts = new Map<string, string | null>();
+
+// Deliberate, bounded exception to the identifiers-only policy above: this text
+// comes from the reviewed eval specification in this checkout, never from
+// native output, so it carries no agent-authored content. It is display-only.
+function scenarioPrompt(skill: string, directory: string, scenario: string): string | null {
+  const key = `${skill}/${directory}/${scenario}`;
+  const cached = prompts.get(key);
+  if (cached !== undefined) return cached;
+  let value: string | null = null;
+  try {
+    const lines = readFileSync(join(repository, 'evals', skill, directory, 'eval.yaml'), 'utf8').split(/\r?\n/);
+    const start = lines.findIndex(line => new RegExp(`^(\\s*)- name: ${scenario}\\s*$`).test(line));
+    const item = start < 0 ? -1 : (/^\s*/.exec(lines[start]) ?? [''])[0].length;
+    // Stimulus keys sit two columns right of their list marker, which excludes
+    // the deeper `config.prompt` of the quality judge from this match.
+    const indent = ' '.repeat(item + 2);
+    const header = start < 0 ? -1
+      : lines.findIndex((line, index) => index > start && new RegExp(`^${indent}prompt: \\|[-+]?\\s*$`).test(line));
+    if (header > start) {
+      const body: string[] = [];
+      for (const line of lines.slice(header + 1)) {
+        if (line.trim() !== '' && !line.startsWith(`${indent} `)) break;
+        body.push(line.slice(indent.length + 2));
+      }
+      const text = body.join('\n').trimEnd().replace(/[\p{Cc}\p{Cf}]/gu, character => character === '\n' ? '\n' : ' ');
+      if (text.length > 0) value = text.slice(0, 8000);
+    }
+  } catch { value = null; }
+  prompts.set(key, value);
+  return value;
 }
 
 function checkSkills(environment: unknown, enabled: boolean, skill: string): void {
@@ -167,7 +208,7 @@ export function readBenchmark(input: string) {
     const consumed = new Set<ObjectValue>();
     for (const plan of variantPlans) {
       const evalFile = text(plan.evalFile);
-      const skill = skillFromFile(evalFile);
+      const { skill, directory } = skillFromFile(evalFile);
       const evalName = identifier(plan.evalName);
       check(plan.model === model, 'plan model differs from matrix axis.');
       checkSkills(plan.environment, arm === 'on', skill);
@@ -196,7 +237,8 @@ export function readBenchmark(input: string) {
         checkSkills(stimulus[0].environment, arm === 'on', skill);
         const key = `${skill}::${evalName}::${scenario}::${model}`;
         const comparison = comparisons.get(key) ?? {
-          id: hash(`${skill}::${evalName}::${scenario}`), skill, scenario, model, on: null, off: null,
+          id: hash(`${skill}::${evalName}::${scenario}`), skill, scenario, model,
+          prompt: scenarioPrompt(skill, directory, scenario), on: null, off: null,
         };
         check(comparison[arm] === null, 'duplicate model/scenario arm.');
         const expected = new Set(Array.from({ length: runs }, (_, index) =>

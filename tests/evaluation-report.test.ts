@@ -183,8 +183,7 @@ describe('native benchmark report', () => {
     }
   });
 
-  it('separates execution errors, grader failures, and actual grader score', () => {
-    const f = fixture();
+  it('separates execution errors, grader failures, and actual grader score', () => {    const f = fixture();
     f.cells[0].trial.status = 'error';
     f.cells[1].trial.gradeResult.passed = false;
     f.cells[1].trial.gradeResult.score = 0.25;
@@ -192,6 +191,58 @@ describe('native benchmark report', () => {
     const c = readBenchmark(f.input).comparisons[0];
     expect(c.off).toMatchObject({ executionErrors: 1, failed: 0, passed: 0, successRate: 0 });
     expect(c.on).toMatchObject({ executionErrors: 0, failed: 1, passed: 0, successRate: 0, score: 0.25 });
+  });
+
+  it('averages each named grader per arm so a zero-weight quality judge stays visible', () => {
+    const f = fixture();
+    for (const cell of f.cells) {
+      cell.trial.gradeResult.details.push({
+        name: 'code-quality', passed: true, score: cell.plan.variant.startsWith('skill=on') ? 0.9 : 0.5,
+      });
+    }
+    f.save();
+    const c = readBenchmark(f.input).comparisons[0];
+    expect(c.on?.graderScores).toEqual({ completed: 1, 'code-quality': 0.9 });
+    expect(c.off?.graderScores).toEqual({ completed: 1, 'code-quality': 0.5 });
+    // A non-gating judge must not change the verdict it is reported beside.
+    expect(c.on?.passed).toBe(1);
+    expect(c.off?.passed).toBe(1);
+  });
+
+  it('shows the reviewed scenario prompt from this checkout, never native free text', () => {
+    const f = fixture();
+    for (const cell of f.cells) {
+      cell.trial.gradeResult.details.push({ name: 'code-quality', passed: true, score: 0.8 });
+    }
+    f.save();
+    const c = readBenchmark(f.input).comparisons[0];
+    expect(c.prompt).toContain('Create a new TypeScript Azure Functions v4 HTTP app');
+    // The block scalar must be dedented and must stop before the next key.
+    expect(c.prompt?.startsWith(' ')).toBe(false);
+    expect(c.prompt).not.toContain('constraints:');
+    // The judge grader also has a `prompt:` key; it must not be mistaken for it.
+    expect(c.prompt).not.toContain('You judge the Azure Functions app');
+    expect(c.prompt).not.toContain('PRIVATE-CANARY');
+    const html = readFileSync(generateReport(f.input, join(f.root, 'prompt-site')), 'utf8');
+    const view = render(html, `?skill=${c.id}`);
+    const rendered = view.node('#app').innerHTML;
+    expect(rendered).toContain('Create a new TypeScript Azure Functions v4 HTTP app');
+    expect(rendered).toContain('Hello, &lt;name&gt;!');
+    expect(rendered).toContain('code-quality');
+    expect(rendered).not.toContain('PRIVATE-CANARY');
+  });
+
+  it('omits the prompt rather than guessing when the scenario spec is unavailable', () => {
+    const f = fixture();
+    for (const cell of f.cells) {
+      const evalFile = cell.plan.evalFile.replace('typescript-http/eval.yaml', 'unregistered/eval.yaml');
+      cell.plan.evalFile = evalFile;
+      cell.summary.evalFile = evalFile;
+      cell.trial.experiment.evalFile = evalFile;
+      cell.trial.shardKey = cell.trial.shardKey.replace('typescript-http/eval.yaml', 'unregistered/eval.yaml');
+    }
+    f.save();
+    expect(readBenchmark(f.input).comparisons[0].prompt).toBeNull();
   });
 
   it('preserves missing metrics and missing counterpart rather than using zero', () => {

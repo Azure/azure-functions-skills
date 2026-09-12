@@ -18,8 +18,10 @@ const secret = 'private-token-canary';
 const env = { PATH: process.env.PATH, GH_TOKEN: secret };
 const result = (status = 0) => ({ status, signal: null, error: undefined, pid: 1, output: [], stdout: '', stderr: '' });
 const options = () => ({ runRoot: root, output: join(root, 'private'), trusted: true, all: true });
+const registry = JSON.parse(readFileSync(resolve('experiments', 'local-benchmark.json'), 'utf8'));
 const config = {
   models: ['claude-sonnet-5', 'gpt-6-astra'],
+  tiers: { powerful: ['gpt-6-astra'], medium: ['claude-sonnet-5'] },
   skills: {
     'azure-functions-create': {
       evals: ['evals/azure-functions-create/typescript-http/eval.yaml'],
@@ -127,6 +129,30 @@ describe('selectBenchmark', () => {
       expect(() => selectBenchmark(invalid, { all: true })).toThrow(/config/i);
     }
   });
+
+  it('resolves a registered tier to its models and keeps central configuration order', () => {
+    expect(selectBenchmark(config, { all: true, tier: 'powerful' }).models).toEqual(['gpt-6-astra']);
+    expect(selectBenchmark(config, { all: true, tier: 'medium' }).models).toEqual(['claude-sonnet-5']);
+    // A tier is a named model subset, so it must never widen an explicit --models subset.
+    expect(() => selectBenchmark(config, { all: true, tier: 'powerful', models: ['claude-sonnet-5'] }))
+      .toThrow(/tier.*models|models.*tier/i);
+    for (const tier of ['', 'unregistered']) expect(() => selectBenchmark(config, { all: true, tier })).toThrow(/tier/i);
+  });
+
+  it('rejects a tier map that does not describe registered models', () => {    for (const tiers of [{ powerful: [] }, { powerful: ['unknown'] }, { powerful: ['gpt-6-astra', 'gpt-6-astra'] },
+      { 'bad/id': ['gpt-6-astra'] }, { powerful: 'gpt-6-astra' }, []]) {
+      expect(() => selectBenchmark({ ...config, tiers }, { all: true })).toThrow(/config/i);
+    }
+  });
+
+  it('classifies every shipped model into exactly one tier without moving the baseline', () => {
+    const tiered = Object.values(registry.tiers as Record<string, string[]>).flat();
+    expect(tiered.slice().sort()).toEqual((registry.models as string[]).slice().sort());
+    // The baseline is the first selected model, so registry order is behaviour, not formatting.
+    expect(selectBenchmark(registry, { all: true }).models[0]).toBe('claude-sonnet-5');
+    for (const tier of Object.keys(registry.tiers))
+      expect(selectBenchmark(registry, { all: true, tier }).models).toEqual(registry.tiers[tier]);
+  });
 });
 
 describe('runBenchmark', () => {
@@ -146,7 +172,7 @@ describe('runBenchmark', () => {
       expect(definition.matrix.skill.values).toEqual([
         { off: [] }, { on: ['../templates/skills/${eval.grandparent}'] },
       ]);
-      expect(definition.matrix.model.values).toEqual(config.models);
+      expect(definition.matrix.model.values).toEqual(registry.models);
       expect(definition.overrides).toEqual({ runs: 1, timeout: '10m' });
       const skills = join(temporary, 'inputs', 'templates', 'skills');
       expect(readdirSync(skills)).toEqual(['azure-functions-create']);

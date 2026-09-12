@@ -16,6 +16,7 @@ interface Selection {
   all?: boolean;
   skill?: string;
   models?: string[];
+  tier?: string;
 }
 
 interface RunOptions extends Selection {
@@ -58,9 +59,17 @@ export function selectBenchmark(value: unknown, selection: Selection) {
   const identifier = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/;
   check(models.every(model => identifier.test(model)) && Object.keys(skills).length > 0,
     'invalid models/skills in benchmark configuration.');
+  const tiers = config.tiers === undefined ? {} : object(config.tiers);
+  for (const [name, tier] of Object.entries(tiers)) {
+    check(identifier.test(name) && strings(tier).every(model => models.includes(model)),
+      'configuration tiers must name registered models.');
+  }
   check(Boolean(selection.all) !== (selection.skill !== undefined), 'specify exactly one of --all or --skill <registered-id>.');
   check(selection.skill === undefined || Object.hasOwn(skills, selection.skill), 'unknown --skill; use a registered skill.');
-  const selectedModels = selection.models ?? models;
+  check(selection.tier === undefined || selection.models === undefined,
+    'specify at most one of --tier or --models; a tier is already a named model subset.');
+  check(selection.tier === undefined || Object.hasOwn(tiers, selection.tier), 'unknown --tier; use a registered tier.');
+  const selectedModels = (selection.tier === undefined ? selection.models : strings(tiers[selection.tier])) ?? models;
   check(selectedModels.length > 0 && new Set(selectedModels).size === selectedModels.length
     && selectedModels.every(model => models.includes(model)), '--models must be a nonempty, unique subset of registered models.');
   const evals: string[] = [];
@@ -234,11 +243,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       'run-root': { type: 'string' }, output: { type: 'string' }, registry: { type: 'string' },
       trusted: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, report: { type: 'boolean' },
       all: { type: 'boolean' }, skill: { type: 'string' }, models: { type: 'string', multiple: true },
+      tier: { type: 'string' },
     }, strict: true });
     const result = runBenchmark({
       runRoot: values['run-root'], output: values.output, trusted: values.trusted,
       dryRun: values['dry-run'], report: values.report, registry: values.registry,
-      all: values.all, skill: values.skill, models: values.models,
+      all: values.all, skill: values.skill, models: values.models, tier: values.tier,
     });
     console.log(result.dryRun ? 'Dry-run only: no measured trials or dashboard generated.'
       : `Native results: ${result.native}${result.site ? `\nStatic site: ${result.site}` : ''}\nNative run/merge exits: ${result.runExit}/${result.mergeExit}\nWorkflow exit: ${result.exitCode}`);
