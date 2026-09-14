@@ -1,11 +1,13 @@
 # Native local comparisons
 
-These Vally **0.16.0** experiments reuse the
-[TypeScript HTTP scenario](../evals/azure-functions-create/typescript-http/README.md).
+These Vally **0.16.0** experiments use the
+[TypeScript HTTP scenario](../evals/azure-functions-create/typescript-http/README.md)
+and the [.NET migration scenario](../evals/azure-functions-update/dotnet-isolated/README.md).
 They compare the same objective task, not whether the agent invoked a skill.
 Vally owns execution, grading and measurement; the existing static dashboard
-consumes its canonical results. No custom agent runner, LLM judge, Azure
-resources, or CI is involved.
+consumes its canonical results. No custom agent runner, Azure resources, or CI
+is involved. The migration scenario also uses Vally's native LLM judge. Its
+judge calls add inference cost; see its guide before running it.
 Run only reviewed, trusted local code with an approved inference budget.
 Never run these from PR-triggered CI or on untrusted contributor content.
 
@@ -19,7 +21,7 @@ below. The convenience workflow's skill/model registration is now solely
 [`local-benchmark.json`](local-benchmark.json); it does not read either proof
 YAML or the repository's suite configuration.
 
-Each cell has `runs: 1`, one worker, a ten-minute native timeout and
+In the two TypeScript definitions, each cell has `runs: 1`, one worker, a ten-minute native timeout and
 `max_duration`, and the same three native graders. OFF replaces the skill array
 with `[]`; ON replaces it with only `azure-functions-create` and its bundled
 references. Prompt, empty application fixture, MCP configuration (none), builtin
@@ -44,7 +46,7 @@ $env:VALLY_OUTPUT_ROOT = 'C:\private\benchmarks'
 # Explicit acknowledgment of reviewed local code, not spending approval.
 $env:VALLY_TRUSTED = '1'
 
-# Free: stage isolated inputs and resolve the native four-cell plan.
+# Free: stage isolated inputs and resolve the native eight-cell plan.
 npm run eval -- --all --dry-run
 ```
 
@@ -61,7 +63,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOK
 }
 
 # Acquiring a token does not authorize inference spending.
-# Paid: ONLY after approving the models, four trials, budget and cleanup policy.
+# Paid: approve eight trials, migration judge calls, budget and cleanup first.
 npm run eval -- --all
 ```
 
@@ -101,9 +103,11 @@ npm run eval:report -- --input C:\private\benchmarks\<printed-bundle>\native --o
 Unknown/empty selections, repeated model IDs, or combining `--all` and `--skill`
 are rejected before native launch. No model flags means all **registered**
 models for the explicitly selected skill set. Selection preserves configuration
-order; the first selected model's OFF arm is the native baseline. The initial
-registration has exactly one skill/scenario and two models: `--all` means four
-trials, not the legacy full/live suites.
+order; the first selected model's OFF arm is the native baseline. The current
+registration has two skills, one scenario each, and two models: `--all` means
+eight trials plus the migration judge calls, not the legacy full/live suites.
+Use `--skill azure-functions-update --models claude-sonnet-5` for two migration
+trials with the same fixed judge. A dry-run does not invoke that judge.
 
 `--run-root` (or `VALLY_RUN_ROOT`) is an **existing, clean external parent** for a fresh temporary
 directory, not a previously staged trial. Choose a writable parent outside the
@@ -126,9 +130,10 @@ or configure CI. It normalizes the first available token in the order above to
 `COPILOT_GITHUB_TOKEN`; a dry-run receives no token at all.
 
 The central JSON registers model IDs, eval paths and the required files for each
-skill. Its initial file list is target `SKILL.md` plus two own references
-(`go-project.md`, `language-snippets.md`); no fixture is needed for this empty-app
-scenario. Selected evals must follow `evals/<skill>/<scenario>/eval.yaml`.
+skill. Create includes target `SKILL.md` plus two own references
+(`go-project.md`, `language-snippets.md`); no fixture is needed for that empty-app
+scenario. Update includes its skill references, the input app, and fixed judge
+guidance. Selected evals must follow `evals/<skill>/<scenario>/eval.yaml`.
 Explicit file entries are restricted to that target's skill/references and the
 declared scenarios' fixture directories; path traversal and links leaving the
 repository are rejected. Registration is reviewed code, not arbitrary ingestion.

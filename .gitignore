@@ -449,3 +449,7 @@ FodyWeavers.xsd
 # Vally eval output
 vally-results/
 results/
+
+# Build output in evaluation fixtures
+evals/**/fixtures/obj/
+evals/**/fixtures/bin/

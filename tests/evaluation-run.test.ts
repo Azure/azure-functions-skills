@@ -160,9 +160,28 @@ describe('runBenchmark', () => {
       expect(opts?.shell).toBe(false);
       return result();
     });
-    expect(runBenchmark({ ...options(), dryRun: true, report: true }, env).dryRun).toBe(true);
+    expect(runBenchmark({ ...options(), all: false, skill: 'azure-functions-create', models: config.models,
+      dryRun: true, report: true }, env).dryRun).toBe(true);
     expect(existsSync(temporary)).toBe(false);
     expect(existsSync(options().output)).toBe(false);
+    expect(generateReport).not.toHaveBeenCalled();
+  });
+
+  it('stages the update fixture and judge guidance without another skill', () => {
+    vi.mocked(spawnSync).mockImplementation((_command, argv, opts) => {
+      const inputs = join(dirname(String(opts?.cwd)), 'inputs');
+      const definition = JSON.parse(readFileSync(argv?.[3] ?? '', 'utf8'));
+      expect(definition.evals).toEqual(['../evals/azure-functions-update/dotnet-isolated/eval.yaml']);
+      expect(definition.matrix.model.values).toEqual(['gpt-6-astra']);
+      expect(readdirSync(join(inputs, 'templates', 'skills'))).toEqual(['azure-functions-update']);
+      const scenario = join(inputs, 'evals', 'azure-functions-update', 'dotnet-isolated');
+      expect(readdirSync(join(scenario, 'fixtures')).sort())
+        .toEqual(['Hello.cs', 'UpgradeApp.csproj', 'guidance.md', 'host.json']);
+      expect(readFileSync(join(scenario, 'eval.yaml'), 'utf8')).toContain('judge_model: gpt-6-astra');
+      return result();
+    });
+    expect(runBenchmark({ ...options(), all: false, skill: 'azure-functions-update',
+      models: ['gpt-6-astra'], dryRun: true }, env).dryRun).toBe(true);
     expect(generateReport).not.toHaveBeenCalled();
   });
 

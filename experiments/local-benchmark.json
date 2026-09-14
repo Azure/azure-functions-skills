@@ -1,5 +1,12 @@
 {
-  "models": ["claude-sonnet-5", "gpt-6-astra"],
+  "models": [
+    "claude-sonnet-5",
+    "gpt-6-astra",
+    "gpt-5.6-sol",
+    "claude-opus-5",
+    "gpt-5.6-luna",
+    "mai-code-1.1-flash"
+  ],
   "skills": {
     "azure-functions-create": {
       "evals": ["evals/azure-functions-create/typescript-http/eval.yaml"],
@@ -7,6 +14,27 @@
         "templates/skills/azure-functions-create/SKILL.md",
         "templates/skills/azure-functions-create/references/go-project.md",
         "templates/skills/azure-functions-create/references/language-snippets.md"
+      ]
+    },
+    "azure-functions-update": {
+      "evals": ["evals/azure-functions-update/dotnet-isolated/eval.yaml"],
+      "files": [
+        "templates/skills/azure-functions-update/SKILL.md",
+        "templates/skills/azure-functions-update/references/host-v4.md",
+        "templates/skills/azure-functions-update/references/dotnet-isolated.md",
+        "templates/skills/azure-functions-update/references/dotnet-version.md",
+        "templates/skills/azure-functions-update/references/node-model-v4.md",
+        "templates/skills/azure-functions-update/references/python-model-v2.md",
+        "templates/skills/azure-functions-update/references/runtime-versions.md",
+        "templates/skills/azure-functions-update/references/extensions.md",
+        "templates/skills/azure-functions-update/references/durable-v2.md",
+        "templates/skills/azure-functions-update/references/bundles-v4.md",
+        "templates/skills/azure-functions-update/references/infrastructure.md",
+        "templates/skills/azure-functions-update/references/pipelines.md",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/UpgradeApp.csproj",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/Hello.cs",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/host.json",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/guidance.md"
       ]
     }
   }
