@@ -9,6 +9,7 @@ import { generateReport } from './report.js';
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 const experiment = join('experiments', 'local.experiment.yaml');
 const settings = '{"disabledSkills":["customize-cloud-agent","github-pr-media"]}';
+const publicNugetSource = 'https://api.nuget.org/v3/index.json';
 const osVariables = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'SYSTEMDRIVE', 'COMSPEC',
   'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432', 'PROCESSOR_ARCHITECTURE', 'NUMBER_OF_PROCESSORS', 'OS']);
 
@@ -25,6 +26,7 @@ interface RunOptions extends Selection {
   dryRun?: boolean;
   report?: boolean;
   registry?: string;
+  nugetSource?: string;
 }
 
 interface RunResult {
@@ -65,11 +67,14 @@ export function selectBenchmark(value: unknown, selection: Selection) {
     && selectedModels.every(model => models.includes(model)), '--models must be a nonempty, unique subset of registered models.');
   const evals: string[] = [];
   const files: string[] = [];
+  let nugetPreflight = false;
   for (const [id, entry] of Object.entries(skills)) {
     check(identifier.test(id), 'invalid skill identifier in configuration.');
     const definition = object(entry);
     const declaredEvals = strings(definition.evals);
     const declaredFiles = strings(definition.files);
+    check(definition.nugetPreflight === undefined || typeof definition.nugetPreflight === 'boolean',
+      'nugetPreflight must be a boolean.');
     const safePath = (file: string) => file.split('/').every(part => identifier.test(part) && part !== '.' && part !== '..');
     const target = `templates/skills/${id}`;
     check(declaredEvals.every(file => {
@@ -83,9 +88,15 @@ export function selectBenchmark(value: unknown, selection: Selection) {
     if (selection.all || id === selection.skill) {
       evals.push(...declaredEvals);
       files.push(...declaredFiles);
+      nugetPreflight ||= definition.nugetPreflight === true;
     }
   }
-  return { models: models.filter(model => selectedModels.includes(model)), evals, files: [...new Set(files)] };
+  return {
+    models: models.filter(model => selectedModels.includes(model)),
+    evals,
+    files: [...new Set(files)],
+    ...(nugetPreflight ? { nugetPreflight: true } : {}),
+  };
 }
 
 function inside(parent: string, child: string): boolean {
@@ -105,7 +116,7 @@ function cleanAncestors(directory: string): void {
 
 export function benchmarkEnvironment(root: string, source: NodeJS.ProcessEnv, dryRun: boolean,
   registry = 'https://registry.npmjs.org/'): NodeJS.ProcessEnv {
-  const url = new URL(registry);
+  const url = validatedSourceUrl(registry, '--registry');
   check(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash,
     '--registry must be an HTTPS registry URL without credentials, query or fragment.');
   const env: NodeJS.ProcessEnv = {};
@@ -124,6 +135,7 @@ export function benchmarkEnvironment(root: string, source: NodeJS.ProcessEnv, dr
     GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
     npm_config_userconfig: join(home, '.npmrc'), npm_config_globalconfig: join(home, 'global.npmrc'),
     npm_config_cache: join(root, 'cache', 'npm'), npm_config_registry: url.href,
+    NUGET_PACKAGES: join(root, 'cache', 'nuget'),
     FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT: '1', VALLY_TELEMETRY_OPTOUT: '1',
     COPILOT_AUTO_UPDATE: 'false', COPILOT_HOME_SETTINGS_JSON: settings,
   });
@@ -133,6 +145,69 @@ export function benchmarkEnvironment(root: string, source: NodeJS.ProcessEnv, dr
     env.COPILOT_GITHUB_TOKEN = token;
   }
   return env;
+}
+
+function validatedSourceUrl(value: string, label: string): URL {
+  try {
+    return new URL(value);
+  } catch {
+    throw new Error(`Local benchmark: ${label} must be a valid URL.`);
+  }
+}
+
+function nugetSourceUrl(value: string): URL {
+  const url = validatedSourceUrl(value, 'NuGet source');
+  check(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash,
+    'NuGet source must be an HTTPS URL without credentials, query or fragment.');
+  return url;
+}
+
+function xmlAttribute(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function writeNugetConfiguration(root: string, source: URL): void {
+  const content = `<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="benchmark" value="${xmlAttribute(source.href)}" protocolVersion="3" />
+  </packageSources>
+</configuration>
+`;
+  for (const path of [
+    join(root, 'appdata', 'NuGet', 'NuGet.Config'),
+    join(root, 'home', '.nuget', 'NuGet', 'NuGet.Config'),
+  ]) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+  }
+}
+
+function nugetPreflight(root: string, env: NodeJS.ProcessEnv, source: URL): void {
+  const project = join(root, 'nuget-preflight.csproj');
+  writeFileSync(project, `<Project Sdk="Azure.Functions.Sdk/1.0.0">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.50.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.0" />
+  </ItemGroup>
+</Project>
+`);
+  const child = spawnSync('dotnet', ['restore', project, '--nologo', '--verbosity', 'minimal'], {
+    cwd: join(root, 'empty'), env, shell: false, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  check(!child.error,
+    `could not launch the .NET NuGet preflight for ${source.href}; install .NET SDK 10 or check PATH.`);
+  check(child.signal === null, `NuGet preflight terminated by ${child.signal} for ${source.href}.`);
+  const output = [child.stdout, child.stderr].filter(value => typeof value === 'string' && value.trim())
+    .join('\n').trim().slice(-4000);
+  check(child.status === 0,
+    `NuGet preflight could not restore Azure.Functions.Sdk 1.0.0 and Worker 2.50.0 from ${source.href}. `
+    + `Use --nuget-source or VALLY_NUGET_SOURCE with a credential-free HTTPS v3 source that contains these packages.`
+    + `${output ? `\n${output}` : ''}`);
 }
 
 export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
@@ -148,6 +223,7 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
   const requestedOutput = options.output ?? join(realpathSync(sourceEnv.VALLY_OUTPUT_ROOT ?? ''), `benchmark-${randomUUID()}`);
   const output = join(realpathSync(dirname(resolve(requestedOutput))), parse(resolve(requestedOutput)).base);
   const registry = options.registry ?? sourceEnv.VALLY_NPM_REGISTRY;
+  const nugetSource = nugetSourceUrl(options.nugetSource ?? sourceEnv.VALLY_NUGET_SOURCE ?? publicNugetSource);
   const repo = realpathSync(repository);
   check(!inside(repo, parent) && !inside(repo, output), '--run-root and --output must be outside the repository.');
   cleanAncestors(parent);
@@ -162,6 +238,7 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
       mkdirSync(join(root, directory));
     }
     writeFileSync(join(root, 'config', 'settings.json'), settings);
+    writeNugetConfiguration(root, nugetSource);
     for (const file of [...selection.evals, ...selection.files]) {
       const source = realpathSync(join(repo, ...file.split('/')));
       check(inside(repo, source), 'input links must not leave the trusted repository.');
@@ -182,6 +259,7 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
     mkdirSync(join(root, 'inputs', 'experiments'));
     // JSON is valid YAML; Vally validates and expands this native matrix.
     writeFileSync(join(root, 'inputs', experiment), JSON.stringify(definition, null, 2));
+    if (selection.nugetPreflight && !options.dryRun) nugetPreflight(root, env, nugetSource);
     const vally = join(repo, 'node_modules', '@microsoft', 'vally-cli', 'dist', 'index.js');
     const invoke = (args: string[]) => {
       const child = spawnSync(process.execPath, [vally, ...args], {
@@ -232,12 +310,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     const { values } = parseArgs({ options: {
       'run-root': { type: 'string' }, output: { type: 'string' }, registry: { type: 'string' },
+      'nuget-source': { type: 'string' },
       trusted: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, report: { type: 'boolean' },
       all: { type: 'boolean' }, skill: { type: 'string' }, models: { type: 'string', multiple: true },
     }, strict: true });
     const result = runBenchmark({
       runRoot: values['run-root'], output: values.output, trusted: values.trusted,
       dryRun: values['dry-run'], report: values.report, registry: values.registry,
+      nugetSource: values['nuget-source'],
       all: values.all, skill: values.skill, models: values.models,
     });
     console.log(result.dryRun ? 'Dry-run only: no measured trials or dashboard generated.'

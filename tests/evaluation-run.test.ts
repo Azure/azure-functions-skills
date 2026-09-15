@@ -28,6 +28,7 @@ const config = {
     'another-skill': {
       evals: ['evals/another-skill/typescript-http/eval.yaml'],
       files: ['templates/skills/another-skill/SKILL.md'],
+      nugetPreflight: true,
     },
   },
 };
@@ -40,6 +41,7 @@ beforeEach(async () => {
   vi.mocked(lstatSync).mockImplementation((path, opts) =>
     resolve(String(path)).startsWith(root) ? fs.lstatSync(path, opts) : undefined);
   vi.mocked(spawnSync).mockImplementation((_command, argv) => {
+    if (_command === 'dotnet') return result();
     const args = [...(argv ?? [])];
     const output = args[args.indexOf('--output-dir') + 1];
     if (args.includes('--dry-run')) return result();
@@ -83,6 +85,7 @@ describe('benchmarkEnvironment', () => {
       disabledSkills: ['customize-cloud-agent', 'github-pr-media'],
     });
     expect(isolated.npm_config_registry).toBe('https://registry.npmjs.org/');
+    expect(isolated.NUGET_PACKAGES).toBe(join(root, 'cache', 'nuget'));
   });
 
   it('does not pass authentication to a free dry-run or silently use a credential store', () => {
@@ -107,6 +110,7 @@ describe('selectBenchmark', () => {
       models: ['gpt-6-astra'],
       evals: config.skills['another-skill'].evals,
       files: config.skills['another-skill'].files,
+      nugetPreflight: true,
     });
     const all = selectBenchmark(config, { all: true, models: ['gpt-6-astra', 'claude-sonnet-5'] });
     expect(all.models).toEqual(config.models);
@@ -155,14 +159,39 @@ describe('runBenchmark', () => {
         .toEqual(['go-project.md', 'language-snippets.md']);
       expect(existsSync(join(temporary, 'inputs', '.vally.yaml'))).toBe(false);
       expect(opts?.env?.HOME).toBe(join(temporary, 'home'));
+      expect(readFileSync(join(temporary, 'appdata', 'NuGet', 'NuGet.Config'), 'utf8'))
+        .toContain('https://api.nuget.org/v3/index.json');
       expect(opts?.env?.COPILOT_GITHUB_TOKEN).toBeUndefined();
       expect(args).toContain('--dry-run');
       expect(opts?.shell).toBe(false);
       return result();
     });
-    expect(runBenchmark({ ...options(), dryRun: true, report: true }, env).dryRun).toBe(true);
+    expect(runBenchmark({ ...options(), all: false, skill: 'azure-functions-create', models: config.models,
+      dryRun: true, report: true }, env).dryRun).toBe(true);
     expect(existsSync(temporary)).toBe(false);
     expect(existsSync(options().output)).toBe(false);
+    expect(generateReport).not.toHaveBeenCalled();
+  });
+
+  it('stages the update fixture and judge guidance without another skill', () => {
+    vi.mocked(spawnSync).mockImplementation((_command, argv, opts) => {
+      const inputs = join(dirname(String(opts?.cwd)), 'inputs');
+      const definition = JSON.parse(readFileSync(argv?.[3] ?? '', 'utf8'));
+      expect(definition.evals).toEqual(['../evals/azure-functions-update/dotnet-isolated/eval.yaml']);
+      expect(definition.matrix.model.values).toEqual(['gpt-6-astra']);
+      expect(readdirSync(join(inputs, 'templates', 'skills'))).toEqual(['azure-functions-update']);
+      const scenario = join(inputs, 'evals', 'azure-functions-update', 'dotnet-isolated');
+      expect(readdirSync(join(scenario, 'fixtures')).sort())
+        .toEqual(['Hello.cs', 'UpgradeApp.csproj', 'guidance.md', 'host.json', 'trial.gitignore']);
+      const evalDefinition = readFileSync(join(scenario, 'eval.yaml'), 'utf8');
+      expect(evalDefinition).toContain('judge_model: gpt-6-astra');
+      expect(evalDefinition).toContain('Azure.Functions.Sdk');
+      expect(evalDefinition).toContain("start --no-build --port $port");
+      expect(evalDefinition).not.toContain("Join-Path $publish 'functions.metadata'");
+      return result();
+    });
+    expect(runBenchmark({ ...options(), all: false, skill: 'azure-functions-update',
+      models: ['gpt-6-astra'], dryRun: true }, env).dryRun).toBe(true);
     expect(generateReport).not.toHaveBeenCalled();
   });
 
@@ -179,6 +208,51 @@ describe('runBenchmark', () => {
     });
     runBenchmark({ ...options(), all: false, skill: 'azure-functions-create', models: ['gpt-6-astra'] }, env);
     expect(spawnSync).toHaveBeenCalledTimes(2);
+  });
+
+  it('preflights the Functions SDK with an isolated credential-free NuGet source before paid trials', () => {
+    const normal = vi.mocked(spawnSync).getMockImplementation();
+    const nugetSource = 'https://packages.example.test/nuget/v3/index.json';
+    vi.mocked(spawnSync).mockImplementation((command, argv, opts) => {
+      if (command === 'dotnet') {
+        expect(argv?.slice(0, 2)).toEqual(['restore', expect.stringMatching(/nuget-preflight\.csproj$/)]);
+        expect(readFileSync(String(argv?.[1]), 'utf8')).toContain('Azure.Functions.Sdk/1.0.0');
+        const appData = opts?.env?.APPDATA ?? '';
+        expect(readFileSync(join(appData, 'NuGet', 'NuGet.Config'), 'utf8')).toContain(nugetSource);
+        return result();
+      }
+      return normal?.(command, argv, opts) ?? result();
+    });
+    runBenchmark({ ...options(), all: false, skill: 'azure-functions-update', nugetSource }, env);
+    expect(vi.mocked(spawnSync).mock.calls[0][0]).toBe('dotnet');
+  });
+
+  it('uses the environment NuGet source unless the command option overrides it', () => {
+    const sources: string[] = [];
+    const normal = vi.mocked(spawnSync).getMockImplementation();
+    vi.mocked(spawnSync).mockImplementation((command, argv, opts) => {
+      if (command !== 'dotnet') {
+        sources.push(readFileSync(join(opts?.env?.APPDATA ?? '', 'NuGet', 'NuGet.Config'), 'utf8'));
+      }
+      return normal?.(command, argv, opts) ?? result();
+    });
+    const sourceEnv = { ...env, VALLY_NUGET_SOURCE: 'https://environment.example.test/v3/index.json' };
+    runBenchmark({ ...options(), all: false, skill: 'azure-functions-update', dryRun: true }, sourceEnv);
+    runBenchmark({
+      ...options(), all: false, skill: 'azure-functions-update', dryRun: true,
+      nugetSource: 'https://option.example.test/v3/index.json',
+    }, sourceEnv);
+    expect(sources[0]).toContain('https://environment.example.test/v3/index.json');
+    expect(sources[1]).toContain('https://option.example.test/v3/index.json');
+  });
+
+  it('stops before Vally and leaves no output when the NuGet preflight fails', () => {
+    vi.mocked(spawnSync).mockImplementation(command =>
+      command === 'dotnet' ? { ...result(1), stderr: 'NU1101: package not found' } : result());
+    expect(() => runBenchmark({ ...options(), all: false, skill: 'azure-functions-update' }, env))
+      .toThrow(/NuGet preflight.*--nuget-source.*NU1101/is);
+    expect(spawnSync).toHaveBeenCalledOnce();
+    expect(existsSync(options().output)).toBe(false);
   });
 
   it('supports explicit environment defaults and creates a fresh private bundle on every invocation', () => {
@@ -203,8 +277,9 @@ describe('runBenchmark', () => {
   it('runs the full native matrix once, merges its one shard and delegates to the existing report', () => {
     const outcome = runBenchmark({ ...options(), report: true }, env);
     const calls = vi.mocked(spawnSync).mock.calls;
-    expect(calls).toHaveLength(2);
-    const args = calls[0][1] ?? [];
+    expect(calls).toHaveLength(3);
+    expect(calls[0][0]).toBe('dotnet');
+    const args = calls[1][1] ?? [];
     expect(args).toContain('--shard');
     expect(args[args.indexOf('--shard') + 1]).toBe('1/1');
     expect(args[args.indexOf('--workers') + 1]).toBe('1');
@@ -212,7 +287,7 @@ describe('runBenchmark', () => {
     for (const flag of ['--compare', '--work-dir', '--max-retries', '--model', '--variant', '--verbose'])
       expect(args).not.toContain(flag);
     expect(JSON.stringify(args)).not.toContain(secret);
-    expect(calls[1][1]?.slice(1, 3)).toEqual(['experiment', 'merge']);
+    expect(calls[2][1]?.slice(1, 3)).toEqual(['experiment', 'merge']);
     expect(generateReport).toHaveBeenCalledWith(join(options().output, 'native'), join(options().output, 'site'));
     expect(outcome.exitCode).toBe(0);
     expect(readdirSync(root)).toEqual(['private']);
@@ -222,7 +297,7 @@ describe('runBenchmark', () => {
     const normal = vi.mocked(spawnSync).getMockImplementation();
     vi.mocked(spawnSync).mockImplementation((...args) => {
       normal?.(...args);
-      return result(1);
+      return args[0] === 'dotnet' ? result() : result(1);
     });
     expect(runBenchmark({ ...options(), report: true }, env).exitCode).toBe(1);
     expect(generateReport).toHaveBeenCalledOnce();
@@ -231,7 +306,7 @@ describe('runBenchmark', () => {
   });
 
   it('preserves partial outputs without inventing a report when native fails before its manifest', () => {
-    vi.mocked(spawnSync).mockImplementation(() => result(2));
+    vi.mocked(spawnSync).mockImplementation(command => command === 'dotnet' ? result() : result(2));
     expect(() => runBenchmark({ ...options(), report: true }, env)).toThrow(/exit 2.*private/i);
     expect(generateReport).not.toHaveBeenCalled();
     expect(readdirSync(root)).toEqual(['private']);
@@ -258,7 +333,7 @@ describe('runBenchmark', () => {
     const normal = vi.mocked(spawnSync).getMockImplementation();
     vi.mocked(spawnSync).mockImplementation((...args) => {
       normal?.(...args);
-      return result(nativeExit);
+      return args[0] === 'dotnet' ? result() : result(nativeExit);
     });
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(rmSync).mockImplementationOnce(() => { throw Object.assign(new Error('locked'), { code: 'EBUSY' }); });
@@ -272,7 +347,7 @@ describe('runBenchmark', () => {
   });
 
   it('does not replace the primary native failure with a filesystem cleanup error', () => {
-    vi.mocked(spawnSync).mockImplementation(() => result(2));
+    vi.mocked(spawnSync).mockImplementation(command => command === 'dotnet' ? result() : result(2));
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(rmSync).mockImplementationOnce(() => { throw Object.assign(new Error('locked'), { code: 'EPERM' }); });
     expect(() => runBenchmark(options(), env)).toThrow(/native run exit 2.*missing shard manifest/);
@@ -295,6 +370,8 @@ describe('runBenchmark', () => {
     expect(() => runBenchmark({ ...options(), trusted: false }, env)).toThrow(/--trusted/);
     expect(() => runBenchmark({ ...options(), registry: `https://user:${secret}@example.com` }, env))
       .toThrow(/registry/i);
+    expect(() => runBenchmark({ ...options(), nugetSource: `https://user:${secret}@example.com` }, env))
+      .toThrow(/NuGet source/i);
     mkdirSync(options().output);
     expect(() => runBenchmark(options(), env)).toThrow(/new.*output/i);
     removeDir(options().output);
