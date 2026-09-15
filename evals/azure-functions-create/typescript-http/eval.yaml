@@ -16,6 +16,13 @@ agent_environment:
     COPILOT_HOME_SETTINGS_JSON: '{"disabledSkills":["customize-cloud-agent","github-pr-media"]}'
 scoring:
   threshold: 1
+  # Weights are keyed by grader type. The judge carries weight 0, so the quality
+  # score is recorded and reported but never changes the pass verdict.
+  weights:
+    completed: 0.34
+    file-exists: 0.33
+    run-command: 0.33
+    panel: 0
 stimuli:
   - name: typescript-http
     prompt: |
@@ -37,6 +44,50 @@ stimuli:
     graders:
       - name: completed
         type: completed
+      - name: code-quality
+        type: panel
+        config:
+          models:
+            - model: gpt-6-astra
+              reasoning_effort: medium
+          evidence:
+            - repo
+          scoring: scale_1_5
+          # Every criterion is advisory and the overall gate is open, so this
+          # grader always passes. It measures quality; it does not gate.
+          overall_threshold: 0
+          prompt: |
+            You judge the Azure Functions app that is already present in the
+            workspace. Read the files before scoring.
+            Judge only the produced code and project layout. Do not reward or
+            penalise the agent for the tools, skills or documentation it used,
+            and do not infer intent from the transcript.
+            Score each criterion from 1 (poor) to 5 (excellent) and give a short
+            reason that cites a concrete file or line.
+          criteria:
+            - name: up-to-date-api
+              required: false
+              weight: 1
+              description: |
+                The app uses the current Azure Functions Node.js v4 programming
+                model: handlers registered in code with `app.http(...)` from the
+                `@azure/functions` package, a `main` entry point declared in
+                package.json, and no per-function `function.json` files, no
+                `context.res` assignment and no `context.log.info` style calls
+                from the retired v3 model. `@azure/functions` is a v4 range and
+                the declared Node.js engine is a supported LTS version.
+                Score 5 only when no retired v3 construct remains.
+            - name: best-practices
+              required: false
+              weight: 1
+              description: |
+                The project follows sound Azure Functions practice: host.json
+                declares an extension bundle, local.settings.json is present and
+                git-ignored, no secret or connection string is hard-coded, the
+                HTTP handler validates its input and returns explicit status
+                codes, TypeScript output is configured coherently, and the
+                repository carries no stray build output or scratch files.
+                Score 5 only when every point holds.
       - name: typescript-source
         type: file-exists
         config:

@@ -85,11 +85,15 @@ does not read credential stores, and dry-runs do not need a token.
 
 Choose `--all` **or** `--skill <registered-id>`. Omitting the selection is an
 error, not implicit permission to run everything. Repeat `--models` to select
-a registered subset; do not supply a comma-separated model list:
+a registered subset; do not supply a comma-separated model list. Alternatively,
+`--tier <powerful|medium|low>` selects a named model subset from the registry:
 
 ```powershell
-# Alternative to --all: one skill, both configured models (four trials).
+# Alternative to --all: one skill, two named models (four trials).
 npm run eval -- --skill azure-functions-create --models claude-sonnet-5 --models gpt-6-astra
+
+# Run one cost tier across every registered skill.
+npm run eval -- --all --tier low
 
 # Run without HTML: this subset has only two trials, Astra OFF/ON.
 npm run eval:run -- --skill azure-functions-create --models gpt-6-astra
@@ -99,11 +103,23 @@ npm run eval:report -- --input C:\private\benchmarks\<printed-bundle>\native --o
 ```
 
 Unknown/empty selections, repeated model IDs, or combining `--all` and `--skill`
-are rejected before native launch. No model flags means all **registered**
-models for the explicitly selected skill set. Selection preserves configuration
-order; the first selected model's OFF arm is the native baseline. The initial
-registration has exactly one skill/scenario and two models: `--all` means four
-trials, not the legacy full/live suites.
+are rejected before native launch. `--tier` and `--models` are mutually
+exclusive, because a tier is already a named model subset. No model flags means
+all **registered** models for the explicitly selected skill set. Selection
+preserves configuration order; the first selected model's OFF arm is the native
+baseline, so the order of `models` in `local-benchmark.json` is behaviour rather
+than formatting. The registry lists seven models in three tiers and one
+skill/scenario, so `--all` means fourteen trials, not the legacy full/live
+suites.
+
+| Tier | Models |
+| --- | --- |
+| `powerful` | `gpt-6-astra`, `gpt-5.6-sol`, `claude-opus-5` |
+| `medium` | `claude-sonnet-5`, `gpt-5.6-terra` |
+| `low` | `gpt-5.6-luna`, `mai-code-1.1-flash` |
+
+Every registered model belongs to exactly one tier, and a unit test enforces
+that. Add a model to `models` and to one tier in the same change.
 
 `--run-root` (or `VALLY_RUN_ROOT`) is an **existing, clean external parent** for a fresh temporary
 directory, not a previously staged trial. Choose a writable parent outside the
