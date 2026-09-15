@@ -161,6 +161,14 @@ required, explicitly set `VALLY_NPM_REGISTRY` or add
 credential-bearing URLs are rejected. Normal `.npmrc` files and
 registry credentials are not inherited.
 
+NuGet also defaults to its public HTTPS v3 source. The runner writes a
+credential-free `NuGet.Config` into the isolated profile and does not inherit
+the developer profile. A registered skill can require a trusted package
+preflight before paid model calls. Set `VALLY_NUGET_SOURCE` or add
+`--nuget-source https://your-approved-source/v3/index.json` when the local
+network requires another reviewed source. URLs with credentials, queries, or
+fragments are rejected. Dry-run does not run the NuGet preflight.
+
 The wrapper executes the **selected native matrix once** as shard `1/1` with a
 fresh UUID, one worker and `--require-pass`. Native `experiment merge` then
 converts that single complete shard into the canonical experiment output used

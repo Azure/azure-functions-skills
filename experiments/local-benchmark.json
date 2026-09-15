@@ -17,6 +17,7 @@
       ]
     },
     "azure-functions-update": {
+      "nugetPreflight": true,
       "evals": ["evals/azure-functions-update/dotnet-isolated/eval.yaml"],
       "files": [
         "templates/skills/azure-functions-update/SKILL.md",
@@ -34,6 +35,7 @@
         "evals/azure-functions-update/dotnet-isolated/fixtures/UpgradeApp.csproj",
         "evals/azure-functions-update/dotnet-isolated/fixtures/Hello.cs",
         "evals/azure-functions-update/dotnet-isolated/fixtures/host.json",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/trial.gitignore",
         "evals/azure-functions-update/dotnet-isolated/fixtures/guidance.md"
       ]
     }

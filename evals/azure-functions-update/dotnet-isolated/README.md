@@ -15,13 +15,13 @@ No custom agent runner or judge service is used.
   Tools v4 must be on PATH. Install them before the evaluation.
 - Restore this repository's dependencies from its configured npm registry.
   Do not switch to the public registry if it is not available in your network.
-- The isolated app must be able to restore NuGet packages without the normal
-  user profile. This fixture uses the default NuGet source. If that source is
-  blocked, prepare an approved, credential-free NuGet.Config as an explicit
-  fixture before running: add it under fixtures/, list it in
-  experiments/local-benchmark.json, and add its src/dest mapping under
-  agent_environment.files in eval.yaml. Use dest: NuGet.Config. Do not copy
-  private package credentials into a trial.
+- The runner creates a credential-free `NuGet.Config` in its isolated profile.
+  Public NuGet is the default. Use `--nuget-source` or
+  `VALLY_NUGET_SOURCE` only when the local network needs another reviewed
+  HTTPS v3 source. The URL cannot contain credentials, a query, or a fragment.
+- Before a paid run, the runner restores a trusted probe for
+  `Azure.Functions.Sdk` 1.0.0 and Worker 2.50.0. A failed preflight stops the
+  run before Vally starts. Dry-run does not access NuGet.
 - Use reviewed, trusted code only. Do not run in PR-triggered CI. The runner
   isolates configuration, not executable code; it is not a security sandbox.
 - Approve model selection, inference budget, trial count, and owned-process
@@ -47,6 +47,16 @@ $env:VALLY_TRUSTED = '1'
 npm run eval -- --skill azure-functions-update --models claude-sonnet-5 --dry-run
 ```
 
+If public NuGet is not available, set an approved credential-free NuGet proxy.
+Do not use an internal proxy in public GitHub Actions. Ask @tsushi if you need
+the Microsoft internal proxy address.
+
+```powershell
+$env:VALLY_NUGET_SOURCE = 'https://nuget-proxy.example/v3/index.json'
+# Or add this option to one command:
+# --nuget-source https://nuget-proxy.example/v3/index.json
+```
+
 Supply a GitHub token for an account with access to both the agent and judge
 models. Keep it in the process environment; do not print it or put it in files.
 For multiple accounts, add --user with the intended account to gh auth token.
@@ -63,6 +73,7 @@ npm run eval -- --skill azure-functions-update --models claude-sonnet-5
 
 # Remove the token from this shell when no more runs are needed.
 Remove-Item Env:COPILOT_GITHUB_TOKEN
+Remove-Item Env:VALLY_NUGET_SOURCE -ErrorAction SilentlyContinue
 ```
 
 To compare both registered agent models, omit --models. That runs four migration
@@ -83,8 +94,11 @@ for isolation, cleanup, account selection, and report-only commands.
 ## Read the Results
 
 - completed: the agent run finished.
-- publish-and-registration: an independent dotnet publish passed; published
-  output targets net10.0, uses dotnet-isolated, and retains the Hello trigger.
+- migration-configuration-and-publish: the project uses Azure.Functions.Sdk
+  1.0.0 or later and Worker 2.50.0 or later without the old Worker.Sdk package;
+  an independent dotnet publish passed; published output targets net10.0 and
+  uses dotnet-isolated; Core Tools registers Hello and both required HTTP
+  responses pass.
 - migration-quality: the LLM checks the final code and diff against the rubric
   and the fixed [official-source notes](fixtures/guidance.md). It also reads the
   independent execution result written before this judge runs.
@@ -97,10 +111,10 @@ The judge receives repository files, the diff, and the trajectory, not just the 
 message. Model and skill labels are not supplied as scoring criteria, but this
 is not a fully blinded experiment: skill files may be present in repo evidence.
 
-The independent check does not send HTTP requests. The prompt asks the agent to
-check local behavior, but the judge assesses response compatibility from code.
-Do not report an independent HTTP test or Azure deployment success from this
-evaluation. There are no IaC, pipeline, Durable, or non-HTTP bindings in this case.
+The independent check starts the published output with Core Tools and sends the
+two required HTTP requests. It does not test other query inputs or Azure
+deployment. There are no IaC, pipeline, Durable, or non-HTTP bindings in this
+case.
 
 The native grader metadata records judge token usage and latency separately.
 Use those fields for judge cost analysis; do not treat dashboard agent token

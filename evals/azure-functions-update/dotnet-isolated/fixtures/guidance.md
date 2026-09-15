@@ -11,12 +11,18 @@ until all arms finish. URLs alone do not give the judge their page content.
   Replace in-process attributes and packages with isolated worker equivalents.
   The app needs worker startup and compatible binding packages.
   Source: https://learn.microsoft.com/en-us/azure/azure-functions/migrate-dotnet-to-isolated-model
-- The current isolated guide uses the Azure.Functions.Sdk project SDK and an
-  explicit Microsoft.Azure.Functions.Worker package. Check project and package
-  references as a unit. An old sample alone does not establish compatibility.
+- The current isolated guide requires the Azure.Functions.Sdk project SDK
+  version 1.0.0 or later and an explicit Microsoft.Azure.Functions.Worker
+  package. For .NET 10, Worker must be version 2.50.0 or later. Remove the old
+  Microsoft.Azure.Functions.Worker.Sdk package reference. A successful publish
+  with the old Microsoft.NET.Sdk and Worker.Sdk package arrangement does not
+  satisfy this fixed review basis. Check project and package references as a
+  unit. An old sample alone does not establish compatibility.
   Worker startup must match the selected HTTP integration. ASP.NET Core
-  integration and the built-in HTTP model are both valid when configured as
-  documented. Preserve response behavior when changing types.
+  integration requires its matching extension at version 2.1.0 or later and
+  the Builder namespace when using FunctionsApplication.CreateBuilder. The
+  built-in HTTP model is also valid when configured as documented. Preserve
+  response behavior when changing types.
   Source: https://learn.microsoft.com/en-us/azure/azure-functions/dotnet-isolated-process-guide#project-and-package-references
   Source: https://learn.microsoft.com/en-us/azure/azure-functions/dotnet-isolated-process-guide#http-trigger
 - Use net10.0 for the target framework and dotnet-isolated for the local worker
@@ -38,10 +44,10 @@ orchestration, or Azure resource to migrate. Do not require new infrastructure,
 telemetry, dependency injection, or other optional features. Do not require a
 specific valid HTTP integration style or a .NET 8 isolated intermediate stage.
 
-The independent grader checks publish, target framework, worker configuration,
-and the generated Hello trigger. It does not start the host or send HTTP
-requests. Assess response preservation from the code. Report this local runtime
-coverage gap; do not describe semantic review as an executed HTTP test.
+The independent grader checks publish, target framework, and worker
+configuration. It starts the published output with Core Tools, confirms that
+the Hello function is registered, and checks both required HTTP responses.
+Do not infer any additional runtime behavior or Azure validation.
 
 .NET 10 support also depends on the Azure hosting plan. There is no deployed
 plan in this fixture. Do not infer cloud support or require a hosting-plan change.
