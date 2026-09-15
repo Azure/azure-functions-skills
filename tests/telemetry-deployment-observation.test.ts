@@ -5,22 +5,24 @@ import { join } from 'node:path';
 import {
   collectResourceTypes,
   createAzureCliDeploymentQuery,
+  createArmRequestBudget,
   buildRunnerInvocation,
   type ArmDeploymentOperation,
   type ArmDeploymentQuery,
   type ArmDeploymentSummary,
+  type ArmRequestBudget,
 } from '../src/telemetry/arm-deployments.js';
 import {
-  collectContributionWithDependencies,
-  parseContributionInput,
+  collectDeploymentObservationWithDependencies,
+  parseDeploymentObservationInput,
   selectDeployment,
-  type ContributionDependencies,
-  type ContributionInput,
-} from '../src/telemetry/contribution.js';
+  type DeploymentObservationDependencies,
+  type DeploymentObservationInput,
+} from '../src/telemetry/deployment-observation.js';
 import {
-  parseContributionEvent,
+  parseDeploymentObservedEvent,
   type ApplicationInsightsClient,
-  type ContributionEvent,
+  type DeploymentObservedEvent,
 } from '../src/telemetry/sender.js';
 import { readWorkspaceTelemetryState } from '../src/telemetry/workspace-optout.js';
 
@@ -276,7 +278,8 @@ describe('createAzureCliDeploymentQuery', () => {
     });
 
     const query = createAzureCliDeploymentQuery(runner);
-    const operations = await query.listDeploymentOperations(ROOT);
+    const budget: ArmRequestBudget = { tryConsume: () => true };
+    const operations = await query.listDeploymentOperations(ROOT, budget);
 
     expect(operations).toHaveLength(2);
     expect(operations[0]?.targetResourceType).toBe('Microsoft.Web/sites');
@@ -294,7 +297,22 @@ describe('createAzureCliDeploymentQuery', () => {
     await expect(query.listDeploymentOperations(ROOT)).rejects.toThrow();
   });
 
-  it('rejects when pagination never terminates within the page limit', async () => {
+  it('rejects when pagination exhausts the shared request budget', async () => {
+    const runner = vi.fn(async () => JSON.stringify({
+      value: [],
+      nextLink: 'https://management.azure.com/subscriptions/s/operations?$skiptoken=next',
+    }));
+
+    const query = createAzureCliDeploymentQuery(runner);
+    let remaining = 3;
+    const budget: ArmRequestBudget = { tryConsume: () => (remaining > 0 ? (remaining -= 1, true) : false) };
+
+    await expect(query.listDeploymentOperations(ROOT, budget)).rejects.toThrow();
+    // First page is free (charged by the caller); the budget bounds every further page.
+    expect(runner).toHaveBeenCalledTimes(4);
+  });
+
+  it('rejects an unbudgeted pagination request rather than paging unbounded', async () => {
     const runner = vi.fn(async () => JSON.stringify({
       value: [],
       nextLink: 'https://management.azure.com/subscriptions/s/operations?$skiptoken=next',
@@ -303,6 +321,8 @@ describe('createAzureCliDeploymentQuery', () => {
     const query = createAzureCliDeploymentQuery(runner);
 
     await expect(query.listDeploymentOperations(ROOT)).rejects.toThrow();
+    // Without a budget, only the first page runs and the remaining nextLink is a hard stop.
+    expect(runner).toHaveBeenCalledTimes(1);
   });
 
   it('looks up a deployment by name via az deployment sub show', async () => {
@@ -375,8 +395,26 @@ describe('buildRunnerInvocation', () => {
   });
 });
 
-describe('parseContributionInput', () => {
-  const VALID: ContributionInput = {
+describe('createArmRequestBudget', () => {
+  it('allows exactly the configured number of consumptions', () => {
+    const budget = createArmRequestBudget(2);
+    expect(budget.tryConsume()).toBe(true);
+    expect(budget.tryConsume()).toBe(true);
+    expect(budget.tryConsume()).toBe(false);
+  });
+
+  it('defaults to the 50-request ARM bound', () => {
+    const budget = createArmRequestBudget();
+    let count = 0;
+    while (budget.tryConsume()) {
+      count += 1;
+    }
+    expect(count).toBe(50);
+  });
+});
+
+describe('parseDeploymentObservationInput', () => {
+  const VALID: DeploymentObservationInput = {
     skill: 'azure-functions-deploy',
     operation: 'deploy',
     agent: 'copilot-cli',
@@ -384,12 +422,12 @@ describe('parseContributionInput', () => {
     environmentName: 'my-env',
   };
 
-  it('accepts the bounded contribution contract', () => {
-    expect(parseContributionInput(VALID)).toEqual(VALID);
+  it('accepts the bounded deployment observation contract', () => {
+    expect(parseDeploymentObservationInput(VALID)).toEqual(VALID);
   });
 
   it('accepts a minimal input without optional fields', () => {
-    expect(parseContributionInput({
+    expect(parseDeploymentObservationInput({
       skill: 'azure-functions-hosted-skills',
       operation: 'provision',
       agent: 'codex',
@@ -397,18 +435,28 @@ describe('parseContributionInput', () => {
   });
 
   it('rejects unknown fields', () => {
-    expect(() => parseContributionInput({ ...VALID, transcript: 'secret' }))
-      .toThrow('Unsupported contribution property: transcript');
+    expect(() => parseDeploymentObservationInput({ ...VALID, transcript: 'secret' }))
+      .toThrow('Unsupported deployment observation property: transcript');
   });
 
   it('rejects unsupported skill and operation values', () => {
-    expect(() => parseContributionInput({ ...VALID, skill: 'azure-functions-create' })).toThrow();
-    expect(() => parseContributionInput({ ...VALID, operation: 'delete' })).toThrow();
+    expect(() => parseDeploymentObservationInput({ ...VALID, skill: 'azure-functions-create' })).toThrow();
+    expect(() => parseDeploymentObservationInput({ ...VALID, operation: 'delete' })).toThrow();
   });
 
   it('rejects control characters and oversized strings', () => {
-    expect(() => parseContributionInput({ ...VALID, agent: 'copilot\ncli' })).toThrow();
-    expect(() => parseContributionInput({ ...VALID, environmentName: 'x'.repeat(300) })).toThrow();
+    expect(() => parseDeploymentObservationInput({ ...VALID, agent: 'copilot\ncli' })).toThrow();
+    expect(() => parseDeploymentObservationInput({ ...VALID, environmentName: 'x'.repeat(300) })).toThrow();
+  });
+
+  it('keeps an optional startedAt string for later selection', () => {
+    const parsed = parseDeploymentObservationInput({ ...VALID, startedAt: '2026-09-09T10:20:00Z' });
+    expect(parsed.startedAt).toBe('2026-09-09T10:20:00Z');
+  });
+
+  it('ignores a non-string startedAt rather than failing', () => {
+    expect(parseDeploymentObservationInput({ ...VALID, startedAt: 12345 })).toEqual(VALID);
+    expect(parseDeploymentObservationInput({ ...VALID, startedAt: 'x\n' })).toEqual(VALID);
   });
 });
 
@@ -446,7 +494,7 @@ function makeClient(
   return { trackEvent: vi.fn(), flush: vi.fn(flush) };
 }
 
-function baseDeps(overrides: Partial<ContributionDependencies>): ContributionDependencies {
+function baseDeps(overrides: Partial<DeploymentObservationDependencies>): DeploymentObservationDependencies {
   return {
     connectionString: 'InstrumentationKey=test-key',
     createClient: () => makeClient(),
@@ -466,7 +514,7 @@ const RECENT_DEPLOYMENT: ArmDeploymentSummary = {
   timestamp: '2026-09-09T10:25:00Z',
 };
 
-const DEPLOY_INPUT: ContributionInput = {
+const DEPLOY_INPUT: DeploymentObservationInput = {
   skill: 'azure-functions-deploy',
   operation: 'deploy',
   agent: 'copilot-cli',
@@ -474,10 +522,10 @@ const DEPLOY_INPUT: ContributionInput = {
   environmentName: 'my-env',
 };
 
-describe('collectContributionWithDependencies', () => {
+describe('collectDeploymentObservationWithDependencies', () => {
   it('short-circuits on environment opt-out before any ARM query', async () => {
     const query = makeQuery([RECENT_DEPLOYMENT], {});
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query,
       environment: { AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'false' },
     }));
@@ -487,7 +535,7 @@ describe('collectContributionWithDependencies', () => {
 
   it('short-circuits on workspace opt-out before any ARM query', async () => {
     const query = makeQuery([RECENT_DEPLOYMENT], {});
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query,
       workspaceTelemetryEnabled: false,
     }));
@@ -497,7 +545,7 @@ describe('collectContributionWithDependencies', () => {
 
   it('returns not-configured for the placeholder connection string without querying ARM', async () => {
     const query = makeQuery([RECENT_DEPLOYMENT], {});
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query,
       connectionString: '__APPLICATIONINSIGHTS_CONNECTION_STRING__',
     }));
@@ -507,7 +555,7 @@ describe('collectContributionWithDependencies', () => {
 
   it('skips before any query when environmentName is absent', async () => {
     const query = makeQuery([RECENT_DEPLOYMENT], {});
-    const result = await collectContributionWithDependencies({
+    const result = await collectDeploymentObservationWithDependencies({
       skill: 'azure-functions-deploy',
       operation: 'deploy',
       agent: 'copilot-cli',
@@ -518,7 +566,7 @@ describe('collectContributionWithDependencies', () => {
 
   it('skips before any query when environmentName is not a valid ARM name', async () => {
     const query = makeQuery([RECENT_DEPLOYMENT], {});
-    const result = await collectContributionWithDependencies({
+    const result = await collectDeploymentObservationWithDependencies({
       skill: 'azure-functions-deploy',
       operation: 'deploy',
       agent: 'copilot-cli',
@@ -533,7 +581,7 @@ describe('collectContributionWithDependencies', () => {
     const query = makeQuery([{ ...RECENT_DEPLOYMENT, name: 'my-env' }], {
       [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
     });
-    await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query,
       createClient: () => client,
     }));
@@ -541,7 +589,7 @@ describe('collectContributionWithDependencies', () => {
   });
 
   it('skips with no-recent-deployment when the lookup returns nothing (404)', async () => {
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query: makeQuery([], {}),
     }));
     expect(result).toEqual({ status: 'skipped', reason: 'no-recent-deployment' });
@@ -553,7 +601,7 @@ describe('collectContributionWithDependencies', () => {
       name: 'my-env',
       timestamp: '2026-09-09T09:00:00Z',
     };
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query: makeQuery([stale], {}),
     }));
     expect(result).toEqual({ status: 'skipped', reason: 'no-recent-deployment' });
@@ -565,7 +613,7 @@ describe('collectContributionWithDependencies', () => {
       name: 'my-env',
       provisioningState: 'Failed',
     };
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query: makeQuery([failed], {}),
     }));
     expect(result).toEqual({ status: 'skipped', reason: 'no-recent-deployment' });
@@ -578,7 +626,7 @@ describe('collectContributionWithDependencies', () => {
       }),
       listDeploymentOperations: vi.fn(async () => []),
     };
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({ query }));
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({ query }));
     expect(result).toEqual({ status: 'skipped', reason: 'deployment-query-failed' });
   });
 
@@ -586,7 +634,7 @@ describe('collectContributionWithDependencies', () => {
     const query = makeQuery([RECENT_DEPLOYMENT], {
       [ROOT]: [createOp({ provisioningOperation: 'Read', targetResourceType: 'Microsoft.Web/sites' })],
     });
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({ query }));
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({ query }));
     expect(result).toEqual({ status: 'skipped', reason: 'no-types' });
   });
 
@@ -599,7 +647,7 @@ describe('collectContributionWithDependencies', () => {
       ],
     });
 
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query,
       createClient: () => client,
     }));
@@ -607,7 +655,7 @@ describe('collectContributionWithDependencies', () => {
     expect(result).toEqual({ status: 'sent' });
     expect(client.trackEvent).toHaveBeenCalledOnce();
     const call = (client.trackEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.name).toBe('azure_contribution');
+    expect(call.name).toBe('azure_deployment_observed');
     expect(call.properties).toEqual({
       skill: 'azure-functions-deploy',
       operation: 'deploy',
@@ -626,7 +674,7 @@ describe('collectContributionWithDependencies', () => {
       [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
     });
 
-    await collectContributionWithDependencies({
+    await collectDeploymentObservationWithDependencies({
       skill: 'azure-functions-hosted-skills',
       operation: 'provision',
       agent: 'codex',
@@ -645,7 +693,7 @@ describe('collectContributionWithDependencies', () => {
       [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
     });
 
-    await collectContributionWithDependencies({
+    await collectDeploymentObservationWithDependencies({
       skill: 'azure-functions-deploy',
       operation: 'deploy',
       agent: 'some-unlisted-agent',
@@ -662,7 +710,7 @@ describe('collectContributionWithDependencies', () => {
       [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
     });
 
-    await collectContributionWithDependencies({
+    await collectDeploymentObservationWithDependencies({
       skill: 'azure-functions-deploy',
       operation: 'deploy',
       agent: 'copilot-cli',
@@ -680,7 +728,7 @@ describe('collectContributionWithDependencies', () => {
       [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
     });
 
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query,
       createClient: () => client,
     }));
@@ -696,7 +744,7 @@ describe('collectContributionWithDependencies', () => {
     const clock = [base, base, base + 100];
     const now = () => (clock.length > 1 ? (clock.shift() as number) : clock[0]);
 
-    const result = await collectContributionWithDependencies(DEPLOY_INPUT, baseDeps({
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
       query,
       now,
       armDeadlineMs: 50,
@@ -704,10 +752,85 @@ describe('collectContributionWithDependencies', () => {
 
     expect(result).toEqual({ status: 'skipped', reason: 'deadline-exceeded' });
   });
+
+  it('charges the deployment lookup against the shared 50-request budget', async () => {
+    let httpCalls = 0;
+    const runner = vi.fn(async (args: readonly string[]) => {
+      httpCalls += 1;
+      if (args[0] === 'deployment' && args[1] === 'sub' && args[2] === 'show') {
+        return JSON.stringify({
+          id: ROOT,
+          name: 'my-env',
+          properties: { provisioningState: 'Succeeded', timestamp: '2026-09-09T10:25:00Z' },
+        });
+      }
+      // Operation pages never terminate on their own, so only the budget can stop them.
+      return JSON.stringify({
+        value: [{ properties: { provisioningOperation: 'Create', provisioningState: 'Succeeded', targetResource: { resourceType: 'Microsoft.Web/sites', id: '/r/1' } } }],
+        nextLink: 'https://management.azure.com/subscriptions/s/operations?$skiptoken=more',
+      });
+    });
+    const query = createAzureCliDeploymentQuery(runner, 60_000);
+
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
+      query,
+      armDeadlineMs: 60_000,
+    }));
+
+    expect(result).toEqual({ status: 'skipped', reason: 'request-limit-exceeded' });
+    // The lookup is one request; with it counted, total ARM HTTP requests never exceed 50.
+    expect(httpCalls).toBeLessThanOrEqual(50);
+  });
 });
 
-describe('parseContributionEvent', () => {
-  const EVENT: ContributionEvent = {
+describe('collectDeploymentObservationWithDependencies startedAt lower bound', () => {
+  function sendableQuery(): ArmDeploymentQuery {
+    return makeQuery([RECENT_DEPLOYMENT], {
+      [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
+    });
+  }
+
+  it('falls back to the window alone when startedAt is absent', async () => {
+    const result = await collectDeploymentObservationWithDependencies(
+      DEPLOY_INPUT,
+      baseDeps({ query: sendableQuery() }),
+    );
+    expect(result).toEqual({ status: 'sent' });
+  });
+
+  it('ignores a malformed startedAt and still sends', async () => {
+    const result = await collectDeploymentObservationWithDependencies(
+      { ...DEPLOY_INPUT, startedAt: 'not-a-date' },
+      baseDeps({ query: sendableQuery() }),
+    );
+    expect(result).toEqual({ status: 'sent' });
+  });
+
+  it('rejects a deployment that completed before startedAt', async () => {
+    // The deployment completed at 10:25; the run started at 10:26, so it is a stale match.
+    const result = await collectDeploymentObservationWithDependencies(
+      { ...DEPLOY_INPUT, startedAt: '2026-09-09T10:26:00Z' },
+      baseDeps({ query: sendableQuery() }),
+    );
+    expect(result).toEqual({ status: 'skipped', reason: 'deployment-precedes-start' });
+  });
+
+  it('accepts a deployment that completed at or after startedAt inside the window', async () => {
+    const client = makeClient();
+    const result = await collectDeploymentObservationWithDependencies(
+      { ...DEPLOY_INPUT, startedAt: '2026-09-09T10:20:00Z' },
+      baseDeps({ query: sendableQuery(), createClient: () => client }),
+    );
+    expect(result).toEqual({ status: 'sent' });
+    const call = (client.trackEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(Object.keys(call.properties)).toHaveLength(7);
+    expect(JSON.stringify(call)).not.toContain('2026-09-09T10:20:00Z');
+    expect(JSON.stringify(call)).not.toContain('startedAt');
+  });
+});
+
+describe('parseDeploymentObservedEvent', () => {
+  const EVENT: DeploymentObservedEvent = {
     skill: 'azure-functions-deploy',
     operation: 'deploy',
     result: 'success',
@@ -717,19 +840,19 @@ describe('parseContributionEvent', () => {
     skillsVersion: 'unknown',
   };
 
-  it('accepts a well-formed contribution event', () => {
-    expect(parseContributionEvent(EVENT)).toEqual(EVENT);
+  it('accepts a well-formed deployment observation event', () => {
+    expect(parseDeploymentObservedEvent(EVENT)).toEqual(EVENT);
   });
 
   it('rejects a non-success result and invalid resource types', () => {
-    expect(() => parseContributionEvent({ ...EVENT, result: 'failure' })).toThrow();
-    expect(() => parseContributionEvent({ ...EVENT, resourceTypes: ['/subscriptions/s'] })).toThrow();
-    expect(() => parseContributionEvent({ ...EVENT, resourceTypes: [] })).toThrow();
+    expect(() => parseDeploymentObservedEvent({ ...EVENT, result: 'failure' })).toThrow();
+    expect(() => parseDeploymentObservedEvent({ ...EVENT, resourceTypes: ['/subscriptions/s'] })).toThrow();
+    expect(() => parseDeploymentObservedEvent({ ...EVENT, resourceTypes: [] })).toThrow();
   });
 
   it('rejects a skill and deploymentKind mismatch', () => {
-    expect(() => parseContributionEvent({ ...EVENT, deploymentKind: 'hosted-agent' })).toThrow();
-    expect(() => parseContributionEvent({
+    expect(() => parseDeploymentObservedEvent({ ...EVENT, deploymentKind: 'hosted-agent' })).toThrow();
+    expect(() => parseDeploymentObservedEvent({
       ...EVENT,
       skill: 'azure-functions-hosted-skills',
       operation: 'provision',
@@ -738,8 +861,8 @@ describe('parseContributionEvent', () => {
   });
 
   it('coerces an out-of-shape skillsVersion to unknown', () => {
-    expect(parseContributionEvent({ ...EVENT, skillsVersion: '/etc/passwd' }).skillsVersion).toBe('unknown');
-    expect(parseContributionEvent({ ...EVENT, skillsVersion: '1.2.3' }).skillsVersion).toBe('1.2.3');
+    expect(parseDeploymentObservedEvent({ ...EVENT, skillsVersion: '/etc/passwd' }).skillsVersion).toBe('unknown');
+    expect(parseDeploymentObservedEvent({ ...EVENT, skillsVersion: '1.2.3' }).skillsVersion).toBe('1.2.3');
   });
 });
 
@@ -777,6 +900,24 @@ describe('readWorkspaceTelemetryState', () => {
   it('fails closed as unreadable when a config cannot be parsed', () => {
     const root = tempWorkspace();
     const path = writeConfig(root, '{ this is not valid json');
+    expect(readWorkspaceTelemetryState([path])).toBe('unreadable');
+  });
+
+  it('fails closed as unreadable when the config is JSON null', () => {
+    const root = tempWorkspace();
+    const path = writeConfig(root, 'null');
+    expect(readWorkspaceTelemetryState([path])).toBe('unreadable');
+  });
+
+  it('fails closed as unreadable when the config is a JSON array', () => {
+    const root = tempWorkspace();
+    const path = writeConfig(root, '[]');
+    expect(readWorkspaceTelemetryState([path])).toBe('unreadable');
+  });
+
+  it('fails closed as unreadable when the config is a bare JSON string', () => {
+    const root = tempWorkspace();
+    const path = writeConfig(root, '"enabled"');
     expect(readWorkspaceTelemetryState([path])).toBe('unreadable');
   });
 });

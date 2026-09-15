@@ -84,8 +84,8 @@ if (command === 'install' || command === 'update') {
 } else if (command === 'doctor') {
   await runDoctorCommand();
 } else if (command === 'telemetry') {
-  if (args[1] === 'contribution') {
-    await runContributionTelemetryCommand();
+  if (args[1] === 'deployment-observed') {
+    await runDeploymentObservedTelemetryCommand();
   } else {
     await runTelemetryCommand();
   }
@@ -95,27 +95,27 @@ if (command === 'install' || command === 'update') {
   process.exit(1);
 }
 
-async function runContributionTelemetryCommand() {
+async function runDeploymentObservedTelemetryCommand() {
   try {
     const dir = getFlag('--dir') || process.cwd();
     const { resolveTelemetryEnabled, telemetryConfigPath } = await import('../lib/setup/workspace-assets.js');
     const {
-      parseContributionInput,
-      collectContribution,
+      parseDeploymentObservationInput,
+      collectDeploymentObservation,
       readWorkspaceTelemetryState,
     } = await import('../lib/telemetry/index.js');
     const rawInput = await readStdin(16 * 1024);
     if (rawInput.trim().length === 0) {
-      throw new Error('Contribution telemetry input is required on stdin.');
+      throw new Error('Deployment observation telemetry input is required on stdin.');
     }
-    const input = parseContributionInput(JSON.parse(rawInput));
+    const input = parseDeploymentObservationInput(JSON.parse(rawInput));
     const configPaths = ['ghcp', 'claude', 'codex'].map(agent => telemetryConfigPath(dir, agent));
     if (readWorkspaceTelemetryState(configPaths) !== 'active') {
       process.stdout.write('disabled\n');
       return;
     }
     const workspaceTelemetryEnabled = resolveTelemetryEnabled(dir, undefined);
-    const result = await collectContribution(input, { workspaceTelemetryEnabled });
+    const result = await collectDeploymentObservation(input, { workspaceTelemetryEnabled });
     process.stdout.write(`${result.status}\n`);
   } catch {
     process.stdout.write('failed\n');

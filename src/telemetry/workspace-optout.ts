@@ -13,7 +13,13 @@ export function readWorkspaceTelemetryState(configPaths: readonly string[]): Wor
       sawUnreadable = true;
       continue;
     }
-    if (isRecord(parsed) && parsed.enabled === false) {
+    if (!isRecord(parsed)) {
+      // A valid JSON value that is not an object (null, array, or primitive) is a
+      // malformed config. Treat it as unreadable so the caller fails closed.
+      sawUnreadable = true;
+      continue;
+    }
+    if (parsed.enabled === false) {
       return 'disabled';
     }
   }

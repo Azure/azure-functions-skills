@@ -8,7 +8,6 @@ const RESOURCE_TYPE_PATTERN =
 const GENERAL_RESOURCE_TYPE_PATTERN =
   /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
 const MAX_RESOURCE_TYPE_LENGTH = 256;
-const MAX_PAGES = 20;
 
 const DEFAULT_DEADLINE_MS = 15_000;
 export const ARM_COLLECTION_DEADLINE_MS = 20_000;
@@ -50,6 +49,7 @@ export interface ResourceTypeCollectionOptions {
   readonly maxDepth?: number;
   readonly maxTypes?: number;
   readonly now?: () => number;
+  readonly budget?: ArmRequestBudget;
 }
 
 export type ArmSkipReason =
@@ -74,6 +74,10 @@ function createRequestBudget(max: number): ArmRequestBudget {
       return true;
     },
   };
+}
+
+export function createArmRequestBudget(max: number = DEFAULT_MAX_REQUESTS): ArmRequestBudget {
+  return createRequestBudget(max);
 }
 
 function startDeadline(totalMs: number, now: () => number = Date.now): { remainingMs(): number } {
@@ -116,7 +120,7 @@ export async function collectResourceTypes(
   const start = now();
   const visited = new Set<string>();
   const types = new Set<string>();
-  const budget = createRequestBudget(maxRequests);
+  const budget = options.budget ?? createRequestBudget(maxRequests);
   const stack: Array<{ readonly id: string; readonly depth: number }> = [
     { id: rootDeploymentId, depth: 0 },
   ];
@@ -235,11 +239,17 @@ export function createAzureCliDeploymentQuery(
         throw new Error('Invalid ARM deployment identifier.');
       }
       const operations: ArmDeploymentOperation[] = [];
-      let url = `${ARM_ORIGIN.replace(/\/$/, '')}${deploymentId}/operations?api-version=${OPERATIONS_API_VERSION}`;
-      for (let page = 0; page < MAX_PAGES; page += 1) {
-        if (page > 0 && budget !== undefined && !budget.tryConsume()) {
-          throw new ArmRequestBudgetError();
+      let url: string | undefined = `${ARM_ORIGIN.replace(/\/$/, '')}${deploymentId}/operations?api-version=${OPERATIONS_API_VERSION}`;
+      let firstPage = true;
+      while (url !== undefined) {
+        // The first page is charged by the caller (it is the deployment's own request);
+        // every subsequent page must consume the shared budget before it runs.
+        if (!firstPage) {
+          if (budget === undefined || !budget.tryConsume()) {
+            throw new ArmRequestBudgetError();
+          }
         }
+        firstPage = false;
         const raw = await runner(['rest', '--method', 'get', '--url', url], callTimeout());
         const parsed: unknown = JSON.parse(raw);
         if (!isRecord(parsed)) return operations;
@@ -257,7 +267,7 @@ export function createAzureCliDeploymentQuery(
         }
         url = nextLink;
       }
-      throw new ArmRequestBudgetError();
+      return operations;
     },
   };
 }
