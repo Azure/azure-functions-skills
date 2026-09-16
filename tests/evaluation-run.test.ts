@@ -98,6 +98,51 @@ describe('benchmarkEnvironment', () => {
 });
 
 describe('selectBenchmark', () => {
+  const scenarioConfig = {
+    models: ['gpt-6-astra'],
+    skills: {
+      update: {
+        evals: ['evals/update/dotnet/eval.yaml', 'evals/update/bundle/eval.yaml'],
+        files: ['templates/skills/update/SKILL.md', 'templates/skills/update/references/bundle.md',
+          'evals/update/dotnet/fixtures/app.cs', 'evals/update/bundle/fixtures/host.json'],
+        nugetPreflight: true,
+        nugetPreflightScenarios: ['dotnet'],
+      },
+    },
+  };
+
+  it('filters scenarios and fixture files but retains skill references', () => {
+    expect(selectBenchmark(scenarioConfig, { skill: 'update', scenarios: ['bundle'] })).toEqual({
+      models: ['gpt-6-astra'],
+      evals: ['evals/update/bundle/eval.yaml'],
+      files: ['templates/skills/update/SKILL.md', 'templates/skills/update/references/bundle.md',
+        'evals/update/bundle/fixtures/host.json'],
+    });
+    expect(selectBenchmark(scenarioConfig, { skill: 'update', scenarios: ['dotnet'] }).nugetPreflight).toBe(true);
+    expect(selectBenchmark(scenarioConfig, { skill: 'update' }).evals).toHaveLength(2);
+    expect(selectBenchmark(scenarioConfig, { all: true }).nugetPreflight).toBe(true);
+    expect(selectBenchmark(scenarioConfig, { skill: 'update', scenarios: ['bundle', 'dotnet'] }).evals)
+      .toEqual(scenarioConfig.skills.update.evals);
+  });
+
+  it('rejects empty, duplicate, unknown and non-skill scenario selections', () => {
+    for (const scenarios of [[], [''], ['unknown'], ['bundle', 'bundle'], ['bundle,dotnet']]) {
+      expect(() => selectBenchmark(scenarioConfig, { skill: 'update', scenarios })).toThrow(/scenario/i);
+    }
+    expect(() => selectBenchmark(scenarioConfig, { all: true, scenarios: ['bundle'] })).toThrow(/--skill/);
+  });
+
+  it('validates scenario prerequisites and treats an empty list as no preflight', () => {
+    for (const nugetPreflightScenarios of [['unknown'], ['dotnet', 'dotnet'], [''], true]) {
+      const invalid = structuredClone(scenarioConfig);
+      Object.assign(invalid.skills.update, { nugetPreflightScenarios });
+      expect(() => selectBenchmark(invalid, { skill: 'update' })).toThrow(/nugetPreflightScenarios/);
+    }
+    const none = structuredClone(scenarioConfig);
+    none.skills.update.nugetPreflightScenarios = [];
+    expect(selectBenchmark(none, { skill: 'update' }).nugetPreflight).toBeUndefined();
+  });
+
   it('requires an explicit all or single-skill selection, even for dry-runs', () => {
     expect(() => selectBenchmark(config, {})).toThrow(/--all.*--skill/);
     expect(() => selectBenchmark(config, { all: true, skill: 'azure-functions-create' })).toThrow(/--all.*--skill/);
@@ -191,8 +236,27 @@ describe('runBenchmark', () => {
       return result();
     });
     expect(runBenchmark({ ...options(), all: false, skill: 'azure-functions-update',
-      models: ['gpt-6-astra'], dryRun: true }, env).dryRun).toBe(true);
+      scenarios: ['dotnet-isolated'], models: ['gpt-6-astra'], dryRun: true }, env).dryRun).toBe(true);
     expect(generateReport).not.toHaveBeenCalled();
+  });
+
+  it('stages only the bundle scenario and skips NuGet before native execution', () => {
+    const normal = vi.mocked(spawnSync).getMockImplementation();
+    vi.mocked(spawnSync).mockImplementation((command, argv, opts) => {
+      expect(command).not.toBe('dotnet');
+      if (argv?.[2] === 'run') {
+        const inputs = join(dirname(String(opts?.cwd)), 'inputs');
+        const definition = JSON.parse(readFileSync(argv[3], 'utf8'));
+        expect(definition.evals).toEqual(['../evals/azure-functions-update/extension-bundles/eval.yaml']);
+        expect(readdirSync(join(inputs, 'evals', 'azure-functions-update'))).toEqual(['extension-bundles']);
+        expect(existsSync(join(inputs, 'templates', 'skills', 'azure-functions-update', 'references', 'bundles-v4.md')))
+          .toBe(true);
+      }
+      return normal?.(command, argv, opts) ?? result();
+    });
+    expect(runBenchmark({ ...options(), all: false, skill: 'azure-functions-update',
+      scenarios: ['extension-bundles'], models: ['gpt-6-astra'] }, env).exitCode).toBe(0);
+    expect(spawnSync).toHaveBeenCalledTimes(2);
   });
 
   it('uses a selected model as the baseline without running extra model-specific commands', () => {

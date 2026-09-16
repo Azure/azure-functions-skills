@@ -1,0 +1,16 @@
+{
+  "version": "2.0",
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[3.41.0]"
+  },
+  "functionTimeout": "00:05:00",
+  "logging": { "logLevel": { "default": "Warning" } },
+  "extensions": {
+    "eventHubs": {
+      "batchCheckpointFrequency": 1,
+      "maxEventBatchSize": 32,
+      "prefetchCount": 64
+    }
+  }
+}

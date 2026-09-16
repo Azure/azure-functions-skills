@@ -29,11 +29,16 @@ Read only the files for the requested scenario and its required dependencies. Do
 | Python programming model v1 to v2 | [Python model migration](references/python-model-v2.md) |
 | Other language versions or host version selection | [Runtime and language versions](references/runtime-versions.md) |
 | Binding extension updates | [Binding extensions](references/extensions.md) |
-| Durable Functions extension v1 to v2 | [Durable Functions migration](references/durable-v2.md) |
+| Durable Functions extension changes, including bundle updates | [Durable Functions migration](references/durable-v2.md) |
 | Extension bundles v1, v2, or v3 to v4 | [Extension bundles](references/bundles-v4.md) |
 | Existing Bicep, ARM, or deployment scripts | [Infrastructure configuration](references/infrastructure.md) |
 | Existing GitHub Actions or Azure Pipelines | [Pipeline configuration](references/pipelines.md) |
 
 Keep host, language, programming model, and extension versions separate. Their version numbers do not identify the same change.
+
+For bundle updates, identify the resolved bundle release and each used
+extension version before changing bindings. A bundle major is not an
+extension version. Keep the language programming model unless its change
+is required and approved.
 
 If a source is unavailable or does not cover the case, use a targeted search in Microsoft Learn or the official repository. Report unresolved gaps instead of repeating the same search or inventing requirements.

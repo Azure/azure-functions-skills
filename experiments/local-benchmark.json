@@ -17,8 +17,11 @@
       ]
     },
     "azure-functions-update": {
-      "nugetPreflight": true,
-      "evals": ["evals/azure-functions-update/dotnet-isolated/eval.yaml"],
+      "nugetPreflightScenarios": ["dotnet-isolated"],
+      "evals": [
+        "evals/azure-functions-update/dotnet-isolated/eval.yaml",
+        "evals/azure-functions-update/extension-bundles/eval.yaml"
+      ],
       "files": [
         "templates/skills/azure-functions-update/SKILL.md",
         "templates/skills/azure-functions-update/references/host-v4.md",
@@ -36,7 +39,16 @@
         "evals/azure-functions-update/dotnet-isolated/fixtures/Hello.cs",
         "evals/azure-functions-update/dotnet-isolated/fixtures/host.json",
         "evals/azure-functions-update/dotnet-isolated/fixtures/trial.gitignore",
-        "evals/azure-functions-update/dotnet-isolated/fixtures/guidance.md"
+        "evals/azure-functions-update/dotnet-isolated/fixtures/guidance.md",
+        "evals/azure-functions-update/extension-bundles/fixtures/bundle-v1.host.json",
+        "evals/azure-functions-update/extension-bundles/fixtures/bundle-v2.host.json",
+        "evals/azure-functions-update/extension-bundles/fixtures/bundle-v3.host.json",
+        "evals/azure-functions-update/extension-bundles/fixtures/AuditChanges.js",
+        "evals/azure-functions-update/extension-bundles/fixtures/AuditChanges.json",
+        "evals/azure-functions-update/extension-bundles/fixtures/CaptureBatch.js",
+        "evals/azure-functions-update/extension-bundles/fixtures/CaptureBatch.json",
+        "evals/azure-functions-update/extension-bundles/fixtures/grade.mjs",
+        "evals/azure-functions-update/extension-bundles/fixtures/trial.gitignore"
       ]
     }
   }

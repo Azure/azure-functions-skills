@@ -3,6 +3,7 @@
 These Vally **0.16.0** experiments use the
 [TypeScript HTTP scenario](../evals/azure-functions-create/typescript-http/README.md)
 and the [.NET migration scenario](../evals/azure-functions-update/dotnet-isolated/README.md).
+The local runner also registers the [Extension Bundle migration scenario](../evals/azure-functions-update/extension-bundles/README.md).
 They compare the same objective task, not whether the agent invoked a skill.
 Vally owns execution, grading and measurement; the existing static dashboard
 consumes its canonical results. No custom agent runner, Azure resources, or CI
@@ -46,7 +47,7 @@ $env:VALLY_OUTPUT_ROOT = 'C:\private\benchmarks'
 # Explicit acknowledgment of reviewed local code, not spending approval.
 $env:VALLY_TRUSTED = '1'
 
-# Free: stage isolated inputs and resolve the native eight-cell plan.
+# Free: stage isolated inputs and show the selected native plan.
 npm run eval -- --all --dry-run
 ```
 
@@ -63,7 +64,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOK
 }
 
 # Acquiring a token does not authorize inference spending.
-# Paid: approve eight trials, migration judge calls, budget and cleanup first.
+# Paid: approve the dry-run trial count, judge calls, budget and cleanup first.
 npm run eval -- --all
 ```
 
@@ -104,10 +105,27 @@ Unknown/empty selections, repeated model IDs, or combining `--all` and `--skill`
 are rejected before native launch. No model flags means all **registered**
 models for the explicitly selected skill set. Selection preserves configuration
 order; the first selected model's OFF arm is the native baseline. The current
-registration has two skills, one scenario each, and two models: `--all` means
-eight trials plus the migration judge calls, not the legacy full/live suites.
-Use `--skill azure-functions-update --models claude-sonnet-5` for two migration
-trials with the same fixed judge. A dry-run does not invoke that judge.
+registration is in `local-benchmark.json`. Each selected scenario runs once
+per selected model with skills OFF and once with skills ON. `--all` selects
+all registered scenarios and models, not the legacy full/live suites.
+Use `--skill azure-functions-update --scenario dotnet-isolated --models claude-sonnet-5`
+for two .NET migration trials with the same fixed judge. A dry-run does not invoke that judge.
+
+Repeat `--scenario <directory-id>` to select scenarios within one `--skill`.
+This option cannot be combined with `--all`. Empty, unknown and duplicate
+scenario IDs are errors. Do not use comma-separated values. Without this
+option, the selected skill runs all its registered scenarios.
+
+```powershell
+# Free: only the bundle scenario, one model, OFF and ON.
+npm run eval -- --skill azure-functions-update --scenario extension-bundles --models gpt-6-astra --dry-run
+```
+
+The runner keeps the selected skill references but does not copy fixtures
+from excluded scenarios. `nugetPreflightScenarios` lists the scenario IDs
+that need NuGet. An empty list disables that preflight. If the field is
+absent, the previous `nugetPreflight` boolean still applies. Bundle-only
+runs do not select .NET or run its NuGet preflight.
 
 `--run-root` (or `VALLY_RUN_ROOT`) is an **existing, clean external parent** for a fresh temporary
 directory, not a previously staged trial. Choose a writable parent outside the
@@ -117,9 +135,10 @@ automatically named, fresh `benchmark-<uuid>` bundles. Alternatively, `--output`
 specifies one **new private bundle**, with an existing parent, outside the
 checkout. Explicit flags override environment defaults. Paths are resolved
 through existing links before checks; an existing bundle is never reused.
-Node 24+, PowerShell 7,
-npm and Functions Core Tools v4 must already be on PATH. The wrapper is Node/ESM
-and cross-platform; the scenario's existing grader requires `pwsh`.
+Node 24+ and npm must already be on PATH. Check the selected scenario guide
+for additional tools. The wrapper is Node/ESM and cross-platform.
+The .NET scenario requires PowerShell 7 and Functions Core Tools v4;
+the bundle scenario uses Node.js only.
 
 `--trusted` (or exactly `VALLY_TRUSTED=1`) acknowledges review of the checked-out configuration, eval, target
 skill and executable tools. It is **not a sandbox or a budget authorization**.
