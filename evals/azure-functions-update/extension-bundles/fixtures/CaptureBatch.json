@@ -1,0 +1,23 @@
+{
+  "bindings": [
+    {
+      "type": "eventHubTrigger",
+      "direction": "in",
+      "name": "messages",
+      "eventHubName": "order-events",
+      "connection": "EventsConnection",
+      "consumerGroup": "audit-reader",
+      "cardinality": "many",
+      "dataType": "json"
+    },
+    {
+      "type": "cosmosDB",
+      "direction": "out",
+      "name": "records",
+      "databaseName": "sales",
+      "collectionName": "processed",
+      "connectionStringSetting": "OrdersConnection",
+      "createIfNotExists": false
+    }
+  ]
+}

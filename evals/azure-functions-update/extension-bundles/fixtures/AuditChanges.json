@@ -1,0 +1,25 @@
+{
+  "bindings": [
+    {
+      "type": "cosmosDBTrigger",
+      "direction": "in",
+      "name": "documents",
+      "databaseName": "sales",
+      "collectionName": "orders",
+      "connectionStringSetting": "OrdersConnection",
+      "leaseConnectionStringSetting": "LeasesConnection",
+      "leaseDatabaseName": "operations",
+      "leaseCollectionName": "leases",
+      "leaseCollectionPrefix": "audit",
+      "createLeaseCollectionIfNotExists": false,
+      "startFromBeginning": false
+    },
+    {
+      "type": "eventHub",
+      "direction": "out",
+      "name": "events",
+      "eventHubName": "order-events",
+      "connection": "EventsConnection"
+    }
+  ]
+}

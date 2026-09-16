@@ -1,0 +1,82 @@
+name: azure-functions-update-extension-bundles
+description: Migrate three JavaScript model-v3 apps from representative bundle v1, v2 and v3 releases to v4.
+tags:
+  skill: azure-functions-update
+  scenario: extension-bundles
+  tier: local
+defaults:
+  executor: copilot-sdk
+  model: claude-sonnet-5
+  runs: 1
+  timeout: 10m
+agent_environment:
+  skills:
+    - ../../../templates/skills/azure-functions-update
+  files:
+    - src: fixtures/bundle-v1.host.json
+      dest: bundle-v1/host.json
+    - src: fixtures/bundle-v2.host.json
+      dest: bundle-v2/host.json
+    - src: fixtures/bundle-v3.host.json
+      dest: bundle-v3/host.json
+    - src: fixtures/AuditChanges.js
+      dest: bundle-v1/AuditChanges/index.js
+    - src: fixtures/AuditChanges.json
+      dest: bundle-v1/AuditChanges/function.json
+    - src: fixtures/CaptureBatch.js
+      dest: bundle-v1/CaptureBatch/index.js
+    - src: fixtures/CaptureBatch.json
+      dest: bundle-v1/CaptureBatch/function.json
+    - src: fixtures/AuditChanges.js
+      dest: bundle-v2/AuditChanges/index.js
+    - src: fixtures/AuditChanges.json
+      dest: bundle-v2/AuditChanges/function.json
+    - src: fixtures/CaptureBatch.js
+      dest: bundle-v2/CaptureBatch/index.js
+    - src: fixtures/CaptureBatch.json
+      dest: bundle-v2/CaptureBatch/function.json
+    - src: fixtures/AuditChanges.js
+      dest: bundle-v3/AuditChanges/index.js
+    - src: fixtures/AuditChanges.json
+      dest: bundle-v3/AuditChanges/function.json
+    - src: fixtures/CaptureBatch.js
+      dest: bundle-v3/CaptureBatch/index.js
+    - src: fixtures/CaptureBatch.json
+      dest: bundle-v3/CaptureBatch/function.json
+    - src: fixtures/trial.gitignore
+      dest: .gitignore
+  env:
+    COPILOT_HOME_SETTINGS_JSON: '{"disabledSkills":["customize-cloud-agent","github-pr-media"]}'
+grading_environment:
+  files:
+    - src: fixtures/grade.mjs
+      dest: grading-evidence/grade.mjs
+scoring:
+  threshold: 1
+stimuli:
+  - name: extension-bundles
+    prompt: |
+      Upgrade the extension bundles to v4 in these three independent Azure
+      Functions apps. Make the required compatibility changes now. Keep the
+      current JavaScript programming model, function names, data flow, resource
+      and app-setting names, lease identity, and effective processing settings.
+      Keep the apps and script entry points at their existing paths. Use azure-functions-update
+      if available; otherwise work without installing a skill.
+      This is an offline source migration. Use Node.js for local checks.
+      Do not start a Functions host, connect to services, deploy, read credentials,
+      or install packages, tools, skills, plugins, or MCP servers. Do not read
+      configuration outside this workspace. Report what you changed and which
+      checks need a live service before deployment.
+    constraints:
+      max_duration: 10m
+    graders:
+      - name: completed
+        type: completed
+      - name: per-app-offline-contracts
+        type: run-command
+        config:
+          command: node
+          args: [grading-evidence/grade.mjs, --evidence]
+          expected_exit_code: 0
+          stdout_contains: '"passed": true'
+          timeout: 30s

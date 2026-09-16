@@ -1,0 +1,8 @@
+**/node_modules/
+**/bin/
+**/obj/
+**/.azurefunctions/
+**/.func/
+**/coverage/
+**/local.settings.json
+*.log
