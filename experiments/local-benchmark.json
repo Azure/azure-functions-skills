@@ -17,8 +17,12 @@
       ]
     },
     "azure-functions-update": {
-      "nugetPreflight": true,
-      "evals": ["evals/azure-functions-update/dotnet-isolated/eval.yaml"],
+      "nugetPreflightScenarios": ["dotnet-isolated"],
+      "evals": [
+        "evals/azure-functions-update/dotnet-isolated/eval.yaml",
+        "evals/azure-functions-update/python-blob-sdk/eval.yaml",
+        "evals/azure-functions-update/python-http-streaming/eval.yaml"
+      ],
       "files": [
         "templates/skills/azure-functions-update/SKILL.md",
         "templates/skills/azure-functions-update/references/host-v4.md",
@@ -26,6 +30,8 @@
         "templates/skills/azure-functions-update/references/dotnet-version.md",
         "templates/skills/azure-functions-update/references/node-model-v4.md",
         "templates/skills/azure-functions-update/references/python-model-v2.md",
+        "templates/skills/azure-functions-update/references/python-blob-sdk.md",
+        "templates/skills/azure-functions-update/references/python-http-streaming.md",
         "templates/skills/azure-functions-update/references/runtime-versions.md",
         "templates/skills/azure-functions-update/references/extensions.md",
         "templates/skills/azure-functions-update/references/durable-v2.md",
@@ -36,7 +42,21 @@
         "evals/azure-functions-update/dotnet-isolated/fixtures/Hello.cs",
         "evals/azure-functions-update/dotnet-isolated/fixtures/host.json",
         "evals/azure-functions-update/dotnet-isolated/fixtures/trial.gitignore",
-        "evals/azure-functions-update/dotnet-isolated/fixtures/guidance.md"
+        "evals/azure-functions-update/dotnet-isolated/fixtures/guidance.md",
+        "evals/azure-functions-update/python-blob-sdk/fixtures/function_app.py",
+        "evals/azure-functions-update/python-blob-sdk/fixtures/requirements.txt",
+        "evals/azure-functions-update/python-blob-sdk/fixtures/host.json",
+        "evals/azure-functions-update/python-blob-sdk/fixtures/trial.gitignore",
+        "evals/azure-functions-update/python-blob-sdk/fixtures/grade.py",
+        "evals/azure-functions-update/python-blob-sdk/fixtures/guidance.md",
+        "evals/azure-functions-update/python-http-streaming/fixtures/function_app.py",
+        "evals/azure-functions-update/python-http-streaming/fixtures/events.py",
+        "evals/azure-functions-update/python-http-streaming/fixtures/requirements.txt",
+        "evals/azure-functions-update/python-http-streaming/fixtures/host.json",
+        "evals/azure-functions-update/python-http-streaming/fixtures/app-settings.json",
+        "evals/azure-functions-update/python-http-streaming/fixtures/trial.gitignore",
+        "evals/azure-functions-update/python-http-streaming/fixtures/grade.py",
+        "evals/azure-functions-update/python-http-streaming/fixtures/guidance.md"
       ]
     }
   }

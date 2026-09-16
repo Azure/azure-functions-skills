@@ -2,12 +2,14 @@
 
 These Vally **0.16.0** experiments use the
 [TypeScript HTTP scenario](../evals/azure-functions-create/typescript-http/README.md)
-and the [.NET migration scenario](../evals/azure-functions-update/dotnet-isolated/README.md).
+and the [.NET migration scenario](../evals/azure-functions-update/dotnet-isolated/README.md),
+plus two [Python migration scenarios](../evals/azure-functions-update/python-migrations.md).
 They compare the same objective task, not whether the agent invoked a skill.
 Vally owns execution, grading and measurement; the existing static dashboard
 consumes its canonical results. No custom agent runner, Azure resources, or CI
-is involved. The migration scenario also uses Vally's native LLM judge. Its
-judge calls add inference cost; see its guide before running it.
+is involved. All three migration scenarios use Vally's native LLM judge.
+Their judge calls add inference cost; see the linked .NET and Python guides
+before running them.
 Run only reviewed, trusted local code with an approved inference budget.
 Never run these from PR-triggered CI or on untrusted contributor content.
 
@@ -46,7 +48,7 @@ $env:VALLY_OUTPUT_ROOT = 'C:\private\benchmarks'
 # Explicit acknowledgment of reviewed local code, not spending approval.
 $env:VALLY_TRUSTED = '1'
 
-# Free: stage isolated inputs and resolve the native eight-cell plan.
+# Free: stage isolated inputs and resolve the current native plan.
 npm run eval -- --all --dry-run
 ```
 
@@ -63,7 +65,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOK
 }
 
 # Acquiring a token does not authorize inference spending.
-# Paid: approve eight trials, migration judge calls, budget and cleanup first.
+# Paid: approve the selected trials, judge calls, budget and cleanup first.
 npm run eval -- --all
 ```
 
@@ -104,10 +106,19 @@ Unknown/empty selections, repeated model IDs, or combining `--all` and `--skill`
 are rejected before native launch. No model flags means all **registered**
 models for the explicitly selected skill set. Selection preserves configuration
 order; the first selected model's OFF arm is the native baseline. The current
-registration has two skills, one scenario each, and two models: `--all` means
-eight trials plus the migration judge calls, not the legacy full/live suites.
-Use `--skill azure-functions-update --models claude-sonnet-5` for two migration
+registration has two skills, four scenarios, and six models: `--all` means
+48 trials plus the migration judge calls, not the legacy full/live suites.
+Use `--skill azure-functions-update --scenario dotnet-isolated --models claude-sonnet-5` for two migration
 trials with the same fixed judge. A dry-run does not invoke that judge.
+
+Repeat `--scenario <directory-id>` to select scenarios within one `--skill`.
+It cannot be used with `--all`. Unknown, empty and duplicate IDs are errors;
+comma-separated IDs are not supported. Omission preserves all registered
+scenarios for the selected skill. Only selected scenario fixtures are staged;
+the skill's references remain available. `nugetPreflightScenarios` registers
+scenario-specific NuGet needs. An empty list means none. If the field is absent,
+the older skill-level `nugetPreflight` boolean still applies. Python-only
+selections do not run .NET or NuGet preflight checks.
 
 `--run-root` (or `VALLY_RUN_ROOT`) is an **existing, clean external parent** for a fresh temporary
 directory, not a previously staged trial. Choose a writable parent outside the

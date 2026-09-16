@@ -98,6 +98,43 @@ describe('benchmarkEnvironment', () => {
 });
 
 describe('selectBenchmark', () => {
+  const multiple = {
+    models: config.models,
+    skills: {
+      update: {
+        evals: ['evals/update/dotnet/eval.yaml', 'evals/update/python/eval.yaml'],
+        files: ['templates/skills/update/SKILL.md', 'templates/skills/update/references/python.md',
+          'evals/update/dotnet/fixtures/app.cs', 'evals/update/python/fixtures/app.py'],
+        nugetPreflight: true,
+        nugetPreflightScenarios: ['dotnet'],
+      },
+    },
+  };
+
+  it('filters scenarios and their fixtures before selecting prerequisites', () => {
+    const selected = selectBenchmark(multiple, { skill: 'update', scenarios: ['python'] });
+    expect(selected.evals).toEqual(['evals/update/python/eval.yaml']);
+    expect(selected.files).toEqual(['templates/skills/update/SKILL.md',
+      'templates/skills/update/references/python.md', 'evals/update/python/fixtures/app.py']);
+    expect(selected.nugetPreflight).toBeUndefined();
+    expect(selectBenchmark(multiple, { skill: 'update', scenarios: ['dotnet'] }).nugetPreflight).toBe(true);
+    expect(selectBenchmark(multiple, { skill: 'update' }).evals).toHaveLength(2);
+    const none = structuredClone(multiple);
+    none.skills.update.nugetPreflightScenarios = [];
+    expect(selectBenchmark(none, { skill: 'update' }).nugetPreflight).toBeUndefined();
+  });
+
+  it('rejects invalid scenario selections and prerequisite metadata', () => {
+    for (const scenarios of [[], [''], ['unknown'], ['python', 'python'], ['python,dotnet']]) {
+      expect(() => selectBenchmark(multiple, { skill: 'update', scenarios })).toThrow(/scenario/i);
+    }
+    expect(() => selectBenchmark(multiple, { all: true, scenarios: ['python'] })).toThrow(/--skill/);
+    for (const nugetPreflightScenarios of [null, 'dotnet', ['missing'], ['dotnet', 'dotnet']]) {
+      const invalid = { ...multiple, skills: { update: { ...multiple.skills.update, nugetPreflightScenarios } } };
+      expect(() => selectBenchmark(invalid, { skill: 'update' })).toThrow(/nugetPreflightScenarios/);
+    }
+  });
+
   it('requires an explicit all or single-skill selection, even for dry-runs', () => {
     expect(() => selectBenchmark(config, {})).toThrow(/--all.*--skill/);
     expect(() => selectBenchmark(config, { all: true, skill: 'azure-functions-create' })).toThrow(/--all.*--skill/);
@@ -134,6 +171,24 @@ describe('selectBenchmark', () => {
 });
 
 describe('runBenchmark', () => {
+  it.each(['python-blob-sdk', 'python-http-streaming'])('stages only %s without a NuGet preflight', scenario => {
+    const normal = vi.mocked(spawnSync).getMockImplementation();
+    vi.mocked(spawnSync).mockImplementation((...args) => {
+      expect(args[0]).not.toBe('dotnet');
+      if (args[1]?.[2] === 'run') {
+        const inputs = join(dirname(String(args[2]?.cwd)), 'inputs');
+        const definition = JSON.parse(readFileSync(args[1][3], 'utf8'));
+        expect(definition.evals).toEqual([`../evals/azure-functions-update/${scenario}/eval.yaml`]);
+        expect(readdirSync(join(inputs, 'evals', 'azure-functions-update'))).toEqual([scenario]);
+        expect(existsSync(join(inputs, 'evals', 'azure-functions-update', scenario, 'fixtures', 'grade.py'))).toBe(true);
+      }
+      return normal?.(...args) ?? result();
+    });
+    runBenchmark({ ...options(), all: false, skill: 'azure-functions-update',
+      scenarios: [scenario], models: ['gpt-6-astra'] }, env);
+    expect(spawnSync).toHaveBeenCalledTimes(2);
+  });
+
   it('stages only the fixed native inputs into an external owned root and cleans them after dry-run', () => {
     let temporary = '';
     vi.mocked(spawnSync).mockImplementation((_command, argv, opts) => {
@@ -191,7 +246,7 @@ describe('runBenchmark', () => {
       return result();
     });
     expect(runBenchmark({ ...options(), all: false, skill: 'azure-functions-update',
-      models: ['gpt-6-astra'], dryRun: true }, env).dryRun).toBe(true);
+      scenarios: ['dotnet-isolated'], models: ['gpt-6-astra'], dryRun: true }, env).dryRun).toBe(true);
     expect(generateReport).not.toHaveBeenCalled();
   });
 

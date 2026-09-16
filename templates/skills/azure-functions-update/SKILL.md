@@ -28,6 +28,8 @@ Read only the files for the requested scenario and its required dependencies. Do
 | .NET version update, including .NET 8 to .NET 10 | [.NET version update](references/dotnet-version.md) |
 | Node.js programming model v3 to v4 | [Node.js model migration](references/node-model-v4.md) |
 | Python programming model v1 to v2 | [Python model migration](references/python-model-v2.md) |
+| Python Blob InputStream to SDK type bindings | [Python Blob SDK bindings](references/python-blob-sdk.md) |
+| Python HTTP streaming | [Python HTTP streaming](references/python-http-streaming.md) |
 | Other language versions or host version selection | [Runtime and language versions](references/runtime-versions.md) |
 | Binding extension updates | [Binding extensions](references/extensions.md) |
 | Durable Functions extension v1 to v2 | [Durable Functions migration](references/durable-v2.md) |

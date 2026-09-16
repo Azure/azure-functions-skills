@@ -1,0 +1,8 @@
+{
+  "pythonVersion": "3.12",
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "FUNCTIONS_EXTENSION_VERSION": "~4",
+    "APP_LABEL": "migration-fixture"
+  }
+}

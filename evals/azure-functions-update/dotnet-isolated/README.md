@@ -44,7 +44,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not read the configured npm registry.' }
 $env:VALLY_TRUSTED = '1'
 
 # No model calls: verify one model with OFF and ON, two planned trials.
-npm run eval -- --skill azure-functions-update --models claude-sonnet-5 --dry-run
+npm run eval -- --skill azure-functions-update --scenario dotnet-isolated --models claude-sonnet-5 --dry-run
 ```
 
 If public NuGet is not available, set an approved credential-free NuGet proxy.
@@ -69,14 +69,14 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOK
 }
 
 # Paid: two migration trials plus their LLM grading calls.
-npm run eval -- --skill azure-functions-update --models claude-sonnet-5
+npm run eval -- --skill azure-functions-update --scenario dotnet-isolated --models claude-sonnet-5
 
 # Remove the token from this shell when no more runs are needed.
 Remove-Item Env:COPILOT_GITHUB_TOKEN
 Remove-Item Env:VALLY_NUGET_SOURCE -ErrorAction SilentlyContinue
 ```
 
-To compare both registered agent models, omit --models. That runs four migration
+To compare all six registered agent models, omit --models. That runs 12 migration
 trials, each with LLM grading. The judge remains gpt-6-astra for every arm. Model
 availability is not checked by dry-run. There is no silent model fallback.
 Avoid --all unless you also want the other registered skill scenarios.

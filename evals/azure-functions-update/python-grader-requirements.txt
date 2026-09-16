@@ -1,0 +1,3 @@
+azure-functions==2.3.0
+azurefunctions-extensions-bindings-blob==1.1.2
+azurefunctions-extensions-http-fastapi==1.0.1
