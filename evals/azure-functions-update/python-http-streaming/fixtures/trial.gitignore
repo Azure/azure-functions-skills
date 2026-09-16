@@ -1,0 +1,11 @@
+.venv/
+.python_packages/
+__pycache__/
+*.pyc
+.pytest_cache/
+.cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+local.settings.json

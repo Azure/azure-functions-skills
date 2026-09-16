@@ -17,6 +17,7 @@ interface Selection {
   all?: boolean;
   skill?: string;
   models?: string[];
+  scenarios?: string[];
 }
 
 interface RunOptions extends Selection {
@@ -62,6 +63,12 @@ export function selectBenchmark(value: unknown, selection: Selection) {
     'invalid models/skills in benchmark configuration.');
   check(Boolean(selection.all) !== (selection.skill !== undefined), 'specify exactly one of --all or --skill <registered-id>.');
   check(selection.skill === undefined || Object.hasOwn(skills, selection.skill), 'unknown --skill; use a registered skill.');
+  check(selection.scenarios === undefined || (selection.skill !== undefined && !selection.all),
+    '--scenario requires --skill, not --all.');
+  check(selection.scenarios === undefined || (selection.scenarios.length > 0
+    && new Set(selection.scenarios).size === selection.scenarios.length
+    && selection.scenarios.every(scenario => identifier.test(scenario))),
+  '--scenario must contain unique nonempty scenario IDs.');
   const selectedModels = selection.models ?? models;
   check(selectedModels.length > 0 && new Set(selectedModels).size === selectedModels.length
     && selectedModels.every(model => models.includes(model)), '--models must be a nonempty, unique subset of registered models.');
@@ -73,8 +80,14 @@ export function selectBenchmark(value: unknown, selection: Selection) {
     const definition = object(entry);
     const declaredEvals = strings(definition.evals);
     const declaredFiles = strings(definition.files);
+    const declaredScenarios = declaredEvals.map(file => file.split('/')[2]);
     check(definition.nugetPreflight === undefined || typeof definition.nugetPreflight === 'boolean',
       'nugetPreflight must be a boolean.');
+    const preflightScenarios = definition.nugetPreflightScenarios;
+    check(preflightScenarios === undefined || (Array.isArray(preflightScenarios)
+      && new Set(preflightScenarios).size === preflightScenarios.length
+      && preflightScenarios.every(scenario => typeof scenario === 'string' && declaredScenarios.includes(scenario))),
+    'nugetPreflightScenarios must contain unique declared scenario IDs.');
     const safePath = (file: string) => file.split('/').every(part => identifier.test(part) && part !== '.' && part !== '..');
     const target = `templates/skills/${id}`;
     check(declaredEvals.every(file => {
@@ -86,9 +99,14 @@ export function selectBenchmark(value: unknown, selection: Selection) {
         || declaredEvals.some(evalFile => file.startsWith(`${evalFile.slice(0, -'eval.yaml'.length)}fixtures/`)))),
     'configuration files must be target SKILL.md, own references or declared scenario fixtures.');
     if (selection.all || id === selection.skill) {
-      evals.push(...declaredEvals);
-      files.push(...declaredFiles);
-      nugetPreflight ||= definition.nugetPreflight === true;
+      check(selection.scenarios === undefined || selection.scenarios.every(scenario => declaredScenarios.includes(scenario)),
+        'unknown --scenario for the selected skill.');
+      const selectedEvals = declaredEvals.filter(file => !selection.scenarios || selection.scenarios.includes(file.split('/')[2]));
+      evals.push(...selectedEvals);
+      files.push(...declaredFiles.filter(file => file.startsWith(`${target}/`)
+        || selectedEvals.some(evalFile => file.startsWith(`${evalFile.slice(0, -'eval.yaml'.length)}fixtures/`))));
+      nugetPreflight ||= preflightScenarios === undefined ? definition.nugetPreflight === true
+        : selectedEvals.some(file => preflightScenarios.includes(file.split('/')[2]));
     }
   }
   return {
@@ -313,12 +331,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       'nuget-source': { type: 'string' },
       trusted: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, report: { type: 'boolean' },
       all: { type: 'boolean' }, skill: { type: 'string' }, models: { type: 'string', multiple: true },
+      scenario: { type: 'string', multiple: true },
     }, strict: true });
     const result = runBenchmark({
       runRoot: values['run-root'], output: values.output, trusted: values.trusted,
       dryRun: values['dry-run'], report: values.report, registry: values.registry,
       nugetSource: values['nuget-source'],
-      all: values.all, skill: values.skill, models: values.models,
+      all: values.all, skill: values.skill, models: values.models, scenarios: values.scenario,
     });
     console.log(result.dryRun ? 'Dry-run only: no measured trials or dashboard generated.'
       : `Native results: ${result.native}${result.site ? `\nStatic site: ${result.site}` : ''}\nNative run/merge exits: ${result.runExit}/${result.mergeExit}\nWorkflow exit: ${result.exitCode}`);
