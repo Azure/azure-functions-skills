@@ -15,7 +15,7 @@ This repository is the **Azure Functions Skills** CLI and plugin system — it e
 ## Security
 
 - No secrets in code.
-- Never run Vally evals in PR-triggered CI or on unreviewed, untrusted contributor code. GitHub Actions evaluation runs require a GitHub Environment reviewer gate.
+- Never run Vally evals in PR-triggered CI or on unreviewed, untrusted contributor code. Never give an evaluation workflow a `pull_request` trigger. Start evaluation workflows by manual `workflow_dispatch`, so only a person with write access can start a run on reviewed code. If a workflow also receives cloud credentials, use a GitHub Environment with a reviewer gate.
 - Local Vally evals of trusted code are allowed without that gate. Isolate every trial from normal developer configuration and verify skill-off trials inherit no repository, workspace, user, or plugin skills.
 - Never run `doctor --deep` on untrusted workspaces.
 

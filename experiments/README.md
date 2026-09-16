@@ -209,6 +209,32 @@ native resolution and wrapper wiring, not inference, model access or grading.
 The four real observations below predate this wrapper; they were not rerun to
 validate these convenience commands.
 
+## On-demand benchmark in GitHub Actions
+
+The `Skill Benchmark` workflow (`.github/workflows/skill-benchmark.yml`) runs
+the same wrapper in CI. It starts only by manual dispatch. Select one tier
+(`all`, `powerful`, `medium` or `low`) when you start it. Select `low` for a
+cheap smoke test. Start a full `all` run when you want a fresh dashboard, for
+example before a release or after a change to a measured skill.
+
+Manual dispatch is also the safety control: only a person with write access can
+start a run, so the evaluated code is always reviewed code. The workflow has no
+`pull_request` trigger and no schedule. Model requests use the Actions token
+with the `copilot-requests: write` permission; no personal access token is
+necessary.
+
+The run writes the dashboard to `reports/benchmarks/current/` and
+opens (or updates) a pull request on the `bot/benchmark-dashboard` branch,
+because `main` is protected. The dashboard is also attached to the run as an
+artifact, so a run stays useful when the pull request is not merged. After the
+pull request is merged, the `Publish E2E Report` workflow publishes the files at
+<https://azure.github.io/azure-functions-skills/benchmarks/>. Only the current
+dashboard is kept; it is overwritten on each run.
+
+The workflow has two jobs. The `benchmark` job measures the models and has no
+write permission, because it gives its token to the evaluated agent. The
+`publish` job holds the write permissions and never runs Vally.
+
 ## Manual native isolation protocol
 
 The commands in this section are advanced manual operations, not replacements

@@ -54,7 +54,7 @@
 - No secrets in code — use environment variables or secret managers.
 - No npm lifecycle scripts except `prepack`. Adding `postinstall`, `preinstall`, etc. is forbidden.
 - Run `npm run lint:security` for supply-chain checks.
-- **Never run Vally evals in PR-triggered CI or on unreviewed, untrusted contributor code.** Skill content can contain prompt injection attacks, and the evaluation agent has file-write and shell-execution permissions. GitHub Actions evaluation runs must use a GitHub Environment with a reviewer gate so only reviewed code is evaluated.
+- **Never run Vally evals in PR-triggered CI or on unreviewed, untrusted contributor code.** Skill content can contain prompt injection attacks, and the evaluation agent has file-write and shell-execution permissions. Never give an evaluation workflow a `pull_request` trigger. Start evaluation workflows by manual `workflow_dispatch`: only a person with write access can start a run, so the evaluated code is always reviewed code. If a workflow also receives cloud credentials (for example Azure), use a GitHub Environment with a reviewer gate.
 - Local Vally evaluation of trusted code is allowed and does not require a GitHub Environment reviewer gate. Use a clean Vally trial workspace containing only the eval's required files and target skill; never benchmark against the developer's normal workspace configuration. Verify that skill-off trials do not inherit repository, workspace, user, or plugin skills through discovery.
 - Never run `doctor --deep` on untrusted workspaces.
 - Confirm the target, budget, repetition count, and owned-resource cleanup policy separately before paid experiments.
