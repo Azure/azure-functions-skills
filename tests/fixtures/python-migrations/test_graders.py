@@ -97,6 +97,28 @@ class MigrationGraders(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "INIT_INDEXING"):
             checker(settings)
 
+    def test_streaming_text_response_subclass(self):
+        report = self.grade("python-http-streaming", "streaming_valid.py", changes=(
+            ("\napp = ", '\nclass TextResponse(Response):\n    media_type = "text/plain"\n\n\napp = '),
+            ("return Response(", "return TextResponse("),
+            (', media_type="text/plain"', ""),
+        ))
+        self.assertTrue(report["passed"], report)
+
+    def test_streaming_missing_text_content_type(self):
+        for content, status in [
+            ('data["message"]', 200),
+            ('"Invalid JSON"', 400),
+            ('"Missing message"', 422),
+        ]:
+            with self.subTest(status=status):
+                report = self.grade("python-http-streaming", "streaming_valid.py", changes=(
+                    (f'Response({content}, status_code={status}, media_type="text/plain")',
+                     f"Response({content}, status_code={status})"),
+                ))
+                self.assertFalse(report["passed"], report)
+                self.assertIn("text/plain", report["error"])
+
     def test_streaming_invalid_examples(self):
         for changes in [
             (("StreamingResponse(count_events(),", 'StreamingResponse([event async for event in count_events()],'),),
