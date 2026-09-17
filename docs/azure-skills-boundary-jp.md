@@ -87,7 +87,9 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | --- | --- |
 | Local tools の setup または prerequisites verification | `azure-functions-setup` |
 | 新しい Functions project の作成、または既存 project への function 追加 | `azure-functions-create` |
-| 既存 Functions の runtime、worker model、binding extension の更新 | `azure-functions-update`（draft: .NET は移行、他の言語は調査のみ） |
+| `azure-functions-update` を名前で指定して使用・再開を依頼 | `azure-functions-update`（draft: .NET のコード移行、他の言語は調査のみ） |
+| 名前の指定なしで Functions のコード移行を依頼 | `azure-functions-update` を案内する。自動では開始しない |
+| Consumption から Flex など、hosting plan・SKU の変更 | Azure Skills。コード移行の開始依頼とはみなさない |
 | Markdown、Functions triggers、code、tools、HTTP、MCP を使う cloud-hosted な intelligent capability、Azure Functions Hosted Skills の build または変更 | `azure-functions-hosted-skills` |
 | Functions app の deploy | `azure-functions-deploy` から Azure Skills に委譲 |
 | Function App の production readiness、best practices、security、observability、scale、cost review | `azure-functions-best-practices` |
@@ -97,6 +99,12 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | この skill suite に対する再利用可能な feedback を記録 | `azure-functions-feedback` |
 
 User intent が Functions 固有 context を含まない汎用 Azure deployment である場合は、Azure Skills に route します。Workspace または prompt が Azure Functions を明確に示す場合は、まず Azure Functions Skills に route し、必要なときだけ共通 Azure execution を Azure Skills に委譲します。
+
+`azure-functions-update` の明示指定は、自動ルーティングの例外です。名前を含む質問・引用・
+ファイル参照・レビューは移行の開始依頼ではありません。選択済みの実行中に行う通常の応答では、
+名前を毎回指定する必要はありません。Update はコード変更と必要な証拠、Azure Skills は承認済みの
+プラットフォーム作業を担当し、証拠を同じ計画に戻します。二つの移行計画を開始しません。
+これは指示上のルールであり、クライアントによるプラグイン間の優先順位の強制ではありません。
 
 ## 将来の skill の product boundary
 

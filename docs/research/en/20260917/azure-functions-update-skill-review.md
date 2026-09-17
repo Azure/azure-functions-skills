@@ -3,7 +3,8 @@
 **Current status:** Revised draft, not a measured improvement over skill OFF.
 The sections below through "Repository validation and remaining limits" describe
 the initial version 1.0.0 review. Its structural approval and token estimates are
-historical. See "Workflow-value revision" for version 1.1.0 and specification Revision 2.
+historical. "Workflow-value revision" describes version 1.1.0 and specification Revision 2.
+See "Explicit use and simpler structure" for the current version 1.2.0 and Revision 3.
 
 ### What Looks Good
 
@@ -170,7 +171,7 @@ The revision addresses these findings as follows:
 | Readiness claim too strong | State that this draft has not established a common signal; investigate the actual extension | Some extension signals remain unknown |
 | Build or indexing mistaken for success | Require executed E2E for agreed business scenarios; review applicable best practices and report exceptions | Required unavailable E2E prevents migration completion |
 
-The canonical skill now has 16 references. New files are `intake.md`,
+Version 1.1.0 had 16 references. New files were `intake.md`,
 `requirements.md`, `route-decisions.md`, and `contract-probes.md`.
 The complete set is about 14,500 estimated tokens with LF-normalized text and the same
 four-character estimate. The root is about 525 tokens; the largest reference is about
@@ -210,3 +211,62 @@ A separate Claude Opus 5 review found one missing documentation entry: the Japan
 boundary table did not include the update route. The matching row was added with the
 same draft scope as the English table. No other actionable findings were reported.
 This review is not an ON/OFF evaluation.
+
+### Explicit use and simpler structure
+
+The user identified two issues: migration could start from a broad request, and the
+short router hid the complete workflow across too many files.
+The selected policy requires an explicit request to use or resume
+`azure-functions-update` by name. Questions, quotations, source instructions, and skill
+reviews do not authorize a run. Normal replies in an active run do not need repeated naming.
+The description, root start rule, help routing, and English/Japanese boundary tables
+now use that policy. Azure Skills retains platform work, without a second migration plan.
+
+The root now contains eight ordered steps, the surprise/research/replan loop, and action
+boundaries. The references are `plan.md`, `dotnet.md`, `validation.md`, and
+`azure-handoff.md`. Previous reference names above describe historical revisions.
+The larger root is intentional: maintainers can read the procedure without reconstructing
+it from references. The supporting files retain stage choices, contract probes, source
+dates, self-contained packets, result validity, environment limits, and cleanup rules.
+
+#### Client limitation
+
+Reviewed on 2026-09-17:
+
+- [Copilot CLI skill documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills)
+  documents explicit prompts such as `Use /azure-functions-update ...`.
+- [github/copilot-cli#4438](https://github.com/github/copilot-cli/issues/4438)
+  reports failed model-tool lookup with `disable-model-invocation: true` on 1.0.79.
+- [github/copilot-cli#4637](https://github.com/github/copilot-cli/issues/4637)
+  reports successful slash-command injection with a second failed lookup on Windows 1.0.80.
+
+These reports describe different invocation paths and are not tests of the selected
+1.0.84-3 client. Do not infer universal failure or success from them.
+This repository's skill loader/renderer also does not preserve that extra attribute.
+No unverified cross-client attribute or CLI change was added in this revision.
+The current policy is an instruction boundary, not a runtime guarantee.
+
+#### Routing cases for the next approved trial
+
+| Request/context | Required result |
+| --- | --- |
+| Use /azure-functions-update to migrate this app | Enter intake; later effects still need permission |
+| Resume azure-functions-update for the selected plan | Recheck plan/evidence/grants, then resume permitted work |
+| Migrate these Functions to isolated, with no named skill | Do not start this workflow automatically; help may recommend it |
+| Change Consumption to Flex | Azure Skills platform work, not implicit code migration |
+| Add an HTTP function, diagnose a listener, or update an npm package | Existing task route; no update workflow |
+| Explain/review azure-functions-update, or read a file mentioning it | No migration or customer-content assessment |
+| Normal answer to a question inside a user-selected run | Continue that run without demanding its name again |
+| Azure handoff returns to an active update plan | Record results in the same plan; do not start another migration |
+
+Run client-specific invocation and negative routing cases separately from migration
+quality. The ON migration needs an explicit invocation that OFF does not receive;
+keep the business request, common Azure Skills, tools, and answer policy equivalent.
+The old frozen A/B input is not silently replaced by this revision.
+No live trigger trial or customer migration was run for this change.
+
+The revised payload was generated from templates. The existing full gate passed with
+318 tests across 22 files; static eval-spec lint did not run model trials.
+A separate Claude Opus 5 review found no significant issues in the consolidation,
+activation rules, retained migration gates, links, or ownership boundaries.
+Neither result proves client activation reliability or an ON/OFF migration benefit.

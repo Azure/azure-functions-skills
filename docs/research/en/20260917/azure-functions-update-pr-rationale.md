@@ -1,6 +1,6 @@
-# Azure Functions update: rationale for a future PR
+# Azure Functions update: PR rationale
 
-Status: Draft notes for author input, 2026-09-17. No PR has been created or edited.
+Status: Draft notes for author input, 2026-09-17, for draft PR #272.
 The unanswered questions below do not block the current skill draft.
 
 ## Confirmed motivation
@@ -50,6 +50,18 @@ improving reliability, not measured results.
 Safety boundaries remain intact. Skill text cannot supply runner enforcement, disclose
 unknown processor retention, or authorize an external action.
 
+## Explicit use and maintenance
+
+The user selected name-explicit activation: ask to use or resume `azure-functions-update`.
+Generic migration and update requests do not activate this workflow. Help recommends
+it without starting it. Platform/SKU/deployment work remains with Azure Skills.
+
+The earlier short router and 16 references made the original workflow hard to follow.
+Version 1.2.0 puts its eight steps and recovery rules in `SKILL.md`, with four references
+for forms, .NET decisions, validation, and Azure handoff. This trades a larger root for
+a readable procedure. It does not claim lower token use or a measured migration benefit.
+Manual activation reliability and coexistence with Azure Skills still need client tests.
+
 ## Evaluation intent for the PR
 
 Reuse [the native local comparison framework](../../../../experiments/README.md),
@@ -62,7 +74,14 @@ unknown. The current registered benchmark is not an update migration benchmark.
 Before adding/running the future update scenario, define:
 
 - Identical input app/revision, task goal, model/effort, tools, permission rules, and
-  customer-answer policy for ON and OFF. Keep OFF free of target and ambient skills.
+  customer-answer policy for ON and OFF. Keep OFF free of the update skill. For the
+  selected comparison, both arms receive the same pinned Azure Skills; other ambient
+  skills stay excluded. OFF means without the update workflow, not without every skill.
+- Separate explicit workflow invocation from automatic routing evaluation. The ON trial
+  needs an explicit use request for `azure-functions-update`; OFF gets the same migration
+  goal without that invocation. Record this intended treatment difference. Do not give
+  one arm extra migration facts or detailed instructions. Do not reuse an unnamed prompt
+  and treat failure to auto-start this opt-in workflow as a migration-quality result.
 - Final E2E for the accepted contracts, with actual outputs and named environment.
 - A source- and artifact-grounded LLM judge for migration correctness, applicable
   current best practices, and usability. Hide condition labels where practical.

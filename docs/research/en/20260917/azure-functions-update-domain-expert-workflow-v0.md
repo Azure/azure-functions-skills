@@ -4,7 +4,7 @@
 
 **Version:** 0
 
-**Revision:** 2, after the value and usability review on 2026-09-17
+**Revision:** 3, after the explicit-use and maintenance review on 2026-09-17
 
 **Research cutoff:** 2026-09-17
 
@@ -22,7 +22,7 @@ This document separates three types of statements:
 - **Proposed:** The workflow should use this rule. Joint review can change it.
 - **Open:** The available evidence does not set the product decision.
 
-Statements marked as joint decisions record user choices. Revisions 1 and 2 add the
+Statements marked as joint decisions record user choices. Revisions 1 through 3 add the
 rules needed to connect those decisions. They do not grant permission for a migration run.
 
 The workflow must record the source URL, source date, access date, applicable version,
@@ -105,6 +105,22 @@ All languages use the same workflow for:
 
 Python and Node.js add language-specific migration routes in later revisions.
 
+### 4.3 Explicit selection
+
+**Joint decision on 2026-09-17:** Start or resume this workflow only when the user
+names `azure-functions-update` and asks to use or resume it. A generic migration,
+runtime update, diagnosis, deployment, or SKU request does not select this workflow.
+A name in a question, quotation, file, or review is not a request to run it.
+Normal replies within an active, user-selected run do not need the name again.
+A saved plan alone does not authorize a new run.
+
+Help can recommend the skill with an explicit-use example, but must not start it
+automatically. Azure Skills keeps platform ownership. An approved handoff returns
+evidence to the existing update plan, not a second code-migration workflow.
+Instruction-level selection does not establish a client-enforced priority across plugins.
+Client-specific manual invocation remains a validation item; do not claim guaranteed
+activation from description text alone.
+
 ## 5. Responsibilities
 
 **Joint clarification on 2026-09-17:** Planning quality is the requirement; subagent
@@ -130,12 +146,19 @@ Azure Skills.
 
 ### 6.1 Root skill and plan separation
 
-**Proposed:** The future root `SKILL.md` is a short router. It contains stable workflow
-rules, permission boundaries, completion levels, and pointers to focused references.
-It must not contain one large checklist for every language, trigger, and Azure service.
+**Revision 3 design:** `SKILL.md` is the complete ordered workflow, not a short router.
+A maintainer must see the initial plan, inventory, route agreement, baseline,
+stage conversion, local/E2E checks, Azure handoff, and final review in one file.
+The same file contains the stop/research/replan loop and permission boundaries.
 
-**Proposed:** The planner creates a task-specific migration plan after it reads the
-workspace and current sources. The plan is not a copy of `SKILL.md`.
+Keep four references: `plan.md` for forms and result rules, `dotnet.md` for migration
+decisions and API contracts, `validation.md` for probes/environments/data, and
+`azure-handoff.md` for platform work. Do not hide normal stage order or stop conditions
+behind a chain of links. Do not put every service detail in the main workflow.
+
+The planner creates an initial plan from known facts and questions, then updates it
+after approved workspace inspection and research. Execution instructions need resolved
+decisions before work starts. The plan is not a copy of `SKILL.md`.
 
 This design follows the model guidance for progressive disclosure. It also prevents
 large reference text from entering every execution task. The task packet must contain
@@ -1455,7 +1478,7 @@ and the diagnostics workflow named in section 10.2. No collector was executed.
 - Checkpoint boundaries and current-artifact evidence validity.
 - Bootstrap approval states and the shared inventory adapter contract.
 - Default separation of local replay, emulator, Azure sandbox, and customer acceptance.
-- Short root router with focused references.
+- One readable root workflow with four supporting references.
 
 ### Joint decisions retained after review
 

@@ -11,7 +11,7 @@ For required service-backed validation, prepare:
 - Test identity, least-privilege roles, fixture, data classification, observation method.
 - Subscription/resource-group proposal, owner, time/cost limit, expiry, tags.
 - Named writes, resource ownership, cleanup method and acceptance condition.
-- Artifact identity from [the evidence record](evidence.md).
+- Artifact identity from [the plan and evidence record](plan.md).
 
 Obtain separate approval for the target, resource scope, identity, writes, cost, duration,
 and cleanup. Prefer dedicated time-limited resources. No changes to existing customer
@@ -21,6 +21,10 @@ Discover available Azure Skills and their requirements. If unavailable, deliver 
 handoff and mark dependent checks blocked; do not bypass it with direct provisioning.
 Return from the handoff with resource identifiers, test evidence, cost and cleanup
 status, then evaluate acceptance. Failed cleanup remains visible and owned.
+
+The handoff serves the already user-selected update plan. Do not start a second code
+migration workflow or use the handoff as an implicit request to activate this skill.
+If the Azure workflow requires broader changes, return the scope decision to the user.
 
 SKU migration, including Linux Consumption to Flex, needs a separate platform decision.
 Keep local work separate from an unresolved hosting-plan change. Customer-environment
