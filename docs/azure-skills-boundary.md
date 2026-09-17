@@ -87,6 +87,7 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | --- | --- |
 | Set up local tools or verify prerequisites | `azure-functions-setup` |
 | Create a new Functions project or add a function to an existing project | `azure-functions-create` |
+| Update an existing Functions runtime, worker model, or binding extension | `azure-functions-update` (draft: .NET migration; other languages assessed only) |
 | Build or modify Azure Functions Hosted Skills: cloud-hosted intelligent capabilities using Markdown, Functions triggers, code, tools, HTTP, or MCP | `azure-functions-hosted-skills` |
 | Deploy a Functions app | `azure-functions-deploy`, then delegate to Azure Skills |
 | Review production readiness, best practices, security, observability, scale, or cost for a Function App | `azure-functions-best-practices` |
