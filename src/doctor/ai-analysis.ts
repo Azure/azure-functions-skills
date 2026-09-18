@@ -4,7 +4,7 @@
  * Builds the doctor prompt, launches an agent in headless mode,
  * reads the resulting report file, and merges findings into the report.
  */
-import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -150,11 +150,13 @@ export function buildAgentCommand(
   agent: string,
   prompt: string,
   _reportPath: string,
+  model = 'auto',
 ): AgentCommand {
+  const modelArgs = model === 'auto' ? [] : ['--model', model];
   switch (agent) {
     case 'github-copilot': {
       const resolved = resolveCliCommand('copilot');
-      const baseArgs = ['-p', prompt, '--allow-all-tools'];
+      const baseArgs = ['-p', prompt, '--allow-all-tools', ...modelArgs];
       return { command: resolved.command, args: [...resolved.argsPrefix, ...baseArgs] };
     }
 
@@ -167,6 +169,7 @@ export function buildAgentCommand(
           '-p', prompt,
           '--dangerously-skip-permissions',
           '--max-turns', '20',
+          ...modelArgs,
         ],
       };
     }
@@ -178,6 +181,7 @@ export function buildAgentCommand(
         '--sandbox', 'workspace-write',
         '--skip-git-repo-check',
         '--ephemeral',
+        ...modelArgs,
         prompt,
       ];
       return { command: resolved.command, args: [...resolved.argsPrefix, ...baseArgs] };
@@ -231,9 +235,19 @@ export async function runAiAnalysis(
   reportPath: string,
   dir: string,
   timeoutMs: number,
+  model = 'auto',
 ): Promise<AiAnalysisResult> {
   const startTime = Date.now();
-  const cmd = buildAgentCommand(agent, prompt, reportPath);
+  const cmd = buildAgentCommand(agent, prompt, reportPath, model);
+  try {
+    clearAiReport(reportPath);
+  } catch (err) {
+    return {
+      findings: [],
+      durationMs: Date.now() - startTime,
+      error: `AI analysis failed to clear the previous findings report: ${(err as Error).message}`,
+    };
+  }
 
   // Inform the user before spawning the agent — the agent has elevated permissions
   // and project content can prompt-inject it on untrusted workspaces.
@@ -279,6 +293,14 @@ export async function runAiAnalysis(
       agentOutput: spawnResult.stdout,
     };
   }
+  if (!existsSync(reportPath)) {
+    return {
+      findings: [],
+      durationMs: Date.now() - startTime,
+      error: 'Agent completed without writing the requested findings report.',
+      agentOutput: spawnResult.stdout,
+    };
+  }
 
   const findings = await readAiReport(reportPath);
   return {
@@ -286,6 +308,10 @@ export async function runAiAnalysis(
     durationMs: Date.now() - startTime,
     agentOutput: spawnResult.stdout,
   };
+}
+
+export function clearAiReport(reportPath: string): void {
+  if (existsSync(reportPath)) unlinkSync(reportPath);
 }
 
 function spawnAgent(cmd: AgentCommand, dir: string, timeoutMs: number): Promise<SpawnResult> {
@@ -334,21 +360,23 @@ export async function readAiReport(reportPath: string): Promise<DoctorCheckResul
     if (!Array.isArray(parsed)) return [];
 
     // Validate each entry has required fields
-    return parsed.filter((entry: unknown): entry is DoctorCheckResult => {
-      if (typeof entry !== 'object' || entry === null) return false;
-      const e = entry as Record<string, unknown>;
-      return (
-        typeof e.id === 'string' &&
-        typeof e.category === 'string' &&
-        typeof e.severity === 'string' &&
-        typeof e.status === 'string' &&
-        typeof e.title === 'string' &&
-        typeof e.message === 'string'
-      );
-    });
+    return parsed.filter(isDoctorCheckResult);
   } catch {
     return [];
   }
+}
+
+export function isDoctorCheckResult(entry: unknown): entry is DoctorCheckResult {
+  if (typeof entry !== 'object' || entry === null) return false;
+  const finding = entry as Record<string, unknown>;
+  return (
+    typeof finding.id === 'string' &&
+    typeof finding.category === 'string' &&
+    typeof finding.severity === 'string' &&
+    typeof finding.status === 'string' &&
+    typeof finding.title === 'string' &&
+    typeof finding.message === 'string'
+  );
 }
 
 // ── Report merger ──
@@ -375,6 +403,7 @@ export function mergeReports(
   durationMs: number,
   error?: string,
   severityThreshold: CheckSeverity = 'high',
+  requestedModel = 'auto',
 ): DoctorReport {
   const allChecks = [...report.tiers.builtin.checks, ...aiFindings];
   const thresholdRank = severityRank(severityThreshold);
@@ -405,6 +434,7 @@ export function mergeReports(
         ran: true,
         checks: aiFindings,
         agent,
+        requestedModel,
         durationMs,
         ...(error ? { error } : {}),
       },

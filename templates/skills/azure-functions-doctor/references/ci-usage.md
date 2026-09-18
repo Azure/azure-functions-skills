@@ -11,7 +11,7 @@ The recommended CI mode is built-in checks plus deep analysis.
     node-version: '22'
 - run: az version
 # Install/authenticate the selected agent CLI before this step.
-- run: npx @azure/functions-skills doctor --deep --accept-deep-risk --agent github-copilot --format json --output doctor-report.json --severity high
+- run: npx @azure/functions-skills doctor --deep --accept-deep-risk --agent github-copilot --model gpt-5.6-sol --format json --output doctor-report.json --severity high
 - uses: actions/upload-artifact@v4
   if: always()
   with:
@@ -36,12 +36,16 @@ The recommended CI mode is built-in checks plus deep analysis.
 |------|--------------|
 | Node.js | Running `@azure/functions-skills` |
 | Azure CLI | Runtime metadata via ARM functionAppStacks |
-| `copilot`, `claude`, or `codex` CLI | `--deep --agent <name>` |
+| `copilot`, `claude`, or `codex` CLI | `--deep --agent <name> [--model <model-id>]` |
 | Azure login / federated credentials | Azure resource tier checks |
 
 `az functionapp list-runtimes` / ARM stack metadata does not normally require reading subscription resources, but Azure CLI must be installed. Azure resource checks require login.
 
 For deterministic offline tests or intentionally network-free runs, set `AZURE_FUNCTIONS_DOCTOR_STACKS_OFFLINE=1` to skip live stack metadata resolution and use cache/fallback data.
+
+Pass an explicit `--model` for reproducible deep comparisons. The requested
+model is recorded in `tiers.ai.requestedModel`; `tiers.ai.effectiveModel` is
+recorded only when the selected launcher exposes the effective model.
 
 ## Exit codes
 

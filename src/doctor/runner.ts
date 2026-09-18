@@ -156,19 +156,31 @@ export async function runDoctor(options: DoctorOptions): Promise<RunResult> {
         );
         const prompt = buildDoctorPrompt(results, reportPath);
         const timeoutMs = options.timeout * 1000;
+        const requestedModel = options.model ?? 'auto';
         const aiResult = await runAiAnalysis(
           resolvedAgent,
           prompt,
           reportPath,
           options.dir,
           timeoutMs,
+          requestedModel,
         );
-        report = mergeReports(report, aiResult.findings, resolvedAgent, aiResult.durationMs, aiResult.error, options.severity);
+        report = mergeReports(
+          report,
+          aiResult.findings,
+          resolvedAgent,
+          aiResult.durationMs,
+          aiResult.error,
+          options.severity,
+          requestedModel,
+        );
       }
     }
   }
 
-  const exitCode = report.summary.status === 'fail' ? 1 : 0;
+  const exitCode = report.tiers.ai.ran && report.tiers.ai.error
+    ? 2
+    : report.summary.status === 'fail' ? 1 : 0;
   return { report, exitCode };
 }
 

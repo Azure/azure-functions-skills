@@ -116,7 +116,7 @@ See [docs/bad-app-fixtures.md](docs/bad-app-fixtures.md) for the manual E2E work
 ```powershell
 .\scripts\doctor-e2e-setup.ps1 -Target Q:\temp\doctor-deep-test -DeepOnly
 cd Q:\temp\doctor-deep-test
-.\run-all.ps1 -Deep -Agent github-copilot
+.\run-all.ps1 -Deep -Agent github-copilot -Model gpt-5.6-sol
 ```
 
 This validates that doctor catches the expected findings on every fixture.
