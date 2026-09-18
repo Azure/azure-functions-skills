@@ -3,9 +3,11 @@ import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APPLICATION_INSIGHTS_CONNECTION_STRING } from './config.js';
+import { isNormalizedResourceType } from './arm-deployments.js';
 
 const EVENT_NAME = 'AzureFunctionsSkillsPluginExecuted';
-const DEFAULT_TIMEOUT_MS = 5_000;
+export const DEPLOYMENT_OBSERVED_EVENT_NAME = 'azure_deployment_observed';
+export const DEFAULT_TIMEOUT_MS = 5_000;
 const CONNECTION_STRING_PLACEHOLDER = '__APPLICATIONINSIGHTS_CONNECTION_STRING__';
 const BUNDLED_SKILLS_ROOT = fileURLToPath(new URL('../../templates/skills/', import.meta.url));
 const ALLOWED_PROPERTIES = new Set([
@@ -29,6 +31,20 @@ const CLIENT_NAMES = new Set([
   'Visual Studio Code',
   'Visual Studio Code - Insiders',
   'unknown',
+]);
+const OBSERVATION_AGENTS = new Set([...CLIENT_NAMES, 'codex']);
+const OBSERVATION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-hosted-skills']);
+const OBSERVATION_OPERATIONS = new Set(['deploy', 'provision']);
+const OBSERVATION_DEPLOYMENT_KINDS = new Set(['function-app', 'hosted-agent']);
+const SKILLS_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9a-z][0-9a-z.]{0,20})?$/;
+const OBSERVED_EVENT_PROPERTIES = new Set([
+  'skill',
+  'operation',
+  'result',
+  'resourceTypes',
+  'deploymentKind',
+  'agent',
+  'skillsVersion',
 ]);
 export const BUNDLED_SKILL_NAMES = new Set([
   'azure-functions-best-practices',
@@ -61,6 +77,16 @@ export interface TelemetryEvent {
   readonly fileReference?: string;
 }
 
+export interface DeploymentObservedEvent {
+  readonly skill: 'azure-functions-deploy' | 'azure-functions-hosted-skills';
+  readonly operation: 'deploy' | 'provision';
+  readonly result: 'success';
+  readonly resourceTypes: readonly string[];
+  readonly deploymentKind: 'function-app' | 'hosted-agent';
+  readonly agent: string;
+  readonly skillsVersion: string;
+}
+
 export type TelemetrySendStatus = 'sent' | 'disabled' | 'not-configured';
 
 export interface TelemetrySendResult {
@@ -75,7 +101,7 @@ export interface ApplicationInsightsClient {
   flush(options: { readonly callback: (response?: string) => void }): void;
 }
 
-interface TelemetryEnvironment {
+export interface TelemetryEnvironment {
   readonly AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY?: string;
   readonly AZURE_MCP_COLLECT_TELEMETRY?: string;
 }
@@ -184,8 +210,162 @@ export async function sendTelemetryEvent(event: TelemetryEvent): Promise<Telemet
   });
 }
 
-function createApplicationInsightsClient(connectionString: string): ApplicationInsightsClient {
-  return new applicationInsights.TelemetryClient(connectionString);
+export function parseDeploymentObservedEvent(value: unknown): DeploymentObservedEvent {
+  if (!isRecord(value)) {
+    throw new Error('Deployment observation event must be a JSON object.');
+  }
+  for (const property of Object.keys(value)) {
+    if (!OBSERVED_EVENT_PROPERTIES.has(property)) {
+      throw new Error(`Unsupported deployment observation event property: ${property}`);
+    }
+  }
+
+  const skill = requiredString(value, 'skill');
+  if (!OBSERVATION_SKILLS.has(skill)) {
+    throw new Error(`Unsupported deployment observation skill: ${skill}`);
+  }
+  const operation = requiredString(value, 'operation');
+  if (!OBSERVATION_OPERATIONS.has(operation)) {
+    throw new Error(`Unsupported deployment observation operation: ${operation}`);
+  }
+  if (requiredString(value, 'result') !== 'success') {
+    throw new Error('Deployment observation result must be success.');
+  }
+  const deploymentKind = requiredString(value, 'deploymentKind');
+  if (!OBSERVATION_DEPLOYMENT_KINDS.has(deploymentKind)) {
+    throw new Error(`Unsupported deployment observation deployment kind: ${deploymentKind}`);
+  }
+  const expectedDeploymentKind = skill === 'azure-functions-deploy' ? 'function-app' : 'hosted-agent';
+  if (deploymentKind !== expectedDeploymentKind) {
+    throw new Error('Deployment observation deploymentKind does not match skill.');
+  }
+  const agent = requiredString(value, 'agent');
+  if (!OBSERVATION_AGENTS.has(agent)) {
+    throw new Error(`Unsupported deployment observation agent: ${agent}`);
+  }
+  const skillsVersion = normalizeSkillsVersion(requiredString(value, 'skillsVersion'));
+
+  const resourceTypesValue = value.resourceTypes;
+  if (!Array.isArray(resourceTypesValue) || resourceTypesValue.length === 0) {
+    throw new Error('Deployment observation resourceTypes must be a non-empty array.');
+  }
+  const resourceTypes = resourceTypesValue.map(entry => {
+    if (typeof entry !== 'string' || !isNormalizedResourceType(entry)) {
+      throw new Error('Invalid deployment observation resource type.');
+    }
+    return entry;
+  });
+
+  return {
+    skill: skill as DeploymentObservedEvent['skill'],
+    operation: operation as DeploymentObservedEvent['operation'],
+    result: 'success',
+    resourceTypes,
+    deploymentKind: deploymentKind as DeploymentObservedEvent['deploymentKind'],
+    agent,
+    skillsVersion,
+  };
+}
+
+export function normalizeObservedAgent(agent: string): string {
+  return OBSERVATION_AGENTS.has(agent) ? agent : 'unknown';
+}
+
+export function normalizeSkillsVersion(value: string | undefined): string {
+  if (typeof value !== 'string') return 'unknown';
+  const trimmed = value.trim();
+  if (trimmed === 'unknown') return 'unknown';
+  return SKILLS_VERSION_PATTERN.test(trimmed) ? trimmed : 'unknown';
+}
+
+export async function sendDeploymentObservedEventWithDependencies(
+  event: DeploymentObservedEvent,
+  dependencies: TelemetryDependencies,
+): Promise<TelemetrySendResult> {
+  const parsedEvent = parseDeploymentObservedEvent(event);
+  if (isOptedOut(dependencies.environment)) {
+    return { status: 'disabled' };
+  }
+  if (!isConfiguredConnectionString(dependencies.connectionString)) {
+    return { status: 'not-configured' };
+  }
+
+  const client = dependencies.createClient(dependencies.connectionString);
+  client.trackEvent({
+    name: DEPLOYMENT_OBSERVED_EVENT_NAME,
+    properties: deploymentObservedProperties(parsedEvent),
+  });
+  await flushWithTimeout(client, dependencies.timeoutMs);
+  return { status: 'sent' };
+}
+
+export async function sendDeploymentObservedEvent(event: DeploymentObservedEvent): Promise<TelemetrySendResult> {
+  return sendDeploymentObservedEventWithDependencies(event, {
+    connectionString: APPLICATION_INSIGHTS_CONNECTION_STRING,
+    createClient: createApplicationInsightsClient,
+    environment: process.env,
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+  });
+}
+
+function deploymentObservedProperties(event: DeploymentObservedEvent): Record<string, string> {
+  return {
+    skill: event.skill,
+    operation: event.operation,
+    result: event.result,
+    resourceTypes: JSON.stringify([...event.resourceTypes]),
+    deploymentKind: event.deploymentKind,
+    agent: event.agent,
+    skillsVersion: event.skillsVersion,
+  };
+}
+
+export function createApplicationInsightsClient(connectionString: string): ApplicationInsightsClient {
+  const client = new applicationInsights.TelemetryClient(connectionString);
+  stripHostContextTags(client);
+  installEnvelopeTagAllowlist(client);
+  return client;
+}
+
+function installEnvelopeTagAllowlist(client: unknown): void {
+  if (!isRecord(client)) return;
+  const addProcessor = client.addTelemetryProcessor;
+  if (typeof addProcessor !== 'function') return;
+  const context = isRecord(client.context) ? client.context : {};
+  const keys = isRecord(context.keys) ? context.keys : {};
+  const sdkVersionKey = typeof keys.internalSdkVersion === 'string'
+    ? keys.internalSdkVersion
+    : 'ai.internal.sdkVersion';
+  const allowed = new Set<string>([sdkVersionKey]);
+  addProcessor.call(client, (envelope: unknown): boolean => {
+    if (isRecord(envelope) && isRecord(envelope.tags)) {
+      const tags = envelope.tags as Record<string, unknown>;
+      for (const key of Object.keys(tags)) {
+        if (!allowed.has(key)) delete tags[key];
+      }
+    }
+    return true;
+  });
+}
+
+function stripHostContextTags(client: unknown): void {
+  if (!isRecord(client)) return;
+  const context = client.context;
+  if (!isRecord(context)) return;
+  const tags = context.tags;
+  if (!isRecord(tags)) return;
+  const keys = isRecord(context.keys) ? context.keys : {};
+  const derivedKeys = [
+    keys.cloudRoleInstance,
+    keys.deviceOSVersion,
+    'ai.cloud.roleInstance',
+    'ai.device.osVersion',
+    'ai.device.osArchitecture',
+    'ai.device.osPlatform',
+  ];
+  for (const key of derivedKeys) {
+    if (typeof key === 'string') delete tags[key];
+  }
 }
 
 function telemetryProperties(event: TelemetryEvent): Record<string, string> {
@@ -210,10 +390,10 @@ function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number):
       client.flush({
         callback: response => {
           clearTimeout(timeout);
-          if (response) {
-            reject(new Error(`Telemetry delivery failed: ${response}`));
-          } else {
+          if (isAcceptedIngestionResponse(response)) {
             resolve();
+          } else {
+            reject(new Error(`Telemetry delivery failed: ${response}`));
           }
         },
       });
@@ -224,12 +404,30 @@ function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number):
   });
 }
 
-function isConfiguredConnectionString(connectionString: string): boolean {
+function isAcceptedIngestionResponse(response: string | undefined): boolean {
+  if (response === undefined || response.length === 0) return true;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(response);
+  } catch {
+    return false;
+  }
+  if (!isRecord(parsed)) return false;
+  const { itemsReceived, itemsAccepted, errors } = parsed;
+  return Array.isArray(errors)
+    && errors.length === 0
+    && typeof itemsAccepted === 'number'
+    && itemsAccepted >= 1
+    && typeof itemsReceived === 'number'
+    && itemsAccepted === itemsReceived;
+}
+
+export function isConfiguredConnectionString(connectionString: string): boolean {
   return connectionString.trim().length > 0
     && connectionString !== CONNECTION_STRING_PLACEHOLDER;
 }
 
-function isOptedOut(environment: TelemetryEnvironment): boolean {
+export function isOptedOut(environment: TelemetryEnvironment): boolean {
   return environment.AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY?.toLowerCase() === 'false'
     || environment.AZURE_MCP_COLLECT_TELEMETRY?.toLowerCase() === 'false';
 }
