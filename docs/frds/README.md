@@ -23,10 +23,11 @@ prerequisites for development.
 
 | ID | Feature | Status | Depends on |
 | --- | --- | --- | --- |
+| [FRD-0003](0003-azure-deployment-observation-telemetry.md) | Azure deployment observation telemetry: observed successful Azure deployment operations | Draft | — |
 
-No FRDs have been authored yet. Use `_template.md` to write the first one as
-`0001-kebab-case-title.md`, add a row to the table above, and keep the index and
-the document's status in sync as it moves through the lifecycle below.
+FRD numbers 0001 and 0002 are reserved by pull requests that were open when this
+index was written; check the index and open pull requests for collisions before
+choosing a number.
 
 [Historical F1-F21 specifications](../prd-docs/README.md) remain in `docs/prd-docs/`.
 Do not move, renumber, or silently reinterpret them. Refer to old features as
