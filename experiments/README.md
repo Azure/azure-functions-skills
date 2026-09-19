@@ -210,12 +210,19 @@ For plugin selections, `native/` instead contains `matrix-manifest.json` and the
 original per-cell result directories. Cells run in sequence through standalone
 Vally with both plugin flags. There is no native merge step. The report reader
 uses the manifest to pair ON and OFF without changing the original result rows.
+Each completed cell also saves a `workspace/` snapshot next to `results.jsonl`
+before the isolated run root is removed. The snapshot excludes generated output,
+logs, hidden configuration directories, grading files, and large files.
+`local.settings.json` and `.env` files are never copied as-is. The snapshot writes
+redacted forms and a `snapshot-manifest.json` that lists copied, redacted, and
+excluded paths. Known emulator-only values remain visible for diagnosis.
 
 ```text
 <private-bundle>/
   raw/<run-id>/shard-1-of-1/   Native originals, including session logs/patches
-  native/                    Native merged canonical results
-  site/                      index.html + logo (only with npm run eval)
+  native/                      Native merged or plugin-matrix results
+    .../<cell-result>/workspace/ Redacted plugin-cell workspace snapshot
+  site/                        index.html + logo (only with npm run eval)
 ```
 
 **Only `site/` is a publication candidate**, after review. Never publish the

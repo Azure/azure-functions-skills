@@ -31,6 +31,7 @@ interface Arm {
   graderScores: Record<string, number | null>;
   metrics: Metrics;
   trials: TrialView[];
+  workspace: string | null;
 }
 
 interface Comparison {
@@ -107,7 +108,7 @@ export function relativeChange(on: number | null, off: number | null): number | 
   return on === null || off === null || off === 0 ? null : (on - off) / off * 100;
 }
 
-function summarize(planned: number, trials: TrialView[]): Arm {
+function summarize(planned: number, trials: TrialView[], workspace: string | null = null): Arm {
   const executed = trials.filter(trial => trial.status !== 'skipped');
   const passed = executed.filter(trial => trial.status === 'success' && trial.passed === true).length;
   const graderNames = [...new Set(executed.flatMap(trial => trial.graders.map(grader => grader.name)))];
@@ -125,7 +126,7 @@ function summarize(planned: number, trials: TrialView[]): Arm {
     graderScores: Object.fromEntries(graderNames.map(name => [name, mean(executed.map(trial =>
       trial.graders.find(grader => grader.name === name)?.score ?? null))])),
     metrics: Object.fromEntries(metricNames.map(key => [key, mean(executed.map(trial => trial.metrics[key]))])) as Metrics,
-    trials,
+    trials, workspace,
   };
 }
 
@@ -214,6 +215,19 @@ function matrixFile(input: string, value: unknown): string {
   return file;
 }
 
+function matrixDirectory(input: string, value: unknown): string {
+  const path = text(value).replaceAll('\\', '/');
+  check(!posix.isAbsolute(path) && !win32.isAbsolute(path) && !path.includes(':')
+    && path.split('/').every(part => part !== '' && part !== '.' && part !== '..'),
+  'matrix paths must be relative and stay inside the input directory.');
+  const directory = realpathSync(join(input, ...path.split('/')));
+  const child = relative(input, directory);
+  check(child !== '' && child !== '..' && !child.startsWith('..\\') && !child.startsWith('../')
+    && !isAbsolute(child) && statSync(directory).isDirectory(),
+  'matrix workspace paths must stay inside the input directory, including links.');
+  return child.replaceAll('\\', '/');
+}
+
 function matrixHash(value: unknown): string {
   const result = text(value);
   check(/^[a-f0-9]{16}$/.test(result), 'expected a 16-character matrix hash.');
@@ -292,6 +306,8 @@ function readMatrixBenchmark(input: string) {
       resultIdentities.add(identity);
       records = jsonLines(file);
     }
+    const workspace = cell.workspace === null || cell.workspace === undefined
+      ? null : matrixDirectory(root, cell.workspace);
     const trials = new Map(scenarios.map(scenario => [scenario, [] as TrialView[]]));
     const seen = new Set<string>();
     const itemIds = new Set<string>();
@@ -337,7 +353,7 @@ function readMatrixBenchmark(input: string) {
         prompt: scenarioPrompt(skill, directory, scenario), on: null, off: null,
       };
       check(comparison[arm] === null, 'duplicate model/scenario arm.');
-      comparison[arm] = summarize(runs, records);
+      comparison[arm] = summarize(runs, records, workspace);
       comparisons.set(key, comparison);
     }
   }

@@ -39,7 +39,8 @@ The deterministic grader restores, builds, publishes, runs existing test project
 present, starts the host, and exercises the HTTP and queue/blob paths. It checks expected
 function registration through the local `/admin/functions` API, not log text.
 It records `grading-evidence/checklist.json`
-and command logs, stops its host, and removes only the emulator resources it created.
+and command logs, stops its host, and removes the three evaluation-owned emulator
+resources after its independent run.
 It never calls Azure or starts an emulator. A failed cleanup fails the result.
 
 The **code-only-v1** judge receives final source and build configuration, fixed review
@@ -76,10 +77,11 @@ operation limits. Neither arm receives the private grading checklist, review not
 or a migration recipe. The agent cannot expand permissions. An operation outside
 the stated limits is reported as blocked.
 
-The deterministic grader owns emulator data and trigger end-to-end execution.
-The agent can build and inspect the host, but it must not create fixed queue or blob
-resources. This separation prevents an agent's local validation data from blocking
-the independent grader.
+The agent can run local end-to-end checks against the three named evaluation-owned
+resources. It must clean up its resources and stop its host. The deterministic grader
+then resets only those names and runs an independent E2E. This sequence lets the skill
+detect migration problems during work without making its own result the acceptance
+evidence.
 
 Vally 0.16 does not load experiment `grader_plugins` during `experiment run`.
 The local runner instead calls standalone `vally eval` with both plugin flags for
@@ -90,7 +92,8 @@ Provide .NET SDK 8, Core Tools v4, PowerShell 7.2+, and a reachable NuGet source
 Also provide a **dedicated Azurite instance** on loopback ports 10000 and 10001,
 using its public development account. Do not share it with another app or concurrent
 trial. The `greeting-requests` queue and `greeting-input`/`greeting-output` containers
-must be absent at each start. Neither agent nor grader may delete pre-existing data.
+are reserved for this evaluation and can be reset. The trusted runner sets
+`VALLY_EVAL_OWNS_AZURITE_RESOURCES=1`; the grader refuses reset without this marker.
 Use `AzureWebJobsStorage=UseDevelopmentStorage=true`; do not use cloud credentials.
 The baseline also needs `FUNCTIONS_WORKER_RUNTIME=dotnet` and
 `FUNCTIONS_INPROC_NET8_ENABLED=1`. Keep real local settings untracked.

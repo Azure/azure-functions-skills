@@ -41,16 +41,22 @@ function Invoke-AzuriteRequest {
 
 function Initialize-StorageCase {
     param($Contract, [Collections.Generic.List[object]]$Owned)
+    if ($env:VALLY_EVAL_OWNS_AZURITE_RESOURCES -ne '1') {
+        throw [InvalidOperationException]::new(
+            'The grader cannot reset emulator data without VALLY_EVAL_OWNS_AZURITE_RESOURCES=1.')
+    }
     $resources = @(
         @{ service = 'queue'; resource = [string]$Contract.queue },
         @{ service = 'blob'; resource = "$($Contract.inputContainer)?restype=container" },
         @{ service = 'blob'; resource = "$($Contract.outputContainer)?restype=container" }
     )
     foreach ($resource in $resources) {
-        $response = Invoke-AzuriteRequest -Service $resource.service -Method PUT -Resource $resource.resource
-        if ($response.StatusCode -in @(204, 409)) {
-            throw [InvalidOperationException]::new("Emulator resource '$($resource.resource)' already exists. Use an empty dedicated emulator.")
+        $removed = Invoke-AzuriteRequest -Service $resource.service -Method DELETE -Resource $resource.resource
+        if ($removed.StatusCode -notin @(202, 204, 404)) {
+            throw [InvalidOperationException]::new(
+                "Cannot reset evaluation-owned emulator resource '$($resource.resource)': HTTP $($removed.StatusCode).")
         }
+        $response = Invoke-AzuriteRequest -Service $resource.service -Method PUT -Resource $resource.resource
         if ($response.StatusCode -ne 201) {
             throw [InvalidOperationException]::new("Cannot create emulator resource '$($resource.resource)': HTTP $($response.StatusCode).")
         }

@@ -164,6 +164,12 @@ describe('deterministic grader script', () => {
     expect(script).toContain('start --no-build');
   });
 
+  it('injects the grader storage endpoint instead of requiring it in local settings', () => {
+    expect(script).toContain("$env:AzureWebJobsStorage = 'UseDevelopmentStorage=true'");
+    expect(script).toContain("$runtimeOk = $runtime -eq 'dotnet-isolated'");
+    expect(script).not.toContain("[string]$localSettings.Values.AzureWebJobsStorage -eq 'UseDevelopmentStorage=true'");
+  });
+
   it('parses as PowerShell and declares the evidence contract explicitly', () => {
     expect(script).toMatch(/\[CmdletBinding\(\)\]/);
     expect(script).toContain('grading-evidence');
@@ -172,7 +178,7 @@ describe('deterministic grader script', () => {
 });
 
 describe('eval specification', () => {
-  it('exports final source separately from logs and local configuration', () => {
+  it('exports final source and relies on the runner for a safe workspace snapshot', () => {
     const artifacts = specification.split('    artifacts:')[1]?.split('    rubric:')[0] ?? '';
     for (const included of ['**/*.cs', '**/*.csproj', '**/*.props', '**/*.targets', 'host.json', 'global.json']) {
       expect(artifacts.split('      exclude:')[0]).toContain(included);
@@ -211,6 +217,18 @@ describe('eval specification', () => {
     const agentFiles = specification.split('agent_environment:')[1]?.split('grading_environment:')[0] ?? '';
     expect(agentFiles).not.toMatch(/acceptance|definition-of-done/);
     expect(agentFiles).toContain('dest: AGENTS.md');
+  });
+
+  it('permits agent E2E only against evaluation-owned storage resources', () => {
+    const boundaries = read('fixtures', 'eval-boundaries.md');
+    expect(boundaries).toContain('Run applicable local end-to-end checks');
+    for (const resource of ['greeting-requests', 'greeting-input', 'greeting-output']) {
+      expect(boundaries).toContain(resource);
+    }
+    expect(boundaries).toContain('evaluation-owned');
+    expect(boundaries).toContain('dedicated emulator connection');
+    expect(boundaries).not.toContain('UseDevelopmentStorage=true');
+    expect(boundaries).not.toContain('grader owns emulator data and');
   });
 
   it('binds the judge to the deterministic evidence instead of transcript claims', () => {
@@ -301,17 +319,53 @@ describe('local benchmark registration', () => {
       expect(request.headers.Authorization).toBe(`SharedKey devstoreaccount1:${signature}`);
     });
 
-    it('does not claim ownership of pre-existing queue data', () => {
+    it('resets only the evaluation-owned storage resources before an independent grader run', () => {
       const result = invoke(`
-        function Invoke-AzuriteRequest { @{ StatusCode = 409; Content = 'QueueAlreadyExists' } }
+        $env:VALLY_EVAL_OWNS_AZURITE_RESOURCES = '1'
+        $calls = [Collections.Generic.List[string]]::new()
+        function Invoke-AzuriteRequest {
+          param($Service, $Method, $Resource)
+          $calls.Add("$Method $Service $Resource")
+          @{ StatusCode = $Method -eq 'DELETE' ? 404 : 201; Content = '' }
+        }
         $owned = [Collections.Generic.List[object]]::new()
-        try { Initialize-StorageCase -Owned $owned -Contract ([pscustomobject]@{
+        Initialize-StorageCase -Owned $owned -Contract ([pscustomobject]@{
           queue = 'greeting-requests'; inputContainer = 'greeting-input'; outputContainer = 'greeting-output'
-        }); throw 'Expected a refusal' }
-        catch [InvalidOperationException] { @{ count = $owned.Count; reason = $_.Exception.Message } | ConvertTo-Json }
+        })
+        @{ count = $owned.Count; calls = @($calls) } | ConvertTo-Json
       `);
       expect(result.status, result.stderr).toBe(0);
-      expect(JSON.parse(result.stdout)).toMatchObject({ count: 0, reason: expect.stringContaining('already exists') });
+      expect(JSON.parse(result.stdout)).toEqual({
+        count: 3,
+        calls: [
+          'DELETE queue greeting-requests',
+          'PUT queue greeting-requests',
+          'DELETE blob greeting-input?restype=container',
+          'PUT blob greeting-input?restype=container',
+          'DELETE blob greeting-output?restype=container',
+          'PUT blob greeting-output?restype=container',
+        ],
+      });
+    });
+
+    it('refuses to reset emulator resources without runner ownership', () => {
+      const result = invoke(`
+        $env:VALLY_EVAL_OWNS_AZURITE_RESOURCES = $null
+        $owned = [Collections.Generic.List[object]]::new()
+        try {
+          Initialize-StorageCase -Owned $owned -Contract ([pscustomobject]@{
+            queue = 'greeting-requests'; inputContainer = 'greeting-input'; outputContainer = 'greeting-output'
+          })
+          throw 'Expected ownership refusal'
+        } catch [InvalidOperationException] {
+          @{ count = $owned.Count; reason = $_.Exception.Message } | ConvertTo-Json
+        }
+      `);
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        count: 0,
+        reason: expect.stringContaining('VALLY_EVAL_OWNS_AZURITE_RESOURCES=1'),
+      });
     });
 
     it('treats an absent output blob as pending and a wrong output as a failed contract', () => {

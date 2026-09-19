@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { createTempDir, removeDir } from './helpers/fs.js';
-import { runPluginMatrix } from '../src/evaluation/plugin-matrix.js';
+import { runPluginMatrix, saveWorkspaceSnapshot } from '../src/evaluation/plugin-matrix.js';
 import { validatePluginEvals } from '../src/evaluation/validate.js';
 import { generateReport, readBenchmark } from '../src/evaluation/report.js';
 
@@ -114,13 +114,23 @@ describe('plugin-aware matrix transport', () => {
 
   it('executes installed Vally with local fake plugins and exports files without any model client', async () => {
     writeFileSync(join(root, 'executor.mjs'), `
-      import { writeFileSync } from 'node:fs';
+      import { mkdirSync, writeFileSync } from 'node:fs';
       import { join } from 'node:path';
       export function registerExecutors(registry) {
         registry.register({
           name: 'test-user-policy', supportsEnvVars: true, validateConfig() {},
           async execute(stimulus, options) {
             writeFileSync(join(options.workDir, 'result.txt'), 'static executor output');
+            writeFileSync(join(options.workDir, 'local.settings.json'), JSON.stringify({
+              IsEncrypted: false,
+              Values: {
+                FUNCTIONS_WORKER_RUNTIME: 'dotnet-isolated',
+                AzureWebJobsStorage: 'UseDevelopmentStorage=true',
+                SecretSetting: 'private-value'
+              }
+            }));
+            mkdirSync(join(options.workDir, 'bin'), { recursive: true });
+            writeFileSync(join(options.workDir, 'bin', 'generated.dll'), 'generated');
             return {
               id: 'static-trial', stimulus, workDir: options.workDir, events: [], output: 'done',
               metadata: {model: options.model, skillsLoaded: [], executor:'test-user-policy', sessionID:'test'},
@@ -168,6 +178,23 @@ describe('plugin-aware matrix transport', () => {
       }));
       const exported = readdirSync(dirname(path), { recursive: true }).map(String);
       expect(exported.some(file => /artifacts[\\/]result\.txt$/.test(file))).toBe(true);
+      const workspace = join(dirname(path), 'workspace');
+      const snapshot = readdirSync(workspace, { recursive: true }).map(String);
+      expect(snapshot.some(file => /result\.txt$/.test(file))).toBe(true);
+      expect(snapshot.some(file => /local\.settings\.redacted\.json$/.test(file))).toBe(true);
+      expect(snapshot.some(file => /local\.settings\.json$/.test(file))).toBe(false);
+      expect(snapshot.some(file => /generated\.dll$/.test(file))).toBe(false);
+      const redactedPath = join(workspace, snapshot.find(file => /local\.settings\.redacted\.json$/.test(file)) ?? '');
+      expect(JSON.parse(readFileSync(redactedPath, 'utf8'))).toEqual({
+        IsEncrypted: false,
+        Values: {
+          FUNCTIONS_WORKER_RUNTIME: 'dotnet-isolated',
+          AzureWebJobsStorage: 'UseDevelopmentStorage=true',
+          SecretSetting: '[REDACTED]',
+        },
+      });
+      expect(JSON.parse(readFileSync(join(workspace, 'snapshot-manifest.json'), 'utf8')))
+        .toMatchObject({ version: 1, redacted: expect.arrayContaining([expect.stringContaining('local.settings.json')]) });
     }
     const report = readBenchmark(options().output);
     expect(report.comparisons[0].on?.passed).toBe(1);
@@ -181,5 +208,22 @@ describe('plugin-aware matrix transport', () => {
     await expect(runPluginMatrix({ ...options(), models: ['../outside'] })).rejects.toThrow(/model/i);
     expect(spawnSync).not.toHaveBeenCalled();
     expect(readdirSync(options().output)).toEqual([]);
+  });
+
+  it('preserves a safe snapshot when local settings contain invalid JSON', () => {
+    const source = join(root, 'snapshot-source');
+    const destination = join(root, 'snapshot-output');
+    mkdirSync(source);
+    writeFileSync(join(source, 'local.settings.json'), '\uFEFF{ invalid');
+    writeFileSync(join(source, '.npmrc'), 'registry=https://example.invalid/\n_authToken=secret');
+    saveWorkspaceSnapshot(source, destination);
+    expect(existsSync(join(destination, 'local.settings.json'))).toBe(false);
+    expect(JSON.parse(readFileSync(join(destination, 'local.settings.redacted.json'), 'utf8')))
+      .toEqual({ redaction: 'Invalid JSON in local.settings.json; original content omitted.' });
+    expect(JSON.parse(readFileSync(join(destination, 'snapshot-manifest.json'), 'utf8')))
+      .toMatchObject({
+        redacted: ['local.settings.json'],
+        excluded: ['.npmrc:sensitive-name'],
+      });
   });
 });

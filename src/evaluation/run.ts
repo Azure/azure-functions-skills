@@ -213,6 +213,7 @@ export function benchmarkEnvironment(root: string, source: NodeJS.ProcessEnv, dr
     npm_config_cache: join(root, 'cache', 'npm'), npm_config_registry: url.href,
     NUGET_PACKAGES: join(root, 'cache', 'nuget'),
     FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT: '1', VALLY_TELEMETRY_OPTOUT: '1',
+    VALLY_EVAL_OWNS_AZURITE_RESOURCES: '1',
     COPILOT_AUTO_UPDATE: 'false', COPILOT_HOME_SETTINGS_JSON: settings,
   });
   if (!dryRun) {

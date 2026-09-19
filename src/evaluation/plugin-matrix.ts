@@ -1,7 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import {
+  copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync,
+  realpathSync, renameSync, writeFileSync,
+} from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { loadEvalSpec, resolveExecutorName, validateEvalSpec } from '@microsoft/vally';
@@ -35,11 +38,23 @@ export interface PluginMatrixCell {
   evalHash: string;
   configHash: string;
   results: string | null;
+  workspace: string | null;
+  workspaceError: string | null;
   exitCode: number | null;
 }
 
 const identifier = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/;
 const hash = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16);
+const snapshotExcludedDirectories = new Set([
+  '.git', '.azure', '.claude', '.copilot', '.github', 'bin', 'dist',
+  'grading-evidence', 'node_modules', 'obj', 'packages',
+]);
+const snapshotFileLimit = 1_000_000;
+const snapshotTotalLimit = 50_000_000;
+const snapshotSensitiveNames = [
+  /^\.env(?:\.|$)/i, /^\.npmrc$/i, /^appsettings(?:\.[^.]+)?\.json$/i,
+  /\.publishsettings$/i, /\.(?:key|pem|pfx)$/i,
+];
 
 function check(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Plugin matrix: ${message}`);
@@ -73,6 +88,115 @@ function findResults(directory: string): string | null {
     .filter(file => existsSync(file));
   check(found.length <= 1, 'multiple result sets exist for one cell; use a new output directory.');
   return found[0] ?? null;
+}
+
+function redactJson(path: string, content: string): string {
+  let value: unknown;
+  try {
+    value = JSON.parse(content.replace(/^\uFEFF/, ''));
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return JSON.stringify({ redaction: `Invalid JSON in ${path}; original content omitted.` }, null, 2) + '\n';
+  }
+  check(value !== null && typeof value === 'object' && !Array.isArray(value),
+    `cannot safely redact ${path}; expected a JSON object.`);
+  const safeValues = new Set(['dotnet', 'dotnet-isolated', 'UseDevelopmentStorage=true']);
+  const redact = (input: unknown): unknown => {
+    if (input === null || typeof input === 'boolean' || typeof input === 'number') return input;
+    if (typeof input === 'string') {
+      return safeValues.has(input) ? input : '[REDACTED]';
+    }
+    if (Array.isArray(input)) return input.map(item => redact(item));
+    return Object.fromEntries(Object.entries(input as Record<string, unknown>)
+      .map(([name, item]) => [name, redact(item)]));
+  };
+  return JSON.stringify(redact(value), null, 2) + '\n';
+}
+
+function redactEnvironment(content: string): string {
+  return content.split(/\r?\n/).map(line => {
+    const match = /^(\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=)/.exec(line);
+    return match ? `${match[1]}[REDACTED]` : line.startsWith('#') || !line.trim() ? line : '[REDACTED]';
+  }).join('\n');
+}
+
+export function saveWorkspaceSnapshot(source: string, destination: string): void {
+  check(existsSync(source) && lstatSync(source).isDirectory(), 'workspace snapshot source is missing.');
+  check(!existsSync(destination), 'workspace snapshot destination already exists.');
+  mkdirSync(destination, { recursive: true, mode: 0o700 });
+  const manifest = {
+    version: 1,
+    source: basename(source),
+    copied: [] as string[],
+    redacted: [] as string[],
+    excluded: [] as string[],
+    totalBytes: 0,
+  };
+  const visit = (directory: string, output: string, prefix = ''): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const inputPath = join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        manifest.excluded.push(`${path}:symlink`);
+        continue;
+      }
+      if (entry.isDirectory()) {
+        if (snapshotExcludedDirectories.has(entry.name.toLowerCase()) || entry.name.startsWith('.')) {
+          manifest.excluded.push(`${path}/`);
+          continue;
+        }
+        const outputPath = join(output, entry.name);
+        mkdirSync(outputPath, { mode: 0o700 });
+        visit(inputPath, outputPath, path);
+        continue;
+      }
+      if (!entry.isFile()) {
+        manifest.excluded.push(`${path}:unsupported`);
+        continue;
+      }
+      const lower = entry.name.toLowerCase();
+      if (lower.endsWith('.log')) {
+        manifest.excluded.push(path);
+        continue;
+      }
+      const size = lstatSync(inputPath).size;
+      if (size > snapshotFileLimit || manifest.totalBytes + size > snapshotTotalLimit) {
+        manifest.excluded.push(`${path}:size-limit`);
+        continue;
+      }
+      if (lower === 'local.settings.json') {
+        const target = join(output, 'local.settings.redacted.json');
+        const redacted = redactJson(path, readFileSync(inputPath, 'utf8'));
+        writeFileSync(target, redacted, { mode: 0o600 });
+        manifest.totalBytes += Buffer.byteLength(redacted);
+        manifest.redacted.push(path);
+        continue;
+      }
+      if (lower !== '.gitignore' && (entry.name.startsWith('.')
+        || snapshotSensitiveNames.some(pattern => pattern.test(entry.name)))) {
+        if (lower === '.env' || lower.startsWith('.env.')) {
+          const target = join(output, `${entry.name}.redacted`);
+          const redacted = redactEnvironment(readFileSync(inputPath, 'utf8'));
+          writeFileSync(target, redacted, { mode: 0o600 });
+          manifest.totalBytes += Buffer.byteLength(redacted);
+          manifest.redacted.push(path);
+        } else {
+          manifest.excluded.push(`${path}:sensitive-name`);
+        }
+        continue;
+      }
+      const content = size <= snapshotFileLimit ? readFileSync(inputPath) : undefined;
+      if (content && /AccountKey=|SharedAccessSignature=|-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/i.test(content.toString('utf8'))) {
+        manifest.excluded.push(`${path}:credential-like-content`);
+        continue;
+      }
+      copyFileSync(inputPath, join(output, entry.name));
+      manifest.totalBytes += size;
+      manifest.copied.push(path);
+    }
+  };
+  visit(source, destination);
+  writeFileSync(join(destination, 'snapshot-manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
 }
 
 export async function runPluginMatrix(options: PluginMatrixOptions) {
@@ -125,6 +249,7 @@ export async function runPluginMatrix(options: PluginMatrixOptions) {
               variant: `skill=${enabled ? 'on' : 'off'},model=${model}`, evalFile, evalName: spec.name,
               model, enabled, runs: 1, stimuli: spec.stimuli.map(stimulus => stimulus.name),
               skills, sharedSkills, evalHash, configHash: hash(serialized), results: null, exitCode: null,
+              workspace: null, workspaceError: null,
             },
           });
         }
@@ -159,6 +284,18 @@ export async function runPluginMatrix(options: PluginMatrixOptions) {
     const results = findResults(cellDirectory);
     plan.cell.results = results ? relative(options.output, results).replaceAll('\\', '/') : null;
     plan.cell.exitCode = result.status;
+    save();
+    const workspaceSource = join(options.workspaceRoot, `cell-${index}`);
+    if (existsSync(workspaceSource)) {
+      const workspaceDestination = results ? join(dirname(results), 'workspace') : join(cellDirectory, 'workspace');
+      try {
+        saveWorkspaceSnapshot(workspaceSource, workspaceDestination);
+        plan.cell.workspace = relative(options.output, workspaceDestination).replaceAll('\\', '/');
+      } catch (error) {
+        plan.cell.workspaceError = error instanceof Error ? error.message : String(error);
+        exitCode ||= 2;
+      }
+    }
     save();
     check(!result.error && result.signal === null && result.status !== null,
       `could not complete cell ${index}; partial results are in ${options.output}.`);

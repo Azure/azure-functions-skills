@@ -100,6 +100,8 @@ function matrixFixture() {
     stimuli: ['typescript-http'], skills: enabled ? [shared, target] : [shared],
     sharedSkills: [shared], evalHash: 'b839dd0e746a0f09', configHash: 'abcdef0000000000',
     results: `${model}/${enabled ? 'on' : 'off'}/results.jsonl` as string | null,
+    workspace: `${model}/${enabled ? 'on' : 'off'}/workspace` as string | null,
+    workspaceError: null as string | null,
     exitCode: 0 as number | null,
   })));
   const manifest = {
@@ -130,6 +132,7 @@ function matrixFixture() {
       const file = join(input, cell.results);
       mkdirSync(dirname(file), { recursive: true });
       writeFileSync(file, records[index].map(record => JSON.stringify(record)).join('\n'));
+      if (cell.workspace !== null) mkdirSync(join(input, cell.workspace), { recursive: true });
     });
   }
   save();
@@ -197,6 +200,7 @@ describe('native benchmark report', () => {
       expect(data.comparisons.map(c => [c.off?.metrics.totalTokens, c.on?.metrics.totalTokens]))
         .toEqual([[100, 101], [102, 103]]);
       expect(data.comparisons[0].on).toMatchObject({ planned: 1, samples: 1, passed: 1, successRate: 100 });
+      expect(data.comparisons[0].on?.workspace).toBe('claude-sonnet-5/on/workspace');
       expect(data.comparisons[0].prompt).toContain('Create a new TypeScript Azure Functions v4 HTTP app');
     });
 
@@ -369,6 +373,8 @@ describe('native benchmark report', () => {
       const detail = render(html, `?skill=${comparison.id}`).node('#app').innerHTML;
       expect(detail).toContain('Enabled: 1/1');
       expect(detail).toContain('matrix-manifest.json');
+      expect(detail).toContain('Workspace snapshot');
+      expect(detail).toContain('claude-sonnet-5/on/workspace');
       expect(detail).not.toMatch(/experiment-manifest|plan-snapshot|native shard keys/);
       expect(render(html, '').node('#app').innerHTML).toContain('Vally standalone matrix');
     });

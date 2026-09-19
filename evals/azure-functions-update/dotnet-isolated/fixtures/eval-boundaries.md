@@ -9,11 +9,15 @@ Do not access Azure, deploy, use credentials, change Git history, or read other
 workspaces or user configuration. Do not change feed, proxy, or TLS settings.
 
 Use only the dedicated loopback test services. Do not use production endpoints.
-Do not start or stop an emulator. The evaluation grader owns emulator data and
-trigger end-to-end execution. During the agent phase, do not create, change, or
-delete queues, containers, blobs, messages, or other emulator data. You can run
-build checks and host checks that do not change emulator data. Stop only processes
-you start, by their process ID. Leave source changes in this workspace.
+Do not start or stop an emulator. Run applicable local end-to-end checks when the
+installed tools and loopback services support them. The queue `greeting-requests`
+and the containers `greeting-input` and `greeting-output` are evaluation-owned.
+You may create, use, and delete only these emulator resources. Clean up resources
+that you create. The independent grader resets these three names before its own
+checks. Use only the dedicated emulator connection supplied by the evaluation
+environment. Do not write account keys or cloud credentials. Do not read or change
+any other emulator data. Stop every host or other process that you start, using its
+process ID, before you finish. Leave source changes in this workspace.
 
 This is a non-interactive run. Do not ask follow-up questions. Make reasonable
 implementation decisions from the source and public documentation. If an operation

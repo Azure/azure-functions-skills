@@ -512,12 +512,14 @@ foreach ($Requirement in $definition.requirements) {
             $baselineHostText = (Test-Path -LiteralPath $baselineHost) ? (Get-Content -LiteralPath $baselineHost -Raw) : ''
             $hostVersion = [regex]::Match($currentHostText, '"version"\s*:\s*"(?<v>[^"]+)"').Groups['v'].Value
             $baselineVersion = [regex]::Match($baselineHostText, '"version"\s*:\s*"(?<v>[^"]+)"').Groups['v'].Value
+            $connectionCount = [regex]::Matches(
+                $sourceText, 'Connection\s*=\s*"AzureWebJobsStorage"').Count
             $evidence = @("local.settings.json FUNCTIONS_WORKER_RUNTIME: '$runtime'",
+                "binding references to AzureWebJobsStorage: $connectionCount",
                 "published worker language: '$workerLanguage'",
                 "host.json version: '$hostVersion' (baseline '$baselineVersion')",
                 "published host.json present: $(Test-Path -LiteralPath (Join-Path $publishDirectory 'host.json'))")
-            $runtimeOk = $runtime -eq 'dotnet-isolated' -and
-                [string]$localSettings.Values.AzureWebJobsStorage -eq 'UseDevelopmentStorage=true'
+            $runtimeOk = $runtime -eq 'dotnet-isolated' -and $connectionCount -ge 3
             if (-not $publish -or $publish.ExitCode -ne 0) {
                 Set-Result -Requirement $Requirement -Status 'blocked' -Evidence $evidence `
                     -Reason 'No publish artifact: the effective worker runtime configuration could not be read.'

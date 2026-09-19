@@ -69,7 +69,8 @@ Moving the existing DI and logging is required, not an optional improvement.
 The app has no deployment files, pipeline, orchestration, Durable Functions surface,
 test project, or Azure resource. Do not require these absent features. Azurite is a
 required, pre-provided local test environment. Missing storage E2E is blocked, not N/A.
-The grader refuses pre-existing queue/container data and deletes only what it creates.
+The three fixture resource names are evaluation-owned. The trusted local runner
+authorizes the grader to reset them before its independent E2E and remove them after it.
 
 The code-only-v1 bundle contains typed statuses from the independent deterministic
 grader. It is the authority for restore, build, publish, project SDK, package declarations,
