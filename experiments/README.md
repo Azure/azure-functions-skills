@@ -4,8 +4,8 @@ These Vally **0.16.0** experiments reuse the
 [TypeScript HTTP scenario](../evals/azure-functions-create/typescript-http/README.md).
 They compare the same objective task, not whether the agent invoked a skill.
 Vally owns execution, grading and measurement; the existing static dashboard
-consumes its canonical results. No custom agent runner, LLM judge, Azure
-resources, or CI is involved.
+consumes its canonical results. These two saved definitions use no custom agent
+runner or LLM judge, and need no Azure resources or CI.
 Run only reviewed, trusted local code with an approved inference budget.
 Never run these from PR-triggered CI or on untrusted contributor content.
 
@@ -71,7 +71,7 @@ $env:VALLY_OUTPUT_ROOT = 'C:\private\benchmarks'
 # Explicit acknowledgment of reviewed local code, not spending approval.
 $env:VALLY_TRUSTED = '1'
 
-# Free: stage isolated inputs and resolve the native four-cell plan.
+# Free: stage isolated inputs and validate the selected plan.
 npm run eval -- --all --dry-run
 ```
 
@@ -88,7 +88,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:COPILOT_GITHUB_TOK
 }
 
 # Acquiring a token does not authorize inference spending.
-# Paid: ONLY after approving the models, four trials, budget and cleanup policy.
+# Paid: ONLY after approving the models, selected trials, budget and cleanup policy.
 npm run eval -- --all
 ```
 
@@ -135,8 +135,8 @@ exclusive, because a tier is already a named model subset. No model flags means
 all **registered** models for the explicitly selected skill set. Selection
 preserves configuration order; the first selected model's OFF arm is the native
 baseline, so the order of `models` in `local-benchmark.json` is behaviour rather
-than formatting. The registry lists seven models in three tiers and one
-skill/scenario, so `--all` means fourteen trials, not the legacy full/live
+than formatting. The registry lists seven models in three tiers and two
+skill/scenario pairs, so `--all` means twenty-eight trials, not the legacy full/live
 suites.
 
 | Tier | Models |
@@ -169,23 +169,30 @@ or configure CI. It normalizes the first available token in the order above to
 `COPILOT_GITHUB_TOKEN`; a dry-run receives no token at all.
 
 The central JSON registers model IDs, eval paths and the required files for each
-skill. Its initial file list is target `SKILL.md` plus two own references
+skill. The empty-app scenario file list is target `SKILL.md` plus two own references
 (`go-project.md`, `language-snippets.md`); no fixture is needed for this empty-app
 scenario. Selected evals must follow `evals/<skill>/<scenario>/eval.yaml`.
 Explicit file entries are restricted to that target's skill/references and the
 declared scenarios' fixture directories; path traversal and links leaving the
 repository are rejected. Registration is reviewed code, not arbitrary ingestion.
 
-The wrapper stages only the selected evals/files and creates one temporary
-native experiment definition, encoded as JSON (valid YAML). Its native model
+The wrapper stages only the selected evals/files. If a selected registration declares
+`plugins.graders` or `plugins.executors`, it uses the standalone matrix controller.
+Plugin entries are compiled module basenames under `lib/evaluation/`, not arbitrary
+command strings. Private answer files are controller inputs, not agent files.
+The Functions case declares both plugins and uses the same private answer policy in
+ON and OFF. See its [local prerequisites](../evals/azure-functions-update/dotnet-isolated/README.md).
+
+Without plugins, the wrapper creates one temporary native experiment definition,
+encoded as JSON (valid YAML). Its native model
 matrix contains only selected models. The ON path uses Vally's
 `${eval.grandparent}` interpolation to resolve each eval's own target skill;
 OFF remains `[]`. This supports multiple registered skills without adding a
-target axis or executing a custom model/skill loop. No new skill scenarios are
+target axis. No new skill scenarios are
 registered automatically when templates or legacy suites change.
 
 The wrapper checks discovery ancestors, creates
-separate empty cwd/home/config/appdata/cache/temp directories, and constructs an
+separate controller, home, config, appdata, cache, and temp directories, and constructs an
 OS/executable environment allowlist. It excludes inherited SSH agents, Azure
 credentials, Copilot overrides, plugins/MCP settings and npm configuration.
 Both arms disable the two builtin skills using the scenario's native settings;
@@ -199,12 +206,17 @@ required, explicitly set `VALLY_NPM_REGISTRY` or add
 credential-bearing URLs are rejected. Normal `.npmrc` files and
 registry credentials are not inherited.
 
-The wrapper executes the **selected native matrix once** as shard `1/1` with a
+For plugin-free selections, the wrapper executes the **selected native matrix once** as shard `1/1` with a
 fresh UUID, one worker and `--require-pass`. Native `experiment merge` then
 converts that single complete shard into the canonical experiment output used
 by `eval:report`. This is necessary because even an unsharded 0.16.0 run writes
 `shard-manifest.json`, not `experiment-manifest.json`. There is no model loop,
 custom merge, retry, comparison judge or additional inference in reporting.
+
+For plugin selections, `native/` instead contains `matrix-manifest.json` and the
+original per-cell result directories. Cells run in sequence through standalone
+Vally with both plugin flags. There is no native merge step. The report reader
+uses the manifest to pair ON and OFF without changing the original result rows.
 
 ```text
 <private-bundle>/
@@ -232,7 +244,8 @@ process identities before manually removing the abandoned `vally-local-*`
 directory. Never delete other sessions' roots or stop hosts by name.
 
 A dry-run generates **no bundle, trial measurement or dashboard**. It validates
-native resolution and wrapper wiring, not inference, model access or grading.
+native resolution or plugin registration, plus wrapper wiring, not inference,
+model access, application readiness, or grading.
 The four real observations below predate this wrapper; they were not rerun to
 validate these convenience commands.
 

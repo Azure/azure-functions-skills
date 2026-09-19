@@ -18,6 +18,7 @@ const secret = 'private-token-canary';
 const env = { PATH: process.env.PATH, GH_TOKEN: secret };
 const result = (status = 0) => ({ status, signal: null, error: undefined, pid: 1, output: [], stdout: '', stderr: '' });
 const options = () => ({ runRoot: root, output: join(root, 'private'), trusted: true, all: true });
+const legacyOptions = () => ({ ...options(), all: false, skill: 'azure-functions-create' });
 const registry = JSON.parse(readFileSync(resolve('experiments', 'local-benchmark.json'), 'utf8'));
 const config = {
   models: ['claude-sonnet-5', 'gpt-6-astra'],
@@ -44,6 +45,14 @@ beforeEach(async () => {
   vi.mocked(spawnSync).mockImplementation((_command, argv) => {
     if (_command === 'dotnet') return result();
     const args = [...(argv ?? [])];
+    if (String(args[0]).endsWith('plugin-matrix.js')) {
+      const control = JSON.parse(readFileSync(String(args[2]), 'utf8'));
+      if (!control.dryRun) {
+        mkdirSync(control.output, { recursive: true });
+        writeFileSync(join(control.output, 'matrix-manifest.json'), '{}');
+      }
+      return result();
+    }
     const output = args[args.indexOf('--output-dir') + 1];
     if (args.includes('--dry-run')) return result();
     if (args[1] === 'experiment' && args[2] === 'run') {
@@ -111,6 +120,7 @@ describe('selectBenchmark', () => {
       evals: config.skills['another-skill'].evals,
       files: config.skills['another-skill'].files,
       sharedSkills: [],
+      graderPlugins: [], executorPlugins: [],
     });
     const all = selectBenchmark(config, { all: true, models: ['gpt-6-astra', 'claude-sonnet-5'] });
     expect(all.models).toEqual(config.models);
@@ -199,6 +209,17 @@ describe('selectBenchmark', () => {
 });
 
 describe('experimentDefinition', () => {
+  it('keeps native experiments plugin-free and selects the separate plugin transport', () => {
+    const definition = experimentDefinition(
+      ['evals/azure-functions-update/dotnet-isolated/eval.yaml'], ['gpt-6-astra', 'claude-opus-5'], []);
+    expect(definition.matrix.model.values).toEqual(['gpt-6-astra', 'claude-opus-5']);
+    expect(definition.matrix.skill.values).toHaveLength(2);
+    expect(definition.overrides.runs).toBe(1);
+    expect(definition).not.toHaveProperty('grader_plugins');
+    const selected = selectBenchmark(registry, { skill: 'azure-functions-update' });
+    expect(selected.graderPlugins).toEqual(['code-only-grader.js']);
+    expect(selected.executorPlugins).toEqual(['interactive-executor.js']);
+  });
   it('differs between arms only by the measured skill', () => {
     const definition = experimentDefinition(['evals/a/b/eval.yaml'], ['gpt-6-astra'], []);
     expect(definition.matrix.skill.values).toEqual([{ off: [] }, { on: ['../templates/skills/${eval.grandparent}'] }]);
@@ -216,24 +237,21 @@ describe('experimentDefinition', () => {
 });
 
 describe('runBenchmark', () => {
-  it('stages only the fixed native inputs into an external owned root and cleans them after dry-run', () => {
+  it('stages fixed inputs and validates the plugin transport without model calls in a dry-run', () => {
     let temporary = '';
     vi.mocked(spawnSync).mockImplementation((_command, argv, opts) => {
       const args = [...(argv ?? [])];
       const cwd = String(opts?.cwd);
       temporary = dirname(cwd);
-      expect(cwd).toBe(join(temporary, 'empty'));
-      expect(readdirSync(cwd)).toEqual([]);
-      expect(args[0]).toBe(resolve('node_modules', '@microsoft', 'vally-cli', 'dist', 'index.js'));
-      expect(args.slice(1, 3)).toEqual(['experiment', 'run']);
-      const experiment = args[3];
-      expect(experiment).toBe(join(temporary, 'inputs', 'experiments', 'local.experiment.yaml'));
-      const definition = JSON.parse(readFileSync(experiment, 'utf8'));
-      expect(definition.matrix.skill.values).toEqual([
-        { off: [] }, { on: ['../templates/skills/${eval.grandparent}'] },
-      ]);
-      expect(definition.matrix.model.values).toEqual(registry.models);
-      expect(definition.overrides).toEqual({ runs: 1, timeout: '10m' });
+      expect(cwd).toBe(join(temporary, 'inputs'));
+      expect(args[0]).toBe(resolve('lib', 'evaluation', 'plugin-matrix.js'));
+      expect(args[1]).toBe('--config');
+      const definition = JSON.parse(readFileSync(String(args[2]), 'utf8'));
+      expect(definition.sharedSkills).toEqual([]);
+      expect(definition.models).toEqual(registry.models);
+      expect(definition.dryRun).toBe(true);
+      expect(definition.graderPlugins).toEqual([resolve('lib', 'evaluation', 'code-only-grader.js')]);
+      expect(definition.executorPlugins).toEqual([resolve('lib', 'evaluation', 'interactive-executor.js')]);
       const skills = join(temporary, 'inputs', 'templates', 'skills');
       expect(readdirSync(skills).sort()).toEqual(['azure-functions-create', 'azure-functions-update']);
       expect(readdirSync(join(skills, 'azure-functions-create')).sort()).toEqual(['SKILL.md', 'references']);
@@ -244,7 +262,6 @@ describe('runBenchmark', () => {
       expect(readFileSync(join(temporary, 'appdata', 'NuGet', 'NuGet.Config'), 'utf8'))
         .toContain('https://api.nuget.org/v3/index.json');
       expect(opts?.env?.COPILOT_GITHUB_TOKEN).toBeUndefined();
-      expect(args).toContain('--dry-run');
       expect(opts?.shell).toBe(false);
       return result();
     });
@@ -273,12 +290,12 @@ describe('runBenchmark', () => {
     vi.mocked(spawnSync).mockImplementation((command, argv, opts) => {
       if (command === 'dotnet') return result();
       const inputs = join(dirname(String(opts?.cwd)), 'inputs');
-      const definition = JSON.parse(readFileSync(String(argv?.[3]), 'utf8'));
-      expect(definition.evals).toEqual(['../evals/azure-functions-update/dotnet-isolated/eval.yaml']);
+      const definition = JSON.parse(readFileSync(String(argv?.[2]), 'utf8'));
+      expect(definition.evals).toEqual(['evals/azure-functions-update/dotnet-isolated/eval.yaml']);
       expect(readdirSync(join(inputs, 'templates', 'skills'))).toEqual(['azure-functions-update']);
       const scenario = join(inputs, 'evals', 'azure-functions-update', 'dotnet-isolated');
       expect(readdirSync(join(scenario, 'fixtures')).sort()).toEqual(['GreetingService.cs', 'Hello.cs', 'QueueGreeting.cs', 'Startup.cs', 'UpgradeApp.csproj',
-        'acceptance.json', 'baseline', 'checks', 'definition-of-done.json', 'host.json', 'review-basis.md', 'trial.gitignore']);
+        'baseline', 'checks', 'definition-of-done.json', 'eval-boundaries.md', 'host.json', 'review-basis.md', 'trial.gitignore', 'user-answers.json']);
       expect(readdirSync(join(scenario, 'fixtures', 'baseline')).sort())
         .toEqual(['GreetingService.cs.txt', 'Hello.cs.txt', 'QueueGreeting.cs.txt', 'Startup.cs.txt', 'UpgradeApp.csproj.txt', 'host.json.txt']);
       expect(readdirSync(join(scenario, 'fixtures', 'checks')).sort()).toEqual(['AzuriteContract.ps1', 'Invoke-DefinitionOfDone.ps1']);
@@ -357,12 +374,11 @@ describe('runBenchmark', () => {
     expect(readdirSync(root)).toEqual([]);
   });
 
-  it('runs the full native matrix once, merges its one shard and delegates to the existing report', () => {
-    const outcome = runBenchmark({ ...options(), report: true }, env);
+  it('keeps the native experiment path for evaluations that need no plugins', () => {
+    const outcome = runBenchmark({ ...legacyOptions(), report: true }, env);
     const calls = vi.mocked(spawnSync).mock.calls;
-    expect(calls).toHaveLength(3);
-    expect(calls[0][0]).toBe('dotnet');
-    const args = calls[1][1] ?? [];
+    expect(calls).toHaveLength(2);
+    const args = calls[0][1] ?? [];
     expect(args).toContain('--shard');
     expect(args[args.indexOf('--shard') + 1]).toBe('1/1');
     expect(args[args.indexOf('--workers') + 1]).toBe('1');
@@ -370,7 +386,7 @@ describe('runBenchmark', () => {
     for (const flag of ['--compare', '--work-dir', '--max-retries', '--model', '--variant', '--verbose'])
       expect(args).not.toContain(flag);
     expect(JSON.stringify(args)).not.toContain(secret);
-    expect(calls[2][1]?.slice(1, 3)).toEqual(['experiment', 'merge']);
+    expect(calls[1][1]?.slice(1, 3)).toEqual(['experiment', 'merge']);
     expect(generateReport).toHaveBeenCalledWith(join(options().output, 'native'), join(options().output, 'site'));
     expect(outcome.exitCode).toBe(0);
     expect(readdirSync(root)).toEqual(['private']);
@@ -384,7 +400,7 @@ describe('runBenchmark', () => {
     });
     expect(runBenchmark({ ...options(), report: true }, env).exitCode).toBe(1);
     expect(generateReport).toHaveBeenCalledOnce();
-    expect(existsSync(join(options().output, 'native', 'experiment-manifest.json'))).toBe(true);
+    expect(existsSync(join(options().output, 'native', 'matrix-manifest.json'))).toBe(true);
     expect(readdirSync(root)).toEqual(['private']);
   });
 
@@ -408,7 +424,7 @@ describe('runBenchmark', () => {
   it('surfaces report errors without discarding real native artifacts', () => {
     vi.mocked(generateReport).mockImplementationOnce(() => { throw new Error('report invalid'); });
     expect(() => runBenchmark({ ...options(), report: true }, env)).toThrow('report invalid');
-    expect(existsSync(join(options().output, 'native', 'experiment-manifest.json'))).toBe(true);
+    expect(existsSync(join(options().output, 'native', 'matrix-manifest.json'))).toBe(true);
     expect(readdirSync(root)).toEqual(['private']);
   });
 
@@ -423,7 +439,7 @@ describe('runBenchmark', () => {
     const outcome = runBenchmark({ ...options(), report: true }, env);
     expect(outcome.exitCode).toBe(nativeExit || 1);
     expect(outcome.runExit).toBe(nativeExit);
-    expect(outcome.mergeExit).toBe(nativeExit);
+    expect(outcome.mergeExit).toBeUndefined();
     expect(outcome.native).toBe(join(options().output, 'native'));
     expect(generateReport).toHaveBeenCalledOnce();
     expect(log).toHaveBeenCalledWith(expect.stringMatching(/cleanup.*EBUSY.*vally-local-.*private/i));
@@ -433,7 +449,7 @@ describe('runBenchmark', () => {
     vi.mocked(spawnSync).mockImplementation(command => command === 'dotnet' ? result() : result(2));
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(rmSync).mockImplementationOnce(() => { throw Object.assign(new Error('locked'), { code: 'EPERM' }); });
-    expect(() => runBenchmark(options(), env)).toThrow(/native run exit 2.*missing shard manifest/);
+    expect(() => runBenchmark(legacyOptions(), env)).toThrow(/native run exit 2.*missing shard manifest/);
     expect(log).toHaveBeenCalledWith(expect.stringMatching(/cleanup.*EPERM/));
     expect(generateReport).not.toHaveBeenCalled();
   });
@@ -444,7 +460,7 @@ describe('runBenchmark', () => {
       if (args[1]?.includes('merge')) return result(2);
       return normal?.(...args) ?? result();
     });
-    expect(() => runBenchmark({ ...options(), report: true }, env)).toThrow(/merge exit 2/);
+    expect(() => runBenchmark({ ...legacyOptions(), report: true }, env)).toThrow(/merge exit 2/);
     expect(generateReport).not.toHaveBeenCalled();
     expect(readdirSync(root)).toEqual(['private']);
   });

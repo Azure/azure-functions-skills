@@ -107,6 +107,8 @@ export function selectBenchmark(value: unknown, selection: Selection) {
   const evals: string[] = [];
   const files: string[] = [];
   const sharedSkills: string[] = [];
+  const graderPlugins: string[] = [];
+  const executorPlugins: string[] = [];
   let nugetPreflight: NugetPreflight | undefined;
   for (const [id, entry] of Object.entries(skills)) {
     check(identifier.test(id), 'invalid skill identifier in configuration.');
@@ -114,6 +116,11 @@ export function selectBenchmark(value: unknown, selection: Selection) {
     const declaredEvals = strings(definition.evals);
     const declaredFiles = strings(definition.files);
     const declaredShared = definition.sharedSkills === undefined ? [] : strings(definition.sharedSkills);
+    const plugins = definition.plugins === undefined ? {} : object(definition.plugins);
+    const declaredGraders = plugins.graders === undefined ? [] : strings(plugins.graders);
+    const declaredExecutors = plugins.executors === undefined ? [] : strings(plugins.executors);
+    check([...declaredGraders, ...declaredExecutors].every(file => identifier.test(file) && file.endsWith('.js')),
+      'plugins must name compiled evaluation modules, without directory paths.');
     // Dependency skills stay in both arms, so only the measured skill differs.
     check(declaredShared.every(shared => shared !== id && Object.hasOwn(skills, shared)),
       'sharedSkills must name other registered skills.');
@@ -134,6 +141,8 @@ export function selectBenchmark(value: unknown, selection: Selection) {
       evals.push(...declaredEvals);
       files.push(...declaredFiles);
       sharedSkills.push(...declaredShared);
+      graderPlugins.push(...declaredGraders);
+      executorPlugins.push(...declaredExecutors);
       if (probe) nugetPreflight = probe;
     }
   }
@@ -143,6 +152,8 @@ export function selectBenchmark(value: unknown, selection: Selection) {
     evals,
     files: [...new Set(files)],
     sharedSkills,
+    graderPlugins: [...new Set(graderPlugins)],
+    executorPlugins: [...new Set(executorPlugins)],
     ...(nugetPreflight ? { nugetPreflight } : {}),
   };
 }
@@ -316,9 +327,9 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
       runNugetPreflight(root, env, nugetSource, selection.nugetPreflight);
     }
     const vally = join(repo, 'node_modules', '@microsoft', 'vally-cli', 'dist', 'index.js');
-    const invoke = (args: string[]) => {
-      const child = spawnSync(process.execPath, [vally, ...args], {
-        cwd: join(root, 'empty'), env, shell: false, stdio: ['ignore', 'inherit', 'inherit'],
+    const invoke = (args: string[], entry = vally, cwd = join(root, 'empty')) => {
+      const child = spawnSync(process.execPath, [entry, ...args], {
+        cwd, env, shell: false, stdio: ['ignore', 'inherit', 'inherit'],
       });
       check(!child.error, 'could not launch native Vally; restore the pinned dependencies and check Node.js.');
       check(child.signal === null, `native Vally terminated by ${child.signal}; private output: ${output}`);
@@ -329,6 +340,28 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
     const raw = join(output, 'raw');
     const shard = join(raw, runId, 'shard-1-of-1');
     const native = join(output, 'native');
+    if (selection.graderPlugins.length || selection.executorPlugins.length) {
+      const control = join(root, 'inputs', 'plugin-matrix.json');
+      writeFileSync(control, JSON.stringify({
+        inputsRoot: join(root, 'inputs'), workspaceRoot: join(root, 'trials'), output: native, runId,
+        evals: selection.evals, models: selection.models, sharedSkills: selection.sharedSkills,
+        graderPlugins: selection.graderPlugins.map(file => join(repo, 'lib', 'evaluation', file)),
+        executorPlugins: selection.executorPlugins.map(file => join(repo, 'lib', 'evaluation', file)),
+        cli: vally, dryRun: options.dryRun === true,
+      }, null, 2));
+      if (!options.dryRun) mkdirSync(output, { mode: 0o700 });
+      const runExit = invoke(['--config', control], join(repo, 'lib', 'evaluation', 'plugin-matrix.js'), join(root, 'inputs'));
+      if (options.dryRun) {
+        check(runExit === 0, `plugin preflight failed (exit ${runExit}); no model calls were made.`);
+        outcome = { exitCode: 0, dryRun: true };
+        return outcome;
+      }
+      check(lstatSync(join(native, 'matrix-manifest.json'), { throwIfNoEntry: false }),
+        `plugin run exit ${runExit}, missing matrix manifest; partial results retained privately at ${output}.`);
+      const site = options.report ? generateReport(native, join(output, 'site')) : undefined;
+      outcome = { exitCode: runExit, dryRun: false, native, site, runExit };
+      return outcome;
+    }
     const args = ['experiment', 'run', join(root, 'inputs', experiment),
       '--shard', '1/1', '--run-id', runId, '--workspace', join(root, 'trials'),
       '--output-dir', raw, '--workers', '1', '--require-pass'];
@@ -377,7 +410,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       all: values.all, skill: values.skill, models: values.models, tier: values.tier,
     });
     console.log(result.dryRun ? 'Dry-run only: no measured trials or dashboard generated.'
-      : `Native results: ${result.native}${result.site ? `\nStatic site: ${result.site}` : ''}\nNative run/merge exits: ${result.runExit}/${result.mergeExit}\nWorkflow exit: ${result.exitCode}`);
+      : `Native results: ${result.native}${result.site ? `\nStatic site: ${result.site}` : ''}\nRun exit: ${result.runExit}${result.mergeExit === undefined ? '' : `; merge exit: ${result.mergeExit}`}\nWorkflow exit: ${result.exitCode}`);
     process.exitCode = result.exitCode;
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

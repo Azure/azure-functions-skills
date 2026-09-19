@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { AnswerPolicySession, parseAnswerPolicy } from '../src/evaluation/answer-policy.js';
 
 const scenario = resolve('evals', 'azure-functions-update', 'dotnet-isolated');
 const reference = resolve('templates', 'skills', 'azure-functions-update', 'references', 'dotnet-isolated.md');
@@ -118,8 +119,7 @@ describe('definition-of-done checklist', () => {
     expect(checklist.requirements.map(requirement => requirement.id)).toEqual(published);
     expect(checklist.reference).toBe('templates/skills/azure-functions-update/references/dotnet-isolated.md');
     expect(checklist.statuses).toEqual(['pass', 'fail', 'blocked', 'not-applicable']);
-    const publicContract = json<{ requirements: Record<string, string> }>('fixtures', 'acceptance.json');
-    expect(Object.keys(publicContract.requirements)).toEqual(published);
+    expect(specification).not.toContain('fixtures/acceptance.json');
   });
 
   it('gives every requirement an owner and every deterministic requirement an implemented check', () => {
@@ -147,6 +147,14 @@ describe('definition-of-done checklist', () => {
 });
 
 describe('deterministic grader script', () => {
+  it('uses the host API and trigger outputs, not emitted logs, for acceptance', () => {
+    expect(script).toContain('/admin/functions');
+    expect(script).not.toContain('$hostLog');
+    expect(script).not.toContain('$hostErrors');
+    expect(script).not.toContain('$missingLogs');
+    expect(checklist.expectations).not.toHaveProperty('logs');
+    expect(checklist.requirements.find(requirement => requirement.id === 'DI-10')?.gates).toEqual(['judge']);
+  });
   it('reports a status and evidence per requirement instead of a single opaque verdict', () => {
     for (const token of ['checklist.json', 'not-applicable', 'blocked', 'evidence', '$Requirement.id']) {
       expect(script).toContain(token);
@@ -165,6 +173,23 @@ describe('deterministic grader script', () => {
 });
 
 describe('eval specification', () => {
+  it('exports final source separately from logs and local configuration', () => {
+    const artifacts = specification.split('    artifacts:')[1]?.split('    rubric:')[0] ?? '';
+    for (const included of ['**/*.cs', '**/*.csproj', '**/*.props', '**/*.targets', 'host.json', 'global.json']) {
+      expect(artifacts.split('      exclude:')[0]).toContain(included);
+    }
+    for (const excluded of ['**/bin/**', '**/obj/**', '**/.*/**', '**/local.settings.json', '**/.env*', '**/*.log']) {
+      expect(artifacts.split('      exclude:')[1]).toContain(excluded);
+    }
+    const workflow = readFileSync(resolve('.github', 'workflows', 'skill-evaluation-offline.yml'), 'utf8');
+    expect(workflow).toContain('vally-results/**/azure-functions-update-dotnet-isolated/**/artifacts/**');
+    expect(workflow).toContain('--grader-plugin "${GITHUB_WORKSPACE}/lib/evaluation/code-only-grader.js"');
+  });
+  it('uses the bounded code-only judge rather than full trajectory or diff evidence', () => {
+    expect(specification).toContain('type: functions-code-review');
+    expect(specification).not.toContain('evidence: [trajectory, diff, repo]');
+    expect(specification).toContain('Runtime log output is not assessed');
+  });
   it('stages the reused fixture, the checklist and the baseline for grading', () => {
     for (const staged of ['fixtures/UpgradeApp.csproj', 'fixtures/Hello.cs', 'fixtures/host.json',
       'fixtures/trial.gitignore', 'fixtures/definition-of-done.json', 'fixtures/review-basis.md',
@@ -174,14 +199,38 @@ describe('eval specification', () => {
     expect(specification).toContain('grading-evidence/baseline/UpgradeApp.csproj.txt');
   });
 
-  it('preanswers the interactive decisions and blocks new material decisions', () => {
-    for (const answer of ['Scope:', 'Target:', 'Permissions:', 'Retention:', 'Dependencies:', 'Expected answers:']) {
-      expect(specification).toContain(answer);
+  it('keeps the task short and customer answers separate from agent inputs', () => {
+    const prompt = specification.split('    prompt: |')[1]?.split('    constraints:')[0] ?? '';
+    expect(prompt).toContain('Use azure-functions-update');
+    expect(prompt.trim().length).toBeLessThan(200);
+    expect(prompt).not.toMatch(/isolated|net8|Worker|Azure\.Functions\.Sdk|binding|checklist|Program\.cs/i);
+    expect(specification).toContain('answerPolicyFile: evals/azure-functions-update/dotnet-isolated/fixtures/user-answers.json');
+    const agentFiles = specification.split('agent_environment:')[1]?.split('grading_environment:')[0] ?? '';
+    expect(agentFiles).not.toMatch(/user-answers|acceptance|definition-of-done/);
+    expect(agentFiles).toContain('dest: AGENTS.md');
+  });
+
+  it('keeps customer facts separate from migration answers and private grading criteria', () => {
+    const policy = json<{ rules: { id: string; match: string[]; answer: string }[] }>('fixtures', 'user-answers.json');
+    const text = JSON.stringify(policy);
+    expect(text).not.toMatch(/Azure\.Functions\.Sdk|Microsoft\.Azure\.Functions\.Worker|Worker\.Extensions|FunctionsStartup|Program\.cs|DI-\d/);
+    for (const [question, id] of [
+      ['Which project should I update?', 'existing-project'],
+      ['May I change the target framework?', 'model-only-scope'],
+      ['Is Azurite already available?', 'local-environment'],
+      ['The skill is unavailable. What should I do?', 'missing-skill'],
+      ['I cannot find azure-functions-update. Can I continue without it?', 'missing-skill'],
+    ]) {
+      const session = new AnswerPolicySession(parseAnswerPolicy(policy));
+      expect(session.decide({ question, allowFreeform: true })).toMatchObject({ status: 'answered', ruleId: id });
     }
-    expect(specification).toMatch(/do not invent.*approval|record a blocked decision/i);
-    expect(specification).toContain('dotnet-version-upgrade');
-    expect(specification).toContain('dest: .migration/definition-of-done.json');
-    expect(specification).toContain('If the skill is unavailable, perform the same task directly');
+    expect(new AnswerPolicySession(parseAnswerPolicy(policy)).decide({
+      question: 'What is the password?', allowFreeform: true,
+    })).toMatchObject({ status: 'blocked', reason: 'no-match' });
+    expect(new AnswerPolicySession(parseAnswerPolicy(policy)).decide({
+      question: 'Which project should I update, and which target framework should I use?', allowFreeform: true,
+    })).toMatchObject({ status: 'blocked', reason: 'ambiguous-match' });
+    expect(read('fixtures', 'eval-boundaries.md')).toContain('Do not assume');
   });
 
   it('binds the judge to the deterministic evidence instead of transcript claims', () => {
@@ -225,6 +274,30 @@ describe('local benchmark registration', () => {
     const helper = join(scenario, 'fixtures', 'checks', 'AzuriteContract.ps1').replaceAll("'", "''");
     const invoke = (code: string) => spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command',
       `$ErrorActionPreference = 'Stop'; . '${helper}'; ${code}`], { encoding: 'utf8' });
+
+    it('reads function names from the loopback admin API without reading host logs', () => {
+      const grader = join(scenario, 'fixtures', 'checks', 'Invoke-DefinitionOfDone.ps1').replaceAll("'", "''");
+      const result = invoke(`
+        $ast = [Management.Automation.Language.Parser]::ParseFile('${grader}', [ref]$null, [ref]$null)
+        $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+          $node.Name -eq 'Get-HostFunctionNames' }, $true)
+        if (-not $function) { throw 'Host inventory helper is missing.' }
+        $readNames = $function.Body.GetScriptBlock()
+        function Invoke-RestMethod {
+          param($Uri, $TimeoutSec, $MaximumRedirection, [switch]$NoProxy)
+          if ($Uri -ne 'http://127.0.0.1:8123/admin/functions' -or
+            $MaximumRedirection -ne 0 -or -not $NoProxy) { throw 'Unexpected endpoint or network options.' }
+          @([pscustomobject]@{ name = 'Hello' }, [pscustomobject]@{ name = 'QueueGreeting' })
+        }
+        $names = @(& $readNames -Port 8123)
+        function Invoke-RestMethod { [pscustomobject]@{ unexpected = 'not a function inventory' } }
+        $invalid = $false
+        try { & $readNames -Port 8123 } catch [FormatException] { $invalid = $true }
+        @{ names = $names; rejectedInvalid = $invalid } | ConvertTo-Json
+      `);
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({ names: ['Hello', 'QueueGreeting'], rejectedInvalid: true });
+    });
 
     it('signs a loopback-only request with the documented public emulator key', () => {
       const result = invoke(`
@@ -290,6 +363,7 @@ describe('local benchmark registration', () => {
         expect(report.overall).toBe('fail');
         expect(report.requirements).toHaveLength(19);
         expect(report.requirements).toContainEqual(expect.objectContaining({ id: 'DI-16', status: 'blocked' }));
+        expect(report.requirements).toContainEqual(expect.objectContaining({ id: 'DI-10', status: 'blocked', judgeRequired: true }));
         expect(report.requirements).toContainEqual(expect.objectContaining({ id: 'DI-POST-01', status: 'not-applicable' }));
         expect(report.requirements.every((item: { evidence: unknown }) => Array.isArray(item.evidence))).toBe(true);
       } finally {

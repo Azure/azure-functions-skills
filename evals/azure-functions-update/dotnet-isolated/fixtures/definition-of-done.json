@@ -24,7 +24,6 @@
       "output": "Hello, Storage!",
       "connection": "AzureWebJobsStorage"
     },
-    "logs": ["HTTP greeting: Hello, Vally!", "Queue greeting"],
     "languageHandoff": "not-requested"
   },
   "requirements": [
@@ -33,7 +32,7 @@
       "title": "Supported host/model/TFM tuple with the model stage keeping its current target framework",
       "gates": ["deterministic", "judge"],
       "check": "supported-tuple-current-tfm",
-      "applicability": "Always applicable. The deterministic gate compares the effective target framework and host version with the staged baseline; the judge checks that the report cites dated support for the resulting tuple."
+      "applicability": "Always applicable. The deterministic gate compares the target framework and host version with the baseline. The judge uses the fixed review basis, not the agent report."
     },
     {
       "id": "DI-02",
@@ -51,10 +50,10 @@
     },
     {
       "id": "DI-04",
-      "title": "func starts with the expected function inventory, listeners, and logs",
+      "title": "func starts with the expected function inventory and executes the storage trigger",
       "gates": ["deterministic"],
       "check": "host-registration",
-      "applicability": "Always applicable. Host stdout and stderr are retained separately from the HTTP result so that a function list alone cannot pass this ID."
+      "applicability": "Always applicable. Read the host admin function inventory and execute the storage trigger. Logs are not assessed. An unavailable inventory endpoint is blocked. A function list alone cannot pass this ID."
     },
     {
       "id": "DI-05",
@@ -94,9 +93,9 @@
     {
       "id": "DI-10",
       "title": "Isolated logging and telemetry preserve the required behavior",
-      "gates": ["deterministic", "judge"],
-      "check": "logging-and-telemetry",
-      "applicability": "Always applicable. Preserve the HTTP greeting and Queue greeting Information logs when method-injected in-process ILogger is replaced with worker logging. No new telemetry service is required."
+      "gates": ["judge"],
+      "check": null,
+      "applicability": "Source review only. Preserve the Information logging calls and messages with worker-compatible logging. Runtime log emission and telemetry delivery are not assessed. No new telemetry service is required."
     },
     {
       "id": "DI-11",

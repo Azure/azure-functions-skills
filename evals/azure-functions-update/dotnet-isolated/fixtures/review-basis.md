@@ -50,8 +50,20 @@ A URL alone does not give the judge the content of its page.
 The fixture has an HTTP function and a queue-triggered function. Both use the singleton
 GreetingService registered by FunctionsStartup. Both receive a method-level ILogger.
 The queue function reads a name through a blob input binding and writes a greeting
-through a blob output binding. Check the staged baseline text files for the original
-names, paths, connection setting, message encoding, output, and Information logs.
+through a blob output binding. These contracts come from the original source, not
+from a migration answer supplied to the agent:
+
+- `Hello` keeps anonymous GET `/api/hello`, HTTP 200, and plain-text responses
+  `Hello, world!` without a name and `Hello, <name>!` with a name query parameter.
+- `QueueGreeting` consumes a base64-encoded request ID from `greeting-requests`.
+  Its input binding reads `greeting-input/<request ID>.txt`; its output binding writes
+  `greeting-output/<request ID>.txt`. Input `Storage` produces `Hello, Storage!`.
+  Both bindings keep the `AzureWebJobsStorage` connection setting.
+- Both functions keep singleton `GreetingService` injection. Information calls keep
+  `HTTP greeting: {Greeting}` and `Queue greeting {RequestId}: {Greeting}`.
+- Keep extension trigger, input, and output bindings; do not replace them with
+  application SDK calls. Keep the effective `host.json` settings.
+
 Moving the existing DI and logging is required, not an optional improvement.
 
 The app has no deployment files, pipeline, orchestration, Durable Functions surface,
@@ -59,12 +71,21 @@ test project, or Azure resource. Do not require these absent features. Azurite i
 required, pre-provided local test environment. Missing storage E2E is blocked, not N/A.
 The grader refuses pre-existing queue/container data and deletes only what it creates.
 
-`grading-evidence/checklist.json` is produced by the independent deterministic grader and
-is the sole authority for restore, build, publish, project SDK, package declarations,
-host registration, HTTP behavior, packaging, and target framework. A judge may lower a
-deterministic `pass` only by pointing at contradicting evidence inside that file or the
-submitted source. A judge can never raise `fail`, `blocked`, or missing evidence to `pass`,
-and never turns a report sentence or a transcript claim into an executed check.
+The code-only-v1 bundle contains typed statuses from the independent deterministic
+grader. It is the authority for restore, build, publish, project SDK, package declarations,
+host API inventory, HTTP and storage behavior, local settings, packaging, and target
+framework. DI-03 is N/A only when the grader finds no test project. DI-POST-01 through
+DI-POST-03 are N/A because no language stage was requested.
+
+DI-04 does not inspect host logs. DI-10 is a source-only judge gate: the deterministic
+status only permits review, not acceptance of logging behavior. Check worker-compatible
+logging, Information level, and both original message templates in code. Emitted logs
+and telemetry delivery are not assessed. The bundle excludes all raw logs, transcripts,
+agent reports, generated files, and local settings. Report quality and transcript actions
+are not assessed. Do not require these excluded inputs.
+
+A judge may lower a machine `pass` by citing a contradiction in the submitted code.
+It can never raise `fail`, `blocked`, or missing evidence to `pass`.
 
 Optional lint, vulnerability, or best-practice findings are reported separately. They are
 not part of the definition of done and never change a requirement status.

@@ -65,6 +65,16 @@ function Get-AppSource {
         Where-Object { $_.FullName -notmatch '[\\/](bin|obj|grading-evidence)[\\/]' }
 }
 
+function Get-HostFunctionNames {
+    param([int]$Port)
+    $inventory = Invoke-RestMethod -TimeoutSec 5 -NoProxy -MaximumRedirection 0 `
+        -Uri "http://127.0.0.1:$Port/admin/functions"
+    if (@($inventory | Where-Object { $_.name -isnot [string] -or -not $_.name }).Count -ne 0) {
+        throw [FormatException]::new('The host returned an invalid function inventory.')
+    }
+    return @($inventory | ForEach-Object { $_.name })
+}
+
 function Get-EffectiveProjectFile {
     @($expected.project) + @('Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props') |
         Where-Object { Test-Path -LiteralPath $_ }
@@ -169,6 +179,7 @@ $hostEvidence = [ordered]@{
     ready         = $false
     registered    = @()
     missing       = @($expected.functions)
+    inventoryFailure = ''
     responses     = @()
     failureReason = ''
     stdout        = Join-Path $EvidenceRoot 'func-stdout.log'
@@ -236,10 +247,15 @@ try {
                 $hostEvidence.failureReason = "The Functions host was not ready within $HostReadySeconds seconds."
             }
             if ($hostEvidence.ready) {
-                $log = ((Get-Content -LiteralPath $hostEvidence.stdout -Raw -ErrorAction SilentlyContinue) ?? '')
-                $hostEvidence.registered = @($expected.functions | Where-Object {
-                    $log -match "(?m)^\s*(?:\[[^\]\r\n]+\]\s*)?$([regex]::Escape($_))\s*:"
-                })
+                try {
+                    $hostEvidence.registered = @(Get-HostFunctionNames -Port $hostEvidence.port)
+                } catch [System.Net.Http.HttpRequestException] {
+                    $hostEvidence.inventoryFailure = "Host function inventory is unavailable: $($_.Exception.Message)"
+                } catch [System.Threading.Tasks.TaskCanceledException] {
+                    $hostEvidence.inventoryFailure = 'Host function inventory request timed out.'
+                } catch [FormatException] {
+                    $hostEvidence.inventoryFailure = $_.Exception.Message
+                }
                 $hostEvidence.missing = @($expected.functions | Where-Object { $hostEvidence.registered -notcontains $_ })
                 foreach ($contract in $expected.responses) {
                     try {
@@ -296,10 +312,6 @@ try {
     $env:FUNCTIONS_WORKER_RUNTIME = $previousRuntime
     $env:AzureWebJobsStorage = $previousStorage
 }
-$hostLog = ((Get-Content -LiteralPath $hostEvidence.stdout -Raw -ErrorAction SilentlyContinue) ?? '') +
-    "`n" + ((Get-Content -LiteralPath $hostEvidence.stderr -Raw -ErrorAction SilentlyContinue) ?? '')
-$hostErrors = @($hostLog -split "`r?`n" | Where-Object { $_ -match '\b(Error|Exception|failed)\b|listener.*unable to start' })
-$missingLogs = @($expected.logs | Where-Object { -not $hostLog.Contains([string]$_) })
 $storageLog = Add-Log -Name 'storage-e2e.json' -Content ($storage | ConvertTo-Json)
 
 # --- Requirement checks ------------------------------------------------------
@@ -349,20 +361,23 @@ foreach ($Requirement in $definition.requirements) {
             }
         }
         'host-registration' {
-            $evidence = @("func stdout: $($hostEvidence.stdout)", "func stderr: $($hostEvidence.stderr)",
+            $evidence = @("inventory endpoint: http://127.0.0.1:$($hostEvidence.port)/admin/functions",
                 "registered: $((@($hostEvidence.registered)) -join ', ')",
                 "expected: $((@($expected.functions)) -join ', ')")
             if (-not $hostEvidence.ready) {
                 Set-Result -Requirement $Requirement -Status 'blocked' -Evidence $evidence `
                     -Reason ($hostEvidence.failureReason ? $hostEvidence.failureReason : 'The Functions host check could not run.')
+            } elseif ($hostEvidence.inventoryFailure) {
+                Set-Result -Requirement $Requirement -Status 'blocked' -Evidence $evidence `
+                    -Reason $hostEvidence.inventoryFailure
             } elseif (@($hostEvidence.missing).Count -ne 0) {
                 Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence `
                     -Reason "Expected function(s) were not registered: $((@($hostEvidence.missing)) -join ', ')."
             } elseif (-not $storage.available) {
                 Set-Result -Requirement $Requirement -Status 'blocked' -Evidence $evidence -Reason $storage.reason
-            } elseif ($hostErrors.Count -ne 0 -or -not $storage.matches -or $missingLogs.Count -ne 0) {
-                Set-Result -Requirement $Requirement -Status 'fail' -Evidence ($evidence + $hostErrors + @($storageLog)) `
-                    -Reason 'The listener, expected logs, or storage trigger execution did not meet the contract.'
+            } elseif (-not $storage.matches) {
+                Set-Result -Requirement $Requirement -Status 'fail' -Evidence ($evidence + @($storageLog)) `
+                    -Reason 'Storage trigger execution did not meet the contract.'
             } else {
                 Set-Result -Requirement $Requirement -Status 'pass' -Evidence $evidence
             }
@@ -447,22 +462,6 @@ foreach ($Requirement in $definition.requirements) {
             } else {
                 Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence `
                     -Reason 'No isolated worker host startup was found, or an in-process FunctionsStartup remains.'
-            }
-        }
-        'logging-and-telemetry' {
-            $insights = @($declaredPackages | Where-Object { $_ -like '*ApplicationInsights*' })
-            $openTelemetry = @($declaredPackages | Where-Object { $_ -like '*OpenTelemetry*' })
-            $evidence = @("Application Insights packages: $((@($insights)) -join ', ')",
-                "OpenTelemetry packages: $((@($openTelemetry)) -join ', ')",
-                "ILogger used in application sources: $([bool]($sourceText -match 'ILogger'))")
-            if (-not $hostEvidence.ready -or -not $storage.available) {
-                Set-Result -Requirement $Requirement -Status 'blocked' -Evidence $evidence `
-                    -Reason 'Both triggers must run before the original logging contract can be checked.'
-            } elseif ($missingLogs.Count -ne 0) {
-                Set-Result -Requirement $Requirement -Status 'fail' -Evidence ($evidence + @($hostEvidence.stdout, $hostEvidence.stderr)) `
-                    -Reason "Expected Information logs are missing: $($missingLogs -join '; ')."
-            } else {
-                Set-Result -Requirement $Requirement -Status 'pass' -Evidence $evidence
             }
         }
         'http-integration-coherent' {
@@ -608,7 +607,11 @@ foreach ($Requirement in $definition.requirements) {
 
 foreach ($Requirement in $definition.requirements) {
     if ($state.Contains($Requirement.id)) { continue }
-    if ($Requirement.id -eq 'DI-POST-01' -and $currentTfm -and $baselineTfm -and $currentTfm -ne $baselineTfm) {
+    if ($Requirement.id -eq 'DI-10') {
+        Set-Result -Requirement $Requirement -Status ($sources.Count -gt 0 ? 'pass' : 'blocked') `
+            -Evidence @('Source review is assigned to the LLM judge. No runtime log assertion is made.') `
+            -Reason 'This status only permits source review. DI-10 is not accepted until the judge passes.'
+    } elseif ($Requirement.id -eq 'DI-POST-01' -and $currentTfm -and $baselineTfm -and $currentTfm -ne $baselineTfm) {
         Set-Result -Requirement $Requirement -Status 'fail' `
             -Evidence @("baseline target framework: $baselineTfm", "submitted target framework: $currentTfm") `
             -Reason 'The target framework changed although this trial requested no language handoff and no approved destination exists.'
@@ -628,6 +631,7 @@ $report = [ordered]@{
     generatedUtc = [DateTime]::UtcNow.ToString('o')
     overall      = $overall
     authority    = 'Deterministic statuses are authoritative. A judge may lower a pass it can disprove from this evidence; it can never raise fail, blocked, or missing evidence to pass.'
+    coverage     = 'Runtime log output is not assessed. DI-10 is a source-only judge gate, not a runtime logging pass.'
     environment  = [ordered]@{
         operatingSystem = [Environment]::OSVersion.VersionString
         powerShell      = $PSVersionTable.PSVersion.ToString()
