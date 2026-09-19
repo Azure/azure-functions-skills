@@ -1,0 +1,71 @@
+name: Intelligent Function App Studio CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'canvas/intelligent-function-app-studio/**'
+      - '.github/workflows/intelligent-function-app-studio-ci.yml'
+      - 'eslint.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'tsconfig.typecheck.json'
+      - 'vitest.config.ts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: intelligent-function-app-studio-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canvas:
+    name: Lint, typecheck, test, and build canvas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use public npm registry
+        run: rm -f .npmrc
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run repository typecheck
+        run: npm run typecheck
+
+      - name: Run canvas typecheck
+        run: npm run typecheck --workspace=intelligent-function-app-studio
+
+      - name: Run canvas unit tests
+        run: npm run test:canvas
+
+      - name: Enforce canvas coverage
+        run: npm run test:canvas:coverage
+
+      - name: Build repository integration
+        run: npm run build
+
+      - name: Build canvas package
+        run: |
+          mkdir -p artifacts
+          npm pack --workspace=intelligent-function-app-studio --ignore-scripts --pack-destination artifacts
+
+      - name: Upload canvas package
+        uses: actions/upload-artifact@v7
+        with:
+          name: intelligent-function-app-studio-${{ github.sha }}
+          path: artifacts/*.tgz
+          if-no-files-found: error
+          retention-days: 7
