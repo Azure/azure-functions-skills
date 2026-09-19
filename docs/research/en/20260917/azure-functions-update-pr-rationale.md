@@ -3,6 +3,13 @@
 Status: Draft notes for author input, 2026-09-17, for draft PR #272.
 The unanswered questions below do not block the current skill draft.
 
+Revision note, 2026-09-18: The current skill uses a common eleven-step model/config
+workflow and `references/dotnet-isolated.md`. Language/TFM changes use a separate handoff.
+The verified external scenario name is `dotnet-version-upgrade`, not
+`dotnet-version-update`. The older combined-route and four-file design below is historical.
+See the [current evaluation](../../../../evals/azure-functions-update/README.md);
+the document rewrite is deferred.
+
 ## Confirmed motivation
 
 The user wants an improvement over a strong model without this skill: a smoother,

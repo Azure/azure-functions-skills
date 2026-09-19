@@ -1,6 +1,13 @@
 # Azure Functions Update Domain-Expert Workflow Specification v0
 
-**Status:** Working draft for joint review
+**Status:** Historical Revision 3; superseded for skill behavior on 2026-09-18.
+
+The current [skill](../../../../templates/skills/azure-functions-update/SKILL.md)
+has a language-neutral eleven-step model/config workflow and a
+[dotnet-isolated scenario](../../../../templates/skills/azure-functions-update/references/dotnet-isolated.md).
+Language/TFM updates are now separate handoffs, not combined conversion checkpoints.
+The scenario's stable completion IDs govern current reviews and evaluations.
+The older sequence and four-file design below remain research history pending a document rewrite.
 
 **Version:** 0
 

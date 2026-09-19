@@ -87,7 +87,7 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | --- | --- |
 | Set up local tools or verify prerequisites | `azure-functions-setup` |
 | Create a new Functions project or add a function to an existing project | `azure-functions-create` |
-| Explicitly ask to use or resume `azure-functions-update` by name | `azure-functions-update` (draft: .NET code migration; other languages assessed only) |
+| Explicitly ask to use or resume `azure-functions-update` by name | `azure-functions-update` (draft: model/config workflow; first scenario is C# in-process to isolated) |
 | Request Functions code migration without selecting the update skill by name | Recommend `azure-functions-update`; do not start it automatically |
 | Change a hosting plan or SKU, including Consumption to Flex | Azure Skills; not an implicit code-migration request |
 | Build or modify Azure Functions Hosted Skills: cloud-hosted intelligent capabilities using Markdown, Functions triggers, code, tools, HTTP, or MCP | `azure-functions-hosted-skills` |
@@ -103,7 +103,8 @@ When the user intent is generic Azure deployment with no Functions-specific cont
 The explicit-use rule for `azure-functions-update` is an exception to automatic routing.
 A question, quotation, file reference, or review that contains the name does not request
 a migration. Normal replies in an active, user-selected run do not need the name again.
-The update workflow owns code changes and required evidence; Azure Skills owns approved
+The update workflow owns Functions model/configuration changes and required evidence.
+Language/TFM updates use a separate language-upgrade handoff. Azure Skills owns approved
 platform work and returns evidence to that same plan. Do not start two migration plans.
 These are instruction rules, not a global client-enforced priority between plugins.
 

@@ -1,5 +1,10 @@
 ## Code Review - Draft: azure-functions-update
 
+**Revision note, 2026-09-18:** This document records reviews through version 1.2.0.
+Those approvals do not cover version 2.0.0. The current skill uses an eleven-step
+model/config workflow and `references/dotnet-isolated.md`, with a separate language
+handoff and stable completion IDs. Prior file names and combined routes below are historical.
+
 **Current status:** Revised draft, not a measured improvement over skill OFF.
 The sections below through "Repository validation and remaining limits" describe
 the initial version 1.0.0 review. Its structural approval and token estimates are
