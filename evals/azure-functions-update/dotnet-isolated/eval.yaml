@@ -5,10 +5,7 @@ tags:
   scenario: dotnet-isolated
   tier: local
 defaults:
-  executor:
-    name: user-policy-copilot
-    config:
-      answerPolicyFile: evals/azure-functions-update/dotnet-isolated/fixtures/user-answers.json
+  executor: copilot-sdk
   model: claude-sonnet-5
   judge_model: gpt-6-astra
   judge_reasoning_effort: high
@@ -65,6 +62,10 @@ stimuli:
     prompt: |
       Use azure-functions-update to update this Azure Functions project to the latest
       programming model.
+      This is a non-interactive evaluation. Do not ask follow-up questions. If the
+      named skill is unavailable, complete the same task directly. Follow AGENTS.md
+      and make reasonable implementation choices yourself within those limits.
+      Do not expand permissions. Report a required out-of-bound action as blocked.
     constraints:
       max_duration: 15m
     artifacts:

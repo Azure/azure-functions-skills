@@ -47,13 +47,6 @@ Shared skills remain in both arms. Only ON receives the measured skill. A dry-ru
 loads and validates plugins but makes no model call. It is not a readiness check
 for the model service or application environment.
 
-`interactive-executor.ts` registers `user-policy-copilot`. It adds an SDK
-user-input handler to the standard Vally Copilot executor. A private answer policy
-contains customer facts and permissions. Only a matched question receives an
-answer; unknown or ambiguous questions block execution. The policy is not a
-migration guide and is not an agent input file. Question records remain private
-outside the agent workspace. This handler is not an operating-system sandbox.
-
 `validate.ts` provides plugin-aware validation without model calls. The matrix
 controller saves original standalone JSONL and its own `matrix-manifest.json`.
 The report reader checks both this format and the existing native experiment
@@ -180,8 +173,8 @@ The wrapper stages only the selected evals/files. If a selected registration dec
 `plugins.graders` or `plugins.executors`, it uses the standalone matrix controller.
 Plugin entries are compiled module basenames under `lib/evaluation/`, not arbitrary
 command strings. Private answer files are controller inputs, not agent files.
-The Functions case declares both plugins and uses the same private answer policy in
-ON and OFF. See its [local prerequisites](../evals/azure-functions-update/dotnet-isolated/README.md).
+The Functions case declares its code-only grader plugin. See its
+[local prerequisites](../evals/azure-functions-update/dotnet-isolated/README.md).
 
 Without plugins, the wrapper creates one temporary native experiment definition,
 encoded as JSON (valid YAML). Its native model

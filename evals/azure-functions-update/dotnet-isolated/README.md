@@ -63,23 +63,23 @@ Optional improvements do not change required acceptance. Do not compare this pol
 directly with earlier full-log judge scores without identifying the policy change.
 Previous results are not changed or regraded.
 
-## Short task and private user answers
+## Short non-interactive task
 
 The initial request asks only to use `azure-functions-update` and update the project
-to the latest programming model. Both arms receive the same source and a short
-`AGENTS.md` with workspace and operation limits. Neither arm receives the private
-grading checklist, review notes, or a migration recipe.
+to the latest programming model. The prompt states that the run is non-interactive,
+so the agent must not ask follow-up questions. It must make implementation choices
+from the source, the selected skill, and public documentation. If the skill is absent,
+OFF performs the same task directly.
 
-The `user-policy-copilot` executor supplies customer answers only when the agent
-uses the SDK user-input callback. Its private policy contains scope, environment,
-permission, and dependency facts, not package choices or code changes. It is not
-staged into the agent workspace. Both arms use the same policy. An arm that asks no
-questions receives no extra answers. An unknown, ambiguous, or unsupported question
-blocks the trial; the runner does not assume approval. This policy does not replace
-an operating-system sandbox or support every third-party confirmation UI.
-Patterns match the full question, without case sensitivity. A closed-choice question
-requires an exact configured answer. A question that matches two rules is blocked,
-not answered by guessing. Review the private question record before a later rerun.
+Both arms receive the same source and a short `AGENTS.md` with workspace and
+operation limits. Neither arm receives the private grading checklist, review notes,
+or a migration recipe. The agent cannot expand permissions. An operation outside
+the stated limits is reported as blocked.
+
+The deterministic grader owns emulator data and trigger end-to-end execution.
+The agent can build and inspect the host, but it must not create fixed queue or blob
+resources. This separation prevents an agent's local validation data from blocking
+the independent grader.
 
 Vally 0.16 does not load experiment `grader_plugins` during `experiment run`.
 The local runner instead calls standalone `vally eval` with both plugin flags for
@@ -120,12 +120,9 @@ Use `--nuget-source` for an approved credential-free HTTPS feed if required.
 Never run paid evaluation from PR-triggered CI.
 
 For a direct Vally command outside the runner, first run `npm run compile` and pass
-`--grader-plugin` with the absolute path to `lib\evaluation\code-only-grader.js`
-and `--executor-plugin` with the absolute path to
-`lib\evaluation\interactive-executor.js`. The policy path is relative to the
-controller working directory, so use the repository root for a direct command.
+`--grader-plugin` with the absolute path to `lib\evaluation\code-only-grader.js`.
 Direct commands do not provide the local runner's isolation.
-`npm run eval:lint` loads both plugins without model calls.
+`npm run eval:lint` loads the grader plugin without model calls.
 
 ## Downloadable source
 

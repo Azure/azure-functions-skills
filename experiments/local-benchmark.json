@@ -25,8 +25,7 @@
     "azure-functions-update": {
       "evals": ["evals/azure-functions-update/dotnet-isolated/eval.yaml"],
       "plugins": {
-        "graders": ["code-only-grader.js"],
-        "executors": ["interactive-executor.js"]
+        "graders": ["code-only-grader.js"]
       },
       "files": [
         "templates/skills/azure-functions-update/SKILL.md",
@@ -40,7 +39,6 @@
         "evals/azure-functions-update/dotnet-isolated/fixtures/trial.gitignore",
         "evals/azure-functions-update/dotnet-isolated/fixtures/definition-of-done.json",
         "evals/azure-functions-update/dotnet-isolated/fixtures/eval-boundaries.md",
-        "evals/azure-functions-update/dotnet-isolated/fixtures/user-answers.json",
         "evals/azure-functions-update/dotnet-isolated/fixtures/review-basis.md",
         "evals/azure-functions-update/dotnet-isolated/fixtures/baseline/UpgradeApp.csproj.txt",
         "evals/azure-functions-update/dotnet-isolated/fixtures/baseline/Hello.cs.txt",

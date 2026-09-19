@@ -218,7 +218,7 @@ describe('experimentDefinition', () => {
     expect(definition).not.toHaveProperty('grader_plugins');
     const selected = selectBenchmark(registry, { skill: 'azure-functions-update' });
     expect(selected.graderPlugins).toEqual(['code-only-grader.js']);
-    expect(selected.executorPlugins).toEqual(['interactive-executor.js']);
+    expect(selected.executorPlugins).toEqual([]);
   });
   it('differs between arms only by the measured skill', () => {
     const definition = experimentDefinition(['evals/a/b/eval.yaml'], ['gpt-6-astra'], []);
@@ -251,7 +251,7 @@ describe('runBenchmark', () => {
       expect(definition.models).toEqual(registry.models);
       expect(definition.dryRun).toBe(true);
       expect(definition.graderPlugins).toEqual([resolve('lib', 'evaluation', 'code-only-grader.js')]);
-      expect(definition.executorPlugins).toEqual([resolve('lib', 'evaluation', 'interactive-executor.js')]);
+      expect(definition.executorPlugins).toEqual([]);
       const skills = join(temporary, 'inputs', 'templates', 'skills');
       expect(readdirSync(skills).sort()).toEqual(['azure-functions-create', 'azure-functions-update']);
       expect(readdirSync(join(skills, 'azure-functions-create')).sort()).toEqual(['SKILL.md', 'references']);
@@ -295,7 +295,7 @@ describe('runBenchmark', () => {
       expect(readdirSync(join(inputs, 'templates', 'skills'))).toEqual(['azure-functions-update']);
       const scenario = join(inputs, 'evals', 'azure-functions-update', 'dotnet-isolated');
       expect(readdirSync(join(scenario, 'fixtures')).sort()).toEqual(['GreetingService.cs', 'Hello.cs', 'QueueGreeting.cs', 'Startup.cs', 'UpgradeApp.csproj',
-        'baseline', 'checks', 'definition-of-done.json', 'eval-boundaries.md', 'host.json', 'review-basis.md', 'trial.gitignore', 'user-answers.json']);
+        'baseline', 'checks', 'definition-of-done.json', 'eval-boundaries.md', 'host.json', 'review-basis.md', 'trial.gitignore']);
       expect(readdirSync(join(scenario, 'fixtures', 'baseline')).sort())
         .toEqual(['GreetingService.cs.txt', 'Hello.cs.txt', 'QueueGreeting.cs.txt', 'Startup.cs.txt', 'UpgradeApp.csproj.txt', 'host.json.txt']);
       expect(readdirSync(join(scenario, 'fixtures', 'checks')).sort()).toEqual(['AzuriteContract.ps1', 'Invoke-DefinitionOfDone.ps1']);

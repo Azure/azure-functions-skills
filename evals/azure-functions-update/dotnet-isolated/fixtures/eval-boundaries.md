@@ -9,11 +9,13 @@ Do not access Azure, deploy, use credentials, change Git history, or read other
 workspaces or user configuration. Do not change feed, proxy, or TLS settings.
 
 Use only the dedicated loopback test services. Do not use production endpoints.
-Do not start or stop an emulator. Treat missing or occupied services as blocked.
-Do not reuse or delete pre-existing data. Stop only processes you start, by their
-process ID. Then delete only test resources you created, including resources
-created by your application. Leave source changes in this workspace.
+Do not start or stop an emulator. The evaluation grader owns emulator data and
+trigger end-to-end execution. During the agent phase, do not create, change, or
+delete queues, containers, blobs, messages, or other emulator data. You can run
+build checks and host checks that do not change emulator data. Stop only processes
+you start, by their process ID. Leave source changes in this workspace.
 
-Ask one user decision at a time when you need more information. Do not assume
-approval for a new operation. Keep secrets and local settings out of source control
-and published output.
+This is a non-interactive run. Do not ask follow-up questions. Make reasonable
+implementation decisions from the source and public documentation. If an operation
+needs permission outside these boundaries, do not perform it; report it as blocked.
+Keep secrets and local settings out of source control and published output.

@@ -125,10 +125,10 @@ jobs:
           fi
           if [ -n "${EVAL_SPEC}" ]; then
             echo "Running single spec: ${EVAL_SPEC}"
-            npx vally eval --eval-spec "${EVAL_SPEC}" --grader-plugin "${GITHUB_WORKSPACE}/lib/evaluation/code-only-grader.js" --executor-plugin "${GITHUB_WORKSPACE}/lib/evaluation/interactive-executor.js" --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
+            npx vally eval --eval-spec "${EVAL_SPEC}" --grader-plugin "${GITHUB_WORKSPACE}/lib/evaluation/code-only-grader.js" --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
           else
             echo "Running suite: ${SUITE}"
-            npx vally eval --suite "${SUITE}" --grader-plugin "${GITHUB_WORKSPACE}/lib/evaluation/code-only-grader.js" --executor-plugin "${GITHUB_WORKSPACE}/lib/evaluation/interactive-executor.js" --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
+            npx vally eval --suite "${SUITE}" --grader-plugin "${GITHUB_WORKSPACE}/lib/evaluation/code-only-grader.js" --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
           fi
 
       - name: Upload results

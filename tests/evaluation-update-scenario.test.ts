@@ -4,7 +4,6 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { AnswerPolicySession, parseAnswerPolicy } from '../src/evaluation/answer-policy.js';
 
 const scenario = resolve('evals', 'azure-functions-update', 'dotnet-isolated');
 const reference = resolve('templates', 'skills', 'azure-functions-update', 'references', 'dotnet-isolated.md');
@@ -199,38 +198,19 @@ describe('eval specification', () => {
     expect(specification).toContain('grading-evidence/baseline/UpgradeApp.csproj.txt');
   });
 
-  it('keeps the task short and customer answers separate from agent inputs', () => {
+  it('keeps the task short and noninteractive without migration hints', () => {
     const prompt = specification.split('    prompt: |')[1]?.split('    constraints:')[0] ?? '';
     expect(prompt).toContain('Use azure-functions-update');
-    expect(prompt.trim().length).toBeLessThan(200);
+    expect(prompt).toContain('non-interactive evaluation');
+    expect(prompt).toContain('Do not ask follow-up questions');
+    expect(prompt).toMatch(/If the\s+named skill is unavailable/);
+    expect(prompt.trim().length).toBeLessThan(600);
     expect(prompt).not.toMatch(/isolated|net8|Worker|Azure\.Functions\.Sdk|binding|checklist|Program\.cs/i);
-    expect(specification).toContain('answerPolicyFile: evals/azure-functions-update/dotnet-isolated/fixtures/user-answers.json');
+    expect(specification).toContain('executor: copilot-sdk');
+    expect(specification).not.toMatch(/answerPolicy|user-policy-copilot/);
     const agentFiles = specification.split('agent_environment:')[1]?.split('grading_environment:')[0] ?? '';
-    expect(agentFiles).not.toMatch(/user-answers|acceptance|definition-of-done/);
+    expect(agentFiles).not.toMatch(/acceptance|definition-of-done/);
     expect(agentFiles).toContain('dest: AGENTS.md');
-  });
-
-  it('keeps customer facts separate from migration answers and private grading criteria', () => {
-    const policy = json<{ rules: { id: string; match: string[]; answer: string }[] }>('fixtures', 'user-answers.json');
-    const text = JSON.stringify(policy);
-    expect(text).not.toMatch(/Azure\.Functions\.Sdk|Microsoft\.Azure\.Functions\.Worker|Worker\.Extensions|FunctionsStartup|Program\.cs|DI-\d/);
-    for (const [question, id] of [
-      ['Which project should I update?', 'existing-project'],
-      ['May I change the target framework?', 'model-only-scope'],
-      ['Is Azurite already available?', 'local-environment'],
-      ['The skill is unavailable. What should I do?', 'missing-skill'],
-      ['I cannot find azure-functions-update. Can I continue without it?', 'missing-skill'],
-    ]) {
-      const session = new AnswerPolicySession(parseAnswerPolicy(policy));
-      expect(session.decide({ question, allowFreeform: true })).toMatchObject({ status: 'answered', ruleId: id });
-    }
-    expect(new AnswerPolicySession(parseAnswerPolicy(policy)).decide({
-      question: 'What is the password?', allowFreeform: true,
-    })).toMatchObject({ status: 'blocked', reason: 'no-match' });
-    expect(new AnswerPolicySession(parseAnswerPolicy(policy)).decide({
-      question: 'Which project should I update, and which target framework should I use?', allowFreeform: true,
-    })).toMatchObject({ status: 'blocked', reason: 'ambiguous-match' });
-    expect(read('fixtures', 'eval-boundaries.md')).toContain('Do not assume');
   });
 
   it('binds the judge to the deterministic evidence instead of transcript claims', () => {
