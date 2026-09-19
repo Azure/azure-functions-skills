@@ -33,6 +33,33 @@ version, `experiment-runner.js` does not supply a retry override and native
 Do not add the unsupported eval-only flag. These limits are not token or money
 caps; `max_turns` and `max_tokens` are not execution limits in 0.16.0.
 
+## Reusable Vally extensions
+
+Vally 0.16 accepts experiment `grader_plugins` but does not load them during
+`experiment run`. `src/evaluation/plugin-matrix.ts` uses standalone `vally eval`
+with `--executor-plugin` and `--grader-plugin` for evaluations that need plugins.
+It reuses Vally execution, grading, and source-artifact export. It does not copy
+the executor or change installed Vally files.
+
+The controller validates every cell with the loaded plugin registries before
+execution. Each cell has one trial, one worker, a ten-minute timeout, and no retry.
+Shared skills remain in both arms. Only ON receives the measured skill. A dry-run
+loads and validates plugins but makes no model call. It is not a readiness check
+for the model service or application environment.
+
+`interactive-executor.ts` registers `user-policy-copilot`. It adds an SDK
+user-input handler to the standard Vally Copilot executor. A private answer policy
+contains customer facts and permissions. Only a matched question receives an
+answer; unknown or ambiguous questions block execution. The policy is not a
+migration guide and is not an agent input file. Question records remain private
+outside the agent workspace. This handler is not an operating-system sandbox.
+
+`validate.ts` provides plugin-aware validation without model calls. The matrix
+controller saves original standalone JSONL and its own `matrix-manifest.json`.
+The report reader checks both this format and the existing native experiment
+format. Local matrix hashes are identified as local metadata, not Vally experiment
+provenance. Missing results remain missing. No native experiment files are fabricated.
+
 ## Local convenience commands
 
 Configure the environment once, then run one noninteractive npm command from
