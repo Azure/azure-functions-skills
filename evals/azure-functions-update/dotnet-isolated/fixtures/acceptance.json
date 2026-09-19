@@ -1,0 +1,28 @@
+{
+  "scenario": "dotnet-isolated",
+  "targetFramework": "net8.0",
+  "languageHandoff": "not-requested",
+  "statuses": ["pass", "fail", "blocked", "not-applicable"],
+  "report": "Use evidence for every ID. Explain every N/A. Missing required execution is blocked, not success.",
+  "requirements": {
+    "DI-01": "Use a supported Functions v4 isolated tuple. Keep net8.0 during this model/configuration phase.",
+    "DI-02": "Restore and build the Functions project directly. Record the SDK and resolved package graph.",
+    "DI-03": "Run existing unit/local tests. N/A is allowed only if an inventory proves none exist.",
+    "DI-04": "Start func. Register Hello and QueueGreeting. Check listeners, expected logs, and errors.",
+    "DI-05": "Run both HTTP cases and the queue/blob E2E case. Missing Azurite or unavailable execution is blocked.",
+    "DI-06": "Declare Microsoft.Azure.Functions.Worker explicitly and resolve a compatible version.",
+    "DI-07": "Remove direct application in-process WebJobs/Functions references and code. Legitimate generated/transitive host dependencies are allowed.",
+    "DI-08": "Convert function attributes and trigger/input/output types and arguments. Preserve function names and behavior.",
+    "DI-09": "Move the GreetingService singleton registration from FunctionsStartup to Program.cs. Preserve constructor injection in both functions and remove the old startup.",
+    "DI-10": "Replace method-injected ILogger with worker logging. Preserve both Information messages. No new telemetry service is required.",
+    "DI-11": "Use a coherent supported HTTP integration, with matching startup and request/response types.",
+    "DI-12": "Preserve both plain-text HTTP 200 responses and the storage greeting output.",
+    "DI-13": "Use dotnet-isolated and UseDevelopmentStorage=true in local settings. Preserve connection names and effective host.json settings.",
+    "DI-14": "Use the effective Azure.Functions.Sdk project SDK. Remove legacy SDK packages and obsolete indexing properties. Do not edit or build generated helper projects directly.",
+    "DI-15": "Publish host.json but exclude local.settings.json and secrets. Keep local settings out of source control.",
+    "DI-16": "Preserve queue name and base64 encoding, blob input/output paths, request ID substitution, and AzureWebJobsStorage. Do not replace bindings with SDK calls. Storage bindings are applicable; Durable and shared consumers are absent.",
+    "DI-POST-01": "N/A because no language stage was requested. Do not change the TFM or simulate the unavailable upgrade agent.",
+    "DI-POST-02": "N/A because no language stage was requested and this model-stage target does not require the post-upgrade alias check.",
+    "DI-POST-03": "N/A because no language stage returns an artifact in this case."
+  }
+}
