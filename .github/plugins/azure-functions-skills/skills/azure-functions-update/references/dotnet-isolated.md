@@ -8,6 +8,9 @@ Do not copy a guide's new TFM into the model-only phase.
 
 Research reviewed on 2026-09-18. Record current source dates and actual target applicability
 in each migration plan; these snapshots are not permanent version pins.
+Use a snapshot below as the recorded source for a decision when it applies to the actual
+target. Request the page again for a different target, a newer requirement, a conflict,
+or a necessary detail that the snapshot does not contain.
 
 | Source | Use |
 | --- | --- |

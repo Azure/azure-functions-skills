@@ -99,7 +99,9 @@ data/privacy limits, and coverage gaps; size alone is not a support boundary.
 Load the matching scenario. Research current official model, migration, language, and
 used trigger/binding guidance. Record source/update/access dates, applicable versions,
 conclusions, and uncertainty. Refresh at decisions, target changes, contradictions,
-and resume. Use release/tag source when needed, including complete compatibility branches.
+and resume. Reuse a recorded source when its versions and dates still apply to the actual
+target; do not request the same page again for the same decision.
+Use release/tag source when needed, including complete compatibility branches.
 If a research tool is unavailable, use public sources rather than repeated failed calls.
 
 Briefly show the proposed model/config changes, unchanged behavior, checks, and unknowns.
@@ -249,6 +251,16 @@ Overall status is `failed_cleanup`, `failed`, `blocked`, `in_progress`, or `comp
 in that priority order for unresolved required conditions. Completion needs all applicable
 required IDs to pass, accepted handoffs, and required cleanup; report optional findings separately.
 Show build/host/local/service evidence separately. Do not call a partial migration complete.
+
+## Keep evidence complete and context small
+
+Record complete evidence, but do not carry long text through the whole run.
+Run build, test, and host commands with their minimal output option.
+Write long output to an approved file. Keep the command, the cwd, the exit result,
+the important lines, and that file path as the evidence for the requirement.
+Read only the necessary part of a large file. Read a complete log when a command fails,
+when results disagree, or when a required check needs that detail.
+A short record does not replace a required check, a required artifact, or actual output.
 
 ## Recovery and permission rules
 
