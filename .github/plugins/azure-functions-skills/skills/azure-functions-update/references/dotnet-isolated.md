@@ -163,40 +163,37 @@ approved certificate trust. An emulator health probe is not a Functions listener
 
 ## Separate .NET language handoff
 
-Only enter common step 8 for a requested/approved update or an approved prerequisite.
-Use the official [GitHub Copilot upgrade installation guide](https://learn.microsoft.com/dotnet/core/porting/github-copilot-upgrade/install?pivots=github-copilot-app).
-Its page date is 2026-07-07, source commit `ca3e7fc9decaf56fe2e2494b52d223d0083ba51d`.
-It uses the `microsoft/upgrade-agent-plugins` marketplace and `upgrade-agent` plugin.
-Follow the instructions for the actual client; do not silently install it.
+Enter common step 8 only for a requested and approved update, or for an approved
+prerequisite. The .NET version update is not this skill's work.
 
-The public plugin at commit `681dbf0b0dc470f63776f44728e76bbc6acc5c45`, version 1.1.539,
-has the scenario
-[`dotnet-version-upgrade`](https://github.com/microsoft/upgrade-agent-plugins/blob/681dbf0b0dc470f63776f44728e76bbc6acc5c45/plugins/upgrade-agent/upgrade/dotnet/skills/scenarios/dotnet-version-upgrade/SKILL.md).
-This is the verified name for the user's intended `dotnet-version-update` handoff.
-It declares `requires-extension: upgrade-dotnet` and `metadata.discovery: scenario`.
-It is not necessarily an independently exposed skill callable by that name.
+Check whether the official .NET upgrade agent is available in the actual client.
+If it is not installed, you cannot install it for the user: each client adds it through
+its own marketplace, extension, or installer step that needs the user's own confirmation.
+Do not do the version update here instead. Give the user the steps for the actual client
+from the official
+[GitHub Copilot upgrade installation guide](https://learn.microsoft.com/dotnet/core/porting/github-copilot-upgrade/install?pivots=github-copilot-app)
+(page reviewed on 2026-07-07), which has separate steps for Visual Studio, VS Code,
+Copilot CLI, the Copilot app, and GitHub.com. Then ask the user to confirm that the agent
+is in the client's agent list. Starting the agent can download software, so get
+permission before you use it. If the user declines, or the installation fails, record a
+blocked handoff with the cause.
 
-The [Upgrade agent entry](https://github.com/microsoft/upgrade-agent-plugins/blob/681dbf0b0dc470f63776f44728e76bbc6acc5c45/plugins/upgrade-agent/agents/upgrade.agent.md)
-uses its MCP's state/scenario/instruction discovery. The documented App agent is
-`upgrade-agent:upgrade`; the CLI installation guide uses `upgrade-agent`.
-Discover actual exposed capabilities and select the verified scenario through that agent.
-If direct delegation is unavailable, give the user the agent-switch instructions and
-the saved handoff packet. Do not invent a direct `dotnet-version-update` tool.
-If a later version uses another name, verify its actual definition before use.
+Delegate through the agent's own discovery and use the capability that the installed
+version exposes. Do not invent a tool name. If direct delegation is not available, give
+the user the agent-switch instructions with the saved handoff packet. The external agent
+can require its own confirmation UI; supplied answers do not guarantee unattended
+operation. A client that cannot use the prepared answers is a blocked handoff, not
+permission to bypass the UI.
 
-Plugin installation and MCP startup can download software; the published MCP uses
-`dnx Microsoft.GitHubCopilot.Upgrade.Mcp`. Do not start it merely to probe availability.
-Review its feed/download behavior and obtain permission. The third-party agent can
-require its own confirmation UI; supplied answers do not guarantee unattended operation.
-If the client cannot use the prepared answers, record a blocked handoff, not permission
-to bypass the UI.
+The handoff packet includes the target TFM and projects, permitted toolchain changes,
+the baseline and checkpoint, incomplete model work, completed Functions settings, the
+original behavior, Git-operation permissions, and all pending completion IDs. The
+external agent must not redo accepted model work, change SKU, create branches or
+commits, or expand scope without authorization. Its `azure-functions-upgrade` scenario
+is not a reason to restart this model migration.
 
-Include target TFM/projects, permitted toolchain changes, baseline/checkpoint, incomplete
-model work, completed Functions settings, original behavior, Git-operation permissions,
-and all pending completion IDs. The external agent must not redo accepted model work,
-change SKU, create branches/commits, or expand scope without authorization.
-Its `azure-functions-upgrade` scenario is not a reason to restart this model migration.
-On return, review the diff and finish common step 9 before final acceptance.
+When the agent returns, review the diff, apply the Functions follow-up below, and
+evaluate every remaining completion ID. Finish common step 9 before final acceptance.
 
 ## Functions follow-up after the language stage
 
