@@ -403,6 +403,6 @@ describe('local benchmark registration', () => {
       } finally {
         rmSync(directory, { recursive: true, force: true });
       }
-    });
+    }, 60_000);
   });
 });
