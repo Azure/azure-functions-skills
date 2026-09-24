@@ -29,9 +29,9 @@ FRD numbers 0001 and 0002 are reserved by pull requests that were open when this
 index was written; check the index and open pull requests for collisions before
 choosing a number.
 
-[Historical F1-F21 specifications](../prd-docs/README.md) remain in `docs/prd-docs/`.
-Do not move, renumber, or silently reinterpret them. Refer to old features as
-`F21`, for example, and new features as `FRD-0001`; these are separate sequences.
+The historical F1-F21 specifications were removed from `docs/prd-docs/`. They are
+still in the git history. Refer to old features as `F21`, for example, and new
+features as `FRD-0001`; these are separate sequences.
 The current CLI contract is documented in [CLI Reference](../cli-reference.md).
 
 ## Choose the development lane after opt-in

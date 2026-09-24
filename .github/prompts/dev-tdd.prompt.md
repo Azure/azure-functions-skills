@@ -15,4 +15,4 @@ After all cycles:
 - Run `npm run lint` to catch style issues.
 - Run `npm run typecheck` to confirm type safety.
 - Ensure proper separation of concerns — no god functions, no duplicated logic.
-- If CLI behavior changed, verify with an E2E run in an isolated workspace.
+- If CLI behavior changed, run the command manually in an isolated workspace.

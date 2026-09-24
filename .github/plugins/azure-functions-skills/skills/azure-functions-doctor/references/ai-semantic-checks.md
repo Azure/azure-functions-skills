@@ -1,6 +1,6 @@
 # AI Semantic Doctor Checks
 
-Use this checklist for `doctor --deep`. Report only concrete issues with evidence. Prefer Warning when a finding depends on interpretation.
+Use this checklist to review code behavior. Report only concrete issues with evidence. Prefer Warning when a finding depends on interpretation.
 
 ## Code behavior
 
@@ -31,7 +31,7 @@ Report deterministic violations when an orchestrator uses non-deterministic APIs
 
 ## Reporting rules
 
-1. Do not repeat Tier 1 findings.
+1. Do not repeat findings already reported from `source-only-checks.md`.
 2. Include file and line whenever possible.
 3. If a finding is only a design preference and not an issue, do not report it.
 4. If unsure, use `status: "warn"` and lower severity.

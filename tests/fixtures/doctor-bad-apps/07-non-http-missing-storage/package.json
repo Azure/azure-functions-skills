@@ -1,7 +1,0 @@
-{
-  "name": "doctor-bad-non-http-missing-storage",
-  "main": "QueueProcessor/index.js",
-  "engines": {
-    "node": ">=22"
-  }
-}

@@ -1,23 +1,10 @@
 ## Azure Functions Skills v${VERSION}
 
-AI assistant plugins for Azure Functions — one-command setup for GitHub Copilot, Claude Code, and Codex.
+Azure Functions skills, Azure MCP configuration, and telemetry hooks for GitHub Copilot, Claude Code, and Codex.
 
-### Install with npm
+### Install
 
-```bash
-npx @azure/functions-skills@${VERSION} setup
-npx @azure/functions-skills@${VERSION} chat
-```
-
-### Install without npm
-
-Download the zip for your AI assistant and extract it into your project root:
-
-| Assistant | Download |
-|-----------|----------|
-| GitHub Copilot | `azure-functions-skills-ghcp-${VERSION}.zip` |
-| Claude Code | `azure-functions-skills-claude-${VERSION}.zip` |
-| Codex | `azure-functions-skills-codex-${VERSION}.zip` |
+Install the `azure-functions-skills` plugin with your coding agent. See the [README](https://github.com/Azure/azure-functions-skills#quick-start) for the steps for each agent.
 
 ### What's new
 

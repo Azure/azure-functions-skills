@@ -23,8 +23,7 @@ implementation.
    [template](../../../docs/frds/_template.md), and any related FRD and its status.
    Inspect the relevant code and documentation before proposing a design.
 2. Update a related FRD where possible. Otherwise, use the next available
-   `docs/frds/NNNN-kebab-case-title.md` and add it to the index. Preserve historical
-   documents and numbering in `docs/prd-docs/`.
+   `docs/frds/NNNN-kebab-case-title.md` and add it to the index.
 3. Maintain one lifecycle FRD per canonical skill rather than one per enhancement,
    generated payload copy, or alias. Give cross-skill mechanisms a separate
    shared-infrastructure FRD when included in the user's selected scope. Do not
@@ -63,8 +62,6 @@ implementation.
 FRD approval does not authorize paid or live Azure experiments or bypass
 repository security rules. Confirm the code revision, target, identity, budget,
 repetition count, and owned-resource cleanup policy separately. Follow the
-repository's [evaluation security rules](../../../AGENTS.md#security): no Vally
-evals in PR-triggered CI or on unreviewed, untrusted contributor code; retain the
-GitHub Environment reviewer gate for GitHub Actions evaluations. Trusted local
-evaluations are allowed in isolated trial workspaces without that gate. Never
-run `doctor --deep` on untrusted workspaces.
+repository's [evaluation security rules](../../../AGENTS.md#security): no
+LLM-backed skill evaluations in PR-triggered CI or on unreviewed, untrusted
+contributor code.

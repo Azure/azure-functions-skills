@@ -11,7 +11,7 @@ Review the current changes against this checklist:
 4. **Security** — no secrets exposed, no unsafe input handling, no prompt injection vectors in skill content.
 5. **Usability** (CLI changes) — are commands intuitive? Are error messages actionable?
 6. **Lint & types** — does `npm run lint` and `npm run typecheck` pass cleanly?
-7. **Documentation** — do affected docs (README, cli-reference.md, doctor-guide.md) need updates?
+7. **Documentation** — do affected docs (README, CONTRIBUTING.md, cli-reference.md) need updates?
 8. **Generated files** — if templates changed, was `npm run build:plugin-payload` run?
 
 After the checklist, use `/rubber-duck` with a different model family for a cross-model review.

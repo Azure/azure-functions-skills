@@ -9,8 +9,5 @@
     "src/**/*.ts",
     "tests/**/*.ts",
     "vitest.config.ts"
-  ],
-  "exclude": [
-    "tests/fixtures/doctor-bad-apps/**"
   ]
 }

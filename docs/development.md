@@ -12,7 +12,7 @@ This repository keeps canonical skill, telemetry hook, and MCP content under `te
 | npm | Dependency install, package scripts, and release publishing | Included with Node.js; see [npm docs](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) |
 | Git | Source control and release checks | [git-scm.com/downloads](https://git-scm.com/downloads) |
 | GitHub CLI | Optional GitHub Release creation in `release:local` | [cli.github.com](https://cli.github.com/) |
-| GitHub Copilot CLI, Claude Code, or Codex CLI | Optional real-agent smoke tests. GitHub Copilot CLI requires Node.js 24+; Claude Code requires Node.js 18+; Codex requires Node.js 16+. | [gh-copilot](https://github.com/github/gh-copilot), [Claude Code](https://claude.ai/download), [Codex package](https://www.npmjs.com/package/@openai/codex) |
+| GitHub Copilot CLI, Claude Code, or Codex CLI | Optional manual skill checks. GitHub Copilot CLI requires Node.js 24+; Claude Code requires Node.js 18+; Codex requires Node.js 16+. | [gh-copilot](https://github.com/github/gh-copilot), [Claude Code](https://claude.ai/download), [Codex package](https://www.npmjs.com/package/@openai/codex) |
 
 Install dependencies:
 
@@ -31,7 +31,7 @@ npm run check
 ```text
 templates/   Canonical skills, telemetry hooks, and MCP definitions
 src/         TypeScript CLI and build system
-tests/       Vitest coverage for build, local install, validation, and release helpers
+tests/       Vitest coverage for build, validation, telemetry, templates, and release helpers
 .github/plugins/azure-functions-skills/  Generated plugin payload
 ```
 
@@ -68,21 +68,15 @@ tests/       Vitest coverage for build, local install, validation, and release h
 
 Do not edit generated files in `.github/plugins/azure-functions-skills/`, `.plugin/marketplace.json`, or `.claude-plugin/marketplace.json` by hand. Change `templates/`, then regenerate.
 
-## Local Smoke Tests
+## Local Build
 
-Build workspace layouts for all targets:
+Build the agent-specific layouts and the plugin payload for all targets:
 
 ```bash
 npm run build
 ```
 
-Install workspace-local files into a temporary project:
-
-```bash
-node bin/azure-functions-skills.js install --local --agent ghcp --dir ../tmp-functions-app
-node bin/azure-functions-skills.js install --local --agent claude --dir ../tmp-functions-app
-node bin/azure-functions-skills.js install --local --agent codex --dir ../tmp-functions-app
-```
+The output is in `dist/workspace/<target>/` and `dist/plugin/azure-functions-skills/`.
 
 ## Release CLI Package
 

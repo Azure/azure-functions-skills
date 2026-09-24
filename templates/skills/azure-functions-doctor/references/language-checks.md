@@ -40,9 +40,9 @@ Load only the section for the detected project language.
 
 Do not fail all Python v2 projects just because `AzureWebJobsFeatureFlags=EnableWorkerIndexing` is absent. Newer host versions enable worker indexing by default.
 
-Tier 1 normally handles `PY-001`, `PY-003`, and `PY-007` through `PY-010`.
-Do not repeat those findings during deep analysis. For `PY-008`, inspect dynamic
-registration only when Tier 1 could not resolve an imported Blueprint. Native
+`PY-008` through `PY-010` are also listed in `source-only-checks.md`. Report each one
+only one time. For `PY-008`, first resolve imported Blueprints statically, and
+inspect dynamic registration only when static resolution fails. Native
 packages such as `numpy`, `cryptography`, and `orjson` are common legitimate
 dependencies; never describe them as malicious solely because they contain
 compiled code. The relevant risk is wheel and build compatibility with the

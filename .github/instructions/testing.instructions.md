@@ -8,7 +8,6 @@ applyTo: "tests/**"
 
 - This project uses **Vitest** for all unit tests.
 - Test files: `tests/*.test.ts`
-- Fixtures: `tests/fixtures/`
 - Run: `npm test` (single run) or `npm run test:watch` (TDD mode)
 
 ## TDD Workflow
@@ -26,8 +25,3 @@ applyTo: "tests/**"
 - Use descriptive test names: `describe('functionName', () => { it('should do X when Y', ...) })`.
 - Keep tests independent — no shared mutable state between tests.
 
-## Fixtures
-
-- Bad-app fixtures for doctor checks live in `tests/fixtures/doctor-bad-apps/`.
-- Expected results are documented in `tests/fixtures/doctor-bad-apps/expected-results.md`.
-- When adding a new doctor check, add a corresponding fixture and update expected results.

@@ -1,6 +1,6 @@
 # Source-only Doctor Checks
 
-These checks can run without LLM semantics and without Azure resource access. They are suitable for `--no-deep` or as context for deep analysis.
+Do these checks first in every analysis. They need only the project files. `RT-003` also uses Azure CLI runtime metadata when Azure CLI is available.
 
 ## Runtime and configuration
 
