@@ -27,13 +27,13 @@ Load only the section for the detected project language.
 
 | ID | Check | Fail | Warning |
 |----|-------|------|---------|
-| `PY-001` | Programming model | Unsupported model/runtime combination | v1 model used for new project |
+| `PY-001` | Programming model | Unsupported model/runtime combination | v1 model used for new project. Both `function.json` functions and v2 `FunctionApp` or `Blueprint` registrations are in the project (mixed models). Python signals exist but no model is found |
 | `PY-002` | Blocking operations | - | `requests`, `time.sleep`, sync I/O in async path |
 | `PY-003` | `requirements.txt` | Missing when external imports exist | Empty or likely incomplete |
 | `PY-004` | Client reuse | - | Azure SDK client created per invocation |
 | `PY-005` | Worker indexing flag | Known old runtime + v2 model requires flag and flag missing | Runtime unknown and old-host compatibility risk |
 | `PY-006` | Worker extensions | Missing required extension setting for custom worker extension usage | Custom extension pattern unclear |
-| `PY-007` | `azure-functions` package | Package version unsupported | Old package version |
+| `PY-007` | `azure-functions` package | Package is not declared, or the constraint excludes 1.17.0 or later in a v2 project | Old package version |
 | `PY-008` | Blueprint registration | Decorated Blueprint is deterministically unregistered | Registration is dynamic and cannot be resolved statically |
 | `PY-009` | Platform-managed worker dependency | - | `azure-functions-worker` is declared by the application |
 | `PY-010` | Native dependency compatibility | - | Compiled packages may lack wheels for the deployment OS/architecture |
@@ -47,6 +47,12 @@ packages such as `numpy`, `cryptography`, and `orjson` are common legitimate
 dependencies; never describe them as malicious solely because they contain
 compiled code. The relevant risk is wheel and build compatibility with the
 Function App operating system and architecture.
+
+For `PY-010`, examine the dependency manifest for these packages at minimum:
+`cryptography`, `grpcio`, `lxml`, `numpy`, `opencv-python`, `orjson`,
+`pandas`, `pillow`, `psycopg2`, `pyodbc`, `scipy`, and `ujson`. Report other
+packages with compiled code too. For each one, tell the user to use remote
+build or to make sure that wheels exist for the deployment OS and architecture.
 
 ## Java
 
@@ -79,7 +85,7 @@ Go support is in preview. Report findings with that framing, and do not treat pr
 | `GO-006` | Extension activation | Extension trigger registered without its blank import | Blank import present but unused trigger registered |
 | `GO-007` | Context propagation | - | `context.Context` ignored, or long work not cancellable |
 | `GO-008` | Startup cost | - | Blocking work in `init()` or before `worker.Start` |
-| `GO-009` | Toolchain version | `go` directive below the worker minimum | No `go` directive in `go.mod` |
+| `GO-009` | Toolchain version | `go` directive below `1.24`, the worker minimum | No `go` directive in `go.mod` |
 | `GO-010` | Unsupported feature | Durable trigger/binding, or an input/output binding, used in a Go project | Trigger not in the supported preview set |
 
 Notes:

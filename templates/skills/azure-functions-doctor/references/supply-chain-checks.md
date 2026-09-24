@@ -22,8 +22,10 @@ The LLM checklist below targets the bridging step between "innocent looking pack
 | `lifecycle-scripts` | `package.json` scripts | high | The project defines `preinstall`, `install`, `postinstall`, `postpack`, `prepublish`, or `prepublishOnly` |
 | `unpinned-prod-deps` | Production dependency versions | medium | A `dependencies` entry is `*`, `latest`, `next`, or starts with `^`, `~`, `>`, or `>=` |
 | `missing-lockfile` | Lockfile | medium | No `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, or `pnpm-lock.yaml` |
-| `install-script-deps` | Production dependencies with install scripts | info | A production dependency in `node_modules` defines `preinstall`, `install`, or `postinstall`. Skip this check when `node_modules` is not present. Do not run `npm install` to do it. |
+| `install-script-deps` | Production dependencies with install scripts | info | A production dependency in `node_modules` defines `preinstall`, `install`, or `postinstall`. Skip this check when `node_modules` is not present. Do not run `npm install` to do it. Do not report the packages in the allowlist below. |
 | `tracked-secret-files` | Local secret files | high | `.env`, `.env.*`, or `local.settings.json` is tracked by git (use `git ls-files`), or is present and not in `.gitignore` |
+
+Allowlist for `install-script-deps`: these are common native modules that need install scripts for a correct reason: `sharp`, `bcrypt`, `sqlite3`, `better-sqlite3`, `node-sass`, `sass`, `esbuild`, `puppeteer`, `playwright`, and `@parcel/watcher`.
 
 For a tracked secret file, tell the user to run `git rm --cached <file>`, to rotate the secrets, and to remove the file from git history if the secrets were pushed.
 
