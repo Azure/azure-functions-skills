@@ -3,10 +3,13 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  ARM_COLLECTION_DEADLINE_MS,
+  ArmNotFoundError,
   collectResourceTypes,
   createAzureCliDeploymentQuery,
   createArmRequestBudget,
   buildRunnerInvocation,
+  isAzureCliNotFound,
   type ArmDeploymentOperation,
   type ArmDeploymentQuery,
   type ArmDeploymentSummary,
@@ -348,12 +351,92 @@ describe('createAzureCliDeploymentQuery', () => {
     expect(calls[0]).toEqual(['deployment', 'sub', 'show', '--name', 'afs-e2e-rzug8t', '-o', 'json']);
   });
 
-  it('returns undefined when the deployment lookup fails (e.g. not found)', async () => {
+  it('returns undefined only when the Azure CLI reports the deployment as not found', async () => {
     const runner = vi.fn(async () => {
-      throw new Error('DeploymentNotFound');
+      throw new ArmNotFoundError();
     });
     const query = createAzureCliDeploymentQuery(runner);
     await expect(query.getDeploymentByName('missing-env')).resolves.toBeUndefined();
+  });
+
+  it('rejects a generic Azure CLI failure instead of treating it as not found', async () => {
+    const runner = vi.fn(async () => {
+      throw new Error('Azure CLI request failed.');
+    });
+    const query = createAzureCliDeploymentQuery(runner);
+    await expect(query.getDeploymentByName('my-env')).rejects.toThrow();
+  });
+
+  it('rejects a lookup response that is not valid JSON', async () => {
+    const query = createAzureCliDeploymentQuery(vi.fn(async () => 'not json'));
+    await expect(query.getDeploymentByName('my-env')).rejects.toThrow();
+  });
+
+  it('rejects a lookup response that is missing required deployment fields', async () => {
+    const query = createAzureCliDeploymentQuery(vi.fn(async () => JSON.stringify({ id: ROOT })));
+    await expect(query.getDeploymentByName('my-env')).rejects.toThrow();
+  });
+
+  it.each([
+    ['an unparseable timestamp', { id: ROOT, name: 'my-env', properties: { provisioningState: 'Succeeded', timestamp: 'yesterday' } }],
+    ['a non-deployment id', { id: '/subscriptions/s/resourceGroups/rg', name: 'my-env', properties: { provisioningState: 'Succeeded', timestamp: '2026-09-09T10:00:00Z' } }],
+    ['a different deployment name', { id: ROOT, name: 'other-env', properties: { provisioningState: 'Succeeded', timestamp: '2026-09-09T10:00:00Z' } }],
+  ])('rejects a lookup response with %s', async (_label, body) => {
+    const query = createAzureCliDeploymentQuery(vi.fn(async () => JSON.stringify(body)));
+    await expect(query.getDeploymentByName('my-env')).rejects.toThrow();
+  });
+
+  it('skips with query-failed when a page mixes a valid Create with a malformed operation', async () => {
+    const runner = vi.fn(async () => JSON.stringify({
+      value: [
+        { properties: { provisioningOperation: 'Create', provisioningState: 'Succeeded', targetResource: { resourceType: 'Microsoft.Web/sites', id: '/r/1' } } },
+        {},
+      ],
+    }));
+    const result = await collectResourceTypes(ROOT, createAzureCliDeploymentQuery(runner));
+    expect(result).toEqual({ status: 'skip', reason: 'query-failed' });
+  });
+
+  it.each([
+    ['a non-object page', '[]'],
+    ['a page without a value array', '{}'],
+    ['a page whose value is not an array', '{"value":{}}'],
+    ['a page with a non-object operation', '{"value":[42]}'],
+    ['a page with an operation missing its properties', '{"value":[{}]}'],
+    ['a page with an operation missing provisioningState', '{"value":[{"properties":{"provisioningOperation":"Create"}}]}'],
+    ['a page with an invalid nextLink type', '{"value":[],"nextLink":7}'],
+  ])('rejects %s instead of returning a partial result', async (_label, page) => {
+    const query = createAzureCliDeploymentQuery(vi.fn(async () => page));
+    await expect(query.listDeploymentOperations(ROOT, { tryConsume: () => true })).rejects.toThrow();
+  });
+
+  it('uses the 20 s FRD time bound by default', async () => {
+    let observedTimeout = 0;
+    const runner = vi.fn(async (_args: readonly string[], timeoutMs?: number) => {
+      observedTimeout = timeoutMs ?? 0;
+      return JSON.stringify({
+        id: ROOT,
+        name: 'my-env',
+        properties: { provisioningState: 'Succeeded', timestamp: '2026-09-09T10:00:00Z' },
+      });
+    });
+    await createAzureCliDeploymentQuery(runner).getDeploymentByName('my-env');
+    expect(observedTimeout).toBeGreaterThan(15_000);
+    expect(observedTimeout).toBeLessThanOrEqual(ARM_COLLECTION_DEADLINE_MS);
+    expect(ARM_COLLECTION_DEADLINE_MS).toBe(20_000);
+  });
+});
+
+describe('isAzureCliNotFound', () => {
+  it('recognizes the ARM not-found error codes', () => {
+    expect(isAzureCliNotFound("ERROR: (DeploymentNotFound) Deployment 'x' could not be found.")).toBe(true);
+    expect(isAzureCliNotFound('ERROR: (ResourceNotFound) The resource was not found.')).toBe(true);
+  });
+
+  it('does not classify other failures as not found', () => {
+    expect(isAzureCliNotFound('ERROR: (AuthorizationFailed) The client does not have authorization.')).toBe(false);
+    expect(isAzureCliNotFound("ERROR: Please run 'az login' to setup account.")).toBe(false);
+    expect(isAzureCliNotFound('')).toBe(false);
   });
 
   it('rejects an invalid deployment name without invoking the runner', async () => {
@@ -387,6 +470,10 @@ describe('buildRunnerInvocation', () => {
     // The `&` in the ARM URL must be inside quotes so cmd.exe does not treat it as a separator.
     expect(commandLine).toContain(`"${URL_ARG}"`);
     expect(invocation.options.windowsVerbatimArguments).toBe(true);
+  });
+
+  it('defaults the subprocess timeout to the 20 s FRD time bound', () => {
+    expect(buildRunnerInvocation('linux', ['rest']).options.timeout).toBe(20_000);
   });
 
   it('rejects arguments containing a double quote or control character', () => {
@@ -488,8 +575,10 @@ describe('selectDeployment', () => {
   });
 });
 
+const ACCEPTED_INGESTION_RESPONSE = '{"itemsReceived":1,"itemsAccepted":1,"appId":null,"errors":[]}';
+
 function makeClient(
-  flush: ApplicationInsightsClient['flush'] = ({ callback }) => callback(),
+  flush: ApplicationInsightsClient['flush'] = ({ callback }) => callback(ACCEPTED_INGESTION_RESPONSE),
 ): ApplicationInsightsClient {
   return { trackEvent: vi.fn(), flush: vi.fn(flush) };
 }
@@ -724,6 +813,23 @@ describe('collectDeploymentObservationWithDependencies', () => {
 
   it('reports failed without throwing when delivery fails', async () => {
     const client = makeClient(({ callback }) => callback('network down'));
+    const query = makeQuery([RECENT_DEPLOYMENT], {
+      [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
+    });
+
+    const result = await collectDeploymentObservationWithDependencies(DEPLOY_INPUT, baseDeps({
+      query,
+      createClient: () => client,
+    }));
+
+    expect(result).toEqual({ status: 'failed', reason: 'delivery-failed' });
+  });
+
+  it.each([
+    ['an empty ingestion response', ''],
+    ['a missing ingestion response', undefined],
+  ])('reports failed for %s because delivery is not confirmed', async (_label, response) => {
+    const client = makeClient(({ callback }) => callback(response));
     const query = makeQuery([RECENT_DEPLOYMENT], {
       [ROOT]: [createOp({ targetResourceType: 'Microsoft.Web/sites', targetResourceId: '/r/1' })],
     });

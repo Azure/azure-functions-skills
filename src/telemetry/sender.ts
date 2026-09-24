@@ -295,7 +295,7 @@ export async function sendDeploymentObservedEventWithDependencies(
     name: DEPLOYMENT_OBSERVED_EVENT_NAME,
     properties: deploymentObservedProperties(parsedEvent),
   });
-  await flushWithTimeout(client, dependencies.timeoutMs);
+  await flushWithTimeout(client, dependencies.timeoutMs, { requireConfirmation: true });
   return { status: 'sent' };
 }
 
@@ -381,7 +381,18 @@ function telemetryProperties(event: TelemetryEvent): Record<string, string> {
   };
 }
 
-function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number): Promise<void> {
+interface FlushOptions {
+  // The usage path keeps its pre-existing contract, where an empty response is
+  // success (AC-001). The deployment observation reports `sent` only when the
+  // ingestion service confirms that it accepted every item.
+  readonly requireConfirmation?: boolean;
+}
+
+function flushWithTimeout(
+  client: ApplicationInsightsClient,
+  timeoutMs: number,
+  options: FlushOptions = {},
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error(`Telemetry delivery timed out after ${timeoutMs}ms`));
@@ -390,7 +401,7 @@ function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number):
       client.flush({
         callback: response => {
           clearTimeout(timeout);
-          if (isAcceptedIngestionResponse(response)) {
+          if (isAcceptedIngestionResponse(response, options.requireConfirmation === true)) {
             resolve();
           } else {
             reject(new Error(`Telemetry delivery failed: ${response}`));
@@ -404,8 +415,8 @@ function flushWithTimeout(client: ApplicationInsightsClient, timeoutMs: number):
   });
 }
 
-function isAcceptedIngestionResponse(response: string | undefined): boolean {
-  if (response === undefined || response.length === 0) return true;
+function isAcceptedIngestionResponse(response: string | undefined, requireConfirmation: boolean): boolean {
+  if (response === undefined || response.length === 0) return !requireConfirmation;
   let parsed: unknown;
   try {
     parsed = JSON.parse(response);

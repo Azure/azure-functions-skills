@@ -9,8 +9,9 @@ const GENERAL_RESOURCE_TYPE_PATTERN =
   /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
 const MAX_RESOURCE_TYPE_LENGTH = 256;
 
-const DEFAULT_DEADLINE_MS = 15_000;
 export const ARM_COLLECTION_DEADLINE_MS = 20_000;
+const DEFAULT_DEADLINE_MS = ARM_COLLECTION_DEADLINE_MS;
+const AZURE_CLI_NOT_FOUND_PATTERN = /\((?:DeploymentNotFound|ResourceNotFound)\)/;
 const DEFAULT_MAX_REQUESTS = 50;
 const DEFAULT_MAX_DEPTH = 10;
 const DEFAULT_MAX_TYPES = 100;
@@ -64,6 +65,18 @@ export type ArmSkipReason =
 
 class ArmDeadlineError extends Error {}
 class ArmRequestBudgetError extends Error {}
+
+// The only runner failure that means "no such deployment". Every other failure
+// (authentication, authorization, network, throttling) is a query failure.
+export class ArmNotFoundError extends Error {
+  constructor() {
+    super('ARM resource not found.');
+  }
+}
+
+export function isAzureCliNotFound(stderr: string): boolean {
+  return AZURE_CLI_NOT_FOUND_PATTERN.test(stderr);
+}
 
 function createRequestBudget(max: number): ArmRequestBudget {
   let remaining = max;
@@ -218,17 +231,15 @@ export function createAzureCliDeploymentQuery(
       let raw: string;
       try {
         raw = await runner(['deployment', 'sub', 'show', '--name', name, '-o', 'json'], callTimeout());
-      } catch {
-        // Not found (DeploymentNotFound) or a transient failure: treat as no deployment.
-        return undefined;
+      } catch (error) {
+        if (error instanceof ArmNotFoundError) return undefined;
+        throw error instanceof Error ? error : new Error('ARM deployment lookup failed.');
       }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        return undefined;
+      const summary = toDeploymentSummary(JSON.parse(raw));
+      if (summary === undefined || summary.name.toLowerCase() !== name.toLowerCase()) {
+        throw new Error('Malformed ARM deployment response.');
       }
-      return toDeploymentSummary(parsed);
+      return summary;
     },
 
     async listDeploymentOperations(
@@ -251,17 +262,24 @@ export function createAzureCliDeploymentQuery(
         }
         firstPage = false;
         const raw = await runner(['rest', '--method', 'get', '--url', url], callTimeout());
+        // A malformed page makes the traversal incomplete. Reject it so the caller
+        // skips, rather than returning a silently truncated operation list.
         const parsed: unknown = JSON.parse(raw);
-        if (!isRecord(parsed)) return operations;
-        const value = parsed.value;
-        if (Array.isArray(value)) {
-          for (const item of value) {
-            const operation = toDeploymentOperation(item);
-            if (operation !== undefined) operations.push(operation);
+        if (!isRecord(parsed) || !Array.isArray(parsed.value)) {
+          throw new Error('Malformed ARM operations page.');
+        }
+        for (const item of parsed.value) {
+          const operation = toDeploymentOperation(item);
+          if (operation === undefined) {
+            throw new Error('Malformed ARM deployment operation.');
           }
+          operations.push(operation);
         }
         const nextLink = parsed.nextLink;
-        if (typeof nextLink !== 'string' || nextLink.length === 0) return operations;
+        if (nextLink === undefined || nextLink === null || nextLink === '') return operations;
+        if (typeof nextLink !== 'string') {
+          throw new Error('Malformed ARM pagination link.');
+        }
         if (!isSameOriginArmUrl(nextLink)) {
           throw new Error('Refusing to follow a non-ARM pagination link.');
         }
@@ -280,19 +298,23 @@ function toDeploymentSummary(value: unknown): ArmDeploymentSummary | undefined {
   const provisioningState = properties.provisioningState;
   const timestamp = properties.timestamp;
   if (typeof id !== 'string' || typeof name !== 'string'
-    || typeof provisioningState !== 'string' || typeof timestamp !== 'string') {
+    || typeof provisioningState !== 'string' || typeof timestamp !== 'string'
+    || !isArmDeploymentId(id) || Number.isNaN(Date.parse(timestamp))) {
     return undefined;
   }
   return { id, name, provisioningState, timestamp };
 }
 
 function toDeploymentOperation(value: unknown): ArmDeploymentOperation | undefined {
-  if (!isRecord(value)) return undefined;
-  const properties = isRecord(value.properties) ? value.properties : {};
+  if (!isRecord(value) || !isRecord(value.properties)) return undefined;
+  const properties = value.properties;
+  const provisioningOperation = asString(properties.provisioningOperation);
+  const provisioningState = asString(properties.provisioningState);
+  if (provisioningOperation === undefined || provisioningState === undefined) return undefined;
   const targetResource = isRecord(properties.targetResource) ? properties.targetResource : {};
   return {
-    provisioningOperation: asString(properties.provisioningOperation),
-    provisioningState: asString(properties.provisioningState),
+    provisioningOperation,
+    provisioningState,
     targetResourceType: asString(targetResource.resourceType),
     targetResourceId: asString(targetResource.id),
   };
@@ -400,9 +422,10 @@ function defaultRunner(args: readonly string[], timeoutMs: number = DEFAULT_DEAD
       invocation.file,
       [...invocation.args],
       invocation.options,
-      (error, stdout) => {
+      (error, stdout, stderr) => {
         if (error) {
-          reject(new Error('Azure CLI request failed.'));
+          // Classify only; never keep or forward CLI output.
+          reject(isAzureCliNotFound(String(stderr)) ? new ArmNotFoundError() : new Error('Azure CLI request failed.'));
           return;
         }
         resolve(stdout);
