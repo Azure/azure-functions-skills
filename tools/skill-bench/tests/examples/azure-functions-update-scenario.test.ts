@@ -1,11 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHash, createHmac } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../src/config.ts';
+import { removeDirectory, temporaryDirectory } from '../helpers.ts';
 
 const example = fileURLToPath(new URL('../../examples/azure-functions-update/', import.meta.url));
 const scenario = join(example, 'evals', 'dotnet-isolated');
@@ -171,7 +172,8 @@ describe('deterministic grader script', () => {
 
   it('injects the grader storage endpoint instead of requiring it in local settings', () => {
     expect(script).toContain("$env:AzureWebJobsStorage = 'UseDevelopmentStorage=true'");
-    expect(script).toContain("$runtimeOk = $runtime -eq 'dotnet-isolated'");
+    expect(script).toContain("$runtime -eq 'dotnet-isolated'");
+    expect(script).toContain('Get-RuntimeInstruction');
     expect(script).not.toContain("[string]$localSettings.Values.AzureWebJobsStorage -eq 'UseDevelopmentStorage=true'");
   });
 
@@ -266,6 +268,50 @@ describe('skill-bench registration', () => {
     expect(agentEnvironment).not.toMatch(/skills:|COPILOT_HOME_SETTINGS_JSON/);
   });
   const hasPowerShell = spawnSync('pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.Major']).status === 0;
+
+  describe.skipIf(!hasPowerShell)('runtime instruction helper (DI-13)', () => {
+    const grader = join(scenario, 'fixtures', 'checks', 'Invoke-DefinitionOfDone.ps1').replaceAll("'", "''");
+    let workspace: string;
+    beforeEach(() => { workspace = temporaryDirectory('af-runtime-'); });
+    afterEach(() => removeDirectory(workspace));
+    const put = (path: string, text: string) => {
+      mkdirSync(dirname(join(workspace, path)), { recursive: true });
+      writeFileSync(join(workspace, path), text);
+    };
+    const find = () => {
+      const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', `
+        $ErrorActionPreference = 'Stop'
+        $ast = [Management.Automation.Language.Parser]::ParseFile('${grader}', [ref]$null, [ref]$null)
+        $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+          $node.Name -eq 'Get-RuntimeInstruction' }, $true)
+        if (-not $function) { throw 'Runtime instruction helper is missing.' }
+        ConvertTo-Json -Compress -InputObject @(& $function.Body.GetScriptBlock() -Root '${workspace.replaceAll("'", "''")}')
+      `], { encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+      return (JSON.parse(result.stdout) as string[]).sort();
+    };
+
+    it('accepts a settings example or a written instruction instead of a local.settings.json file', () => {
+      put('local.settings.example.txt', '{ "Values": { "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated" } }');
+      put('docs/migration-plan.md', 'Set `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated` in local settings.');
+      put('README.md', 'Set FUNCTIONS_WORKER_RUNTIME to dotnet-isolated before you start the host.\nDo not commit local.settings.json.');
+      expect(find()).toEqual(['README.md', 'docs/migration-plan.md', 'local.settings.example.txt']);
+    });
+
+    it('ignores skill payloads, grader input, build output, local settings and other values', () => {
+      put('azure-functions-update/SKILL.md', 'FUNCTIONS_WORKER_RUNTIME=dotnet-isolated');
+      put('azure-functions-update/references/dotnet-isolated.md', 'FUNCTIONS_WORKER_RUNTIME=dotnet-isolated');
+      put('grading-evidence/review-basis.md', 'FUNCTIONS_WORKER_RUNTIME=dotnet-isolated');
+      put('bin/notes.md', 'FUNCTIONS_WORKER_RUNTIME=dotnet-isolated');
+      put('.hidden/notes.md', 'FUNCTIONS_WORKER_RUNTIME=dotnet-isolated');
+      put('local.settings.json', '{ "Values": { "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated" } }');
+      put('notes.md', 'FUNCTIONS_WORKER_RUNTIME=dotnet and dotnet-isolated is the goal.');
+      put('warning.md', 'Do not set FUNCTIONS_WORKER_RUNTIME=dotnet-isolated for this app.');
+      put('legacy.txt', 'Never use `FUNCTIONS_WORKER_RUNTIME` = `dotnet-isolated` here; keep it removed.');
+      put('Program.cs', '// FUNCTIONS_WORKER_RUNTIME=dotnet-isolated');
+      expect(find()).toEqual([]);
+    });
+  });
 
   describe.skipIf(!hasPowerShell)('Azurite contract helper', () => {
     const helper = join(scenario, 'fixtures', 'checks', 'AzuriteContract.ps1').replaceAll("'", "''");

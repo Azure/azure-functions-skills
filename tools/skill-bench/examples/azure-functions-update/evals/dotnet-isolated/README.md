@@ -98,6 +98,14 @@ Use `AzureWebJobsStorage=UseDevelopmentStorage=true`; do not use cloud credentia
 The baseline also needs `FUNCTIONS_WORKER_RUNTIME=dotnet` and
 `FUNCTIONS_INPROC_NET8_ENABLED=1`. Keep real local settings untracked.
 
+DI-13 does not require `local.settings.json`, because it is a user file that git
+ignores. If the file exists, `FUNCTIONS_WORKER_RUNTIME` must be `dotnet-isolated`.
+If it is absent, a Markdown, text, or JSON file in the workspace (for example a
+settings example, a README, or the migration plan) must state
+`FUNCTIONS_WORKER_RUNTIME=dotnet-isolated`. The check ignores skill folders (a
+folder with `SKILL.md`), `grading-evidence/`, build output, and dot folders, so
+the ON arm cannot pass only because the skill text is present.
+
 skill-bench stages only declared files into a clean external directory. The
 `nuget-preflight` plugin isolates NuGet settings and caches and checks the selected
 SDK/Worker restore path before a paid call. This is not a complete host or emulator
@@ -105,12 +113,12 @@ readiness check. The operator must check the other prerequisites first. No
 installation or emulator start is automatic.
 
 After code review, use existing clean external parent directories. Run these commands
-in `tools/skill-bench`. This example selects GPT-6 Astra and Claude Opus 5, with one
+in `tools/skill-bench`. This example selects GPT-6 Astra and GPT-6 Sol, with one
 ON and one OFF trial for each model:
 
 ```powershell
 node bin/skill-bench.js dry-run --config examples/azure-functions-update/skill-bench.config.json `
-  --skill azure-functions-update --model gpt-6-astra --model claude-opus-5 `
+  --skill azure-functions-update --model gpt-6-astra --model gpt-6-sol `
   --run-root C:\eval-clean --trusted
 ```
 

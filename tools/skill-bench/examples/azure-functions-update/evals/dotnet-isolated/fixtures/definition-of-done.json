@@ -32,119 +32,136 @@
       "title": "Supported host/model/TFM tuple with the model stage keeping its current target framework",
       "gates": ["deterministic", "judge"],
       "check": "supported-tuple-current-tfm",
-      "applicability": "Always applicable. The deterministic gate compares the target framework and host version with the baseline. The judge uses the fixed review basis, not the agent report."
+      "applicability": "Always applicable. The deterministic gate compares the target framework and host version with the baseline. The judge uses the fixed review basis, not the agent report.",
+      "hint": "Keep the current target framework and a supported host version. Do not change the target framework in the model stage."
     },
     {
       "id": "DI-02",
       "title": "Direct restore and build of the Functions project succeed",
       "gates": ["deterministic"],
       "check": "restore-and-build",
-      "applicability": "Always applicable. Evidence is the recorded command, exit code, and effective SDK and package graph."
+      "applicability": "Always applicable. Evidence is the recorded command, exit code, and effective SDK and package graph.",
+      "hint": "Run dotnet restore and dotnet build on the Functions project. Fix the SDK and package errors that the build log shows."
     },
     {
       "id": "DI-03",
       "title": "Existing unit and local tests succeed",
       "gates": ["deterministic"],
       "check": "existing-tests",
-      "applicability": "not-applicable only when the recorded project inventory proves that the workspace contains no test project. A test project that cannot run is blocked, never not-applicable, and E2E evidence never substitutes for it."
+      "applicability": "not-applicable only when the recorded project inventory proves that the workspace contains no test project. A test project that cannot run is blocked, never not-applicable, and E2E evidence never substitutes for it.",
+      "hint": "Run the existing test projects and fix the tests that fail."
     },
     {
       "id": "DI-04",
       "title": "func starts with the expected function inventory and executes the storage trigger",
       "gates": ["deterministic"],
       "check": "host-registration",
-      "applicability": "Always applicable. Read the host admin function inventory and execute the storage trigger. Logs are not assessed. An unavailable inventory endpoint is blocked. A function list alone cannot pass this ID."
+      "applicability": "Always applicable. Read the host admin function inventory and execute the storage trigger. Logs are not assessed. An unavailable inventory endpoint is blocked. A function list alone cannot pass this ID.",
+      "hint": "Start the host with func start. Make sure that all original functions register and that the storage trigger runs."
     },
     {
       "id": "DI-05",
       "title": "Agreed trigger end-to-end paths produce the original business outputs",
       "gates": ["deterministic"],
       "check": "trigger-e2e",
-      "applicability": "Applies to the HTTP responses and the queue-trigger/blob-input/blob-output flow. Missing Azurite is blocked, not not-applicable. An HTTP pass does not substitute for storage E2E."
+      "applicability": "Applies to the HTTP responses and the queue-trigger/blob-input/blob-output flow. Missing Azurite is blocked, not not-applicable. An HTTP pass does not substitute for storage E2E.",
+      "hint": "Make sure that the storage emulator is available. Then make the HTTP paths and the queue-to-blob path return the original output."
     },
     {
       "id": "DI-06",
       "title": "Explicit Microsoft.Azure.Functions.Worker reference resolves compatibly",
       "gates": ["deterministic"],
       "check": "explicit-worker-package",
-      "applicability": "Always applicable. Central package version management is allowed as long as the application declares the package explicitly."
+      "applicability": "Always applicable. Central package version management is allowed as long as the application declares the package explicitly.",
+      "hint": "Add an explicit Microsoft.Azure.Functions.Worker package reference to the project."
     },
     {
       "id": "DI-07",
       "title": "Application direct WebJobs and legacy Functions packages and code are migrated",
       "gates": ["deterministic", "judge"],
       "check": "legacy-surface-migrated",
-      "applicability": "Applies to application sources and declared package references only. Generated host-extension projects, obj/bin output, and transitive WebJobs dependencies are excluded from the prohibition."
+      "applicability": "Applies to application sources and declared package references only. Generated host-extension projects, obj/bin output, and transitive WebJobs dependencies are excluded from the prohibition.",
+      "hint": "Remove Microsoft.NET.Sdk.Functions, the direct WebJobs packages and the in-process code from the application."
     },
     {
       "id": "DI-08",
       "title": "Function attributes, trigger and binding types, and arguments are isolated-compatible",
       "gates": ["deterministic", "judge"],
       "check": "function-signatures",
-      "applicability": "Always applicable. The deterministic gate checks attribute, name, route, and authorization retention; the judge checks parameter, return, collector, and binder adaptation."
+      "applicability": "Always applicable. The deterministic gate checks attribute, name, route, and authorization retention; the judge checks parameter, return, collector, and binder adaptation.",
+      "hint": "Use the isolated worker attributes and types. Keep the function names, routes, authorization levels and HTTP methods."
     },
     {
       "id": "DI-09",
       "title": "Program.cs owns the required DI and startup and starts the worker host",
       "gates": ["deterministic", "judge"],
       "check": "worker-startup",
-      "applicability": "Always applicable. Move the FunctionsStartup GreetingService singleton registration to Program.cs and preserve constructor injection in both functions."
+      "applicability": "Always applicable. Move the FunctionsStartup GreetingService singleton registration to Program.cs and preserve constructor injection in both functions.",
+      "hint": "Build the worker host in Program.cs. Move the DI registrations from FunctionsStartup to Program.cs."
     },
     {
       "id": "DI-10",
       "title": "Isolated logging and telemetry preserve the required behavior",
       "gates": ["judge"],
       "check": null,
-      "applicability": "Source review only. Preserve the Information logging calls and messages with worker-compatible logging. Runtime log emission and telemetry delivery are not assessed. No new telemetry service is required."
+      "applicability": "Source review only. Preserve the Information logging calls and messages with worker-compatible logging. Runtime log emission and telemetry delivery are not assessed. No new telemetry service is required.",
+      "hint": "Use ILogger from the isolated worker and keep the original log messages."
     },
     {
       "id": "DI-11",
       "title": "HTTP integration, startup, types, async I/O, and serialization agree",
       "gates": ["deterministic", "judge"],
       "check": "http-integration-coherent",
-      "applicability": "Applies because the app has an HTTP trigger. Either the ASP.NET Core integration or the built-in HTTP model is acceptable when it is coherent; neither style is mandatory."
+      "applicability": "Applies because the app has an HTTP trigger. Either the ASP.NET Core integration or the built-in HTTP model is acceptable when it is coherent; neither style is mandatory.",
+      "hint": "Use one HTTP model: the ASP.NET Core integration with its package and startup, or the built-in HTTP model."
     },
     {
       "id": "DI-12",
       "title": "JSON and output contracts remain unchanged against the baseline fixture",
       "gates": ["deterministic"],
       "check": "output-contract-preserved",
-      "applicability": "Always applicable. The staged baseline fixture under grading-evidence/baseline supplies the original contract, including any Newtonsoft attributes."
+      "applicability": "Always applicable. The staged baseline fixture under grading-evidence/baseline supplies the original contract, including any Newtonsoft attributes.",
+      "hint": "Keep the original response body, media type and JSON attributes."
     },
     {
       "id": "DI-13",
       "title": "Worker and runtime configuration and binding settings are correct",
       "gates": ["deterministic", "judge"],
       "check": "runtime-configuration",
-      "applicability": "Always applicable. Effective FUNCTIONS_WORKER_RUNTIME, retained connection names, and host.json semantics are checked; a proposed deployment configuration never proves deployed state."
+      "applicability": "Always applicable. Effective FUNCTIONS_WORKER_RUNTIME, retained connection names, and host.json semantics are checked. local.settings.json is a user file that git ignores: when it exists, its value must be dotnet-isolated; when it is absent, a settings example, README, or plan in the workspace must state FUNCTIONS_WORKER_RUNTIME=dotnet-isolated. Skill files do not count; a proposed deployment configuration never proves deployed state.",
+      "hint": "Set FUNCTIONS_WORKER_RUNTIME=dotnet-isolated in local.settings.json, or write it in a settings example, a README or the migration plan. Keep the AzureWebJobsStorage connection name on all bindings and keep the host.json version."
     },
     {
       "id": "DI-14",
       "title": "Current Functions project SDK and compatible build setup are effective",
       "gates": ["deterministic"],
       "check": "project-sdk-effective",
-      "applicability": "Always applicable in the model-only phase at the current target framework. Azure.Functions.Sdk must resolve inline or through global.json, without Microsoft.NET.Sdk.Functions, Microsoft.Azure.Functions.Worker.Sdk, or FunctionsEnableWorkerIndexing, and generated helper projects must not be edited or built directly."
+      "applicability": "Always applicable in the model-only phase at the current target framework. Azure.Functions.Sdk must resolve inline or through global.json, without Microsoft.NET.Sdk.Functions, Microsoft.Azure.Functions.Worker.Sdk, or FunctionsEnableWorkerIndexing, and generated helper projects must not be edited or built directly.",
+      "hint": "Use <Project Sdk=\"Azure.Functions.Sdk/<version>\"> or global.json. Remove Microsoft.NET.Sdk.Functions, Microsoft.Azure.Functions.Worker.Sdk and FunctionsEnableWorkerIndexing."
     },
     {
       "id": "DI-15",
       "title": "Packaging includes the required host configuration and excludes local secrets",
       "gates": ["deterministic"],
       "check": "packaging-and-secrets",
-      "applicability": "Always applicable. Evidence is the inspected publish artifact, not a file name in a report, and no deployment is performed."
+      "applicability": "Always applicable. Evidence is the inspected publish artifact, not a file name in a report, and no deployment is performed.",
+      "hint": "Make sure that the publish output contains host.json and does not contain local.settings.json or secret values."
     },
     {
       "id": "DI-16",
       "title": "Used binding, Durable, and shared-consumer contracts are preserved",
       "gates": ["deterministic", "judge"],
       "check": "binding-contracts",
-      "applicability": "Applicable: preserve the queue name, base64 message encoding, blob paths, request ID substitution, connection setting name, and greeting output. Durable history and shared consumer projects are absent, but the storage binding requirement is not not-applicable."
+      "applicability": "Applicable: preserve the queue name, base64 message encoding, blob paths, request ID substitution, connection setting name, and greeting output. Durable history and shared consumer projects are absent, but the storage binding requirement is not not-applicable.",
+      "hint": "Keep the queue name, the message encoding, the blob paths and the connection setting name."
     },
     {
       "id": "DI-POST-01",
       "title": "After an approved language handoff, the effective target framework and toolchain paths match the destination",
       "gates": ["judge"],
       "check": null,
-      "applicability": "not-applicable in this scenario because the stimulus requests no language stage and keeps the current target framework. It becomes blocked if the trial requests the dotnet-version-upgrade handoff and the client cannot provide it, and fail if the target framework changed without an approved handoff."
+      "applicability": "not-applicable in this scenario because the stimulus requests no language stage and keeps the current target framework. It becomes blocked if the trial requests the dotnet-version-upgrade handoff and the client cannot provide it, and fail if the target framework changed without an approved handoff.",
+      "hint": "Change the target framework only after an approved language handoff."
     },
     {
       "id": "DI-POST-02",

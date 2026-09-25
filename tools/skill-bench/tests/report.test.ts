@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { linkSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { generateReport, readBenchmark, relativeChange } from '../src/report.ts';
+import { failureSummary, generateReport, readBenchmark, relativeChange, safeText } from '../src/report.ts';
+import { main } from '../src/cli.ts';
 import { removeDirectory, temporaryDirectory } from './helpers.ts';
 
 const roots: string[] = [];
@@ -79,6 +80,7 @@ function render(html: string, search: string) {
     return element;
   };
   node('#benchmark-data').textContent = data;
+  node('#model').value = 'all';
   const document = {
     documentElement: { lang: '' }, title: '',
     querySelector: node,
@@ -178,6 +180,158 @@ describe('readBenchmark', () => {
     }
     writeFileSync(join(f.input, 'matrix-manifest.json'), JSON.stringify(f.manifest));
     expect(() => readBenchmark(f.input)).toThrow(/path|inside|distinct/);
+  });
+});
+
+describe('failure diagnostics', () => {
+  function failing() {
+    const f = fixture();
+    // model-a ON: graders fail with structured checks.
+    f.records[1][0].gradeResult = { passed: false, score: 0, details: [
+      { name: 'completed', passed: true, score: 1 },
+      { name: 'definition-of-done', passed: false, score: 0, evidence: 'PRIVATE-EVIDENCE',
+        details: [{ name: 'exit-code', passed: false, score: 0 }, { name: 'stdout-contains', passed: false, score: 0 }] },
+      { name: 'migration-quality', status: 'success', passed: false, score: 0, evidence: 'PRIVATE-EVIDENCE', metadata: {
+        summary: 'Checks failed in C:\\Users\\PRIVATE-USER\\work with ghp_abcdefghijklmnopqrstuvwxyz0123456789.',
+        checks: [
+          { id: 'DI-01', status: 'pass', title: 'Supported tuple' },
+          { id: 'DI-13', status: 'fail', title: 'Runtime configuration', reason: 'Missing in /home/PRIVATE-USER/app/x.md\u0007',
+            hint: 'Document FUNCTIONS_WORKER_RUNTIME.', evidence: ['PRIVATE-EVIDENCE'] },
+        ] } },
+    ] };
+    // model-b OFF: the model is not available.
+    f.records[2][0].status = 'error';
+    f.records[2][0].gradeResult = null;
+    f.records[2][0].error = 'Request session.create failed with message: Model "model-b" is not available.';
+    // model-b ON: no grader verdict.
+    f.records[3][0].gradeResult = null;
+    f.save();
+    return f;
+  }
+
+  it('explains execution errors, grader failures, ungraded and passed trials', () => {
+    const f = failing();
+    const [a, b] = readBenchmark(f.input).comparisons;
+    expect(a.off?.trials[0].diagnosis).toEqual({ stage: 'passed', message: 'All graders passed.', hint: null });
+    const failed = a.on?.trials[0];
+    expect(failed?.diagnosis).toEqual({ stage: 'grading',
+      message: 'Failed graders: definition-of-done (exit-code, stdout-contains); migration-quality.',
+      hint: 'Document FUNCTIONS_WORKER_RUNTIME.' });
+    expect(failed?.graders[1].failed).toEqual(['exit-code', 'stdout-contains']);
+    const review = failed?.graders[2];
+    expect(review?.checks).toEqual([
+      { id: 'DI-01', status: 'pass', title: 'Supported tuple', reason: null, hint: null },
+      { id: 'DI-13', status: 'fail', title: 'Runtime configuration', reason: 'Missing in <path>',
+        hint: 'Document FUNCTIONS_WORKER_RUNTIME.' },
+    ]);
+    expect(review?.summary).toBe('Checks failed in <path>');
+    expect(b.off?.trials[0].diagnosis).toMatchObject({ stage: 'execution',
+      message: 'The model "model-b" is not available.', hint: expect.stringMatching(/model ID/) });
+    expect(b.on?.trials[0].diagnosis).toMatchObject({ stage: 'ungraded' });
+    expect(a.on?.results).toBe('model-a/on/results.jsonl');
+    expect(JSON.stringify(readBenchmark(f.input))).not.toMatch(/PRIVATE-|ghp_/);
+  });
+
+  it('uses a requirements list when a grader has no checks list', () => {
+    const f = fixture();
+    f.records[0][0].gradeResult = { passed: false, score: 0, details: [{ name: 'review', passed: false, score: 0,
+      metadata: { requirements: [{ id: 'R-1', status: 'blocked', judgeRequired: true }] } }] };
+    f.save();
+    expect(readBenchmark(f.input).comparisons[0].off?.trials[0].graders[0].checks)
+      .toEqual([{ id: 'R-1', status: 'blocked', title: null, reason: null, hint: null }]);
+  });
+
+  it('ignores requirements metadata with another shape', () => {
+    const f = fixture();
+    f.records[0][0].gradeResult = { passed: false, score: 0, details: [
+      { name: 'a', passed: false, score: 0, metadata: { requirements: { fulfilled: 5 } } },
+      { name: 'b', passed: false, score: 0, metadata: { requirements: ['x', { id: 'R-1', status: 'custom' }] } },
+    ] };
+    f.save();
+    expect(readBenchmark(f.input).comparisons[0].off?.trials[0].graders.map(grader => grader.checks)).toEqual([[], []]);
+  });
+
+  it.each([
+    ['C:\\Users\\Jane Doe\\PRIVATE-DIR\\app.cs failed', '<path>'],
+    ['at \\\\server\\share name\\PRIVATE-DIR\\x\nnext line', 'at <path> next line'],
+    ['open /home/me/PRIVATE-DIR/x.md now', 'open <path> now'],
+    ['token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJQUklWQVRFIn0.c2lnbmF0dXJl', 'token <redacted>'],
+    ['Authorization: PRIVATE-VALUE', 'Authorization: <redacted>'],
+    ['api_key=PRIVATE-VALUE; client_secret: PRIVATE-VALUE', 'api_key=<redacted>; client_secret: <redacted>'],
+    ['https://user:PRIVATE-VALUE@example.com/feed', 'https://<redacted>@example.com/feed'],
+    ['hash 0123456789abcdef0123456789abcdef01', 'hash <redacted>'],
+    ['The route, authorization level, or HTTP method changed.', 'The route, authorization level, or HTTP method changed.'],
+    ['grading-evidence/checks/Invoke-DefinitionOfDone.ps1 is missing.', 'grading-evidence/checks/Invoke-DefinitionOfDone.ps1 is missing.'],
+    ['Use Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore 2.1.1.', 'Use Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore 2.1.1.'],
+  ])('redacts %j', (value, expected) => {
+    expect(safeText(value)).toBe(expected);
+  });
+
+  it.each(['status', 'id'])('rejects a check with an invalid %s', kind => {
+    const f = fixture();
+    const check = kind === 'status' ? { id: 'R-1', status: 'maybe' } : { id: '<img>', status: 'fail' };
+    f.records[0][0].gradeResult = { passed: false, score: 0, details: [{ name: 'review', passed: false, score: 0,
+      metadata: { checks: [check] } }] };
+    f.save();
+    expect(() => readBenchmark(f.input)).toThrow(/check/);
+  });
+
+  it('classifies authentication and timeout errors', () => {
+    const f = fixture();
+    f.records[0][0].status = 'error';
+    f.records[0][0].error = 'HTTP 401 Unauthorized';
+    f.records[1][0].status = 'error';
+    f.records[1][0].error = { message: 'The trial timed out after 1800000 ms.' };
+    f.save();
+    const [a] = readBenchmark(f.input).comparisons;
+    expect(a.off?.trials[0].diagnosis.hint).toMatch(/COPILOT_GITHUB_TOKEN/);
+    expect(a.on?.trials[0].diagnosis.hint).toMatch(/timeout/i);
+  });
+
+  it('summarizes failures for the terminal', () => {
+    const f = failing();
+    f.cells[0].results = null;
+    f.save();
+    const lines = failureSummary(readBenchmark(f.input));
+    expect(lines.join('\n')).toBe([
+      '4 of 4 cells need attention.',
+      'alpha/hello off model-a: 1 planned trial has no result. The cell did not run or did not write results.',
+      'alpha/hello on model-a: Failed graders: definition-of-done (exit-code, stdout-contains); migration-quality.',
+      '  - DI-13 fail: Runtime configuration. Missing in <path>',
+      '  hint: Document FUNCTIONS_WORKER_RUNTIME.',
+      '  results: model-a/on/results.jsonl',
+      'alpha/hello off model-b: The model "model-b" is not available.',
+      '  hint: Check the model ID in skill-bench.config.json. Make sure that the token account can use this model in GitHub Copilot.',
+      '  results: model-b/off/results.jsonl',
+      'alpha/hello on model-b: No grader verdict was recorded.',
+      '  results: model-b/on/results.jsonl',
+    ].join('\n'));
+    expect(failureSummary(readBenchmark(fixture().input))).toEqual(['All 4 cells passed.']);
+  });
+
+  it('prints the failure summary after the report command', async () => {
+    const f = failing();
+    const out: string[] = [];
+    const code = await main(['report', '--input', f.input, '--output', join(f.root, 'site')],
+      { out: text => out.push(text), err: text => out.push(text) });
+    expect(code).toBe(0);
+    expect(out.join('\n')).toMatch(/index\.html[\s\S]*3 of 4 cells need attention[\s\S]*DI-13 fail/);
+  });
+
+  it('shows why each trial failed in the dashboard, without evidence', () => {
+    const f = failing();
+    const html = readFileSync(generateReport(f.input, join(f.root, 'site')), 'utf8');
+    expect(html).not.toMatch(/PRIVATE-/);
+    const id = readBenchmark(f.input).comparisons[0].id;
+    const detail = render(html, `?skill=${id}`).node('#app').innerHTML;
+    expect(detail).toContain('Why it failed');
+    expect(detail).toContain('DI-13');
+    expect(detail).toContain('Document FUNCTIONS_WORKER_RUNTIME.');
+    expect(detail).toContain('exit-code');
+    expect(detail).toContain('model-a/on/results.jsonl');
+    expect(render(html, `?skill=${id}&model=model-b`).node('#app').innerHTML).toContain('is not available');
+    const cards = render(html, '').node('#cards').innerHTML;
+    expect(cards).toContain('need attention');
   });
 });
 

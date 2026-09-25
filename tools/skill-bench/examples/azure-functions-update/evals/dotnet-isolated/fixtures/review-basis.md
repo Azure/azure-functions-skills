@@ -36,7 +36,10 @@ A URL alone does not give the judge the content of its page.
   HTTP model with `HttpRequestData`. Do not require one particular style, and do not
   require adding HTTP dependencies to a non-HTTP app.
   Source: <https://learn.microsoft.com/azure/azure-functions/dotnet-isolated-process-guide#http-trigger>
-- Local settings use `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated`. Existing `host.json`
+- The isolated worker runtime is `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated`. `local.settings.json`
+  is a user file that git ignores, so the submission does not have to create it. When it
+  exists, its value must be `dotnet-isolated`. When it is absent, a settings example, a
+  README, or the migration plan must state the setting. Existing `host.json`
   semantics and connection setting names are retained. A proposed deployment configuration
   is not evidence of deployed state, and nothing is deployed in this trial.
   Source: <https://learn.microsoft.com/azure/azure-functions/functions-develop-local>

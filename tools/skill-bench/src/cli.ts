@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util';
 import { loadConfig } from './config.ts';
 import { selectCells } from './plan.ts';
 import type { Selection } from './plan.ts';
-import { generateReport } from './report.ts';
+import { failureSummary, generateReport, readBenchmark } from './report.ts';
 import { defaultDependencies, runBench } from './run.ts';
 import type { RunDependencies } from './run.ts';
 
@@ -74,6 +74,7 @@ export async function main(argv: string[], io: CliIo = consoleIo, source: NodeJS
     if (command === 'report') {
       if (!values.input || !values.output) throw new Error('report needs --input <run output> and --output <new directory>.');
       io.out(generateReport(values.input, values.output));
+      for (const line of failureSummary(readBenchmark(values.input))) io.out(line);
       return 0;
     }
     if (!['plan', 'dry-run', 'run'].includes(command)) {
@@ -98,6 +99,11 @@ export async function main(argv: string[], io: CliIo = consoleIo, source: NodeJS
     if (result.output) {
       io.out(`Results: ${result.output}`);
       if (values.site) io.out(`Dashboard: ${generateReport(result.output, values.site)}`);
+      try {
+        for (const line of failureSummary(readBenchmark(result.output))) io.out(line);
+      } catch (error) {
+        io.err(`skill-bench: cannot summarize the results: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
     return result.exitCode;
   } catch (error) {

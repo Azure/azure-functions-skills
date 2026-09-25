@@ -7,12 +7,42 @@ const metricNames = ['totalTokens', 'turnCount', 'toolCallCount', 'wallTimeMs', 
 type Metrics = Record<typeof metricNames[number], number | null>;
 type ObjectValue = Record<string, unknown>;
 
+export type CheckStatus = 'pass' | 'fail' | 'blocked' | 'not-applicable' | 'skipped';
+const checkStatuses = new Set<string>(['pass', 'fail', 'blocked', 'not-applicable', 'skipped']);
+
+export interface CheckView {
+  id: string;
+  status: CheckStatus;
+  title: string | null;
+  reason: string | null;
+  hint: string | null;
+}
+
+export interface GraderView {
+  name: string;
+  passed: boolean | null;
+  score: number | null;
+  /** Names of the failed sub-checks that Vally records in details. */
+  failed: string[];
+  /** The grader's own short explanation from metadata.summary. */
+  summary: string | null;
+  /** Structured checks from metadata.checks (or metadata.requirements). Evidence is never copied. */
+  checks: CheckView[];
+}
+
+export interface Diagnosis {
+  stage: 'passed' | 'execution' | 'grading' | 'ungraded' | 'skipped';
+  message: string;
+  hint: string | null;
+}
+
 export interface TrialView {
   id: string;
   status: string;
   passed: boolean | null;
   score: number | null;
-  graders: { name: string; passed: boolean | null; score: number | null }[];
+  graders: GraderView[];
+  diagnosis: Diagnosis;
   metrics: Metrics;
 }
 
@@ -30,6 +60,7 @@ export interface ArmSummary {
   metrics: Metrics;
   trials: TrialView[];
   workspace: string | null;
+  results: string | null;
 }
 
 export interface Comparison {
@@ -112,7 +143,7 @@ export function relativeChange(on: number | null, off: number | null): number | 
   return on === null || off === null || off === 0 ? null : (on - off) / off * 100;
 }
 
-function summarize(planned: number, trials: TrialView[], workspace: string | null): ArmSummary {
+function summarize(planned: number, trials: TrialView[], workspace: string | null, results: string | null): ArmSummary {
   const executed = trials.filter(trial => trial.status !== 'skipped');
   const passed = executed.filter(trial => trial.status === 'success' && trial.passed === true).length;
   const graderNames = [...new Set(executed.flatMap(trial => trial.graders.map(grader => grader.name)))];
@@ -128,8 +159,136 @@ function summarize(planned: number, trials: TrialView[], workspace: string | nul
     graderScores: Object.fromEntries(graderNames.map(name => [name, mean(executed.map(trial =>
       trial.graders.find(grader => grader.name === name)?.score ?? null))])),
     metrics: Object.fromEntries(metricNames.map(key => [key, mean(executed.map(trial => trial.metrics[key]))])) as Metrics,
-    trials, workspace,
+    trials, workspace, results,
   };
+}
+
+// Free text from results can hold paths, tokens or log output. Show only a short, redacted form.
+// A Windows or UNC path can contain spaces, so the redaction removes the rest of that line.
+export function safeText(value: unknown, limit = 300): string | null {
+  if (typeof value !== 'string') return null;
+  const result = value
+    .replace(/\\\\[^\r\n"'<>|]+/g, '<path>')
+    .replace(/\b[A-Za-z]:[\\/][^\r\n"'<>|]*/g, '<path>')
+    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
+    .replace(/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g, '<redacted>')
+    .replace(/\beyJ[\w-]+\.[\w-]+\.[\w-]+/g, '<redacted>')
+    .replace(/(\/\/)[^\s/@:]+:[^\s/@]+@/g, '$1<redacted>@')
+    .replace(/\b(authorization)(\s*[:=]\s*)(?:bearer\s+|basic\s+)?[^\s;,&"']+/gi, '$1$2<redacted>')
+    .replace(/\bbearer\s+[^\s;,&"']+/gi, 'Bearer <redacted>')
+    .replace(/\b([\w.-]*(?:key|secret|token|password|passwd|pwd|signature|sig|credential)s?)(\s*[:=]\s*)[^\s;,&"']+/gi,
+      '$1$2<redacted>')
+    .replace(/[A-Za-z0-9+/]{40,}={0,2}/g, '<redacted>')
+    .replace(/\b[a-fA-F0-9]{32,}\b/g, '<redacted>')
+    .replace(/(?<![\w.:/<>-])\/(?:[\w.@~-]+\/)+[\w.@~-]*/g, '<path>')
+    .replace(/\s+/g, ' ').trim();
+  if (!result) return null;
+  return result.length > limit ? `${result.slice(0, limit - 1)}…` : result;
+}
+
+function checkRow(value: unknown): CheckView {
+  const row = object(value);
+  check(typeof row.id === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(row.id), 'unsafe grader check ID.');
+  check(typeof row.status === 'string' && checkStatuses.has(row.status), 'unknown grader check status.');
+  return { id: row.id, status: row.status as CheckStatus, title: safeText(row.title, 200),
+    reason: safeText(row.reason), hint: safeText(row.hint) };
+}
+
+// metadata.checks is the skill-bench convention, so an invalid list is an error. Other graders can use
+// metadata.requirements for their own data, so the report uses it only when every row has the check shape.
+function checkViews(metadata: ObjectValue): CheckView[] {
+  if (metadata.checks !== undefined && metadata.checks !== null) {
+    const rows = list(metadata.checks);
+    check(rows.length <= 200, 'too many grader checks.');
+    return rows.map(checkRow);
+  }
+  if (!Array.isArray(metadata.requirements) || metadata.requirements.length > 200) return [];
+  try {
+    return metadata.requirements.map(checkRow);
+  } catch {
+    return [];
+  }
+}
+
+function graderView(item: ObjectValue): GraderView {
+  const metadata = item.metadata == null || typeof item.metadata !== 'object' || Array.isArray(item.metadata)
+    ? {} : item.metadata as ObjectValue;
+  const failed = list(item.details ?? []).map(object)
+    .filter(detail => detail.status === 'error' || detail.passed === false).map(detail => identifier(detail.name));
+  return {
+    name: identifier(item.name), passed: item.status === 'error' ? false : verdict(item.passed),
+    score: item.status === 'error' ? (item.score === 0 ? 0 : null) : number(item.score),
+    failed, summary: safeText(metadata.summary), checks: checkViews(metadata),
+  };
+}
+
+function executionDiagnosis(error: unknown): Diagnosis {
+  const raw = typeof error === 'string' ? error
+    : error !== null && typeof error === 'object' && typeof (error as ObjectValue).message === 'string'
+      ? (error as ObjectValue).message as string : '';
+  const model = /model\s+"?([a-zA-Z0-9][a-zA-Z0-9._-]{0,159})"?\s+is not available/i.exec(raw);
+  if (model) {
+    return { stage: 'execution', message: `The model "${model[1]}" is not available.`,
+      hint: 'Check the model ID in skill-bench.config.json. Make sure that the token account can use this model in GitHub Copilot.' };
+  }
+  const message = safeText(raw) ?? 'The trial stopped with an execution error.';
+  if (/\b(?:401|403)\b|unauthori[sz]ed|forbidden|authenticat/i.test(raw)) {
+    return { stage: 'execution', message,
+      hint: 'Set COPILOT_GITHUB_TOKEN (or GH_TOKEN) to a valid token for an account with GitHub Copilot access.' };
+  }
+  if (/timed?\s*out|timeout/i.test(raw)) {
+    return { stage: 'execution', message,
+      hint: 'Increase the timeout in the eval or the config, or look for a command in the trial that did not stop.' };
+  }
+  return { stage: 'execution', message, hint: 'Open results.jsonl for this cell to read the full error.' };
+}
+
+function diagnose(status: string, passed: boolean | null, graders: GraderView[], error: unknown): Diagnosis {
+  if (status === 'skipped') return { stage: 'skipped', message: 'The trial was skipped.', hint: null };
+  if (status === 'error') return executionDiagnosis(error);
+  if (passed === true) return { stage: 'passed', message: 'All graders passed.', hint: null };
+  if (passed === null) return { stage: 'ungraded', message: 'No grader verdict was recorded.', hint: null };
+  const bad = graders.filter(grader => grader.passed !== true);
+  const names = bad.map(grader => grader.failed.length ? `${grader.name} (${grader.failed.join(', ')})` : grader.name);
+  const hint = bad.flatMap(grader => grader.checks)
+    .find(item => (item.status === 'fail' || item.status === 'blocked') && item.hint)?.hint ?? null;
+  return { stage: 'grading',
+    message: names.length ? `Failed graders: ${names.join('; ')}.` : 'The overall grade did not pass.', hint };
+}
+
+function arms(comparison: Comparison): [string, ArmSummary][] {
+  return (['off', 'on'] as const).flatMap(arm => comparison[arm] ? [[arm, comparison[arm]] as [string, ArmSummary]] : []);
+}
+
+/** Short terminal lines that explain each cell that did not pass. */
+export function failureSummary(benchmark: Benchmark): string[] {
+  const lines: string[] = [];
+  let total = 0;
+  let attention = 0;
+  for (const comparison of benchmark.comparisons) {
+    for (const [arm, summary] of arms(comparison)) {
+      total += 1;
+      const label = `${comparison.skill}/${comparison.scenario} ${arm} ${comparison.model}`;
+      const bad = summary.trials.filter(trial => trial.diagnosis.stage !== 'passed');
+      if (bad.length === 0 && summary.unexecuted === 0) continue;
+      attention += 1;
+      if (summary.unexecuted > 0) {
+        lines.push(`${label}: ${summary.unexecuted} planned trial${summary.unexecuted === 1 ? ' has' : 's have'} no result. `
+          + 'The cell did not run or did not write results.');
+      }
+      for (const trial of bad) {
+        lines.push(`${label}: ${trial.diagnosis.message}`);
+        for (const item of trial.graders.flatMap(grader => grader.checks)) {
+          if (item.status !== 'fail' && item.status !== 'blocked') continue;
+          lines.push(`  - ${item.id} ${item.status}${item.title || item.reason ? ':' : ''}`
+            + `${item.title ? ` ${item.title}.` : ''}${item.reason ? ` ${item.reason}` : ''}`);
+        }
+        if (trial.diagnosis.hint) lines.push(`  hint: ${trial.diagnosis.hint}`);
+      }
+      if (bad.length > 0 && summary.results) lines.push(`  results: ${summary.results}`);
+    }
+  }
+  return attention === 0 ? [`All ${total} cells passed.`] : [`${attention} of ${total} cells need attention.`, ...lines];
 }
 
 function trialView(record: ObjectValue, id: string): TrialView {
@@ -142,13 +301,12 @@ function trialView(record: ObjectValue, id: string): TrialView {
   const trajectory = record.trajectory == null ? {} : object(record.trajectory);
   const metrics = trajectory.metrics == null ? {} : object(trajectory.metrics);
   const tokens = metrics.tokenUsage == null ? {} : object(metrics.tokenUsage);
+  const passed = gradeError ? false : verdict(grade.passed);
+  const graders = details.map(graderView);
   return {
-    id: hash(id), status, passed: gradeError ? false : verdict(grade.passed),
+    id: hash(id), status, passed,
     score: gradeError ? (grade.score === 0 ? 0 : null) : number(grade.score),
-    graders: details.map(item => ({
-      name: identifier(item.name), passed: item.status === 'error' ? false : verdict(item.passed),
-      score: item.status === 'error' ? (item.score === 0 ? 0 : null) : number(item.score),
-    })),
+    graders, diagnosis: diagnose(status, passed, graders, record.error),
     metrics: Object.fromEntries(metricNames.map(name => [
       name, number(name === 'totalTokens' ? tokens.totalTokens : metrics[name]),
     ])) as Metrics,
@@ -253,8 +411,10 @@ export function readBenchmark(input: string): Benchmark {
     evalPlans.set(evalFile, plan);
 
     let records: ObjectValue[] = [];
+    let resultsPath: string | null = null;
     if (cell.results !== null && cell.results !== undefined) {
       const file = insidePath(root, cell.results, 'file');
+      resultsPath = relative(root, file).replaceAll('\\', '/');
       const stat = statSync(file, { bigint: true });
       const identity = `${stat.dev}:${stat.ino}`;
       check(!resultFiles.has(file) && !resultIdentities.has(identity), 'cells must use distinct result files.');
@@ -309,7 +469,7 @@ export function readBenchmark(input: string): Benchmark {
         prompt: prompt(prompts[scenario]), on: null, off: null,
       };
       check(comparison[arm] === null, 'duplicate model and scenario arm.');
-      comparison[arm] = summarize(runs, found, workspace);
+      comparison[arm] = summarize(runs, found, workspace, resultsPath);
       comparisons.set(key, comparison);
     }
   }
