@@ -1,0 +1,29 @@
+{
+  "description": "Application fixture derived from the upstream pull request. DI, logging and storage bindings are deliberate additions; the original HTTP outputs remain unchanged.",
+  "repository": "Azure/azure-functions-skills",
+  "pullRequest": 267,
+  "ref": "tsushi-microsoft-azure-functions-update-skill",
+  "commit": "605f4eca7ee8839787fb630fc8134ec0436a1cc9",
+  "retrieved": "2026-09-18",
+  "method": "GitHub contents API at the pinned commit; bytes written verbatim, no branch checkout, merge, or cherry-pick.",
+  "files": [
+    { "path": "fixtures/UpgradeApp.csproj", "blob": "f5fdcb2cc5b448f55f7e7bc9e9c4bc835cc30c56", "bytes": 428 },
+    { "path": "fixtures/Hello.cs", "blob": "81f8c0cc8ceeb82212e364438dea97173532e95b", "bytes": 510 },
+    { "path": "fixtures/host.json", "blob": "81e35b7b9143f17721be380344ff89c3bc1078a8", "bytes": 22 },
+    { "path": "fixtures/trial.gitignore", "blob": "cd42ee34e873b4ddf17cdeeed2e6c0d4e094c62b", "bytes": 10 }
+  ],
+  "adapted": ["fixtures/UpgradeApp.csproj", "fixtures/Hello.cs"],
+  "added": ["fixtures/Startup.cs", "fixtures/GreetingService.cs", "fixtures/QueueGreeting.cs"],
+  "designReference": {
+    "repository": "fabiocav/azure-functions-dotnet-migration",
+    "commit": "767350e51ca1d5972eb79544608b11c18f92354b",
+    "note": "Startup registration and constructor injection informed this small original fixture. No source was copied."
+  },
+  "notReused": [
+    {
+      "path": "fixtures/guidance.md",
+      "reason": "The upstream review basis requires a .NET 10 destination in the Functions phase. This scenario keeps the current target framework and moves the language stage to a separate handoff, so the review basis was rewritten as fixtures/review-basis.md."
+    }
+  ],
+  "verification": "tests/evaluation-update-scenario.test.ts checks unchanged upstream files, identifies adapted files, and compares all grading baseline text copies with the current fixture. The blob hashes above describe the upstream version, not the adapted version."
+}
