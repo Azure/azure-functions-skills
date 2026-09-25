@@ -1,14 +1,8 @@
 # Azure Functions Skills
 
 [![npm](https://img.shields.io/npm/v/@azure/functions-skills)](https://www.npmjs.com/package/@azure/functions-skills)
-[![E2E report](https://github.com/Azure/azure-functions-skills/actions/workflows/publish-e2e-report.yml/badge.svg)](https://azure.github.io/azure-functions-skills/)
 
-**Azure Functions context for your coding agent.** The plugin provides skills, Azure MCP configuration, and telemetry hooks for GitHub Copilot, Claude Code, and Codex. The `doctor` command catches configuration and code issues *before* you deploy.
-
-Latest E2E status: [HTML report](https://azure.github.io/azure-functions-skills/)
-
-For contributor skill benchmarks, see the [isolated local Vally workflow](experiments/README.md#local-convenience-commands)
-and [static benchmark report](dashboard/README.md). These are separate from the installation E2E report above.
+**Azure Functions context for your coding agent.** The plugin provides skills, Azure MCP configuration, and telemetry hooks for GitHub Copilot, Claude Code, and Codex.
 
 ## What & why
 
@@ -18,10 +12,7 @@ It is **focused on Azure Functions**. For deployment of *any* Azure resource (Fu
 
 ## Prerequisites
 
-**Node.js 20+** is the only thing you need to install yourself for the Azure Functions Skills CLI.
-Use **Node.js 24+** when installing or testing GitHub Copilot CLI (`--agent ghcp`) because the
-Copilot CLI runtime requires Node 24 or later. Claude Code and Codex do not currently require Node
-24. Everything else (Azure CLI, Core Tools, language runtimes) is checked and guided by the
+**Node.js 20+** is necessary for the telemetry hooks and the companion CLI. Everything else (Azure CLI, Core Tools, language runtimes) is checked and guided by the
 `azure-functions-setup` skill when environment verification is needed.
 
 ## Quick Start
@@ -81,7 +72,7 @@ codex plugin marketplace add Azure/azure-functions-skills
 
 Then start Codex, run `/plugins`, select **azure-functions-skills**, and choose **Install plugin**.
 
-> The [`@azure/functions-skills`](https://www.npmjs.com/package/@azure/functions-skills) npm package provides the companion CLI and workspace-local install flow. Installing it does not install or launch a coding-agent plugin.
+> The [`@azure/functions-skills`](https://www.npmjs.com/package/@azure/functions-skills) npm package provides the companion CLI and the telemetry sender. Installing it does not install or launch a coding-agent plugin.
 
 ### 2. Verify your prerequisites
 
@@ -93,38 +84,14 @@ Ask which Azure Functions workflow to use. `azure-functions-help` discovers the 
 
 > **More options?** See [CLI Reference](docs/cli-reference.md) for every command, flag, and headless example.
 
-## Local installs and VS Code extension integration
+## Companion CLI
 
-`install --local` copies skill bodies, MCP settings, and telemetry hooks from the installed `@azure/functions-skills` npm package. It does not copy agent definitions, instruction files, routing files, or prompts.
+The npm package includes a small CLI. The telemetry hooks use it to send events. You can also use it to list and apply Azure Functions templates:
 
 ```bash
-npx @azure/functions-skills install --local --agent ghcp --dir ./my-app
-npx @azure/functions-skills update --local --agent ghcp --dir ./my-app
-npx @azure/functions-skills install --local --agent ghcp --dir ./my-app --no-telemetry
+npx @azure/functions-skills template list --language typescript
+npx @azure/functions-skills template apply --template <id> --dir ./my-app
 ```
-
-VS Code extensions can call the same local install flow from TypeScript:
-
-```ts
-import { installLocalSkills } from '@azure/functions-skills/setup';
-
-const result = await installLocalSkills({
-  targetDir: workspaceFolder.uri.fsPath,
-  agents: ['ghcp'],
-});
-```
-
-Common options:
-
-| Option | Description |
-| --- | --- |
-| `targetDir` | Required workspace root where local skills should be installed. |
-| `agents` | Optional agents: `ghcp`, `claude`, `codex`. Defaults to GHCP-compatible setup when omitted. |
-| `dryRun` | Return planned local files without writing. |
-| `checkForUpdates` | Set `false` to skip npm package freshness guidance. |
-| `runner` | Optional command runner for tests or extension-host controlled npm checks. |
-
-The result includes installed agents, files written, planned files, dry-run status, and `packageUpdate` guidance that extensions can surface in their own UI.
 
 ## Telemetry
 
@@ -146,10 +113,8 @@ This is an adoption/observation trend, not exact accounting. Phase 1 limitations
 
 Application telemetry content is categorical, but HTTPS necessarily exposes the client's network address to the receiving service. This does not promise anonymous transport; the receiving Application Insights service's privacy policy and IP handling apply.
 
-For host-managed plugin installs, opt out by setting either
-`AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or `AZURE_MCP_COLLECT_TELEMETRY=false`
-in the environment. Workspace-local installs can also use `--no-telemetry`; that preference
-is stored in the installed `telemetry.config.json` and preserved by local updates.
+To opt out, set either `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or
+`AZURE_MCP_COLLECT_TELEMETRY=false` in the environment.
 
 ## Skills
 
@@ -166,74 +131,15 @@ For contributor guidance on the product boundary between Azure Skills and Azure 
 | [`azure-functions-diagnostics`](templates/skills/azure-functions-diagnostics/SKILL.md) | Investigate deployment, runtime, trigger, binding, logging issues |
 | [`azure-functions-health-status`](templates/skills/azure-functions-health-status/SKILL.md) | Collect current health, metrics, logs, Resource Health, Activity Log |
 | [`azure-functions-inventory`](templates/skills/azure-functions-inventory/SKILL.md) | Collect app specification and configuration inventory |
-| [`azure-functions-doctor`](templates/skills/azure-functions-doctor/SKILL.md) | Pre-deployment validation (used by the `doctor` CLI command) |
+| [`azure-functions-doctor`](templates/skills/azure-functions-doctor/SKILL.md) | Pre-deployment check of local code, configuration, and supply-chain risks |
 | [`azure-functions-common`](templates/skills/azure-functions-common/SKILL.md) | Shared language, trigger, binding, extension, routing references |
 | [`azure-functions-feedback`](templates/skills/azure-functions-feedback/SKILL.md) | Turn session findings into previewed issues or pull requests |
 
 The `azure-functions-help` skill provides the discovery and routing entry point.
 
-## Doctor — pre-deployment validation
-
-Catch configuration mistakes, deprecated settings, **and semantic code issues** (missing error handling, blocking I/O, hardcoded secrets, durable-orchestrator non-determinism) *before* you deploy. The LLM semantic analysis is the value — `doctor` ships it as both a local CLI command and a GitHub Actions step.
-
-### Local — LLM analysis + visual HTML report
-
-```bash
-npx @azure/functions-skills doctor --dir . \
-  --deep --accept-deep-risk \
-  --agent github-copilot \
-  --format html --output doctor-report.html
-```
-
-`--accept-deep-risk` acknowledges that the agent runs with elevated permissions (file write, shell execution) — only use on trusted workspaces. Skip the LLM with `--no-deep` for fast deterministic checks only.
-
-Open `doctor-report.html` in a browser:
-
-![Doctor HTML report](docs/images/doctor-report.png)
-
-### GitHub Actions — pre-deploy gate with deep analysis
-
-Trigger on `push: main` (post-merge), not on pull requests — `--deep` refuses to run on pull-request workspaces because PR code is untrusted (it can prompt-inject the agent). See [docs/doctor-guide.md#security-model](docs/doctor-guide.md#security-model).
-
-```yaml
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deep-doctor:
-    runs-on: ubuntu-latest
-    environment: trusted-deep-analysis  # GitHub Environment for approval + scoped secret
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Install GitHub Copilot CLI
-        run: npm install -g @github/copilot
-      - name: Run Azure Functions doctor
-        env:
-          GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
-        run: |
-          npx @azure/functions-skills doctor \
-            --deep --accept-deep-risk \
-            --agent github-copilot \
-            --format markdown --output doctor.md \
-            --severity high
-      - name: Publish summary
-        if: always()
-        run: cat doctor.md >> $GITHUB_STEP_SUMMARY
-```
-
-Exit code is `1` if any finding is at or above `--severity` (default `high`), gating downstream deploy steps. For PR validation, use the same command with `--no-deep` (Tier 1 only) on `pull_request` events.
-
-> **Doctor walkthrough?** See [docs/doctor-guide.md](docs/doctor-guide.md) for Tier 1 vs Tier 2 details, output formats, deep mode security, and bad-app fixtures.
-
-Doctor also includes **supply-chain security checks** (lifecycle scripts, unpinned production dependencies, missing lockfile, tracked `.env` files, install-script deps, plus Tier 2 semantic checks for import-time side effects, fetch-then-execute, and credential exfiltration patterns) — informed by recent npm and PyPI compromises. See [SECURITY.md](SECURITY.md) for the threat model.
-
 ## Contributing
 
-We welcome contributions. The canonical source for skills, telemetry hooks, and MCP definitions lives under [`templates/`](templates/) — edit there, then `npm run build:plugin-payload` to regenerate the published plugin payload.
+We welcome contributions. To add or improve a skill, edit the files under [`templates/skills/`](templates/skills/), then run `npm run build:plugin-payload` to regenerate the published plugin payload. The release process delivers the skill to all supported coding agents.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 

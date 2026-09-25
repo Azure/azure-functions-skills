@@ -47,11 +47,7 @@ describe('telemetry release contract', () => {
   });
 
   it('uses the public npm registry in GitHub Actions', () => {
-    const workflows = [
-      'build-and-test.yml',
-      'skill-evaluation-offline.yml',
-      'skill-evaluation-azure-live-deploy.yml',
-    ];
+    const workflows = ['build-and-test.yml'];
 
     for (const workflow of workflows) {
       const content = readFileSync(join(ROOT, '.github', 'workflows', workflow), 'utf-8');

@@ -24,7 +24,7 @@ Azure Functions Skills は **Azure Functions domain layer** です。各 skill �
 | Functions runtime、trigger、binding、language、extension references | Azure Functions Skills | Functions 固有の domain knowledge であり、`azure-functions-common` の reference routing と相性がよいため |
 | Diagnostics、health、inventory、best practices、upgrade、Functions-specific migration、testing、performance tuning | Azure Functions Skills | Day 1+ の Functions 固有価値であり、runtime / trigger / binding evidence が必要なため |
 | Lambda to Functions などのクロスクラウド移行 | 主担当は Azure Skills | `azure-cloud-migrate` が cross-cloud scenario 全体を持つため。Functions 固有の target validation は Azure Functions Skills と連携する |
-| Plugin payload と任意の workspace-local copy | Azure Functions Skills | この repo は skills、MCP 設定、telemetry hooks を公開し、plugin install は各 host tool が担当するため |
+| Plugin payload | Azure Functions Skills | この repo は skills、MCP 設定、telemetry hooks を公開し、plugin install は各 host tool が担当するため |
 
 ## Contributor 判断基準
 
@@ -106,7 +106,7 @@ User intent が Functions 固有 context を含まない汎用 Azure deployment 
 - Functions runtime、host、language worker、programming model、trigger、binding、extension bundle、Function App settings に依存するもの。
 - Functions 固有の operational behavior を説明または修正するもの。
 - Deployed functions、trigger metadata、worker runtime、host health endpoints、Functions の App Insights traces、trigger-specific metrics など、Functions 固有の evidence を必要とするもの。
-- Azure Functions skill discovery または workspace-local copy experience を改善するもの。
+- Azure Functions skill discovery または plugin install experience を改善するもの。
 - Azure Functions team の知識を、agent が利用できる workflow、checklist、script、reference file に変換するもの。
 
 例:

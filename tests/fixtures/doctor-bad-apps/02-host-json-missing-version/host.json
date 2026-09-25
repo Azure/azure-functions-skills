@@ -1,9 +1,0 @@
-{
-  "logging": {
-    "applicationInsights": {
-      "samplingSettings": {
-        "isEnabled": true
-      }
-    }
-  }
-}

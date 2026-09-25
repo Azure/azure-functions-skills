@@ -8,7 +8,8 @@ import {
 import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createTempDir, removeDir } from './helpers/fs.js';
-import { installLocalSkills } from '../src/setup/index.js';
+import { buildTarget } from '../src/build/build-target.js';
+import { loadHooks, loadMcpServers, loadSkills } from '../src/build/loader.js';
 
 const ROOT = join(import.meta.dirname, '..');
 const TEMP_DIRS: string[] = [];
@@ -75,15 +76,17 @@ describe('telemetry hook transport', () => {
     });
   }, HOOK_TEST_TIMEOUT_MS);
 
-  it('does not invoke the package command for a workspace-local opt-out', async () => {
+  it('does not invoke the package command when telemetry is disabled in the config', () => {
     const tempDir = createTempDir('af-skills-hook-opt-out-');
     TEMP_DIRS.push(tempDir);
-    await installLocalSkills({
-      targetDir: tempDir,
-      agents: ['ghcp'],
-      telemetryEnabled: false,
-      checkForUpdates: false,
-    });
+    const templatesDir = join(ROOT, 'templates');
+    buildTarget('ghcp', {
+      skills: loadSkills(join(templatesDir, 'skills')),
+      mcpServers: loadMcpServers(join(templatesDir, 'mcp', 'servers.yaml')),
+      hooks: loadHooks(join(templatesDir, 'hooks')),
+    }, tempDir);
+    const hooksDir = join(tempDir, 'ghcp', '.github', 'hooks');
+    writeFileSync(join(hooksDir, 'telemetry.config.json'), JSON.stringify({ enabled: false }));
 
     const capturePath = join(tempDir, 'payload.json');
     const environment = {
@@ -101,9 +104,7 @@ describe('telemetry hook transport', () => {
     }
 
     const script = join(
-      tempDir,
-      '.github',
-      'hooks',
+      hooksDir,
       'scripts',
       process.platform === 'win32' ? 'track-telemetry.ps1' : 'track-telemetry.sh',
     );

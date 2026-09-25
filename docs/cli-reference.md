@@ -2,47 +2,6 @@
 
 `@azure/functions-skills` keeps a deliberately small CLI surface. Coding-agent plugin installation and updates belong to each host's plugin manager.
 
-## Local skills
-
-Use `--local` when a workspace needs package-bundled skills, MCP configuration, and telemetry hooks, including VS Code integrations that call the library API.
-
-```bash
-npx @azure/functions-skills install --local --agent ghcp --dir ./my-app
-npx @azure/functions-skills update --local --agent ghcp --dir ./my-app
-```
-
-| Flag | Description |
-| --- | --- |
-| `--local` | Required. Use package-bundled workspace assets instead of a host plugin. |
-| `--agent <name>` | Repeatable: `ghcp`, `claude`, or `codex`. Auto-detected when omitted. |
-| `--all` | Apply all three target layouts. |
-| `--dir <path>` | Target directory; defaults to the current directory. |
-| `--dry-run` | List generated files without writing them. |
-
-Updates remove existing `azure-functions-*` skill directories and owned telemetry-hook files before copying the current package assets. No `.azure-functions-skills` state directory is created.
-
-### Library API
-
-```ts
-import { installLocalSkills } from '@azure/functions-skills/setup';
-
-const result = await installLocalSkills({
-  targetDir: workspaceFolder.uri.fsPath,
-  agents: ['ghcp'],
-});
-```
-
-The result contains `agents`, `filesWritten`, `plannedFiles`, `dryRun`, and npm `packageUpdate` guidance.
-
-## Doctor
-
-```bash
-npx @azure/functions-skills doctor --dir ./my-app
-npx @azure/functions-skills doctor --dir ./my-app --deep --accept-deep-risk --agent github-copilot
-```
-
-`doctor` writes to `.azure-functions-doctor/doctor-report.json` by default. Deep analysis installs workspace-local skill assets only when the selected agent cannot already see `azure-functions-doctor`.
-
 ## Templates
 
 ```bash
@@ -52,6 +11,30 @@ npx @azure/functions-skills template apply --dir ./app --template <template-id>
 
 Use `template list --json` for structured discovery. `template apply` supports `--language`, `--runtime-version`, `--mode auto|new|add`, `--dry-run`, `--force`, `--json`, and `--manifest-url`.
 
+### Library API
+
+```ts
+import { listFunctionTemplates, applyFunctionTemplate } from '@azure/functions-skills/templates';
+```
+
+## Telemetry
+
+```bash
+echo '<event-json>' | npx @azure/functions-skills telemetry
+```
+
+The plugin telemetry hooks call this command. It reads one sanitized event from stdin and sends it to Application Insights. You do not usually run it yourself.
+
+```bash
+echo '<observation-json>' | npx @azure/functions-skills telemetry deployment-observed --dir <workspace-root>
+```
+
+The `azure-functions-deploy` and `azure-functions-hosted-skills` skills call this command one time, only after a supported `azd up` or standalone `azd provision` is successful. It is not a deployment command. It reads a bounded JSON object from stdin, uses your Azure CLI sign-in to make sure that the Azure Resource Manager deployment is successful, and sends the categorical `azure_deployment_observed` event. It prints one status word and always exits with `0`. Thus, it cannot change the result of a deployment.
+
+`--dir` sets the workspace root. The default is the current directory. If a `telemetry.config.json` file from an earlier local install in that workspace has `"enabled": false`, the command sends nothing.
+
+Both commands obey the opt-out environment variables in the [README](../README.md#telemetry). When telemetry is disabled, they do no work.
+
 ## Contributor build
 
 ```bash
@@ -59,13 +42,4 @@ npm run build
 npm run build:plugin-payload
 ```
 
-The plugin payload always contains skills, MCP configuration, and telemetry hooks. There are no payload profiles.
-
-## Internal telemetry commands
-
-The package exposes two hidden `telemetry` subcommands that are **not** user-facing deployment commands and are not part of the supported CLI surface above. They are invoked internally — by the telemetry hooks and by the deployment skills — never as a way to deploy or provision anything:
-
-- `telemetry` reads one sanitized usage event on stdin and sends it.
-- `telemetry deployment-observed [--dir <workspace-root>]` is called once by `azure-functions-deploy` or `azure-functions-hosted-skills` only after a supported `azd up` / standalone `azd provision` has already succeeded. It reads a bounded JSON object on stdin, independently confirms success against Azure Resource Manager using your existing Azure CLI sign-in, and emits the categorical `azure_deployment_observed` event. It prints one status word and always exits `0`, so it never provisions resources, changes a deployment outcome, or triggers a redeploy. `--dir` selects the workspace whose telemetry opt-out configuration (`telemetry.config.json`) applies and defaults to the current working directory; pass the workspace root explicitly so a workspace opt-out is honored even when the command runs from a subdirectory.
-
-Both honor the same opt-out mechanisms described in the project [README](../README.md#telemetry); when telemetry is disabled they perform no work.
+`npm run build` writes the agent-specific layouts (`ghcp`, `claude`, `codex`) and the plugin payload to `dist/`. `npm run build:plugin-payload` regenerates the committed plugin payload and marketplace manifests. The plugin payload always contains skills, MCP configuration, and telemetry hooks.

@@ -4,10 +4,10 @@
 
 ## Project Overview
 
-- **What**: CLI tool + plugin system that equips coding agents with Azure Functions–specific knowledge
+- **What**: Skills + telemetry plugin that equips coding agents with Azure Functions–specific knowledge, plus a small companion CLI (template apply, telemetry sender, build)
 - **Stack**: TypeScript (strict), Node.js 18+, ESM
 - **Targets**: GitHub Copilot CLI, Claude Code, Codex CLI
-- **Testing**: Vitest for unit tests, Vally for skill evaluation (LLM-backed)
+- **Testing**: Vitest for unit tests
 
 ## Commands
 
@@ -23,7 +23,6 @@
 | Skill validation | `npm run validate:skills` |
 | Plugin payload verify | `npm run verify:plugin-payload` |
 | Full gate | `npm run check` |
-| Eval smoke | `npm run eval:smoke` |
 
 ## Code Style
 
@@ -35,7 +34,7 @@
 
 ## Architecture
 
-- Separate concerns by domain: `src/doctor/`, `src/setup/`, `src/build/`.
+- Separate concerns by domain: `src/build/`, `src/telemetry/`, `src/templates/`.
 - Avoid duplicate code — extract shared logic into helpers.
 - `templates/` is the canonical source; generated payloads are derived.
 - Never hand-edit files under `.github/plugins/`, `.plugin/`, or `.claude-plugin/`. Change `templates/`, then regenerate with `npm run build:plugin-payload`.
@@ -46,7 +45,7 @@
 - Unit tests live in `tests/*.test.ts`.
 - Use `npm run test:watch` during TDD cycles.
 - Run `npm test` before every commit.
-- CLI changes require E2E verification: `node bin/azure-functions-skills.js <cmd> --dir <isolated-workspace>`.
+- CLI changes require a manual run: `node bin/azure-functions-skills.js <cmd> --dir <isolated-workspace>`.
 - When the task is not code-related (skills, CI config, documentation), TDD is not required.
 
 ## Security
@@ -54,16 +53,14 @@
 - No secrets in code — use environment variables or secret managers.
 - No npm lifecycle scripts except `prepack`. Adding `postinstall`, `preinstall`, etc. is forbidden.
 - Run `npm run lint:security` for supply-chain checks.
-- **Never run Vally evals in PR-triggered CI or on unreviewed, untrusted contributor code.** Skill content can contain prompt injection attacks, and the evaluation agent has file-write and shell-execution permissions. Never give an evaluation workflow a `pull_request` trigger. Start evaluation workflows by manual `workflow_dispatch`: only a person with write access can start a run, so the evaluated code is always reviewed code. If a workflow also receives cloud credentials (for example Azure), use a GitHub Environment with a reviewer gate.
-- Local Vally evaluation of trusted code is allowed and does not require a GitHub Environment reviewer gate. Use a clean Vally trial workspace containing only the eval's required files and target skill; never benchmark against the developer's normal workspace configuration. Verify that skill-off trials do not inherit repository, workspace, user, or plugin skills through discovery.
-- Never run `doctor --deep` on untrusted workspaces.
+- **Never run LLM-backed skill evaluations in PR-triggered CI or on unreviewed, untrusted contributor code.** Skill content can contain prompt injection attacks, and the evaluation agent has file-write and shell-execution permissions. Start such runs only by manual `workflow_dispatch` or locally on trusted code in an isolated workspace.
 - Confirm the target, budget, repetition count, and owned-resource cleanup policy separately before paid experiments.
 
 ## Boundaries
 
 - Never edit generated files under `.github/plugins/`, `.plugin/`, `.claude-plugin/`.
 - Never commit `local.settings.json` or `.env` files.
-- Do not run `setup` or `chat` from the repo root — use `--dir <isolated-workspace>` to avoid pollution.
+- Do not run `template apply` from the repo root — use `--dir <isolated-workspace>` to avoid pollution.
 - Do not touch `templates/agents/AGENTS.md` — that is the user-facing template, not this repo's dev standards.
 
 ## Before Committing
@@ -71,7 +68,7 @@
 1. `npm run lint`
 2. `npm run typecheck`
 3. `npm test`
-4. CLI changes → E2E verify with real agent
+4. CLI changes → run the command manually in an isolated workspace
 5. Template changes → `npm run build:plugin-payload` then `npm run verify:plugin-payload`
 
 ## After Implementation

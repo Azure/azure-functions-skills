@@ -1,5 +1,4 @@
 export type BuildTargetName = 'ghcp' | 'claude' | 'codex';
-export type CliAgentName = BuildTargetName;
 
 export interface Skill {
   id: string;

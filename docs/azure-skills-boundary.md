@@ -24,7 +24,7 @@ Azure Functions Skills is not a replacement for Azure Skills. It should gather A
 | Functions runtime, trigger, binding, language, and extension references | Azure Functions Skills | This is Functions-specific domain knowledge and belongs with `azure-functions-common` reference routing. |
 | Diagnostics, health, inventory, best practices, upgrade, Functions-specific migration, testing, performance tuning | Azure Functions Skills | These are Day 1+ Functions-specific workflows that need runtime / trigger / binding evidence. |
 | Cross-cloud migration such as Lambda to Functions | Azure Skills primary | `azure-cloud-migrate` owns the cross-cloud scenario. Azure Functions Skills can help with target Functions validation. |
-| Plugin payload and optional workspace-local copy | Azure Functions Skills | The repository publishes skills, MCP configuration, and telemetry hooks; host tools own plugin installation. |
+| Plugin payload | Azure Functions Skills | The repository publishes skills, MCP configuration, and telemetry hooks; host tools own plugin installation. |
 
 ## Contributor Decision Guide
 
@@ -106,7 +106,7 @@ Use these rules when deciding whether a future skill belongs in Azure Functions 
 - It depends on Functions runtime, host, language worker, programming model, trigger, binding, extension bundle, or Function App settings.
 - It explains or fixes Functions-specific operational behavior.
 - It needs Functions-specific evidence, such as deployed functions, trigger metadata, worker runtime, host health endpoints, App Insights traces for Functions, or trigger-specific metrics.
-- It improves Azure Functions skill discovery or the workspace-local copy experience.
+- It improves Azure Functions skill discovery or the plugin install experience.
 - It packages Azure Functions team knowledge into agent-consumable workflow, checklist, script, or reference files.
 
 Examples:

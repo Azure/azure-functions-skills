@@ -4,36 +4,16 @@ import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 const command = args[0];
-const TARGETS = ['ghcp', 'claude', 'codex'];
-const DOCTOR_FORMATS = ['text', 'json', 'markdown', 'html'];
 
 const HELP = `
 @azure/functions-skills — Azure Functions skills for coding agents
 
 Commands:
-  install --local   Copy skills, MCP, and telemetry hooks into a workspace
-  update --local    Replace workspace-local Azure Functions assets
-  doctor            Analyze an Azure Functions project
   template list     List Azure Functions templates
   template apply    Apply an Azure Functions template
-  build             Build local and plugin artifacts
+  build             Build agent-specific and plugin artifacts
 
 Plugin installation is managed by the host coding agent, not this package.
-`;
-
-const DOCTOR_HELP = `
-Usage: azure-functions-skills doctor [options]
-
-Options:
-  --dir <path>              Project directory (default: current directory)
-  --checks <ids>            Comma-separated check IDs
-  --severity <level>        Failure threshold (default: high)
-  --format <text|json|markdown|html>
-  --output <path>           Report output path
-  --deep                    Run AI-assisted analysis
-  --accept-deep-risk        Acknowledge elevated agent permissions
-  --agent <name>            github-copilot, claude-code, or codex
-  --timeout <seconds>       AI analysis timeout (default: 300)
 `;
 
 const TEMPLATE_APPLY_HELP = `
@@ -60,19 +40,12 @@ if (command === '--version' || command === '-V') {
   process.exit(0);
 }
 
-if (command === 'help' && args[1] === 'doctor') {
-  console.log(DOCTOR_HELP.trim());
-  process.exit(0);
-}
-
 if (!command || command === '--help' || command === '-h' || command === 'help') {
   console.log(HELP.trim());
   process.exit(0);
 }
 
-if (command === 'install' || command === 'update') {
-  await runLocalInstall(command);
-} else if (command === 'template') {
+if (command === 'template') {
   await runTemplateCommand();
 } else if (command === 'build') {
   const { execFileSync } = await import('node:child_process');
@@ -81,8 +54,6 @@ if (command === 'install' || command === 'update') {
     [join(import.meta.dirname, '..', 'lib', 'build', 'build.js'), ...args.slice(1)],
     { stdio: 'inherit' },
   );
-} else if (command === 'doctor') {
-  await runDoctorCommand();
 } else if (command === 'telemetry') {
   if (args[1] === 'deployment-observed') {
     await runDeploymentObservedTelemetryCommand();
@@ -97,8 +68,8 @@ if (command === 'install' || command === 'update') {
 
 async function runDeploymentObservedTelemetryCommand() {
   try {
-    const dir = getFlag('--dir') || process.cwd();
-    const { resolveTelemetryEnabled, telemetryConfigPath } = await import('../lib/setup/workspace-assets.js');
+    const dirIndex = args.indexOf('--dir');
+    const dir = (dirIndex >= 0 && args[dirIndex + 1]) || process.cwd();
     const {
       parseDeploymentObservationInput,
       collectDeploymentObservation,
@@ -109,13 +80,17 @@ async function runDeploymentObservedTelemetryCommand() {
       throw new Error('Deployment observation telemetry input is required on stdin.');
     }
     const input = parseDeploymentObservationInput(JSON.parse(rawInput));
-    const configPaths = ['ghcp', 'claude', 'codex'].map(agent => telemetryConfigPath(dir, agent));
+    // Workspaces from earlier local installs can keep an opt-out in telemetry.config.json.
+    const configPaths = [
+      join(dir, '.github', 'hooks', 'telemetry.config.json'),
+      join(dir, '.claude', 'hooks', 'telemetry.config.json'),
+      join(dir, '.codex', 'hooks', 'telemetry.config.json'),
+    ];
     if (readWorkspaceTelemetryState(configPaths) !== 'active') {
       process.stdout.write('disabled\n');
       return;
     }
-    const workspaceTelemetryEnabled = resolveTelemetryEnabled(dir, undefined);
-    const result = await collectDeploymentObservation(input, { workspaceTelemetryEnabled });
+    const result = await collectDeploymentObservation(input, { workspaceTelemetryEnabled: undefined });
     process.stdout.write(`${result.status}\n`);
   } catch {
     process.stdout.write('failed\n');
@@ -152,61 +127,6 @@ async function readStdin(maxBytes) {
     chunks.push(buffer);
   }
   return Buffer.concat(chunks).toString('utf-8');
-}
-
-async function runLocalInstall(action) {
-  if (args.includes('--help') || args.includes('-h')) {
-    console.log(`
-Usage: azure-functions-skills ${action} --local [options]
-
-Options:
-  --local            Required; install package-bundled assets into the workspace
-  --agent <name>     ghcp, claude, or codex (repeatable)
-  --all              Install for all supported agents
-  --dir <path>       Target directory (default: current directory)
-  --dry-run          List files without writing them
-  --no-telemetry     Disable telemetry for this workspace
-`.trim());
-    process.exit(0);
-  }
-
-  if (!args.includes('--local')) {
-    console.error('This package no longer installs plugins. Use your coding agent to install the plugin, or pass --local for a workspace-local copy.');
-    process.exit(1);
-  }
-
-  const selectedAgents = flagValues('--agent');
-  const invalidAgent = selectedAgents.find(agent => !TARGETS.includes(agent));
-  if (invalidAgent) {
-    console.error(`Unknown agent: ${invalidAgent}. Available: ${TARGETS.join(', ')}`);
-    process.exit(1);
-  }
-
-  const { detectAgents, installLocalSkills } = await import('../lib/setup/index.js');
-  const agents = args.includes('--all')
-    ? TARGETS
-    : selectedAgents.length > 0
-      ? selectedAgents
-      : await detectAgents();
-  const dir = getFlag('--dir') || process.cwd();
-  const result = await installLocalSkills({
-    targetDir: dir,
-    agents,
-    dryRun: args.includes('--dry-run'),
-    telemetryEnabled: args.includes('--no-telemetry') ? false : undefined,
-  });
-
-  if (result.dryRun) {
-    console.log(`Planned local ${action}:`);
-    for (const file of result.plannedFiles) console.log(`  - ${file}`);
-  } else {
-    console.log(`Azure Functions Skills locally ${action === 'install' ? 'installed' : 'updated'}.`);
-    console.log(`  Agents: ${result.agents.join(', ')}`);
-    console.log(`  Files written: ${result.filesWritten}`);
-  }
-  if (result.packageUpdate.status === 'update-available') {
-    console.log(`  Package update: ${result.packageUpdate.message}`);
-  }
 }
 
 async function runTemplateCommand() {
@@ -253,43 +173,6 @@ async function runTemplateCommand() {
   }
 }
 
-async function runDoctorCommand() {
-  if (args.includes('--help') || args.includes('-h')) {
-    console.log(DOCTOR_HELP.trim());
-    return;
-  }
-  const { runDoctor, formatReport } = await import('../lib/doctor/index.js');
-  const { writeFileSync, mkdirSync } = await import('node:fs');
-  const { dirname } = await import('node:path');
-  const dir = getFlag('--dir') || process.cwd();
-  const output = getFlag('--output') || join(dir, '.azure-functions-doctor', 'doctor-report.json');
-  const checksFlag = getFlag('--checks');
-  const format = getFlag('--format') || 'text';
-  try {
-    if (!DOCTOR_FORMATS.includes(format)) {
-      throw new Error(`Unsupported report format: ${format}. Available: ${DOCTOR_FORMATS.join(', ')}`);
-    }
-    const { report, exitCode } = await runDoctor({
-      dir,
-      deep: args.includes('--deep') && !args.includes('--no-deep'),
-      acceptDeepRisk: args.includes('--accept-deep-risk'),
-      agent: getFlag('--agent'),
-      timeout: Number.parseInt(getFlag('--timeout') || '300', 10),
-      format,
-      output,
-      checks: checksFlag ? checksFlag.split(',').map(value => value.trim()) : undefined,
-      severity: getFlag('--severity') || 'high',
-    });
-    console.log(formatReport(report, 'text'));
-    mkdirSync(dirname(output), { recursive: true });
-    writeFileSync(output, formatReport(report, format));
-    process.exit(exitCode);
-  } catch (error) {
-    console.error(`Doctor failed: ${errorMessage(error)}`);
-    process.exit(2);
-  }
-}
-
 function parseTemplateOptions(commandArgs) {
   const options = {
     dir: process.cwd(),
@@ -328,19 +211,6 @@ function printTemplateList(templates) {
     console.log(`${template.id} — ${template.displayName}`);
     if (template.shortDescription) console.log(`  ${template.shortDescription}`);
   }
-}
-
-function flagValues(flag) {
-  const values = [];
-  for (let index = 0; index < args.length; index++) {
-    if (args[index] === flag && args[index + 1]) values.push(args[++index]);
-  }
-  return values;
-}
-
-function getFlag(flag) {
-  const index = args.indexOf(flag);
-  return index >= 0 ? args[index + 1] : undefined;
 }
 
 function errorMessage(error) {

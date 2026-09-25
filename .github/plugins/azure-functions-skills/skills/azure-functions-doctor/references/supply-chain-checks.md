@@ -1,6 +1,6 @@
-# Supply chain security checks (Tier 2 / `--deep`)
+# Supply chain security checks
 
-Load this reference when the project has a `package.json`, `requirements.txt`, `pom.xml`, or other dependency manifest. These checks complement Tier 1 deterministic supply-chain analysis with semantic analysis the LLM is uniquely good at. The `lifecycle-scripts`, `unpinned-prod-deps`, `missing-lockfile`, and `install-script-deps` checks apply to Node.js projects; `tracked-secret-files` applies across supported project types.
+Load this reference when the project has a `package.json`, `requirements.txt`, `pom.xml`, or other dependency manifest. Do the baseline file checks first. Then do the semantic checks. The baseline checks `lifecycle-scripts`, `unpinned-prod-deps`, `missing-lockfile`, and `install-script-deps` apply to Node.js projects. `tracked-secret-files` applies to all project types.
 
 ## Threat model
 
@@ -15,7 +15,21 @@ Supply-chain attackers compromise a legitimate package and ship a malicious vers
 
 The LLM checklist below targets the bridging step between "innocent looking package" and "exfiltrated credentials".
 
-## Checks the LLM should perform on `--deep`
+## Baseline file checks
+
+| ID | Check | Severity | Finding |
+|----|-------|----------|---------|
+| `lifecycle-scripts` | `package.json` scripts | high | The project defines `preinstall`, `install`, `postinstall`, `postpack`, `prepublish`, or `prepublishOnly` |
+| `unpinned-prod-deps` | Production dependency versions | medium | A `dependencies` entry is `*`, `latest`, `next`, or starts with `^`, `~`, `>`, or `>=` |
+| `missing-lockfile` | Lockfile | medium | No `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, or `pnpm-lock.yaml` |
+| `install-script-deps` | Production dependencies with install scripts | info | A production dependency in `node_modules` defines `preinstall`, `install`, or `postinstall`. Skip this check when `node_modules` is not present. Do not run `npm install` to do it. Do not report the packages in the allowlist below. |
+| `tracked-secret-files` | Local secret files | high | `.env`, `.env.*`, or `local.settings.json` is tracked by git (use `git ls-files`), or is present and not in `.gitignore` |
+
+Allowlist for `install-script-deps`: these are common native modules that need install scripts for a correct reason: `sharp`, `bcrypt`, `sqlite3`, `better-sqlite3`, `node-sass`, `sass`, `esbuild`, `puppeteer`, `playwright`, and `@parcel/watcher`.
+
+For a tracked secret file, tell the user to run `git rm --cached <file>`, to rotate the secrets, and to remove the file from git history if the secrets were pushed.
+
+## Checks the LLM should perform
 
 ### SC-101 — Module-load / import-time side effects
 
@@ -167,6 +181,5 @@ For each finding produced from this checklist, use:
 
 ## Cross-reference
 
-- Tier 1 deterministic checks: Node.js-only `lifecycle-scripts`, `unpinned-prod-deps`, `missing-lockfile`, and `install-script-deps`, plus cross-language `tracked-secret-files`, in `src/doctor/checks.ts`
 - Background: StepSecurity analysis of the durabletask PyPI compromise (May 19, 2026)
 - Generic guidance: [SLSA framework](https://slsa.dev/), npm provenance, PyPI Trusted Publishing

@@ -1,7 +1,0 @@
-{
-  "name": "doctor-bad-missing-worker-runtime",
-  "main": "index.js",
-  "engines": {
-    "node": ">=22"
-  }
-}

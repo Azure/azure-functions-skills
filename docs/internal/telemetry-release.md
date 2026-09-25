@@ -82,8 +82,8 @@ PowerShell and Bash scripts in two places:
 - `templates/hooks/`, used by the build system;
 - `dist/plugin/azure-functions-skills/hooks/`, used in the built plugin payload.
 
-Workspace-local installs copy the corresponding telemetry assets into each
-selected host's native hook directory.
+`npm run build` also writes the telemetry assets into each host's native hook
+directory in the agent-specific layouts under `dist/workspace/`.
 
 The scripts filter and normalize hook input, then send one sanitized JSON object
 over stdin to the package's hidden telemetry command:
@@ -106,8 +106,8 @@ releasing the plugin before the package without affecting agent tool use.
 
 Users can opt out by setting either
 `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or
-`AZURE_MCP_COLLECT_TELEMETRY=false`. Workspace-local installs also honor
-`telemetry.config.json` with `"enabled": false`.
+`AZURE_MCP_COLLECT_TELEMETRY=false`. The hook scripts also honor a
+`telemetry.config.json` next to the hooks with `"enabled": false`.
 
 ## Deployment-observation collector
 

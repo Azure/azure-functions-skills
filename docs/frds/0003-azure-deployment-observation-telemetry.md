@@ -63,7 +63,7 @@ resource, each nested module, or each attempt would obscure the question.
 | [Hook scripts](../../templates/hooks/scripts) | Record skill and tool usage. Deployment success is **not** inferable here |
 | [Deploy skill](../../templates/skills/azure-functions-deploy/SKILL.md) | Delegates to the external `azure-deploy` executor, which this repository does not own |
 | [Hosted skills](../../templates/skills/azure-functions-hosted-skills/SKILL.md) | Runs azd directly |
-| [Workspace preferences](../../src/setup/workspace-assets.ts) | Per-host telemetry opt-out, in addition to environment variables |
+| [Hook telemetry config](../../templates/hooks/telemetry.config.json) | Per-host telemetry opt-out, in addition to environment variables |
 | [Release transport](../internal/telemetry-release.md) | Injects the destination at release time |
 
 ### Related work

@@ -1,5 +1,5 @@
 ---
-applyTo: "bin/**,src/setup/**"
+applyTo: "bin/**,src/templates/**,src/telemetry/**"
 ---
 
 # CLI Development Rules
@@ -22,15 +22,15 @@ applyTo: "bin/**,src/setup/**"
 
 - Always compile: `npm run compile`
 - Run unit tests: `npm test`
-- **E2E verification is mandatory**: test the actual CLI command in an isolated workspace.
+- **Manual verification is mandatory**: run the actual CLI command in an isolated workspace.
   ```bash
   node bin/azure-functions-skills.js <cmd> --dir <isolated-workspace>
   ```
-- Never run `setup` or `chat` from the repo root — it pollutes the working tree.
+- Never run `template apply` from the repo root — it pollutes the working tree.
 
 ## Architecture
 
 - CLI entry point: `bin/azure-functions-skills.js`
-- Domain modules: `src/doctor/`, `src/setup/`, `src/build/`
+- Domain modules: `src/build/`, `src/telemetry/`, `src/templates/`
 - Keep option parsing in `bin/`; keep business logic in `src/`.
 - Separate concerns — do not mix I/O, validation, and domain logic in one function.

@@ -1,6 +1,6 @@
 # Contributing to Azure Functions Skills
 
-Thank you for considering a contribution! This guide covers how to add or change skills, agents, references, tests, and the CLI.
+Thank you for considering a contribution! Most contributions add or improve a skill. For a skill change, you edit only the files under `templates/skills/`. The build and release process delivers the skill to all supported coding agents.
 
 For repo-internal build/release commands see [docs/development.md](docs/development.md).
 
@@ -13,39 +13,28 @@ npm ci
 npm run check
 ```
 
-`npm run check` runs lint, typecheck, skill validation, plugin payload verification, tests, and build. Pull requests must pass this gate.
+`npm run check` runs lint, typecheck, security lint, skill validation, plugin payload verification, tests, and build. Pull requests must pass this gate.
 
 ## Repository layout
 
 ```text
 templates/                Canonical source — edit this
-  agents/                 Agent definitions (e.g. functions-copilot)
   skills/                 Each skill: SKILL.md + references/ + optional scripts/
-  hooks/                  Hook payloads (welcome-setup, etc.)
-  prompts/                Chat startup prompt content
+  hooks/                  Telemetry hook payloads
   mcp/servers.yaml        MCP server definitions
 
 src/                      TypeScript CLI and build system
-  doctor/                 doctor command implementation
-  setup/                  install/setup/workspace flows
-  chat/                   chat command
   build/                  Template → payload build pipeline
+  telemetry/              Telemetry sender used by the hooks
+  templates/              Azure Functions template list/apply
 
 tests/                    Vitest coverage
-  fixtures/doctor-bad-apps/  Intentionally broken Azure Functions projects
 
 .github/plugins/azure-functions-skills/  Generated plugin payload (do not hand-edit)
 .plugin/marketplace.json                  Generated marketplace manifest
 .claude-plugin/marketplace.json           Generated marketplace manifest
 
-docs/                     User-facing documentation
-  cli-reference.md
-  doctor-guide.md
-  skills-vs-azure-skills.md
-  bad-app-fixtures.md
-  research/               Bug-bash feedback, historical notes
-  internal/               Internal design documents
-  prd-docs/               Feature specs (Fxx-*.md)
+docs/                     Documentation
 ```
 
 ## How to make changes
@@ -56,6 +45,8 @@ docs/                     User-facing documentation
    - `SKILL.md` — the skill body (front matter + instructions)
    - `references/` — supporting checklists, examples
    - `scripts/` — helper scripts (if any)
+
+   To start a new skill, run `npm run new:skill`.
 
 2. Validate:
 
@@ -78,14 +69,13 @@ docs/                     User-facing documentation
 
 Do not edit `.github/plugins/azure-functions-skills/`, `.plugin/marketplace.json`, or `.claude-plugin/marketplace.json` by hand. Change `templates/`, then regenerate.
 
-### Modify the CLI
+Focus on the quality of the task result and on usability. Make sure that an agent can follow each instruction without guessing. Try the skill manually with a coding agent before you open the pull request.
 
-CLI source lives under `src/`:
+### Modify the CLI or build system
 
-- `src/doctor/` — doctor command (built-in checks, AI tier, formatters)
-- `src/setup/` — install/setup/workspace flows
-- `src/chat/` — chat command
-- `src/build/` — build pipeline (template → workspace + plugin layouts)
+- `src/build/` — build pipeline (template → agent layouts + plugin payload)
+- `src/telemetry/` — telemetry event validation and sending
+- `src/templates/` — template list/apply
 - `bin/azure-functions-skills.js` — CLI entry point and option parsing
 
 Workflow:
@@ -94,34 +84,6 @@ Workflow:
 2. `npm run compile` — TypeScript build
 3. `npm test` — Vitest
 4. `npm run lint` and `npm run typecheck`
-
-For testing CLI changes against a real workspace:
-
-```bash
-node bin/azure-functions-skills.js <cmd> --dir ../tmp-functions-app ...
-```
-
-### Add a doctor check
-
-1. Add a `DoctorCheck` to `src/doctor/checks.ts`. Each check has `id`, `category`, `defaultSeverity`, `appliesTo`, `run`.
-2. Add it to `ALL_CHECKS`.
-3. Add a unit test in `tests/doctor-checks.test.ts`.
-4. Add a bad-app fixture exercising the new check (see [docs/bad-app-fixtures.md](docs/bad-app-fixtures.md)).
-5. Update `tests/fixtures/doctor-bad-apps/expected-results.md`.
-
-### Test doctor end-to-end
-
-See [docs/bad-app-fixtures.md](docs/bad-app-fixtures.md) for the manual E2E workflow:
-
-```powershell
-.\scripts\doctor-e2e-setup.ps1 -Target Q:\temp\doctor-deep-test -DeepOnly
-cd Q:\temp\doctor-deep-test
-.\run-all.ps1 -Deep -Agent github-copilot
-```
-
-This validates that doctor catches the expected findings on every fixture.
-
-> **Security note:** Run `doctor --deep` only on workspaces you trust. Never run it on a pull request workspace from a contributor — pull request code is untrusted by definition and can prompt-inject the LLM agent (which has file write and shell execution permissions). Doctor refuses to start in `pull_request` event contexts. See [docs/doctor-guide.md → Security model](docs/doctor-guide.md#security-model).
 
 ## Security policy for skill and CI changes
 
@@ -137,18 +99,17 @@ Because skills are loaded by an LLM agent that may run with elevated permissions
 1. **Fork & branch**: branch from `main` with a descriptive name.
 2. **Small, focused changes**: one concern per PR.
 3. **Run the gate**: `npm run check` must pass locally.
-4. **Tests**: add or update tests for behavior changes; favor TDD where applicable.
-5. **Docs**: update affected user-facing docs (`docs/cli-reference.md`, `docs/doctor-guide.md`, etc.) and the README if applicable.
-6. **PRD updates**: if a feature spec exists under `docs/prd-docs/`, update its status when the implementation changes.
-7. **No hand-edits to generated files**: change `templates/` and regenerate via `npm run build:plugin-payload`.
+4. **Tests**: add or update tests for code behavior changes; favor TDD where applicable.
+5. **Docs**: update the README and affected docs if applicable.
+6. **No hand-edits to generated files**: change `templates/` and regenerate via `npm run build:plugin-payload`.
 
 ## Commit style
 
 Conventional commits are preferred but not strictly enforced. Use the imperative mood:
 
 ```text
-doctor: fail closed on unknown AI severity (#117)
-formatters: HTML enum allowlist for status/severity (#115)
+feat: add Durable Functions retry guidance to azure-functions-create
+fix: correct extension bundle range in azure-functions-common
 docs: rewrite README with focused topics + linked references
 ```
 
@@ -167,8 +128,8 @@ See [docs/development.md](docs/development.md) for the full release command refe
 
 ## Reporting issues
 
-- **Bug reports**: include the doctor JSON output if doctor is involved; redact secrets first.
-- **Feature requests**: describe the user scenario and what doctor/install/chat outcome you expect.
+- **Bug reports**: include the skill name, the coding agent, and the prompt you used; redact secrets first.
+- **Feature requests**: describe the user scenario and the result you expect from the agent.
 - **Security**: do not file public issues for security vulnerabilities. Email `secure@microsoft.com` instead.
 
 ## Code of Conduct
