@@ -1,0 +1,164 @@
+{
+  "skill": "azure-functions-update",
+  "scenario": "dotnet-isolated",
+  "reference": "templates/skills/azure-functions-update/references/dotnet-isolated.md",
+  "statuses": ["pass", "fail", "blocked", "not-applicable"],
+  "expectations": {
+    "project": "UpgradeApp.csproj",
+    "targetFramework": "net8.0",
+    "hostVersion": "v4",
+    "functions": ["Hello", "QueueGreeting"],
+    "route": "api/hello",
+    "method": "GET",
+    "authorization": "anonymous",
+    "responses": [
+      { "path": "/api/hello", "status": 200, "body": "Hello, world!" },
+      { "path": "/api/hello?name=Vally", "status": 200, "body": "Hello, Vally!" }
+    ],
+    "bindingSurfaces": ["http", "queue-trigger", "blob-input", "blob-output"],
+    "storage": {
+      "queue": "greeting-requests",
+      "inputContainer": "greeting-input",
+      "outputContainer": "greeting-output",
+      "input": "Storage",
+      "output": "Hello, Storage!",
+      "connection": "AzureWebJobsStorage"
+    },
+    "languageHandoff": "not-requested"
+  },
+  "requirements": [
+    {
+      "id": "DI-01",
+      "title": "Supported host/model/TFM tuple with the model stage keeping its current target framework",
+      "gates": ["deterministic", "judge"],
+      "check": "supported-tuple-current-tfm",
+      "applicability": "Always applicable. The deterministic gate compares the target framework and host version with the baseline. The judge uses the fixed review basis, not the agent report."
+    },
+    {
+      "id": "DI-02",
+      "title": "Direct restore and build of the Functions project succeed",
+      "gates": ["deterministic"],
+      "check": "restore-and-build",
+      "applicability": "Always applicable. Evidence is the recorded command, exit code, and effective SDK and package graph."
+    },
+    {
+      "id": "DI-03",
+      "title": "Existing unit and local tests succeed",
+      "gates": ["deterministic"],
+      "check": "existing-tests",
+      "applicability": "not-applicable only when the recorded project inventory proves that the workspace contains no test project. A test project that cannot run is blocked, never not-applicable, and E2E evidence never substitutes for it."
+    },
+    {
+      "id": "DI-04",
+      "title": "func starts with the expected function inventory and executes the storage trigger",
+      "gates": ["deterministic"],
+      "check": "host-registration",
+      "applicability": "Always applicable. Read the host admin function inventory and execute the storage trigger. Logs are not assessed. An unavailable inventory endpoint is blocked. A function list alone cannot pass this ID."
+    },
+    {
+      "id": "DI-05",
+      "title": "Agreed trigger end-to-end paths produce the original business outputs",
+      "gates": ["deterministic"],
+      "check": "trigger-e2e",
+      "applicability": "Applies to the HTTP responses and the queue-trigger/blob-input/blob-output flow. Missing Azurite is blocked, not not-applicable. An HTTP pass does not substitute for storage E2E."
+    },
+    {
+      "id": "DI-06",
+      "title": "Explicit Microsoft.Azure.Functions.Worker reference resolves compatibly",
+      "gates": ["deterministic"],
+      "check": "explicit-worker-package",
+      "applicability": "Always applicable. Central package version management is allowed as long as the application declares the package explicitly."
+    },
+    {
+      "id": "DI-07",
+      "title": "Application direct WebJobs and legacy Functions packages and code are migrated",
+      "gates": ["deterministic", "judge"],
+      "check": "legacy-surface-migrated",
+      "applicability": "Applies to application sources and declared package references only. Generated host-extension projects, obj/bin output, and transitive WebJobs dependencies are excluded from the prohibition."
+    },
+    {
+      "id": "DI-08",
+      "title": "Function attributes, trigger and binding types, and arguments are isolated-compatible",
+      "gates": ["deterministic", "judge"],
+      "check": "function-signatures",
+      "applicability": "Always applicable. The deterministic gate checks attribute, name, route, and authorization retention; the judge checks parameter, return, collector, and binder adaptation."
+    },
+    {
+      "id": "DI-09",
+      "title": "Program.cs owns the required DI and startup and starts the worker host",
+      "gates": ["deterministic", "judge"],
+      "check": "worker-startup",
+      "applicability": "Always applicable. Move the FunctionsStartup GreetingService singleton registration to Program.cs and preserve constructor injection in both functions."
+    },
+    {
+      "id": "DI-10",
+      "title": "Isolated logging and telemetry preserve the required behavior",
+      "gates": ["judge"],
+      "check": null,
+      "applicability": "Source review only. Preserve the Information logging calls and messages with worker-compatible logging. Runtime log emission and telemetry delivery are not assessed. No new telemetry service is required."
+    },
+    {
+      "id": "DI-11",
+      "title": "HTTP integration, startup, types, async I/O, and serialization agree",
+      "gates": ["deterministic", "judge"],
+      "check": "http-integration-coherent",
+      "applicability": "Applies because the app has an HTTP trigger. Either the ASP.NET Core integration or the built-in HTTP model is acceptable when it is coherent; neither style is mandatory."
+    },
+    {
+      "id": "DI-12",
+      "title": "JSON and output contracts remain unchanged against the baseline fixture",
+      "gates": ["deterministic"],
+      "check": "output-contract-preserved",
+      "applicability": "Always applicable. The staged baseline fixture under grading-evidence/baseline supplies the original contract, including any Newtonsoft attributes."
+    },
+    {
+      "id": "DI-13",
+      "title": "Worker and runtime configuration and binding settings are correct",
+      "gates": ["deterministic", "judge"],
+      "check": "runtime-configuration",
+      "applicability": "Always applicable. Effective FUNCTIONS_WORKER_RUNTIME, retained connection names, and host.json semantics are checked; a proposed deployment configuration never proves deployed state."
+    },
+    {
+      "id": "DI-14",
+      "title": "Current Functions project SDK and compatible build setup are effective",
+      "gates": ["deterministic"],
+      "check": "project-sdk-effective",
+      "applicability": "Always applicable in the model-only phase at the current target framework. Azure.Functions.Sdk must resolve inline or through global.json, without Microsoft.NET.Sdk.Functions, Microsoft.Azure.Functions.Worker.Sdk, or FunctionsEnableWorkerIndexing, and generated helper projects must not be edited or built directly."
+    },
+    {
+      "id": "DI-15",
+      "title": "Packaging includes the required host configuration and excludes local secrets",
+      "gates": ["deterministic"],
+      "check": "packaging-and-secrets",
+      "applicability": "Always applicable. Evidence is the inspected publish artifact, not a file name in a report, and no deployment is performed."
+    },
+    {
+      "id": "DI-16",
+      "title": "Used binding, Durable, and shared-consumer contracts are preserved",
+      "gates": ["deterministic", "judge"],
+      "check": "binding-contracts",
+      "applicability": "Applicable: preserve the queue name, base64 message encoding, blob paths, request ID substitution, connection setting name, and greeting output. Durable history and shared consumer projects are absent, but the storage binding requirement is not not-applicable."
+    },
+    {
+      "id": "DI-POST-01",
+      "title": "After an approved language handoff, the effective target framework and toolchain paths match the destination",
+      "gates": ["judge"],
+      "check": null,
+      "applicability": "not-applicable in this scenario because the stimulus requests no language stage and keeps the current target framework. It becomes blocked if the trial requests the dotnet-version-upgrade handoff and the client cannot provide it, and fail if the target framework changed without an approved handoff."
+    },
+    {
+      "id": "DI-POST-02",
+      "title": "Modern .NET follow-up has the effective threading ExecutionContext alias",
+      "gates": ["judge"],
+      "check": null,
+      "applicability": "not-applicable in this scenario because no language stage runs and the model-stage guide does not require the alias at the current target framework."
+    },
+    {
+      "id": "DI-POST-03",
+      "title": "Functions follow-up and all affected checks pass on the returned artifact",
+      "gates": ["judge"],
+      "check": null,
+      "applicability": "not-applicable in this scenario because no language stage runs, so no returned artifact exists and no earlier evidence is invalidated."
+    }
+  ]
+}
