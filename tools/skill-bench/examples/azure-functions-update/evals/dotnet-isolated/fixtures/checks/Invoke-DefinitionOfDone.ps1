@@ -119,6 +119,40 @@ function Get-TargetFramework {
     return $multiple.Success ? $multiple.Groups['tfm'].Value : $null
 }
 
+function Get-RuntimeInstruction {
+    # local.settings.json is a user file that git ignores. A migration can instead document the
+    # setting in a settings example, a README, or a plan. Skill payloads and grader input do not count.
+    param([Parameter(Mandatory)][string]$Root)
+    $pattern = 'FUNCTIONS_WORKER_RUNTIME[\s`''":=]*(?:(?:to|as|is)\s+[`''"]*)?dotnet-isolated(?![\w-])'
+    # A warning such as "do not set ..." is not an instruction. Examine each sentence or line.
+    $negation = '(?i)\b(?:not|never|don''t|doesn''t|avoid|instead\s+of|remove[sd]?|without|legacy|obsolete|wrong|incorrect)\b'
+    $extensions = @('.md', '.txt', '.json', '.jsonc', '.example', '.sample', '.template')
+    $skipped = @('bin', 'obj', 'node_modules', 'grading-evidence')
+    $found = [Collections.Generic.List[string]]::new()
+    $pending = [Collections.Generic.Queue[string]]::new()
+    $pending.Enqueue((Resolve-Path -LiteralPath $Root).Path)
+    $base = $pending.Peek()
+    while ($pending.Count -gt 0) {
+        $directory = $pending.Dequeue()
+        if ($directory -ne $base -and (Test-Path -LiteralPath (Join-Path $directory 'SKILL.md'))) { continue }
+        foreach ($item in Get-ChildItem -LiteralPath $directory -Force) {
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            if ($item.PSIsContainer) {
+                if (-not $item.Name.StartsWith('.') -and $skipped -notcontains $item.Name.ToLowerInvariant()) {
+                    $pending.Enqueue($item.FullName)
+                }
+            } elseif ($item.Name -ne 'local.settings.json' -and $item.Length -le 262144 -and
+                $extensions -contains $item.Extension.ToLowerInvariant()) {
+                $sentences = [regex]::Split([string](Get-Content -LiteralPath $item.FullName -Raw), '(?<=[.;!?])\s+|\r?\n')
+                if (@($sentences | Where-Object { $_ -match $pattern -and $_ -notmatch $negation }).Count -gt 0) {
+                    $found.Add([IO.Path]::GetRelativePath($base, $item.FullName).Replace('\', '/'))
+                }
+            }
+        }
+    }
+    return @($found | Sort-Object)
+}
+
 function Set-Result {
     param(
         [Parameter(Mandatory)] $Requirement,
@@ -502,9 +536,11 @@ foreach ($Requirement in $definition.requirements) {
             }
         }
         'runtime-configuration' {
-            $localSettings = (Test-Path -LiteralPath 'local.settings.json') ?
+            $hasLocalSettings = Test-Path -LiteralPath 'local.settings.json'
+            $localSettings = $hasLocalSettings ?
                 (Get-Content -LiteralPath 'local.settings.json' -Raw | ConvertFrom-Json) : $null
             $runtime = $localSettings ? [string]$localSettings.Values.FUNCTIONS_WORKER_RUNTIME : ''
+            $instructions = @(Get-RuntimeInstruction -Root (Get-Location).Path)
             $workerConfigPath = Join-Path $publishDirectory 'worker.config.json'
             $workerLanguage = (Test-Path -LiteralPath $workerConfigPath) ?
                 [string](Get-Content -LiteralPath $workerConfigPath -Raw | ConvertFrom-Json).description.language : ''
@@ -514,20 +550,30 @@ foreach ($Requirement in $definition.requirements) {
             $baselineVersion = [regex]::Match($baselineHostText, '"version"\s*:\s*"(?<v>[^"]+)"').Groups['v'].Value
             $connectionCount = [regex]::Matches(
                 $sourceText, 'Connection\s*=\s*"AzureWebJobsStorage"').Count
-            $evidence = @("local.settings.json FUNCTIONS_WORKER_RUNTIME: '$runtime'",
+            $evidence = @("local.settings.json present: $hasLocalSettings; FUNCTIONS_WORKER_RUNTIME: '$runtime'",
+                "documented FUNCTIONS_WORKER_RUNTIME=dotnet-isolated in: $(($instructions -join ', ') ?? '')",
                 "binding references to AzureWebJobsStorage: $connectionCount",
                 "published worker language: '$workerLanguage'",
                 "host.json version: '$hostVersion' (baseline '$baselineVersion')",
                 "published host.json present: $(Test-Path -LiteralPath (Join-Path $publishDirectory 'host.json'))")
-            $runtimeOk = $runtime -eq 'dotnet-isolated' -and $connectionCount -ge 3
+            # A real local.settings.json must have the correct value. Without it, a written instruction is enough.
+            $localRuntimeOk = $hasLocalSettings ? ($runtime -eq 'dotnet-isolated') : ($instructions.Count -gt 0)
+            $problems = @()
+            if ($hasLocalSettings -and -not $localRuntimeOk) {
+                $problems += "local.settings.json sets FUNCTIONS_WORKER_RUNTIME to '$runtime', not dotnet-isolated."
+            } elseif (-not $localRuntimeOk) {
+                $problems += 'No local.settings.json, settings example, README, or plan states FUNCTIONS_WORKER_RUNTIME=dotnet-isolated.'
+            }
+            if ($connectionCount -lt 3) { $problems += "Only $connectionCount binding(s) use the AzureWebJobsStorage connection; 3 are expected." }
+            if ($workerLanguage -ne 'dotnet-isolated') { $problems += "The published worker language is '$workerLanguage', not dotnet-isolated." }
+            if ($hostVersion -ne $baselineVersion) { $problems += "host.json version '$hostVersion' differs from the baseline '$baselineVersion'." }
             if (-not $publish -or $publish.ExitCode -ne 0) {
                 Set-Result -Requirement $Requirement -Status 'blocked' -Evidence $evidence `
                     -Reason 'No publish artifact: the effective worker runtime configuration could not be read.'
-            } elseif ($runtimeOk -and $workerLanguage -eq 'dotnet-isolated' -and $hostVersion -eq $baselineVersion) {
+            } elseif ($problems.Count -eq 0) {
                 Set-Result -Requirement $Requirement -Status 'pass' -Evidence $evidence
             } else {
-                Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence `
-                    -Reason 'The effective worker runtime or the retained host.json semantics do not match the isolated model contract.'
+                Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence -Reason ($problems -join ' ')
             }
         }
         'project-sdk-effective' {

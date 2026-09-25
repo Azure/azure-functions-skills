@@ -147,4 +147,30 @@ describe('gradeCodeOnly', () => {
     expect(verdict.status).toBe('error');
     expect(grade).not.toHaveBeenCalled();
   });
+
+  it('explains failed checks with titles, reasons and hints but no evidence', async () => {
+    const result = summary() as { overall: string; requirements: Record<string, unknown>[] };
+    result.overall = 'fail';
+    result.requirements[12] = { ...result.requirements[12], status: 'fail', title: 'Runtime configuration',
+      reason: 'The worker runtime is not documented.' };
+    put('grading-evidence/checklist.json', JSON.stringify(result));
+    put('grading-evidence/definition-of-done.json', JSON.stringify({
+      requirements: ids.map(id => ({ id, title: `Title ${id}`, ...(id === 'DI-13' ? { hint: 'Document the setting.' } : {}) })),
+    }));
+    const verdict = await gradeCodeOnly(input(), { grade: vi.fn() });
+    const metadata = verdict.metadata as { summary: string; checks: Record<string, unknown>[] };
+    expect(metadata.summary).toMatch(/machine checks did not pass.*LLM review did not run/i);
+    expect(metadata.checks).toHaveLength(19);
+    expect(metadata.checks[12]).toEqual({ id: 'DI-13', status: 'fail', title: 'Title DI-13',
+      reason: 'The worker runtime is not documented.', hint: 'Document the setting.' });
+    expect(metadata.checks[0]).toEqual({ id: 'DI-01', status: 'pass', title: 'Title DI-01' });
+    expect(JSON.stringify(verdict)).not.toContain('PRIVATE_LOG_CONTENT');
+  });
+
+  it('adds a summary when the judge fails the review', async () => {
+    const grade = vi.fn(async () => ({ name: 'prompt', kind: 'llm' as const, passed: false, score: 0, evidence: 'Rejected.' }));
+    const verdict = await gradeCodeOnly(input(), { grade });
+    expect((verdict.metadata as { summary: string }).summary).toMatch(/LLM review did not pass/);
+    expect((verdict.metadata as { checks: unknown[] }).checks).toHaveLength(19);
+  });
 });

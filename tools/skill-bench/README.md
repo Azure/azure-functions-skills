@@ -75,6 +75,27 @@ interface PreflightPlugin {
 
 Scenario plugins go in the example directory, not in `src/`.
 
+## Failure diagnostics
+
+After `run` and `report`, the CLI prints a short list of the cells that did not pass. The dashboard shows the same data in the **Why it failed** panel of each comparison. A card row shows a warning when a trial needs attention.
+
+Each trial gets a `diagnosis` in `benchmark.json`:
+
+| Stage | Meaning |
+| --- | --- |
+| `execution` | The trial did not complete. For example, the model is not available, the token is not valid, or a timeout occurred. The message includes a hint. |
+| `grading` | The trial completed, but one or more graders failed. The message names the failed graders and their failed sub-checks. |
+| `ungraded` | The trial completed, but no grader verdict was recorded. |
+| `skipped` | Vally skipped the trial. |
+| `passed` | All graders passed. |
+
+A grader plugin can give more detail in its result `metadata`:
+
+- `summary`: one short sentence that tells why the grader failed.
+- `checks`: a list of `{ "id", "status", "title"?, "reason"?, "hint"? }`. `status` is `pass`, `fail`, `blocked`, `not-applicable`, or `skipped`. `hint` tells the user what to change. If `checks` is absent, the report uses `requirements` with the same shape.
+
+The report never copies grader `evidence`, transcripts, or logs. It removes control characters from the text fields, replaces absolute paths with `<path>` and token-like values with `<redacted>`, and limits the length. It rejects an unknown check status or an unsafe check ID. Do not put secrets or log output in these fields. Use `results.jsonl` for the full record.
+
 ## Security
 
 - `dry-run` and `run` need `--trusted` (or `SKILL_BENCH_TRUSTED=1`). Use it only for reviewed eval and plugin code. Eval content can contain prompt injection, and the agent can write files and run commands.
