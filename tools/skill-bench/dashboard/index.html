@@ -30,6 +30,7 @@
     .detail-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:18px}.panel{border:1px solid var(--line);background:white;border-radius:12px;padding:22px}.panel h2{font-size:16px;margin-bottom:16px}.check{display:flex;align-items:start;gap:9px;padding:9px 0;border-bottom:1px solid #f1f3f7;font-size:12px}.check:last-child{border:0}.check .mark{color:var(--accent);font-weight:700}.definition{display:grid;grid-template-columns:115px 1fr;font-size:12px;gap:10px 14px}.definition dt{color:var(--muted)}.definition dd{margin:0;overflow-wrap:anywhere}.internal{margin-top:18px;background:white;border:1px solid var(--line);border-radius:12px}.internal summary{cursor:pointer;padding:17px 22px;font-size:13px;font-weight:650}.internal div{padding:0 22px 20px;font-size:12px;color:var(--muted)}.prompt{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:10px;font-size:12px;line-height:1.65;color:var(--ink)}
     .bar-row{grid-template-columns:46px 1fr 68px}.metric-bottom{gap:8px;flex-wrap:wrap}.metric-bottom small{overflow-wrap:anywhere}.legend>span{display:inline-block}
     [hidden]{display:none!important}
+    .attention{color:var(--orange)!important;font-weight:650}.diagnosis{margin-top:20px}.diagnosis h3{font-size:13px;margin:16px 0 4px}.diag{border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin:8px 0;font-size:12px}.diag.passed{border-color:#cfe9e2}.diag.execution,.diag.grading,.diag.ungraded,.diag.unexecuted{border-color:#f1d2b0;background:#fffaf4}.diag-stage{font-weight:700;margin-right:6px}.hint{color:var(--orange);margin-top:6px;overflow-wrap:anywhere}.diag-grader{margin-top:9px}.diag-list{list-style:none;padding:0;margin:6px 0 0}.diag-check{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #f1f3f7;overflow-wrap:anywhere}.diag-check:last-child{border:0}.diag-check .mark{color:var(--accent);font-weight:700;width:14px;flex:none}.diag-check.fail .mark,.diag-check.blocked .mark{color:var(--orange)}.diag-check.not-applicable .mark,.diag-check.skipped .mark{color:var(--muted)}
     @media(max-width:850px){.intro-aside{display:none}.pair{grid-template-columns:60px 60px}.pair.wide{grid-template-columns:75px 75px}th,td{padding-left:12px;padding-right:12px}.detail-grid{grid-template-columns:1fr}.metric-grid{gap:10px}.metric-card{padding:17px}.metric-values .big{font-size:25px}.scenario-chip{display:none}}
     @media(max-width:620px){main{padding:25px 16px}.nav{padding:14px 16px;flex-wrap:wrap}.nav-right{width:100%;justify-content:space-between;gap:8px}.brand{font-size:13px}.nav-link{display:none}h1{font-size:25px}.overview{gap:8px}.stat{padding:13px 10px;display:block}.stat-value{font-size:25px}.stat strong{font-size:11px;margin-top:5px}.stat p{font-size:10px}.toolbar{align-items:stretch;gap:10px}.field{flex:1}.field select,.field input{min-width:0;width:100%}.legend{width:100%;padding:2px 0}.skill-head{padding:17px 15px}.skill-title p{font-size:11px}table{min-width:760px}.metric-grid{grid-template-columns:1fr}.metric-values{justify-content:start;gap:40px}.detail-select{align-items:start}.detail-select .legend{width:auto;display:block;line-height:2}.footer{display:block}.note{padding:16px}.metric-card h2{margin-bottom:12px}}
   </style>
@@ -85,6 +86,7 @@
     };
     const modelOptions = (selected,available=models) => available.map(model=>`<option value="${esc(model)}" ${selected===model?'selected':''}>${esc(modelName(model))}</option>`).join('');
     const counts = arm => arm ? `${arm.samples}/${arm.planned}` : '—';
+    const attention = arm => arm ? arm.unexecuted + arm.trials.filter(trial=>trial.diagnosis?.stage!=='passed').length : 0;
     const metric = (arm,key) => arm?.metrics[key] ?? null;
     function delta(on,off,unit='',lower=false){
       if(on==null||off==null)return `<span class="comparison neutral">${t('Not comparable','比較できません')}</span>`;
@@ -107,7 +109,9 @@
       if(!comparisons.length)return '';
       const rows=comparisons.map(c=>{
         const href=url(c.id,c.model);
-        return `<tr><td><a class="model" href="${esc(href)}">${esc(modelName(c.model))}</a><span class="sub">${t('Executed / planned','実行済み / 計画')}: ${onLabel} ${counts(c.on)} · ${offLabel} ${counts(c.off)}</span></td>
+        const issues=attention(c.on)+attention(c.off);
+        const flag=issues?`<span class="sub attention">⚠ ${issues} ${t('trial(s) need attention. Open Details to see why.','件の試行に要確認があります。詳細で理由を確認してください。')}</span>`:'';
+        return `<tr><td><a class="model" href="${esc(href)}">${esc(modelName(c.model))}</a><span class="sub">${t('Executed / planned','実行済み / 計画')}: ${onLabel} ${counts(c.on)} · ${offLabel} ${counts(c.off)}</span>${flag}</td>
           <td>${paired(c.on?.successRate,c.off?.successRate,percent,false,true)}</td><td>${paired(metric(c.on,'totalTokens'),metric(c.off,'totalTokens'),compact,true)}</td><td>${paired(metric(c.on,'turnCount'),metric(c.off,'turnCount'),number)}</td>
           <td>${delta(c.on?.successRate,c.off?.successRate,' pp')}</td><td><a class="detail-link" href="${esc(href)}">${t('Details','詳細')} →</a></td></tr>`;
       }).join('');
@@ -155,6 +159,21 @@
       const quality=graderNames.includes('code-quality')?metricCard(t('Code quality · LLM judge','コード品質 · LLM judge'),graderScore(c.on,'code-quality'),graderScore(c.off,'code-quality'),number,delta(graderScore(c.on,'code-quality'),graderScore(c.off,'code-quality')),t('Up-to-date APIs and best practice. Scored but not gating.','最新 API とベストプラクティス。スコアのみで合否には影響しません。'),1):'';
       const prompt=c.prompt==null?'':`<details class="internal"><summary>${t('Prompt used for this scenario','このシナリオで使用したプロンプト')}</summary><div><p>${t('Verbatim from the reviewed eval specification, not from agent output.','レビュー済み eval 仕様からの引用で、エージェントの出力ではありません。')}</p><pre class="prompt">${esc(c.prompt)}</pre></div></details>`;
       const snapshotLocation=arm=>arm?.workspace==null?'—':`<code>${esc(arm.workspace)}</code>`;
+      const stageLabel={passed:'PASS',execution:t('Execution error','実行エラー'),grading:t('Grader failure','Grader 不合格'),ungraded:t('No verdict','判定なし'),skipped:t('Skipped','スキップ')};
+      const markFor={pass:'✓',fail:'✗',blocked:'■','not-applicable':'–',skipped:'–'};
+      const checkRow=item=>`<li class="diag-check ${esc(item.status)}"><span class="mark">${markFor[item.status]??'?'}</span><span><strong>${esc(item.id)}</strong> ${esc(item.status)}${item.title?` · ${esc(item.title)}`:''}${item.reason?`<br><span class="sub">${esc(item.reason)}</span>`:''}${item.hint?`<div class="hint">${t('How to fix','対処')}: ${esc(item.hint)}</div>`:''}</span></li>`;
+      const graderRow=g=>`<div class="diag-grader"><strong>${esc(g.name)}</strong>: ${g.passed===true?'PASS':g.passed===false?'FAIL':'—'}${(g.failed??[]).length?` <span class="sub">${t('Failed sub-checks','失敗したサブチェック')}: ${g.failed.map(esc).join(', ')}</span>`:''}${g.summary?`<p class="sub">${esc(g.summary)}</p>`:''}${(g.checks??[]).length?`<ul class="diag-list">${g.checks.map(checkRow).join('')}</ul>`:''}</div>`;
+      const diagnosis=[[withSkills,c.on],[withoutSkills,c.off]].map(([title,arm])=>{
+        if(!arm)return `<h3>${title}</h3><div class="diag unexecuted">${missing}</div>`;
+        const items=arm.trials.map(trial=>{
+          const d=trial.diagnosis??{stage:'ungraded',message:missing,hint:null};
+          const graders=d.stage==='passed'?'':trial.graders.filter(g=>g.passed!==true||(g.checks??[]).length).map(graderRow).join('');
+          return `<div class="diag ${esc(d.stage)}"><div><span class="diag-stage">${stageLabel[d.stage]??esc(d.stage)}</span>${esc(d.message)}</div>${d.hint?`<div class="hint">${t('Next step','次の対処')}: ${esc(d.hint)}</div>`:''}${graders}</div>`;
+        });
+        if(arm.unexecuted)items.push(`<div class="diag unexecuted"><span class="diag-stage">${t('Not executed','未実行')}</span>${t(`${arm.unexecuted} planned trial(s) have no result. The cell did not run or did not write results.`,`計画済み試行 ${arm.unexecuted} 件に結果がありません。セルが実行されなかったか、結果を書き込みませんでした。`)}</div>`);
+        const source=arm.results?`<p class="sub">${t('Full record','完全な記録')}: <code>${esc(arm.results)}</code></p>`:'';
+        return `<h3>${title}</h3>${items.join('')}${source}`;
+      }).join('');
       document.title=`${skillName(c)} · ${modelName(c.model)} | Benchmarks`;
       app.innerHTML=`<div class="crumb"><a href="${esc(url(null,c.model))}">${t('Dashboard','ダッシュボード')}</a><span>/</span>${esc(skillName(c))}<span>/</span>${esc(modelName(c.model))}</div>
         <div class="eyebrow">${esc(c.skill)}</div><h1>${esc(skillName(c))}</h1><p class="lead">${esc(scenarioName(c))}</p>${sample}
@@ -169,6 +188,7 @@
         }).join('')}</div>
         <div class="detail-grid"><section class="panel"><h2>${t('Native grader results','Native grader の結果')}</h2><p class="sub">${t('Per-trial verdicts and scores; no raw evidence or logs.','試行ごとの判定とスコア。生の証拠・ログは公開しません。')}</p>${trials}</section>
         <section class="panel"><h2>${t('Comparison conditions','比較条件')}</h2><dl class="definition"><dt>${t('Model','モデル')}</dt><dd>${esc(modelName(c.model))}</dd><dt>${t('Sample count','サンプル数')}</dt><dd>${onLabel}: ${counts(c.on)} · ${offLabel}: ${counts(c.off)} (${t('executed / planned','実行済み / 計画')})</dd><dt>${t('Comparison','比較')}</dt><dd>${difference}</dd><dt>${t('Data source','データソース')}</dt><dd>${sourceLabel}</dd>${standalone?`<dt>${t('Workspace snapshot','Workspace snapshot')}</dt><dd>${onLabel}: ${snapshotLocation(c.on)}<br>${offLabel}: ${snapshotLocation(c.off)}<br><span class="sub">${t('Paths are relative to the native result directory.','パスはnative結果ディレクトリからの相対パスです。')}</span></dd>`:''}</dl></section></div>
+        <section class="panel diagnosis"><h2>${t('Why it failed · Diagnosis','失敗の理由 · 診断')}</h2><p class="sub">${t('The failure stage, the failed checks, and the next step for each trial. Grader evidence and logs are not shown.','試行ごとの失敗段階、失敗したチェック、次の対処。Grader の証拠とログは表示しません。')}</p>${diagnosis}</section>
         <section class="skill-card" style="margin-top:20px"><div class="skill-head"><h2>${t('Result breakdown','結果の内訳')}</h2></div><div class="table-wrap"><table><thead><tr><th>${t('Metric','指標')}</th><th>${withSkills}</th><th>${withoutSkills}</th></tr></thead><tbody>
         ${[['planned',t('Planned','計画')],['samples',t('Executed','実行済み')],['unexecuted',t('Unexecuted','未実行')],['skipped',t('Skipped','スキップ')],['executionErrors',t('Execution errors','実行エラー')],['failed',t('Grader failures','Grader 不合格')],['passed',t('Passed','合格')],['score',t('Grader score · Mean','Grader スコア · 平均')]].map(([key,title])=>breakdown(title,arm=>number(arm[key]))).join('')}
         ${graderNames.map(name=>breakdown(`${t('Grader','Grader')} · ${esc(name)} · ${t('Mean','平均')}`,arm=>number(graderScore(arm,name)))).join('')}

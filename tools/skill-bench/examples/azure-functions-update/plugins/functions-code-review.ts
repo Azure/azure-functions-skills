@@ -88,15 +88,61 @@ export function buildCodeReview(root: string) {
   return review;
 }
 
+interface DiagnosticCheck {
+  id: string;
+  status: string;
+  title?: string;
+  reason?: string;
+  hint?: string;
+}
+
+function text(value: unknown, limit = 300): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim().slice(0, limit) : undefined;
+}
+
+// Dashboard diagnostics. They include titles, grader reasons and fix hints, never evidence or logs.
+export function buildDiagnosticChecks(root: string): DiagnosticCheck[] {
+  const result = record(JSON.parse(readSmall(root, 'grading-evidence/checklist.json', 1_000_000)));
+  const definitions = new Map<string, Record<string, unknown>>();
+  try {
+    const definition = record(JSON.parse(readSmall(root, 'grading-evidence/definition-of-done.json', 1_000_000)));
+    for (const value of Array.isArray(definition.requirements) ? definition.requirements : []) {
+      const row = record(value);
+      if (typeof row.id === 'string') definitions.set(row.id, row);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  return (Array.isArray(result.requirements) ? result.requirements : []).map(value => {
+    const row = record(value);
+    if (typeof row.id !== 'string' || typeof row.status !== 'string' || !statuses.has(row.status)) {
+      throw new Error('Invalid deterministic requirement status.');
+    }
+    const known = definitions.get(row.id);
+    const title = text(known?.title) ?? text(row.title);
+    const failed = row.status === 'fail' || row.status === 'blocked';
+    const reason = row.status === 'pass' ? undefined : text(row.reason);
+    const hint = failed ? text(known?.hint) : undefined;
+    return { id: row.id, status: row.status, ...(title ? { title } : {}), ...(reason ? { reason } : {}),
+      ...(hint ? { hint } : {}) };
+  });
+}
+
 export async function gradeCodeOnly(input: GraderInput, judge: Pick<Grader, 'grade'>): Promise<GraderResult> {
   if (!input.trajectory?.workDir) throw new Error('Code review needs the submitted workspace.');
   const review = buildCodeReview(input.trajectory.workDir);
+  const checks = buildDiagnosticChecks(input.trajectory.workDir);
   if (review.execution.overall !== 'pass') {
     return {
       name, kind: 'code', status: review.execution.overall === 'blocked' ? 'error' : 'success',
       passed: false, score: 0,
       evidence: `Independent execution is ${review.execution.overall}. No model review was run.`,
-      metadata: { policy: review.policy, requirements: review.execution.requirements },
+      metadata: {
+        policy: review.policy, requirements: review.execution.requirements, checks,
+        summary: review.execution.overall === 'blocked'
+          ? 'A machine check was blocked, so the LLM review did not run. Fix the blocked checks first.'
+          : 'The machine checks did not pass, so the LLM review did not run. Fix the failed checks first.',
+      },
     };
   }
   const projection = mkdtempSync(join(tmpdir(), 'functions-code-review-'));
@@ -107,7 +153,9 @@ export async function gradeCodeOnly(input: GraderInput, judge: Pick<Grader, 'gra
       trajectory: { ...input.trajectory, workDir: projection },
       config: { ...input.config, evidence: ['repo'], output_delivery: 'inline' },
     });
-    return { ...result, name, metadata: { ...result.metadata, policy: review.policy } };
+    return { ...result, name, metadata: { ...result.metadata, policy: review.policy, checks,
+      ...(result.passed ? {} : { summary: 'The machine checks passed, but the LLM review did not pass. '
+        + 'See results.jsonl for the judge rationale.' }) } };
   } finally {
     rmSync(projection, { recursive: true, force: true });
   }
