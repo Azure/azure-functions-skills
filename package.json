@@ -70,6 +70,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "applicationinsights": "1.8.10"
+    "applicationinsights": "3.16.0"
   }
 }
