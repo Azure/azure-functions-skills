@@ -182,6 +182,7 @@ Catch configuration mistakes, deprecated settings, **and semantic code issues** 
 npx @azure/functions-skills doctor --dir . \
   --deep --accept-deep-risk \
   --agent github-copilot \
+  --model gpt-5.6-sol \
   --format html --output doctor-report.html
 ```
 
@@ -218,6 +219,7 @@ jobs:
           npx @azure/functions-skills doctor \
             --deep --accept-deep-risk \
             --agent github-copilot \
+            --model gpt-5.6-sol \
             --format markdown --output doctor.md \
             --severity high
       - name: Publish summary

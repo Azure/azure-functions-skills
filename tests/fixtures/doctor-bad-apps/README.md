@@ -19,6 +19,7 @@ node bin/azure-functions-skills.js doctor `
   --dir tests\fixtures\doctor-bad-apps\<fixture-name> `
   --deep --accept-deep-risk `
   --agent github-copilot `
+  --model gpt-5.6-sol `
   --format json --output <fixture-name>-result.json
 ```
 
@@ -63,6 +64,7 @@ Use `expected-results.md` for expected findings. Tier 1 findings are strict; Tie
 | `csharp-clean` | C# .NET | Healthy isolated model project |
 | `java-clean` | Java | Healthy Maven project |
 | `powershell-clean` | PowerShell | Healthy managed-deps project |
+| `go-clean` | Go | Healthy native-worker project |
 
 ### Deep / semantic fixtures (multi-language — require LLM analysis)
 
@@ -84,6 +86,7 @@ Use `expected-results.md` for expected findings. Tier 1 findings are strict; Tie
 | `java-deep-client-reuse` | Java | Missing extension bundle | JV-001, JV-002, JV-003, CQ-005, CQ-007 — Old plugin/Java 11, client per invocation, no idempotency, empty catch |
 | `powershell-deep-install-module` | PowerShell | — | PS-002, PS-003, CQ-002 — Heavy profile, Install-Module in handler, $env/$global persistence |
 | `powershell-deep-managed-deps` | PowerShell | Deprecated AzureWebJobsDashboard | PS-001, CQ-002, CQ-007 — managedDependency without requirements.psd1, $global cache anti-pattern |
+| `go-deep-toolchain-and-runtime` | Go | Old toolchain, pseudo-version worker pin, wrong runtime | GO-001..GO-004, SC-002 — panic escape, client lifecycle, worker configuration, anonymous auth |
 
 ### Supply-chain fixtures (Tier 1 + Tier 2)
 
@@ -112,6 +115,10 @@ node <repo-root>/scripts/doctor-validation-report.mjs --fixtures-dir .
 Start-Process .\ai-validation-report.html
 ```
 
-The script uses a curated keyword map for each fixture and reports overall recall (%), per-fixture matched / missed / extra findings, and AI durations. Self-contained HTML, no external dependencies.
+The script uses a machine-readable expectation catalog and scored many-to-many
+matching. It reports expected-item recall, associated and extra AI findings,
+match evidence, model provenance, and workspace integrity errors. A finding is
+extra only when it has no valid expectation match. Reports are advisory because
+LLM output is non-deterministic and model-dependent.
 
 > **Why not delegate this to an LLM agent?** An earlier version of this README contained a "let a coding agent produce the report" prompt. That pattern was withdrawn because every fixture under this directory is intentionally adversarial test content (some files are designed to look like real prompt-injection / supply-chain payloads). Pointing a general-purpose agent at the fixtures directory and asking it to *read* and *interpret* their JSON output is itself a prompt-injection surface. Use the deterministic Node.js script above instead.
