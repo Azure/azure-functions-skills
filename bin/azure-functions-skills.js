@@ -55,11 +55,48 @@ if (command === 'template') {
     { stdio: 'inherit' },
   );
 } else if (command === 'telemetry') {
-  await runTelemetryCommand();
+  if (args[1] === 'deployment-observed') {
+    await runDeploymentObservedTelemetryCommand();
+  } else {
+    await runTelemetryCommand();
+  }
 } else {
   console.error(`Unknown command: ${command}`);
   console.error(HELP.trim());
   process.exit(1);
+}
+
+async function runDeploymentObservedTelemetryCommand() {
+  try {
+    const dirIndex = args.indexOf('--dir');
+    const dir = (dirIndex >= 0 && args[dirIndex + 1]) || process.cwd();
+    const {
+      parseDeploymentObservationInput,
+      collectDeploymentObservation,
+      readWorkspaceTelemetryState,
+    } = await import('../lib/telemetry/index.js');
+    const rawInput = await readStdin(16 * 1024);
+    if (rawInput.trim().length === 0) {
+      throw new Error('Deployment observation telemetry input is required on stdin.');
+    }
+    const input = parseDeploymentObservationInput(JSON.parse(rawInput));
+    // Workspaces from earlier local installs can keep an opt-out in telemetry.config.json.
+    const configPaths = [
+      join(dir, '.github', 'hooks', 'telemetry.config.json'),
+      join(dir, '.claude', 'hooks', 'telemetry.config.json'),
+      join(dir, '.codex', 'hooks', 'telemetry.config.json'),
+    ];
+    if (readWorkspaceTelemetryState(configPaths) !== 'active') {
+      process.stdout.write('disabled\n');
+      return;
+    }
+    const result = await collectDeploymentObservation(input, { workspaceTelemetryEnabled: undefined });
+    process.stdout.write(`${result.status}\n`);
+  } catch {
+    process.stdout.write('failed\n');
+  } finally {
+    process.exit(0);
+  }
 }
 
 async function runTelemetryCommand() {
