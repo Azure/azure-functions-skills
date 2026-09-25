@@ -1,0 +1,202 @@
+{
+  "01-missing-host-json": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["project-exists:fail"]
+  },
+  "02-host-json-missing-version": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["runtime-version:fail", "extension-bundle:warn", "local-settings:warn"]
+  },
+  "03-extension-bundle-missing-version": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["extension-bundle:fail"]
+  },
+  "04-extension-bundle-outdated": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["extension-bundle:fail"]
+  },
+  "05-unsupported-node-version": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["node-version:fail"]
+  },
+  "06-missing-worker-runtime": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["local-settings:warn"]
+  },
+  "07-non-http-missing-storage": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["connection-strings:fail"]
+  },
+  "08-deprecated-settings": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["deprecated-settings:warn"]
+  },
+  "09-unknown-trigger-type": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["function-bindings:warn"]
+  },
+  "10-entrypoint-tsconfig-errors": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["entry-point:fail", "typescript-build:fail"]
+  },
+  "csharp-clean": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "csharp-deep-blocking-async": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "csharp-deep-inprocess-antipatterns": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "go-clean": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "go-deep-toolchain-and-runtime": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["go-version:fail", "go-version:warn", "local-settings:warn"]
+  },
+  "java-clean": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "java-deep-client-reuse": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["extension-bundle:warn"]
+  },
+  "node-clean": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "node-deep-anonymous-admin": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "node-deep-client-reuse": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["extension-bundle:fail"]
+  },
+  "node-deep-durable-nondeterministic": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "node-deep-eventhub-no-idempotency": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "node-deep-output-binding-errors": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "node-deep-secrets-obfuscated": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "node-deep-servicebus-autocomplete": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["function-bindings:warn"]
+  },
+  "node-supply-chain-credential-collector": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["function-bindings:warn"]
+  },
+  "node-supply-chain-dropper-pattern": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "node-supply-chain-postinstall": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["lifecycle-scripts:fail"]
+  },
+  "node-supply-chain-tracked-env": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["tracked-secret-files:fail"]
+  },
+  "node-supply-chain-unpinned-deps": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["unpinned-prod-deps:warn", "missing-lockfile:warn"]
+  },
+  "powershell-clean": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "powershell-deep-install-module": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "powershell-deep-managed-deps": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["deprecated-settings:warn"]
+  },
+  "python-clean": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "python-deep-blocking-sync": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["local-settings:warn"]
+  },
+  "python-deep-secrets-sql-injection": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "python-deep-v1-incomplete-deps": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["deprecated-settings:warn"]
+  },
+  "python-deep-v2-async-antipatterns": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "python-blueprint-unregistered": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["python-blueprint-registration:warn"]
+  },
+  "python-deploy-artifacts": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["python-deploy-artifacts:warn"]
+  },
+  "python-durable-defaults": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["python-durable-configuration:warn"]
+  },
+  "python-missing-application-insights": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["application-insights:warn"]
+  },
+  "python-missing-azure-functions": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["python-azure-functions:fail"]
+  },
+  "python-missing-dependency-manifest": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["python-dependency-manifest:fail"]
+  },
+  "python-mixed-model": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["python-programming-model:warn"]
+  },
+  "python-native-dependencies": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["python-native-dependencies:warn"]
+  },
+  "python-outdated-azure-functions": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["python-azure-functions:fail"]
+  },
+  "python-supply-chain-c2-import": {
+    "expectedStatus": "pass",
+    "requiredFindings": []
+  },
+  "python-v2-missing-storage": {
+    "expectedStatus": "fail",
+    "requiredFindings": ["connection-strings:fail"]
+  },
+  "python-worker-dependency": {
+    "expectedStatus": "pass",
+    "requiredFindings": ["python-worker-dependency:warn"]
+  }
+}

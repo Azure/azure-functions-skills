@@ -24,7 +24,9 @@ node bin/azure-functions-skills.js doctor `
 
 > **CI cost note:** Each Tier 2 fixture spawns an LLM agent for semantic analysis. Consider using `SKIP_DEEP_TESTS=1` for CI runs that should only validate Tier 1 checks.
 
-Use `expected-results.md` for expected findings. Tier 1 findings are strict; Tier 2 findings are advisory (LLM output is non-deterministic).
+Use `expected-results.md` for documented expectations and `expected-results.json`
+for machine-readable Tier 1 assertions. Tier 1 findings are strict; Tier 2
+findings are advisory (LLM output is non-deterministic).
 
 ## Fixture list
 
@@ -93,7 +95,7 @@ Use `expected-results.md` for expected findings. Tier 1 findings are strict; Tie
 | `node-supply-chain-unpinned-deps` | Node.js | `unpinned-prod-deps:warn`, `missing-lockfile:warn` | — |
 | `node-supply-chain-tracked-env` | Node.js | `tracked-secret-files:fail`, `missing-lockfile:warn` | SC-109 hardcoded secrets in source |
 | `node-supply-chain-dropper-pattern` | Node.js | `missing-lockfile:warn` | SC-101+102+103+104+108 (durabletask Node.js port) |
-| `node-supply-chain-credential-collector` | Node.js | `missing-lockfile:warn` | SC-105 credential harvest, SC-106 .bashrc persistence |
+| `node-supply-chain-credential-collector` | Node.js | `function-bindings:warn`, `missing-lockfile:warn` | SC-105 credential harvest, SC-106 .bashrc persistence |
 | `python-supply-chain-c2-import` | Python | — | SC-101+102+103+104+108 (durabletask Python port) |
 
 ## Check ID reference
