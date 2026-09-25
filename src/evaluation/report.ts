@@ -1,6 +1,6 @@
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { isAbsolute, join, posix, relative, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -31,6 +31,7 @@ interface Arm {
   graderScores: Record<string, number | null>;
   metrics: Metrics;
   trials: TrialView[];
+  workspace: string | null;
 }
 
 interface Comparison {
@@ -107,7 +108,7 @@ export function relativeChange(on: number | null, off: number | null): number | 
   return on === null || off === null || off === 0 ? null : (on - off) / off * 100;
 }
 
-function summarize(planned: number, trials: TrialView[]): Arm {
+function summarize(planned: number, trials: TrialView[], workspace: string | null = null): Arm {
   const executed = trials.filter(trial => trial.status !== 'skipped');
   const passed = executed.filter(trial => trial.status === 'success' && trial.passed === true).length;
   const graderNames = [...new Set(executed.flatMap(trial => trial.graders.map(grader => grader.name)))];
@@ -125,7 +126,7 @@ function summarize(planned: number, trials: TrialView[]): Arm {
     graderScores: Object.fromEntries(graderNames.map(name => [name, mean(executed.map(trial =>
       trial.graders.find(grader => grader.name === name)?.score ?? null))])),
     metrics: Object.fromEntries(metricNames.map(key => [key, mean(executed.map(trial => trial.metrics[key]))])) as Metrics,
-    trials,
+    trials, workspace,
   };
 }
 
@@ -179,7 +180,189 @@ function checkSkills(environment: unknown, enabled: boolean, skill: string): voi
     : skills.length === 0, 'expected only the target skill ON, and no skills OFF.');
 }
 
+function trialView(record: ObjectValue, id: string, standalone = false): TrialView {
+  const status = text(record.status);
+  check(['success', 'error', 'skipped'].includes(status), 'unknown native execution status.');
+  check('gradeResult' in record, 'missing native gradeResult (use null when ungraded).');
+  const grade = record.gradeResult === null ? {} : object(record.gradeResult);
+  const details = list(grade.details ?? []).map(object);
+  const gradeError = standalone && (grade.status === 'error' || details.some(g => g.status === 'error'));
+  const trajectory = record.trajectory == null ? {} : object(record.trajectory);
+  const metrics = trajectory.metrics == null ? {} : object(trajectory.metrics);
+  const tokens = metrics.tokenUsage == null ? {} : object(metrics.tokenUsage);
+  return {
+    id: hash(id), status, passed: gradeError ? false : verdict(grade.passed),
+    score: gradeError ? (grade.score === 0 ? 0 : null) : number(grade.score),
+    graders: details.map(g => ({
+      name: identifier(g.name), passed: standalone && g.status === 'error' ? false : verdict(g.passed),
+      score: standalone && g.status === 'error' ? (g.score === 0 ? 0 : null) : number(g.score),
+    })),
+    metrics: Object.fromEntries(metricNames.map(name => [
+      name, number(name === 'totalTokens' ? tokens.totalTokens : metrics[name]),
+    ])) as Metrics,
+  };
+}
+
+function matrixFile(input: string, value: unknown): string {
+  const path = text(value).replaceAll('\\', '/');
+  check(!posix.isAbsolute(path) && !win32.isAbsolute(path) && !path.includes(':')
+    && path.split('/').every(part => part !== '' && part !== '.' && part !== '..'),
+  'matrix paths must be relative and stay inside the input directory.');
+  const file = realpathSync(join(input, ...path.split('/')));
+  const child = relative(input, file);
+  check(child !== '' && child !== '..' && !child.startsWith('..\\') && !child.startsWith('../')
+    && !isAbsolute(child) && statSync(file).isFile(), 'matrix file paths must stay inside the input directory, including links.');
+  return file;
+}
+
+function matrixDirectory(input: string, value: unknown): string {
+  const path = text(value).replaceAll('\\', '/');
+  check(!posix.isAbsolute(path) && !win32.isAbsolute(path) && !path.includes(':')
+    && path.split('/').every(part => part !== '' && part !== '.' && part !== '..'),
+  'matrix paths must be relative and stay inside the input directory.');
+  const directory = realpathSync(join(input, ...path.split('/')));
+  const child = relative(input, directory);
+  check(child !== '' && child !== '..' && !child.startsWith('..\\') && !child.startsWith('../')
+    && !isAbsolute(child) && statSync(directory).isDirectory(),
+  'matrix workspace paths must stay inside the input directory, including links.');
+  return child.replaceAll('\\', '/');
+}
+
+function matrixHash(value: unknown): string {
+  const result = text(value);
+  check(/^[a-f0-9]{16}$/.test(result), 'expected a 16-character matrix hash.');
+  return result;
+}
+
+function matrixSkills(value: unknown): string[] {
+  const skills = list(value).map(value => {
+    const path = text(value);
+    check(posix.isAbsolute(path) || win32.isAbsolute(path), 'matrix skills must use absolute paths.');
+    // Source directories can be on another machine. Do not read them.
+    const normalized = (win32.isAbsolute(path) ? win32.normalize(path) : posix.normalize(path))
+      .replaceAll('\\', '/').replace(/\/+$/, '');
+    identifier(normalized.split('/').at(-1));
+    return normalized;
+  });
+  check(new Set(skills).size === skills.length, 'duplicate matrix skill paths.');
+  return skills.sort();
+}
+
+function readMatrixBenchmark(input: string) {
+  const root = realpathSync(input);
+  const manifest = json(readFileSync(matrixFile(root, 'matrix-manifest.json'), 'utf8'), 'matrix-manifest.json');
+  check(manifest.type === 'vally-eval-matrix' && manifest.version === 1 && manifest.vallyVersion === '0.16.0',
+    'use a vally-eval-matrix version 1 manifest from Vally 0.16.0.');
+  const runId = identifier(manifest.runId);
+  const planHash = matrixHash(manifest.planHash);
+  // These hashes identify the local controller plan, not a native experiment.
+  const provenance = {
+    runId, experiment: 'plugin-skill-benchmark', experimentHash: planHash, planDigest: planHash,
+    vallyVersion: '0.16.0', transport: 'vally-eval', hashSource: 'local-matrix-plan',
+  };
+  const cells = list(manifest.cells).map(object);
+  check(cells.length > 0, 'matrix has no planned cells.');
+  const comparisons = new Map<string, Comparison>();
+  const evalPlans = new Map<string, string>();
+  const resultFiles = new Set<string>();
+  const resultIdentities = new Set<string>();
+  for (const cell of cells) {
+    const evalFile = text(cell.evalFile);
+    const { skill, directory } = skillFromFile(evalFile);
+    check(evalFile === `evals/${skill}/${directory}/eval.yaml`, 'invalid matrix eval path.');
+    const evalName = identifier(cell.evalName);
+    const model = identifier(cell.model);
+    check(typeof cell.enabled === 'boolean', 'matrix enabled must be a boolean.');
+    const arm = cell.enabled ? 'on' : 'off';
+    const variant = `skill=${arm},model=${model}`;
+    check(cell.variant === variant, 'matrix model or enabled flag differs from variant.');
+    const runs = number(cell.runs);
+    check(runs !== null && Number.isInteger(runs) && runs > 0 && runs <= 10000, 'invalid planned runs.');
+    const scenarios = list(cell.stimuli).map(identifier);
+    check(scenarios.length > 0 && new Set(scenarios).size === scenarios.length, 'invalid planned stimuli.');
+    const shared = matrixSkills(cell.sharedSkills);
+    const skills = matrixSkills(cell.skills);
+    check(!shared.some(path => path.split('/').at(-1) === skill), 'target skill cannot be a shared dependency.');
+    const target = skills.filter(path => !shared.includes(path));
+    check(shared.every(path => skills.includes(path))
+      && (cell.enabled ? target.length === 1 && target[0].split('/').at(-1) === skill : target.length === 0),
+    'matrix ON must contain the target and shared skills; OFF must contain only shared skills.');
+    const evalHash = matrixHash(cell.evalHash);
+    matrixHash(cell.configHash);
+    check(cell.exitCode === null || (typeof cell.exitCode === 'number' && Number.isInteger(cell.exitCode)),
+      'matrix exitCode must be an integer or null.');
+    const plan = JSON.stringify({ evalName, evalHash, runs, scenarios: [...scenarios].sort(), shared });
+    check(!evalPlans.has(evalFile) || evalPlans.get(evalFile) === plan,
+      'matrix eval hash, stimuli or shared skills differ between cells.');
+    evalPlans.set(evalFile, plan);
+
+    let records: ObjectValue[] = [];
+    if (cell.results !== null) {
+      const file = matrixFile(root, cell.results);
+      const stat = statSync(file, { bigint: true });
+      const identity = `${stat.dev}:${stat.ino}`;
+      check(!resultFiles.has(file) && !resultIdentities.has(identity), 'matrix cells must use distinct result files.');
+      resultFiles.add(file);
+      resultIdentities.add(identity);
+      records = jsonLines(file);
+    }
+    const workspace = cell.workspace === null || cell.workspace === undefined
+      ? null : matrixDirectory(root, cell.workspace);
+    const trials = new Map(scenarios.map(scenario => [scenario, [] as TrialView[]]));
+    const seen = new Set<string>();
+    const itemIds = new Set<string>();
+    let evalSource: string | undefined;
+    let summarySeen = false;
+    for (const record of records) {
+      // Standalone JSONL ends with a summary. It is not a trial or a verdict.
+      if (record.type === 'run-summary') {
+        check(!summarySeen, 'duplicate standalone run summary.');
+        summarySeen = true;
+        continue;
+      }
+      check(record.type === 'trial-result' && !summarySeen, 'unexpected standalone result record.');
+      check(record.evalName === evalName && (record.model === undefined || record.model === model),
+        'standalone trial eval or model differs from the matrix plan.');
+      check(record.variant === undefined || record.variant === 'main' || record.variant === variant,
+        'standalone trial variant differs from the matrix plan.');
+      const trajectory = record.trajectory == null ? {} : object(record.trajectory);
+      const metadata = trajectory.metadata == null ? {} : object(trajectory.metadata);
+      check(metadata.model === undefined || metadata.model === model, 'trajectory model differs from the matrix plan.');
+      const source = text(record.evalFilePath);
+      check(evalSource === undefined || evalSource === source, 'standalone cell contains multiple eval source paths.');
+      evalSource = source;
+      const scenario = identifier(record.stimulus);
+      const planned = trials.get(scenario);
+      check(planned, 'unplanned standalone stimulus.');
+      // Vally omits trialIndex and totalTrials for a single-trial run.
+      const index = record.trialIndex === undefined && runs === 1 ? 0 : number(record.trialIndex);
+      check(index !== null && Number.isInteger(index) && index < runs
+        && (record.totalTrials === runs || (record.totalTrials === undefined && runs === 1)),
+      'standalone trial index or total differs from the matrix plan.');
+      const key = `${scenario}::${index}`;
+      const itemId = text(record.itemId);
+      check(!seen.has(key) && !itemIds.has(itemId), 'duplicate standalone trial identity.');
+      seen.add(key);
+      itemIds.add(itemId);
+      planned.push(trialView(record, `${evalFile}::${variant}::${key}`, true));
+    }
+    for (const [scenario, records] of trials) {
+      const key = `${skill}::${evalName}::${scenario}::${model}`;
+      const comparison = comparisons.get(key) ?? {
+        id: hash(`${skill}::${evalName}::${scenario}`), skill, scenario, model,
+        prompt: scenarioPrompt(skill, directory, scenario), on: null, off: null,
+      };
+      check(comparison[arm] === null, 'duplicate model/scenario arm.');
+      comparison[arm] = summarize(runs, records, workspace);
+      comparisons.set(key, comparison);
+    }
+  }
+  return { provenance, comparisons: [...comparisons.values()].sort((a, b) =>
+    `${a.id}:${a.model}`.localeCompare(`${b.id}:${b.model}`)) };
+}
+
 export function readBenchmark(input: string) {
+  if (readdirSync(input).includes('matrix-manifest.json')) return readMatrixBenchmark(input);
   const manifest = json(readFileSync(join(input, 'experiment-manifest.json'), 'utf8'), 'experiment-manifest.json');
   const snapshot = json(readFileSync(join(input, 'plan-snapshot.json'), 'utf8'), 'plan-snapshot.json');
   check(manifest.type === 'experiment-manifest' && snapshot.type === 'experiment-plan-snapshot'
@@ -260,22 +443,7 @@ export function readBenchmark(input: string) {
               && context.name === provenance.experiment && context.runId === provenance.runId
               && context.variant === variant && context.evalHash === summary.evalHash && context.configHash === summary.configHash,
             'trial does not match model/run/eval/config provenance.');
-            const status = text(record.status);
-            check(['success', 'error', 'skipped'].includes(status), 'unknown native execution status.');
-            check('gradeResult' in record, 'missing native gradeResult (use null when ungraded).');
-            const grade = record.gradeResult === null ? {} : object(record.gradeResult);
-            const trajectory = record.trajectory == null ? {} : object(record.trajectory);
-            const metrics = trajectory.metrics == null ? {} : object(trajectory.metrics);
-            const tokens = metrics.tokenUsage == null ? {} : object(metrics.tokenUsage);
-            return {
-              id: hash(shardKey), status, passed: verdict(grade.passed), score: number(grade.score),
-              graders: list(grade.details ?? []).map(object).map(g => ({
-                name: identifier(g.name), passed: verdict(g.passed), score: number(g.score),
-              })),
-              metrics: Object.fromEntries(metricNames.map(name => [
-                name, number(name === 'totalTokens' ? tokens.totalTokens : metrics[name]),
-              ])) as Metrics,
-            };
+            return trialView(record, shardKey);
           });
         comparison[arm] = summarize(runs, trials);
         comparisons.set(key, comparison);

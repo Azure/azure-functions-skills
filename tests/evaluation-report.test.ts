@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { linkSync, mkdirSync, readFileSync, writeFileSync, readdirSync, symlinkSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { generateReport, readBenchmark, relativeChange } from '../src/evaluation/report.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
@@ -86,6 +86,59 @@ function fixture() {
   return { root, input, cells, experiment, snapshot, save };
 }
 
+function matrixFixture() {
+  const root = createTempDir('af-matrix-report-');
+  roots.push(root);
+  const input = join(root, 'matrix');
+  mkdirSync(input);
+  const shared = join(root, 'PRIVATE-SOURCE', 'shared-skill');
+  const target = join(root, 'PRIVATE-SOURCE', 'azure-functions-create');
+  const cells = ['claude-sonnet-5', 'gpt-6-astra'].flatMap(model => [false, true].map(enabled => ({
+    variant: `skill=${enabled ? 'on' : 'off'},model=${model}`,
+    evalFile: 'evals/azure-functions-create/typescript-http/eval.yaml',
+    evalName: 'azure-functions-create-typescript-http', model, enabled, runs: 1,
+    stimuli: ['typescript-http'], skills: enabled ? [shared, target] : [shared],
+    sharedSkills: [shared], evalHash: 'b839dd0e746a0f09', configHash: 'abcdef0000000000',
+    results: `${model}/${enabled ? 'on' : 'off'}/results.jsonl` as string | null,
+    workspace: `${model}/${enabled ? 'on' : 'off'}/workspace` as string | null,
+    workspaceError: null as string | null,
+    exitCode: 0 as number | null,
+  })));
+  const manifest = {
+    type: 'vally-eval-matrix', version: 1, vallyVersion: '0.16.0',
+    runId: '06b6578a-ad9f-4b21-8d90-d2ef8c7819a8', planHash: '0a81350e649a2fbc', cells,
+  };
+  const records: Record<string, unknown>[][] = cells.map((cell, index) => [{
+    type: 'trial-result', itemId: `PRIVATE-ITEM-${index}`, evalName: cell.evalName,
+    evalFilePath: join(root, 'PRIVATE-SOURCE', `.matrix-${index}.json`),
+    variant: 'main', stimulus: cell.stimuli[0], model: cell.model, trialIndex: 0, totalTrials: 1,
+    status: 'success', durationMs: 999,
+    gradeResult: {
+      passed: true, score: 1, details: [{ name: 'completed', passed: true, score: 1, evidence: 'PRIVATE-EVIDENCE' }],
+    },
+    trajectory: {
+      metadata: { model: cell.model, policyAnswers: 'PRIVATE-ANSWERS' },
+      metrics: {
+        tokenUsage: { totalTokens: 100 + index, inputTokens: 90, outputTokens: 10, cacheReadTokens: 9999 },
+        turnCount: 2, toolCallCount: 1, wallTimeMs: 123, errorCount: 0, skillActivationCount: Number(cell.enabled),
+      },
+      events: [{ content: 'PRIVATE-TRANSCRIPT' }],
+    },
+  }, { type: 'run-summary', passed: true, jsonlPath: 'PRIVATE-OUTPUT', evals: [] }]);
+  function save() {
+    writeFileSync(join(input, 'matrix-manifest.json'), JSON.stringify(manifest));
+    cells.forEach((cell, index) => {
+      if (cell.results === null || cell.results.includes('..')) return;
+      const file = join(input, cell.results);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, records[index].map(record => JSON.stringify(record)).join('\n'));
+      if (cell.workspace !== null) mkdirSync(join(input, cell.workspace), { recursive: true });
+    });
+  }
+  save();
+  return { root, input, manifest, cells, records, save };
+}
+
 // Exercise the existing inline renderer without adding a browser dependency.
 function render(html: string, search: string) {
   const data = /<script id="benchmark-data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)?.[1];
@@ -133,6 +186,198 @@ describe('native benchmark report', () => {
     expect(astra.on?.score).toBe(1);
     expect(astra.on?.successRate).toBe(100);
     expect(relativeChange(astra.on?.metrics.totalTokens ?? null, astra.off?.metrics.totalTokens ?? null)).toBeCloseTo(142.1152, 3);
+  });
+
+  describe('standalone Vally matrix report', () => {
+    it('pairs four cells by model and labels hashes as local transport metadata', () => {
+      const f = matrixFixture();
+      const data = readBenchmark(f.input);
+      expect(data.provenance).toMatchObject({
+        transport: 'vally-eval', experiment: 'plugin-skill-benchmark', hashSource: 'local-matrix-plan',
+        runId: f.manifest.runId, experimentHash: f.manifest.planHash, planDigest: f.manifest.planHash,
+      });
+      expect(data.comparisons.map(c => c.model)).toEqual(['claude-sonnet-5', 'gpt-6-astra']);
+      expect(data.comparisons.map(c => [c.off?.metrics.totalTokens, c.on?.metrics.totalTokens]))
+        .toEqual([[100, 101], [102, 103]]);
+      expect(data.comparisons[0].on).toMatchObject({ planned: 1, samples: 1, passed: 1, successRate: 100 });
+      expect(data.comparisons[0].on?.workspace).toBe('claude-sonnet-5/on/workspace');
+      expect(data.comparisons[0].prompt).toContain('Create a new TypeScript Azure Functions v4 HTTP app');
+    });
+
+    it('accepts omitted standalone model, variant and single-trial indices', () => {
+      const f = matrixFixture();
+      for (const rows of f.records) {
+        for (const key of ['model', 'variant', 'trialIndex', 'totalTrials']) delete rows[0][key];
+      }
+      f.save();
+      expect(readBenchmark(f.input).comparisons[0].off?.passed).toBe(1);
+    });
+
+    it.each(['null-result', 'empty-results', 'summary-only', 'all-null'])(
+      'keeps %s unexecuted, without a passing or failing score', kind => {
+        const f = matrixFixture();
+        if (kind === 'null-result') f.cells[0].results = null;
+        if (kind === 'all-null') f.cells.forEach(cell => { cell.results = null; cell.exitCode = null; });
+        if (kind === 'empty-results') f.records[0] = [];
+        if (kind === 'summary-only') f.records[0].shift();
+        f.save();
+        expect(readBenchmark(f.input).comparisons[0].off).toMatchObject({
+          planned: 1, samples: 0, unexecuted: 1, passed: 0, failed: 0, successRate: null, score: null,
+          metrics: { totalTokens: null },
+        });
+      });
+
+    it('keeps ungraded, skipped, execution errors and grader errors distinct', () => {
+      const f = matrixFixture();
+      f.records[0][0].gradeResult = null;
+      f.records[1][0].status = 'skipped';
+      f.records[2][0].status = 'error';
+      f.records[2][0].gradeResult = null;
+      f.records[3][0].gradeResult = { name: 'grader-error', status: 'error', passed: false, score: 0 };
+      f.save();
+      const [a, b] = readBenchmark(f.input).comparisons;
+      expect(a.off).toMatchObject({ samples: 1, passed: 0, failed: 0, successRate: null, score: null });
+      expect(a.on).toMatchObject({ skipped: 1, samples: 0, successRate: null });
+      expect(b.off).toMatchObject({ executionErrors: 1, passed: 0, successRate: 0 });
+      expect(b.on).toMatchObject({ failed: 1, passed: 0, successRate: 0, score: 0 });
+    });
+
+    it.each(['top-level', 'detail'])('does not accept a successful verdict for a %s grader error', kind => {
+      const f = matrixFixture();
+      const error = { name: 'completed', status: 'error', passed: true, score: 1 };
+      f.records[0][0].gradeResult = kind === 'top-level' ? error : { passed: true, score: 1, details: [error] };
+      f.save();
+      expect(readBenchmark(f.input).comparisons[0].off?.passed).toBe(0);
+    });
+
+    it.each([
+      'model', 'metadata-model', 'variant', 'enabled', 'duplicate-trial', 'duplicate-item', 'trial-index', 'total-trials',
+      'stimulus', 'eval-name', 'missing-grade', 'shared-difference', 'missing-dependency', 'extra-skill',
+      'off-target', 'duplicate-dependency', 'target-dependency', 'relative-skill', 'unsafe-label',
+      'eval-hash', 'plan-hash', 'config-hash', 'eval-path', 'duplicate-results', 'duplicate-cell',
+      'unknown-record', 'version',
+    ])('rejects inconsistent %s data', kind => {
+      const f = matrixFixture();
+      const cell = f.cells[0];
+      const row = f.records[0][0];
+      if (kind === 'model') row.model = 'another-model';
+      if (kind === 'metadata-model') row.trajectory = { metadata: { model: 'another-model' } };
+      if (kind === 'variant') row.variant = 'skill=on,model=claude-sonnet-5';
+      if (kind === 'enabled') cell.enabled = true;
+      if (kind === 'duplicate-trial') f.records[0].splice(1, 0, { ...row, itemId: 'another-item' });
+      if (kind === 'duplicate-item') {
+        f.cells.forEach(c => { c.runs = 2; });
+        row.totalTrials = 2;
+        f.records[0].splice(1, 0, { ...row, trialIndex: 1 });
+      }
+      if (kind === 'trial-index') row.trialIndex = 1;
+      if (kind === 'total-trials') row.totalTrials = 2;
+      if (kind === 'stimulus') row.stimulus = 'unplanned';
+      if (kind === 'eval-name') row.evalName = 'unplanned';
+      if (kind === 'missing-grade') delete row.gradeResult;
+      if (kind === 'shared-difference') { cell.sharedSkills = []; cell.skills = []; }
+      if (kind === 'missing-dependency') f.cells[1].skills.shift();
+      if (kind === 'extra-skill') cell.skills.push(join(f.root, 'extra-skill'));
+      if (kind === 'off-target') cell.skills.push(join(f.root, 'azure-functions-create'));
+      if (kind === 'duplicate-dependency') { cell.sharedSkills.push(cell.sharedSkills[0]); cell.skills.push(cell.skills[0]); }
+      if (kind === 'target-dependency') {
+        cell.sharedSkills = [join(f.root, 'azure-functions-create')]; cell.skills = [...cell.sharedSkills];
+      }
+      if (kind === 'relative-skill') { cell.sharedSkills = ['shared-skill']; cell.skills = ['shared-skill']; }
+      if (kind === 'unsafe-label') cell.model = '</script>';
+      if (kind === 'eval-hash') cell.evalHash = 'aaaaaaaaaaaaaaaa';
+      if (kind === 'plan-hash') f.manifest.planHash = 'not-a-hash';
+      if (kind === 'config-hash') cell.configHash = 'not-a-hash';
+      if (kind === 'eval-path') cell.evalFile = '../' + cell.evalFile;
+      if (kind === 'duplicate-results') f.cells[1].results = cell.results;
+      if (kind === 'duplicate-cell') { f.cells.push({ ...cell, results: null }); f.records.push([]); }
+      if (kind === 'unknown-record') f.records[0].push({ type: 'custom-result' });
+      if (kind === 'version') f.manifest.version = 2;
+      f.save();
+      expect(() => readBenchmark(f.input)).toThrow();
+    });
+
+    it('allows dependency order changes without changing the dependency set', () => {
+      const f = matrixFixture();
+      for (const cell of f.cells) {
+        const other = join(f.root, 'PRIVATE-SOURCE', 'another-dependency');
+        cell.sharedSkills.push(other);
+        cell.skills.push(other);
+        if (cell.enabled) cell.sharedSkills.reverse();
+      }
+      f.save();
+      expect(readBenchmark(f.input).comparisons).toHaveLength(2);
+    });
+
+    it.each(['traversal', 'absolute', 'link-escape', 'link-alias', 'hard-link-alias'])('rejects %s result paths', kind => {
+      const f = matrixFixture();
+      if (kind === 'traversal') f.cells[0].results = '../outside.jsonl';
+      if (kind === 'absolute') f.cells[0].results = join(f.root, 'outside.jsonl');
+      if (kind === 'link-escape' || kind === 'link-alias') {
+        const target = kind === 'link-escape' ? join(f.root, 'outside') : join(f.input, 'claude-sonnet-5', 'off');
+        mkdirSync(target, { recursive: true });
+        if (kind === 'link-escape') writeFileSync(join(target, 'results.jsonl'), JSON.stringify(f.records[0][0]));
+        symlinkSync(target, join(f.input, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
+        f.cells[kind === 'link-alias' ? 1 : 0].results = 'linked/results.jsonl';
+      }
+      if (kind === 'hard-link-alias') {
+        linkSync(join(f.input, 'claude-sonnet-5', 'off', 'results.jsonl'), join(f.input, 'alias.jsonl'));
+        f.cells[1].results = 'alias.jsonl';
+      }
+      writeFileSync(join(f.input, 'matrix-manifest.json'), JSON.stringify(f.manifest));
+      expect(() => readBenchmark(f.input)).toThrow(/path|inside|distinct/);
+    });
+
+    it('keeps separate planned stimuli and does not use summaries as verdicts', () => {
+      const f = matrixFixture();
+      for (const cell of f.cells) cell.stimuli.push('not-executed');
+      f.records[0][1].passed = false;
+      f.save();
+      const data = readBenchmark(f.input);
+      expect(data.comparisons).toHaveLength(4);
+      for (const comparison of data.comparisons.filter(c => c.scenario === 'not-executed')) {
+        expect(comparison.on).toMatchObject({ samples: 0, unexecuted: 1, successRate: null });
+        expect(comparison.off).toMatchObject({ samples: 0, unexecuted: 1, successRate: null });
+      }
+      expect(data.comparisons.find(c => c.scenario === 'typescript-http')?.off?.passed).toBe(1);
+    });
+
+    it('does not replace absent metrics or change an incomplete mean denominator', () => {
+      const f = matrixFixture();
+      for (const [index, cell] of f.cells.entries()) {
+        cell.runs = 2;
+        const first = f.records[index][0];
+        first.totalTrials = 2;
+        f.records[index].splice(1, 0, {
+          ...first, itemId: `second-${index}`, trialIndex: 1, trajectory: { metrics: { turnCount: 4 } },
+        });
+      }
+      f.save();
+      expect(readBenchmark(f.input).comparisons[0].on).toMatchObject({
+        samples: 2, passed: 2, metrics: { totalTokens: null, turnCount: 3 },
+      });
+    });
+
+    it('does not fall back to a native manifest when a matrix manifest is invalid', () => {
+      const f = fixture();
+      writeFileSync(join(f.input, 'matrix-manifest.json'), JSON.stringify({ type: 'experiment-manifest' }));
+      expect(() => readBenchmark(f.input)).toThrow(/vally-eval-matrix/);
+    });
+
+    it('renders only safe fields from standalone results and local provenance', () => {
+      const f = matrixFixture();
+      const html = readFileSync(generateReport(f.input, join(f.root, 'site')), 'utf8');
+      expect(html).not.toMatch(/PRIVATE-|evalFilePath|sharedSkills|policyAnswers|cacheReadTokens|itemId/);
+      expect(html).toContain('"transport":"vally-eval"');
+      const comparison = readBenchmark(f.input).comparisons[0];
+      const detail = render(html, `?skill=${comparison.id}`).node('#app').innerHTML;
+      expect(detail).toContain('Enabled: 1/1');
+      expect(detail).toContain('matrix-manifest.json');
+      expect(detail).toContain('Workspace snapshot');
+      expect(detail).toContain('claude-sonnet-5/on/workspace');
+      expect(detail).not.toMatch(/experiment-manifest|plan-snapshot|native shard keys/);
+      expect(render(html, '').node('#app').innerHTML).toContain('Vally standalone matrix');
+    });
   });
 
   it('does not treat provenance summaries or empty result files as grader failures', () => {

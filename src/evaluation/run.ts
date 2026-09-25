@@ -9,8 +9,15 @@ import { generateReport } from './report.js';
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 const experiment = join('experiments', 'local.experiment.yaml');
 const settings = '{"disabledSkills":["customize-cloud-agent","github-pr-media"]}';
+const publicNugetSource = 'https://api.nuget.org/v3/index.json';
 const osVariables = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'SYSTEMDRIVE', 'COMSPEC',
   'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432', 'PROCESSOR_ARCHITECTURE', 'NUMBER_OF_PROCESSORS', 'OS']);
+
+interface NugetPreflight {
+  targetFramework: string;
+  sdk: string;
+  packages: Record<string, string>;
+}
 
 interface Selection {
   all?: boolean;
@@ -26,6 +33,7 @@ interface RunOptions extends Selection {
   dryRun?: boolean;
   report?: boolean;
   registry?: string;
+  nugetSource?: string;
 }
 
 interface RunResult {
@@ -50,6 +58,24 @@ function strings(value: unknown): string[] {
   check(Array.isArray(value) && value.length > 0 && value.every(v => typeof v === 'string' && v.length > 0)
     && new Set(value).size === value.length, 'configuration lists must contain unique nonempty strings.');
   return value as string[];
+}
+
+function preflight(value: unknown): NugetPreflight | undefined {
+  if (value === undefined) return undefined;
+  const config = value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown> : undefined;
+  check(config !== undefined, 'nugetPreflight must be an object describing the probe project.');
+  const { targetFramework, sdk, packages } = config;
+  check(typeof targetFramework === 'string' && /^net(\d+\.\d+|standard\d\.\d|framework\d{3})$/.test(targetFramework),
+    'nugetPreflight.targetFramework must be a target framework moniker.');
+  check(typeof sdk === 'string' && /^[A-Za-z0-9][A-Za-z0-9.]*\/\d+(\.\d+){1,3}(-[A-Za-z0-9.]+)?$/.test(sdk),
+    'nugetPreflight.sdk must be a versioned MSBuild project SDK such as Azure.Functions.Sdk/1.0.0.');
+  const declared = packages !== null && typeof packages === 'object' && !Array.isArray(packages)
+    ? Object.entries(packages as Record<string, unknown>) : [];
+  check(declared.length > 0 && declared.every(([id, version]) => /^[A-Za-z0-9][A-Za-z0-9.]*$/.test(id)
+    && typeof version === 'string' && /^\d+(\.\d+){1,3}(-[A-Za-z0-9.]+)?$/.test(version)),
+  'nugetPreflight.packages must map package identifiers to explicit versions.');
+  return { targetFramework, sdk, packages: Object.fromEntries(declared) as Record<string, string> };
 }
 
 export function selectBenchmark(value: unknown, selection: Selection) {
@@ -80,11 +106,25 @@ export function selectBenchmark(value: unknown, selection: Selection) {
     && selectedModels.every(model => models.includes(model)), '--models must be a nonempty, unique subset of registered models.');
   const evals: string[] = [];
   const files: string[] = [];
+  const sharedSkills: string[] = [];
+  const graderPlugins: string[] = [];
+  const executorPlugins: string[] = [];
+  let nugetPreflight: NugetPreflight | undefined;
   for (const [id, entry] of Object.entries(skills)) {
     check(identifier.test(id), 'invalid skill identifier in configuration.');
     const definition = object(entry);
     const declaredEvals = strings(definition.evals);
     const declaredFiles = strings(definition.files);
+    const declaredShared = definition.sharedSkills === undefined ? [] : strings(definition.sharedSkills);
+    const plugins = definition.plugins === undefined ? {} : object(definition.plugins);
+    const declaredGraders = plugins.graders === undefined ? [] : strings(plugins.graders);
+    const declaredExecutors = plugins.executors === undefined ? [] : strings(plugins.executors);
+    check([...declaredGraders, ...declaredExecutors].every(file => identifier.test(file) && file.endsWith('.js')),
+      'plugins must name compiled evaluation modules, without directory paths.');
+    // Dependency skills stay in both arms, so only the measured skill differs.
+    check(declaredShared.every(shared => shared !== id && Object.hasOwn(skills, shared)),
+      'sharedSkills must name other registered skills.');
+    const probe = preflight(definition.nugetPreflight);
     const safePath = (file: string) => file.split('/').every(part => identifier.test(part) && part !== '.' && part !== '..');
     const target = `templates/skills/${id}`;
     check(declaredEvals.every(file => {
@@ -96,11 +136,43 @@ export function selectBenchmark(value: unknown, selection: Selection) {
         || declaredEvals.some(evalFile => file.startsWith(`${evalFile.slice(0, -'eval.yaml'.length)}fixtures/`)))),
     'configuration files must be target SKILL.md, own references or declared scenario fixtures.');
     if (selection.all || id === selection.skill) {
+      check(!selection.all || declaredShared.length === 0,
+        'sharedSkills needs --skill <registered-id>; a whole-registry run cannot keep every arm equal.');
       evals.push(...declaredEvals);
       files.push(...declaredFiles);
+      sharedSkills.push(...declaredShared);
+      graderPlugins.push(...declaredGraders);
+      executorPlugins.push(...declaredExecutors);
+      if (probe) nugetPreflight = probe;
     }
   }
-  return { models: models.filter(model => selectedModels.includes(model)), evals, files: [...new Set(files)] };
+  for (const shared of sharedSkills) files.push(...strings(object(skills[shared]).files));
+  return {
+    models: models.filter(model => selectedModels.includes(model)),
+    evals,
+    files: [...new Set(files)],
+    sharedSkills,
+    graderPlugins: [...new Set(graderPlugins)],
+    executorPlugins: [...new Set(executorPlugins)],
+    ...(nugetPreflight ? { nugetPreflight } : {}),
+  };
+}
+
+export function experimentDefinition(evals: string[], models: string[], sharedSkills: string[]) {
+  const dependencies = sharedSkills.map(shared => `../templates/skills/${shared}`);
+  return {
+    name: 'local-skill-benchmark',
+    evals: evals.map(file => `../${file}`),
+    overrides: { runs: 1, timeout: '10m' }, execution: { workers: 1 },
+    baseline: { skill: 'off', model: models[0] },
+    matrix: {
+      skill: {
+        path: '/environment/skills',
+        values: [{ off: dependencies }, { on: [...dependencies, '../templates/skills/${eval.grandparent}'] }],
+      },
+      model: { path: '/defaults/model', values: models },
+    },
+  };
 }
 
 function inside(parent: string, child: string): boolean {
@@ -120,7 +192,7 @@ function cleanAncestors(directory: string): void {
 
 export function benchmarkEnvironment(root: string, source: NodeJS.ProcessEnv, dryRun: boolean,
   registry = 'https://registry.npmjs.org/'): NodeJS.ProcessEnv {
-  const url = new URL(registry);
+  const url = sourceUrl(registry, '--registry');
   check(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash,
     '--registry must be an HTTPS registry URL without credentials, query or fragment.');
   const env: NodeJS.ProcessEnv = {};
@@ -139,7 +211,9 @@ export function benchmarkEnvironment(root: string, source: NodeJS.ProcessEnv, dr
     GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
     npm_config_userconfig: join(home, '.npmrc'), npm_config_globalconfig: join(home, 'global.npmrc'),
     npm_config_cache: join(root, 'cache', 'npm'), npm_config_registry: url.href,
+    NUGET_PACKAGES: join(root, 'cache', 'nuget'),
     FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT: '1', VALLY_TELEMETRY_OPTOUT: '1',
+    VALLY_EVAL_OWNS_AZURITE_RESOURCES: '1',
     COPILOT_AUTO_UPDATE: 'false', COPILOT_HOME_SETTINGS_JSON: settings,
   });
   if (!dryRun) {
@@ -148,6 +222,65 @@ export function benchmarkEnvironment(root: string, source: NodeJS.ProcessEnv, dr
     env.COPILOT_GITHUB_TOKEN = token;
   }
   return env;
+}
+
+function sourceUrl(value: string, label: string): URL {
+  try {
+    return new URL(value);
+  } catch {
+    throw new Error(`Local benchmark: ${label} must be a valid URL.`);
+  }
+}
+
+function nugetSourceUrl(value: string): URL {
+  const url = sourceUrl(value, 'NuGet source');
+  check(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash,
+    'NuGet source must be an HTTPS URL without credentials, query or fragment.');
+  return url;
+}
+
+function writeNugetConfiguration(root: string, source: URL): void {
+  const attribute = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const content = `<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="benchmark" value="${attribute(source.href)}" protocolVersion="3" />
+  </packageSources>
+</configuration>
+`;
+  for (const path of [join(root, 'appdata', 'NuGet', 'NuGet.Config'),
+    join(root, 'home', '.nuget', 'NuGet', 'NuGet.Config')]) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+  }
+}
+
+function runNugetPreflight(root: string, env: NodeJS.ProcessEnv, source: URL, probe: NugetPreflight): void {
+  const references = Object.entries(probe.packages)
+    .map(([id, version]) => `    <PackageReference Include="${id}" Version="${version}" />`).join('\n');
+  const project = join(root, 'nuget-preflight.csproj');
+  writeFileSync(project, `<Project Sdk="${probe.sdk}">
+  <PropertyGroup>
+    <TargetFramework>${probe.targetFramework}</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+${references}
+  </ItemGroup>
+</Project>
+`);
+  const child = spawnSync('dotnet', ['restore', project, '--nologo', '--verbosity', 'minimal'], {
+    cwd: join(root, 'empty'), env, shell: false, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  check(!child.error, `could not launch the .NET NuGet preflight for ${source.href}; install the .NET SDK or check PATH.`);
+  check(child.signal === null, `NuGet preflight terminated by ${child.signal} for ${source.href}.`);
+  const output = [child.stdout, child.stderr].filter(value => typeof value === 'string' && value.trim())
+    .join('\n').trim().slice(-4000);
+  check(child.status === 0, `NuGet preflight could not restore ${probe.sdk} and `
+    + `${Object.keys(probe.packages).join(', ')} for ${probe.targetFramework} from ${source.href}. `
+    + 'Use --nuget-source or VALLY_NUGET_SOURCE with a credential-free HTTPS v3 source that contains these packages.'
+    + `${output ? `\n${output}` : ''}`);
 }
 
 export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
@@ -163,6 +296,7 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
   const requestedOutput = options.output ?? join(realpathSync(sourceEnv.VALLY_OUTPUT_ROOT ?? ''), `benchmark-${randomUUID()}`);
   const output = join(realpathSync(dirname(resolve(requestedOutput))), parse(resolve(requestedOutput)).base);
   const registry = options.registry ?? sourceEnv.VALLY_NPM_REGISTRY;
+  const nugetSource = nugetSourceUrl(options.nugetSource ?? sourceEnv.VALLY_NUGET_SOURCE ?? publicNugetSource);
   const repo = realpathSync(repository);
   check(!inside(repo, parent) && !inside(repo, output), '--run-root and --output must be outside the repository.');
   cleanAncestors(parent);
@@ -177,6 +311,7 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
       mkdirSync(join(root, directory));
     }
     writeFileSync(join(root, 'config', 'settings.json'), settings);
+    writeNugetConfiguration(root, nugetSource);
     for (const file of [...selection.evals, ...selection.files]) {
       const source = realpathSync(join(repo, ...file.split('/')));
       check(inside(repo, source), 'input links must not leave the trusted repository.');
@@ -184,23 +319,18 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
       mkdirSync(dirname(target), { recursive: true });
       copyFileSync(source, target);
     }
-    const definition = {
-      name: 'local-skill-benchmark',
-      evals: selection.evals.map(file => `../${file}`),
-      overrides: { runs: 1, timeout: '10m' }, execution: { workers: 1 },
-      baseline: { skill: 'off', model: selection.models[0] },
-      matrix: {
-        skill: { path: '/environment/skills', values: [{ off: [] }, { on: ['../templates/skills/${eval.grandparent}'] }] },
-        model: { path: '/defaults/model', values: selection.models },
-      },
-    };
+    const definition = experimentDefinition(selection.evals, selection.models, selection.sharedSkills);
     mkdirSync(join(root, 'inputs', 'experiments'));
     // JSON is valid YAML; Vally validates and expands this native matrix.
     writeFileSync(join(root, 'inputs', experiment), JSON.stringify(definition, null, 2));
+    // A missing package feed must stop the run before any paid model call.
+    if (selection.nugetPreflight && !options.dryRun) {
+      runNugetPreflight(root, env, nugetSource, selection.nugetPreflight);
+    }
     const vally = join(repo, 'node_modules', '@microsoft', 'vally-cli', 'dist', 'index.js');
-    const invoke = (args: string[]) => {
-      const child = spawnSync(process.execPath, [vally, ...args], {
-        cwd: join(root, 'empty'), env, shell: false, stdio: ['ignore', 'inherit', 'inherit'],
+    const invoke = (args: string[], entry = vally, cwd = join(root, 'empty')) => {
+      const child = spawnSync(process.execPath, [entry, ...args], {
+        cwd, env, shell: false, stdio: ['ignore', 'inherit', 'inherit'],
       });
       check(!child.error, 'could not launch native Vally; restore the pinned dependencies and check Node.js.');
       check(child.signal === null, `native Vally terminated by ${child.signal}; private output: ${output}`);
@@ -211,6 +341,28 @@ export function runBenchmark(options: RunOptions, sourceEnv = process.env) {
     const raw = join(output, 'raw');
     const shard = join(raw, runId, 'shard-1-of-1');
     const native = join(output, 'native');
+    if (selection.graderPlugins.length || selection.executorPlugins.length) {
+      const control = join(root, 'inputs', 'plugin-matrix.json');
+      writeFileSync(control, JSON.stringify({
+        inputsRoot: join(root, 'inputs'), workspaceRoot: join(root, 'trials'), output: native, runId,
+        evals: selection.evals, models: selection.models, sharedSkills: selection.sharedSkills,
+        graderPlugins: selection.graderPlugins.map(file => join(repo, 'lib', 'evaluation', file)),
+        executorPlugins: selection.executorPlugins.map(file => join(repo, 'lib', 'evaluation', file)),
+        cli: vally, dryRun: options.dryRun === true,
+      }, null, 2));
+      if (!options.dryRun) mkdirSync(output, { mode: 0o700 });
+      const runExit = invoke(['--config', control], join(repo, 'lib', 'evaluation', 'plugin-matrix.js'), join(root, 'inputs'));
+      if (options.dryRun) {
+        check(runExit === 0, `plugin preflight failed (exit ${runExit}); no model calls were made.`);
+        outcome = { exitCode: 0, dryRun: true };
+        return outcome;
+      }
+      check(lstatSync(join(native, 'matrix-manifest.json'), { throwIfNoEntry: false }),
+        `plugin run exit ${runExit}, missing matrix manifest; partial results retained privately at ${output}.`);
+      const site = options.report ? generateReport(native, join(output, 'site')) : undefined;
+      outcome = { exitCode: runExit, dryRun: false, native, site, runExit };
+      return outcome;
+    }
     const args = ['experiment', 'run', join(root, 'inputs', experiment),
       '--shard', '1/1', '--run-id', runId, '--workspace', join(root, 'trials'),
       '--output-dir', raw, '--workers', '1', '--require-pass'];
@@ -247,6 +399,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     const { values } = parseArgs({ options: {
       'run-root': { type: 'string' }, output: { type: 'string' }, registry: { type: 'string' },
+      'nuget-source': { type: 'string' },
       trusted: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, report: { type: 'boolean' },
       all: { type: 'boolean' }, skill: { type: 'string' }, models: { type: 'string', multiple: true },
       tier: { type: 'string' },
@@ -254,10 +407,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const result = runBenchmark({
       runRoot: values['run-root'], output: values.output, trusted: values.trusted,
       dryRun: values['dry-run'], report: values.report, registry: values.registry,
+      nugetSource: values['nuget-source'],
       all: values.all, skill: values.skill, models: values.models, tier: values.tier,
     });
     console.log(result.dryRun ? 'Dry-run only: no measured trials or dashboard generated.'
-      : `Native results: ${result.native}${result.site ? `\nStatic site: ${result.site}` : ''}\nNative run/merge exits: ${result.runExit}/${result.mergeExit}\nWorkflow exit: ${result.exitCode}`);
+      : `Native results: ${result.native}${result.site ? `\nStatic site: ${result.site}` : ''}\nRun exit: ${result.runExit}${result.mergeExit === undefined ? '' : `; merge exit: ${result.mergeExit}`}\nWorkflow exit: ${result.exitCode}`);
     process.exitCode = result.exitCode;
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

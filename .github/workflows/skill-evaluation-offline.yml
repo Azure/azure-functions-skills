@@ -102,8 +102,8 @@ jobs:
         # and avoids races where the agent answers before the MCP server is ready.
         run: npx -y @azure/mcp@latest server --help >/dev/null
 
-      - name: Validate eval specs (vally lint)
-        run: npx vally lint --eval-spec evals
+      - name: Validate eval specs and plugins
+        run: npm run eval:lint
 
       - name: Run vally eval
         # Token is scoped to this step only (least privilege). The @github/copilot-sdk
@@ -125,10 +125,10 @@ jobs:
           fi
           if [ -n "${EVAL_SPEC}" ]; then
             echo "Running single spec: ${EVAL_SPEC}"
-            npx vally eval --eval-spec "${EVAL_SPEC}" --output jsonl --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
+            npx vally eval --eval-spec "${EVAL_SPEC}" --grader-plugin "${GITHUB_WORKSPACE}/lib/evaluation/code-only-grader.js" --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
           else
             echo "Running suite: ${SUITE}"
-            npx vally eval --suite "${SUITE}" --output jsonl --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
+            npx vally eval --suite "${SUITE}" --grader-plugin "${GITHUB_WORKSPACE}/lib/evaluation/code-only-grader.js" --output-dir ./vally-results --junit "${MODEL_ARG[@]}"
           fi
 
       - name: Upload results
@@ -138,3 +138,15 @@ jobs:
           name: vally-results-${{ github.run_id }}
           path: vally-results/
           if-no-files-found: warn
+
+      - name: Upload migrated application source
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: migrated-app-source-${{ github.run_id }}
+          path: |
+            vally-results/**/azure-functions-update-dotnet-isolated/**/artifacts/**
+            vally-results/artifacts/dotnet-isolated*/**
+          # The source allowlist excludes local settings, .env files, logs and build output.
+          include-hidden-files: true
+          if-no-files-found: ignore

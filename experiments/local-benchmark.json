@@ -21,6 +21,41 @@
         "templates/skills/azure-functions-create/references/go-project.md",
         "templates/skills/azure-functions-create/references/language-snippets.md"
       ]
+    },
+    "azure-functions-update": {
+      "evals": ["evals/azure-functions-update/dotnet-isolated/eval.yaml"],
+      "plugins": {
+        "graders": ["code-only-grader.js"]
+      },
+      "files": [
+        "templates/skills/azure-functions-update/SKILL.md",
+        "templates/skills/azure-functions-update/references/dotnet-isolated.md",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/UpgradeApp.csproj",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/Hello.cs",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/Startup.cs",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/GreetingService.cs",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/QueueGreeting.cs",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/host.json",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/trial.gitignore",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/definition-of-done.json",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/eval-boundaries.md",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/review-basis.md",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/baseline/UpgradeApp.csproj.txt",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/baseline/Hello.cs.txt",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/baseline/host.json.txt",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/baseline/Startup.cs.txt",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/baseline/GreetingService.cs.txt",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/baseline/QueueGreeting.cs.txt",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/checks/AzuriteContract.ps1",
+        "evals/azure-functions-update/dotnet-isolated/fixtures/checks/Invoke-DefinitionOfDone.ps1"
+      ],
+      "nugetPreflight": {
+        "targetFramework": "net8.0",
+        "sdk": "Azure.Functions.Sdk/1.0.0",
+        "packages": {
+          "Microsoft.Azure.Functions.Worker": "2.50.0"
+        }
+      }
     }
   }
 }

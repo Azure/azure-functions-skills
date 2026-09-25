@@ -51,12 +51,12 @@
     "validate:skills": "npm run compile && node lib/build/validate-skills.js",
     "verify:plugin-payload": "npm run compile && node lib/build/verify-plugin-payload.js",
     "release:local": "node scripts/release-local.mjs",
-    "eval:lint": "vally lint --eval-spec evals",
+    "eval:lint": "npm run compile && node lib/evaluation/validate.js --grader-plugin ./lib/evaluation/code-only-grader.js",
     "eval:report": "npm run compile && node lib/evaluation/report.js",
     "eval:run": "npm run compile && node lib/evaluation/run.js",
     "eval:smoke": "vally eval --suite smoke",
     "eval:full": "vally eval --suite full",
-    "eval:suites": "vally eval",
+    "eval:suites": "npm run compile && vally eval --grader-plugin ./lib/evaluation/code-only-grader.js",
     "eval": "npm run compile && node lib/evaluation/run.js --report"
   },
   "engines": {
@@ -64,6 +64,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@microsoft/vally": "0.16.0",
     "@microsoft/vally-cli": "0.16.0",
     "@types/node": "^26.1.0",
     "eslint": "^10.3.0",
