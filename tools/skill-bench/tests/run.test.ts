@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SpawnSyncOptions, SpawnSyncReturns } from 'node:child_process';
-import { runBench } from '../src/run.ts';
+import { removeRunRoot, runBench } from '../src/run.ts';
+import { main } from '../src/cli.ts';
 import type { RunDependencies } from '../src/run.ts';
 import { put, removeDirectory, temporaryDirectory, writeProject } from './helpers.ts';
 
@@ -162,5 +163,120 @@ describe('runBench paid run', () => {
     const manifest = JSON.parse(readFileSync(join(output, 'matrix-manifest.json'), 'utf8'));
     expect(manifest.cells.map((cell: { results: unknown }) => cell.results)).toEqual([null, null]);
     expect(existsSync(runRoot) && readdirSync(runRoot)).toEqual([]);
+  });
+});
+
+const busy = (code: string) => Object.assign(new Error(`${code}: resource busy`), { code });
+
+describe('removeRunRoot', () => {
+  it('retries a transient Windows lock with backoff, then succeeds', async () => {
+    const delays: number[] = [];
+    let attempts = 0;
+    const failure = await removeRunRoot('R', {
+      remove: () => { if (++attempts < 3) throw busy(attempts === 1 ? 'EPERM' : 'EBUSY'); },
+      sleep: async ms => { delays.push(ms); },
+    });
+    expect(failure).toBeNull();
+    expect(attempts).toBe(3);
+    expect(delays).toEqual([250, 500]);
+  });
+
+  it('returns the error after the last attempt and does not retry other errors', async () => {
+    let attempts = 0;
+    const failure = await removeRunRoot('R', { remove: () => { attempts++; throw busy('ENOTEMPTY'); }, sleep: async () => {} });
+    expect(failure).toMatch(/ENOTEMPTY/);
+    expect(attempts).toBe(6);
+    attempts = 0;
+    expect(await removeRunRoot('R', { remove: () => { attempts++; throw busy('EINVAL'); }, sleep: async () => {} }))
+      .toMatch(/EINVAL/);
+    expect(attempts).toBe(1);
+  });
+});
+
+describe('runBench cleanup and teardown', () => {
+  const locked = (base: RunDependencies, logs: string[]): RunDependencies => ({
+    ...base, log: message => logs.push(message), sleep: async () => {},
+    remove: () => { throw busy('EPERM'); },
+  });
+
+  it('keeps results and the exit code when the staged root stays locked, and records it', async () => {
+    const output = join(outParent, 'out');
+    const logs: string[] = [];
+    const result = await runBench({
+      config: writeProject(root), selection: { all: true, models: ['model-a'] }, dryRun: false, runRoot, trusted: true, output,
+    }, paidEnv, locked(fakeVally([]), logs));
+    expect(result.exitCode).toBe(0);
+    expect(result.cleanup).toMatchObject({ removed: false, error: expect.stringMatching(/EPERM/) });
+    const left = result.cleanup?.path ?? '';
+    expect(left.startsWith(runRoot)).toBe(true);
+    expect(logs.join('\n')).toContain(`Warning: cannot remove the staged run root ${left}`);
+    const manifest = JSON.parse(readFileSync(join(output, 'matrix-manifest.json'), 'utf8'));
+    expect(manifest.cleanup).toEqual({ removed: false, path: left, error: result.cleanup?.error });
+    expect(manifest.cells.every((cell: { results: unknown }) => cell.results !== null)).toBe(true);
+  });
+
+  it('still writes the dashboard with --site when cleanup fails', async () => {
+    const out: string[] = [];
+    const base = fakeVally([]);
+    const dependencies: RunDependencies = { ...locked(base, out), spawn: (command, args, options) => {
+      const result = base.spawn(command, args, options);
+      const value = (flag: string) => args[args.indexOf(flag) + 1];
+      const model = value('--model');
+      put(value('--output-dir'), '20250101T000000/results.jsonl', JSON.stringify({
+        type: 'trial-result', itemId: `item-${value('--output-dir')}`, evalName: 'alpha-basic',
+        evalFilePath: value('--eval-spec'), variant: 'main', stimulus: 'alpha-basic-stimulus', model, trialIndex: 0, totalTrials: 1,
+        status: 'success', durationMs: 1,
+        gradeResult: { passed: true, score: 1, details: [] },
+      }) + '\n');
+      return result;
+    } };
+    const site = join(outParent, 'site');
+    const code = await main(['run', '--config', writeProject(root), '--all', '--model', 'model-a', '--trusted',
+      '--run-root', runRoot, '--output', join(outParent, 'out'), '--site', site],
+    { out: text => out.push(text), err: text => out.push(text) }, paidEnv, dependencies);
+    expect(code).toBe(0);
+    expect(existsSync(join(site, 'index.html'))).toBe(true);
+    expect(out.join('\n')).toMatch(/Warning: cannot remove the staged run root/);
+  });
+
+  it('calls each plugin teardownCell after every cell and after the preflight run', async () => {
+    put(root, 'bench/plugins/probe.ts', `import { appendFileSync } from 'node:fs';
+export const preflight = {
+  name: 'probe',
+  run() {},
+  teardownCell(context) {
+    appendFileSync(context.options.log, [context.workspace ? 'cell' : 'preflight', typeof context.env.PATH,
+      context.env.COPILOT_GITHUB_TOKEN ?? 'no-token'].join(' ') + '\\n');
+    if (context.workspace) throw new Error('teardown failure is only a warning');
+  },
+};
+`);
+    const log = join(outParent, 'teardown.log');
+    const config = writeProject(root, {
+      skills: { alpha: { skillDir: '../skills/alpha', evals: ['evals/basic/eval.yaml'],
+        plugins: { preflight: [{ module: 'plugins/probe.ts', options: { log } }] } } },
+    });
+    const logs: string[] = [];
+    const result = await runBench({ config, selection: { all: true, models: ['model-a'] }, dryRun: false, runRoot,
+      trusted: true, output: join(outParent, 'out') }, paidEnv, { ...fakeVally([]), log: message => logs.push(message) });
+    expect(result.exitCode).toBe(0);
+    expect(readFileSync(log, 'utf8').trim().split(/\r?\n/)).toEqual([
+      'preflight string no-token', 'cell string token-value', 'cell string token-value']);
+    expect(logs.join('\n')).toMatch(/Warning: teardown probe for alpha\/basic\/off\/model-a failed: teardown failure/);
+  });
+
+  it('does not call teardownCell in a dry-run', async () => {
+    put(root, 'bench/plugins/probe.ts', `export const preflight = {
+  name: 'probe', teardownCell() { throw new Error('no teardown in a dry-run'); },
+};
+`);
+    const config = writeProject(root, {
+      skills: { alpha: { skillDir: '../skills/alpha', evals: ['evals/basic/eval.yaml'],
+        plugins: { preflight: [{ module: 'plugins/probe.ts', options: {} }] } } },
+    });
+    const logs: string[] = [];
+    await runBench({ config, selection: { all: true }, dryRun: true, runRoot, trusted: true }, {},
+      { ...fakeVally([]), log: message => logs.push(message) });
+    expect(logs.join('\n')).not.toMatch(/teardown/);
   });
 });

@@ -31,6 +31,8 @@ skill-bench report  --input <run output> --output <new or empty dir>
 
 `--run-root` must be an existing, clean directory. Do not put it below your user profile, a Git repository, or a directory that has agent configuration. The tool deletes the staged cells when it completes.
 
+On Windows, a process that a trial started can keep a file open for some seconds. The tool tries to delete the staged cells again, with a longer wait each time. If the delete still fails, the tool keeps the results, writes the `--site` dashboard, and shows a warning with the directory path. The exit code comes from the trials only. The manifest gets a `cleanup` record. Delete the directory manually when the processes stop. To make a dashboard from existing results, use `skill-bench report --input <run output> --output <new dir>`.
+
 ## Configuration
 
 `skill-bench.config.json` has these keys. All paths are relative to the config file.
@@ -50,7 +52,7 @@ skill-bench report  --input <run output> --output <new or empty dir>
 | `skills.<name>.plugins.preflight` | No | Preflight plugins: `{ "module": "...", "options": {...} }`. |
 | `sharedSkills` | No | Skills that both arms get: `{ "<name>": { "skillDir": "...", "files": [...] } }`. |
 | `disabledSkills` | No | Skill names that the agent must not load. |
-| `env` | No | Extra environment variables for each cell. Do not put secrets here. |
+| `env` | No | Extra environment variables for each cell, for example to stop build servers that stay after a trial. The tool refuses reserved names and names that look like secrets. Do not put secrets here. |
 | `redaction.keepValues` | No | Values that the snapshot redaction keeps. |
 | `display` | No | Labels for `models`, `skills`, and `scenarios` in the dashboard. |
 
@@ -70,8 +72,11 @@ interface PreflightPlugin {
   validate?(options: unknown): void;                 // dry-run and run
   prepareCell?(context: PreflightCellContext): void; // dry-run and run, for each cell
   run?(context: PreflightRunContext): void | Promise<void>; // run only, one time for each skill
+  teardownCell?(context: PreflightTeardownContext): void | Promise<void>; // run only, after each cell and after run
 }
 ```
+
+Use `teardownCell` to stop processes that a trial started, for example build servers. The context has the cell root, the workspace (`null` after `run`), and the cell environment. An error in `teardownCell` gives a warning. It does not stop the run.
 
 Scenario plugins go in the example directory, not in `src/`.
 
@@ -117,7 +122,7 @@ node bin/skill-bench.js dry-run --config examples/azure-functions-update/skill-b
 
 ## Examples
 
-- `examples/azure-functions-update/`: the .NET in-process to isolated worker migration. It has a NuGet preflight plugin and a code review grader plugin. The paid run needs .NET, Azure Functions Core Tools, and Azurite.
+- `examples/azure-functions-update/`: the .NET in-process to isolated worker migration. It has a NuGet preflight plugin and a code review grader plugin. The preflight plugin also stops the .NET build servers after each cell (`dotnet build-server shutdown`), and the config sets `MSBuildNodeReuse=false`, `DOTNET_CLI_USE_MSBUILD_SERVER=0`, and `UseSharedCompilation=false`. The paid run needs .NET, Azure Functions Core Tools, and Azurite.
 - `examples/azure-functions-create/`: the TypeScript HTTP function. It uses the root `evals/` directory.
 
 The examples point at skills in the root `templates/skills/` directory. If you move this tool to its own repository, change the `skillDir` and `evals` paths.
