@@ -1,0 +1,28 @@
+{
+  "title": "Azure Functions Skills: create",
+  "models": ["claude-sonnet-5", "gpt-6-astra", "gpt-6-sol", "claude-opus-5.5", "gpt-6-terra", "gpt-6-luna", "mai-code-1.1-flash"],
+  "tiers": {
+    "powerful": ["gpt-6-astra", "gpt-6-sol", "claude-opus-5.5"],
+    "medium": ["claude-sonnet-5", "gpt-6-terra"],
+    "low": ["gpt-6-luna", "mai-code-1.1-flash"]
+  },
+  "timeout": "10m",
+  "disabledSkills": ["customize-cloud-agent", "github-pr-media"],
+  "skills": {
+    "azure-functions-create": {
+      "skillDir": "../../../../templates/skills/azure-functions-create",
+      "files": ["SKILL.md", "references/go-project.md", "references/language-snippets.md"],
+      "evals": ["../../../../evals/azure-functions-create/typescript-http/eval.yaml"]
+    }
+  },
+  "env": { "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT": "1" },
+  "display": {
+    "models": {
+      "claude-sonnet-5": "Claude Sonnet 5", "gpt-6-astra": "GPT-6 Astra", "gpt-6-sol": "GPT-6 Sol",
+      "claude-opus-5.5": "Claude Opus 5.5", "gpt-6-terra": "GPT-6 Terra", "gpt-6-luna": "GPT-6 Luna",
+      "mai-code-1.1-flash": "MAI-Code-1.1-Flash"
+    },
+    "skills": { "azure-functions-create": "Create an app" },
+    "scenarios": { "typescript-http": "Create a TypeScript HTTP API" }
+  }
+}
