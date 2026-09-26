@@ -24,15 +24,29 @@ export interface PreflightRunContext {
 }
 
 /**
+ * Context for work after a paid cell, for example to stop build servers that
+ * keep files open. `workspace` is null after the preflight `run`.
+ */
+export interface PreflightTeardownContext {
+  options: unknown;
+  cellRoot: string;
+  workspace: string | null;
+  env: Environment;
+}
+
+/**
  * A scenario plugin that prepares or checks the environment. A module exports
  * it as the named export `preflight`. `validate` and `prepareCell` also run in
  * a dry-run; `run` runs only in a paid run, before any model call.
+ * `teardownCell` runs only in a paid run, after each cell and after `run`.
+ * A teardown error is a warning; it does not stop the run.
  */
 export interface PreflightPlugin {
   name: string;
   validate?(options: unknown): void;
   prepareCell?(context: PreflightCellContext): void;
   run?(context: PreflightRunContext): void | Promise<void>;
+  teardownCell?(context: PreflightTeardownContext): void | Promise<void>;
 }
 
 export interface LoadedPreflight {
@@ -84,7 +98,7 @@ function isPreflight(value: unknown): value is PreflightPlugin {
   if (value === null || typeof value !== 'object') return false;
   const plugin = value as Record<string, unknown>;
   return typeof plugin.name === 'string' && plugin.name.length > 0
-    && ['validate', 'prepareCell', 'run'].every(key => plugin[key] === undefined || typeof plugin[key] === 'function');
+    && ['validate', 'prepareCell', 'run', 'teardownCell'].every(key => plugin[key] === undefined || typeof plugin[key] === 'function');
 }
 
 export async function loadPreflights(definitions: PreflightDefinition[]): Promise<LoadedPreflight[]> {

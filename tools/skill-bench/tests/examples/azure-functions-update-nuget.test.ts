@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { nugetConfig, parseOptions, preflight, sourceUrl } from '../../examples/azure-functions-update/plugins/nuget-preflight.ts';
+import { nugetConfig, parseOptions, preflight, shutdownBuildServers, sourceUrl } from '../../examples/azure-functions-update/plugins/nuget-preflight.ts';
 import { removeDirectory, temporaryDirectory } from '../helpers.ts';
 
 const options = { targetFramework: 'net8.0', sdk: 'Azure.Functions.Sdk/1.0.0', packages: { 'Microsoft.Azure.Functions.Worker': '2.50.0' } };
@@ -32,5 +32,21 @@ describe('nuget-preflight example plugin', () => {
     expect(first).toContain('<clear />');
     expect(first).toContain(join(root, 'cache', 'nuget'));
     expect(nugetConfig(new URL('https://a.example/v3?x"'.replace('?x"', '')), 'C:\\p&q')).toContain('C:\\p&amp;q');
+  });
+
+  it('stops .NET build servers after a cell with the cell environment, no shell and a timeout', () => {
+    const calls: { command: string; args: readonly string[]; options: Record<string, unknown> }[] = [];
+    const env = { PATH: 'p', MSBuildNodeReuse: 'false' };
+    shutdownBuildServers(env, (command, args, spawnOptions) => {
+      calls.push({ command, args, options: spawnOptions as Record<string, unknown> });
+      return { status: 0, signal: null, error: undefined };
+    });
+    expect(calls).toEqual([{ command: 'dotnet', args: ['build-server', 'shutdown'],
+      options: expect.objectContaining({ env, shell: false, timeout: 60_000 }) }]);
+    expect(() => shutdownBuildServers(env, () => ({ status: 1, signal: null, error: undefined })))
+      .toThrow(/build-server shutdown/);
+    expect(() => shutdownBuildServers(env, () => ({ status: null, signal: null, error: new Error('ENOENT') })))
+      .toThrow(/cannot start dotnet/);
+    expect(typeof preflight.teardownCell).toBe('function');
   });
 });

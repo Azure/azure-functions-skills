@@ -260,6 +260,7 @@ describe('skill-bench registration', () => {
     expect(options.sdk).toMatch(/^Azure\.Functions\.Sdk\/\d+(\.\d+){1,3}$/);
     expect(Object.keys(options.packages)).toContain('Microsoft.Azure.Functions.Worker');
     expect(config.env.VALLY_EVAL_OWNS_AZURITE_RESOURCES).toBe('1');
+    expect(config.env).toMatchObject({ MSBuildNodeReuse: 'false', DOTNET_CLI_USE_MSBUILD_SERVER: '0', UseSharedCompilation: 'false' });
     expect(config.disabledSkills).toEqual(['customize-cloud-agent', 'github-pr-media']);
   });
 
