@@ -105,6 +105,7 @@ export async function main(argv: string[], io: CliIo = consoleIo, source: NodeJS
         io.err(`skill-bench: cannot summarize the results: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    if (result.cleanup) io.err(`Warning: remove ${result.cleanup.path} manually; skill-bench could not remove it.`);
     return result.exitCode;
   } catch (error) {
     io.err(`skill-bench: ${error instanceof Error ? error.message : String(error)}`);

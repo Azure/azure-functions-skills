@@ -11,7 +11,7 @@ import type { Environment } from './env.ts';
 import { selectCells } from './plan.ts';
 import type { Selection } from './plan.ts';
 import { loadPreflights, validateSpecs, withRegistries } from './plugins.ts';
-import type { LoadedPreflight } from './plugins.ts';
+import type { LoadedPreflight, PreflightTeardownContext } from './plugins.ts';
 import { assertCleanAncestors, hash, stageRun, verifyStagedRun } from './stage.ts';
 import type { StagedCell, StagedRun } from './stage.ts';
 
@@ -35,6 +35,15 @@ export interface RunDependencies {
   vallyCli: string;
   ancestorCheck: (directory: string) => void;
   log: (message: string) => void;
+  /** Removes the staged run root. Tests replace it. */
+  remove?: (path: string) => void;
+  sleep?: (milliseconds: number) => Promise<void>;
+}
+
+export interface CleanupRecord {
+  removed: false;
+  path: string;
+  error: string;
 }
 
 export interface ManifestCell {
@@ -69,6 +78,8 @@ export interface Manifest {
   title: string;
   display: BenchConfig['display'];
   cells: ManifestCell[];
+  /** Present only when skill-bench cannot remove the staged run root. */
+  cleanup?: CleanupRecord;
 }
 
 export interface RunResult {
@@ -76,6 +87,7 @@ export interface RunResult {
   dryRun: boolean;
   cells: ManifestCell[];
   output?: string;
+  cleanup?: CleanupRecord;
 }
 
 function check(condition: unknown, message: string): asserts condition {
@@ -92,6 +104,48 @@ export const defaultDependencies: RunDependencies = {
   ancestorCheck: assertCleanAncestors,
   log: message => console.log(message),
 };
+
+const lockCodes = new Set(['EPERM', 'EBUSY', 'ENOTEMPTY', 'EACCES', 'EMFILE']);
+const cleanupAttempts = 6;
+
+function removeTree(path: string): void {
+  rmSync(path, { recursive: true, force: true });
+}
+
+const wait = (milliseconds: number) => new Promise<void>(done => { setTimeout(done, milliseconds); });
+
+/**
+ * Remove the staged run root. On Windows, a process that a trial started
+ * (for example a build server) can keep a file open for some seconds. Retry
+ * lock errors with backoff. Return the last error message, or null.
+ */
+export async function removeRunRoot(path: string,
+  dependencies: Pick<RunDependencies, 'remove' | 'sleep'> = {}): Promise<string | null> {
+  const remove = dependencies.remove ?? removeTree;
+  const sleep = dependencies.sleep ?? wait;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      remove(path);
+      return null;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? '';
+      if (!lockCodes.has(code) || attempt >= cleanupAttempts) return error instanceof Error ? error.message : String(error);
+      await sleep(250 * 2 ** (attempt - 1));
+    }
+  }
+}
+
+async function teardown(preflights: LoadedPreflight[], label: string, context: Omit<PreflightTeardownContext, 'options'>,
+  log: (message: string) => void): Promise<void> {
+  for (const item of preflights) {
+    if (!item.plugin.teardownCell) continue;
+    try {
+      await item.plugin.teardownCell({ ...context, options: item.options });
+    } catch (error) {
+      log(`Warning: teardown ${item.plugin.name} for ${label} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
 
 function checkVallyCli(file: string): void {
   check(existsSync(file), `cannot find the Vally CLI at ${file}; run npm ci in tools/skill-bench.`);
@@ -189,14 +243,16 @@ export async function runBench(options: RunOptions, source: NodeJS.ProcessEnv = 
     preflights.set(skill, await loadPreflights(config.skills[skill].preflight));
   }
   const run = await stageRun(config, cells, runRoot, dependencies.ancestorCheck);
-  try {
+  let manifest: Manifest | undefined;
+  let save: (() => void) | undefined;
+  const execute = async (): Promise<RunResult> => {
     prepareCells(run, config, preflights);
     const environments = new Map<number, Environment>(run.cells.map(cell => [cell.index, cellEnvironment(cell.root, source, {
       paid, settings: run.settings, registry, fixed: config.env,
     })]));
     await validateCells(run, config);
     const manifestCells = run.cells.map(manifestCell);
-    const manifest: Manifest = {
+    manifest = {
       type: 'skill-bench-matrix', version: 1, vallyVersion, runId: randomUUID(),
       planHash: hash(JSON.stringify(manifestCells.map(cell => ({ ...cell, skills: [], sharedSkills: [] })))),
       title: config.title, display: config.display, cells: manifestCells,
@@ -215,16 +271,19 @@ export async function runBench(options: RunOptions, source: NodeJS.ProcessEnv = 
         item.plugin.prepareCell?.({ options: item.options, cellRoot: root, home: join(root, 'home'), appData: join(root, 'appdata') });
         mkdirSync(join(root, 'work'));
         dependencies.log(`Preflight ${item.plugin.name} for ${skill}.`);
-        await item.plugin.run({
-          options: item.options, workDir: join(root, 'work'),
-          env: cellEnvironment(root, source, { paid: false, settings: run.settings, registry, fixed: config.env }),
-        });
+        const env = cellEnvironment(root, source, { paid: false, settings: run.settings, registry, fixed: config.env });
+        try {
+          await item.plugin.run({ options: item.options, workDir: join(root, 'work'), env });
+        } finally {
+          await teardown([item], `preflight ${skill}`, { cellRoot: root, workspace: null, env }, dependencies.log);
+        }
       }
     }
     mkdirSync(destination, { recursive: true, mode: 0o700 });
-    const save = () => {
+    const written = manifest;
+    save = () => {
       const temporary = join(destination, 'matrix-manifest.json.tmp');
-      writeFileSync(temporary, JSON.stringify(manifest, null, 2) + '\n');
+      writeFileSync(temporary, JSON.stringify(written, null, 2) + '\n');
       renameSync(temporary, join(destination, 'matrix-manifest.json'));
     };
     save();
@@ -239,12 +298,12 @@ export async function runBench(options: RunOptions, source: NodeJS.ProcessEnv = 
       for (const plugin of definition.executors) args.push('--executor-plugin', plugin);
       for (const plugin of definition.graders) args.push('--grader-plugin', plugin);
       dependencies.log(`Cell ${position + 1}/${run.cells.length}: ${cell.id}`);
-      const result = dependencies.spawn(process.execPath, args, {
+      const child = dependencies.spawn(process.execPath, args, {
         cwd: run.inputs, env: environments.get(cell.index), shell: false, stdio: ['ignore', 'inherit', 'inherit'],
       });
       const results = findResults(cellOutput);
       record.results = results ? relative(destination, results).replaceAll('\\', '/') : null;
-      record.exitCode = result.status;
+      record.exitCode = child.status;
       save();
       if (existsSync(cell.workspace)) {
         const snapshot = results ? join(dirname(results), 'workspace') : join(cellOutput, 'workspace');
@@ -257,13 +316,35 @@ export async function runBench(options: RunOptions, source: NodeJS.ProcessEnv = 
         }
         save();
       }
-      check(!result.error && result.signal === null && result.status !== null,
+      await teardown(preflights.get(cell.skill) ?? [], cell.id,
+        { cellRoot: cell.root, workspace: cell.workspace, env: environments.get(cell.index) ?? {} }, dependencies.log);
+      check(!child.error && child.signal === null && child.status !== null,
         `cell ${cell.id} did not complete; partial results are in ${destination}.`);
       // A zero exit without results is a harness failure.
-      exitCode ||= result.status || (results === null ? 2 : 0);
+      exitCode ||= child.status || (results === null ? 2 : 0);
     }
     return { exitCode, dryRun: false, cells: manifestCells, output: destination };
+  };
+  let result: RunResult | undefined;
+  try {
+    result = await execute();
   } finally {
-    rmSync(run.root, { recursive: true, force: true, maxRetries: 3 });
+    // A cleanup failure never hides the results or changes the exit code.
+    const error = await removeRunRoot(run.root, dependencies);
+    if (error !== null) {
+      dependencies.log(`Warning: cannot remove the staged run root ${run.root}: ${error}. The results are kept. `
+        + 'Remove the directory manually after the processes that use it stop.');
+      const cleanup: CleanupRecord = { removed: false, path: run.root, error };
+      if (manifest && save) {
+        manifest.cleanup = cleanup;
+        try {
+          save();
+        } catch (saveError) {
+          dependencies.log(`Warning: cannot record the cleanup failure in the manifest: ${saveError instanceof Error ? saveError.message : String(saveError)}`);
+        }
+      }
+      if (result) result = { ...result, cleanup };
+    }
   }
+  return result;
 }

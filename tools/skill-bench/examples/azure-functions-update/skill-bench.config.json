@@ -30,7 +30,10 @@
   },
   "env": {
     "VALLY_EVAL_OWNS_AZURITE_RESOURCES": "1",
-    "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT": "1"
+    "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT": "1",
+    "MSBuildNodeReuse": "false",
+    "DOTNET_CLI_USE_MSBUILD_SERVER": "0",
+    "UseSharedCompilation": "false"
   },
   "redaction": { "keepValues": ["dotnet", "dotnet-isolated", "UseDevelopmentStorage=true"] },
   "display": {

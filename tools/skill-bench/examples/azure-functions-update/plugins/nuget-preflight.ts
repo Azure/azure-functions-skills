@@ -2,7 +2,10 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { PreflightCellContext, PreflightPlugin, PreflightRunContext } from '../../../src/plugins.ts';
+import type { SpawnSyncOptions } from 'node:child_process';
+import type {
+  PreflightCellContext, PreflightPlugin, PreflightRunContext, PreflightTeardownContext,
+} from '../../../src/plugins.ts';
 
 const publicSource = 'https://api.nuget.org/v3/index.json';
 
@@ -66,6 +69,27 @@ export function nugetConfig(source: URL, packagesFolder: string): string {
 `;
 }
 
+export interface ShutdownResult {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  error?: Error;
+}
+
+export type ShutdownSpawn = (command: string, args: readonly string[], options: SpawnSyncOptions) => ShutdownResult;
+
+/**
+ * Stop the MSBuild, Roslyn (VBCSCompiler) and Razor build servers that a
+ * trial or the restore check started. Else they can keep files in the cell
+ * open, and skill-bench cannot remove the staged run root on Windows.
+ */
+export function shutdownBuildServers(env: NodeJS.ProcessEnv, spawn: ShutdownSpawn = spawnSync): void {
+  const child = spawn('dotnet', ['build-server', 'shutdown'], {
+    env, shell: false, timeout: 60_000, stdio: 'ignore', windowsHide: true,
+  });
+  check(!child.error, `cannot start dotnet to stop the build servers: ${child.error?.message ?? ''}`);
+  check(child.status === 0, `dotnet build-server shutdown ended with ${child.signal ?? `exit code ${String(child.status)}`}.`);
+}
+
 export const preflight: PreflightPlugin = {
   name: 'nuget-preflight',
   validate(options) {
@@ -103,5 +127,8 @@ ${references}
     check(child.status === 0, `cannot restore ${options.sdk} and ${Object.keys(options.packages).join(', ')} `
       + `for ${options.targetFramework} from ${source.href}. Set SKILL_BENCH_NUGET_SOURCE to a credential-free `
       + `HTTPS v3 feed that contains these packages.${output ? `\n${output}` : ''}`);
+  },
+  teardownCell(context: PreflightTeardownContext) {
+    shutdownBuildServers(context.env);
   },
 };
