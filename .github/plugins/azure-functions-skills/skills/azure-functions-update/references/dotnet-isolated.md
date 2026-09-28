@@ -118,11 +118,22 @@ If no existing tests exist, record that fact; it does not remove trigger E2E req
    serialization attributes. Update attributes or configure the appropriate serializer.
    ASP.NET HTTP serialization and general worker serialization are distinct pipelines.
    Compare original fixtures; never rewrite expectations to match the migration.
-10. Set local `FUNCTIONS_WORKER_RUNTIME` to `dotnet-isolated`. Preserve connection setting
-    names and effective `host.json` values; translate version-specific extension settings
-    if their schema changed. Worker-only configuration does not supply host binding settings.
-    Propose matching deployment/IaC settings without deploying. Keep `host.json` in output
-    and exclude secret-bearing local settings from commits and publish output.
+10. Set the worker runtime setting and keep the binding settings.
+    - Set `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated` in `local.settings.json` and in the Azure app settings.
+    - Put `"FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"` in the `Values` section of `local.settings.json`.
+    - Do this when the file exists. Also create the file when the local host needs it to start.
+    - Keep `local.settings.json` git-ignored and out of publish output. Put no secrets in it for this change.
+    - A temporary shell environment variable alone is not evidence for DI-13.
+    - Write `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated` as the exact setting in the plan and in the final report.
+    - Propose `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated` for the Azure app settings and for the IaC or deployment configuration.
+    - Do not deploy. A proposal is not proof of the deployed state.
+    - In the plan and the report, write the setting as one positive sentence on its own line.
+      Example: "Set FUNCTIONS_WORKER_RUNTIME=dotnet-isolated in local.settings.json and in the Azure app settings."
+    - Write the old in-process value `dotnet` only in a separate sentence.
+    - Preserve connection setting names and effective `host.json` values.
+      Translate version-specific extension settings if their schema changed.
+      Worker-only configuration does not supply host binding settings.
+      Keep `host.json` in the build and publish output.
 11. Build, run existing tests, and apply the completion table below. A coherent conversion
     can have temporary errors, but its accepted checkpoint must meet its required gates.
 
@@ -245,7 +256,7 @@ Optional improvements do not change this required checklist.
 | DI-10 | Isolated logging and telemetry preserve required behavior | Supported logger acquisition, separate host/worker filters, selected telemetry path, expected logs and correlation; no blanket new telemetry requirement |
 | DI-11 | HTTP integration, startup, types, async I/O, and HTTP serialization agree | Applicable official HTTP mode and runtime requests; N/A for no HTTP triggers, not an obligation to add HTTP dependencies |
 | DI-12 | JSON and output contracts remain unchanged | Original fixtures for names/nulls/enums/dates/encoding and current outputs; account for Newtonsoft attributes and separate serializer pipelines |
-| DI-13 | Worker/runtime configuration and binding settings are correct | Local `dotnet-isolated`, retained connection names, effective `host.json`, proposed deployment config; proposals do not prove deployed state |
+| DI-13 | Worker/runtime configuration and binding settings are correct | `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated` in `local.settings.json`, in the plan, and in the final report; proposed Azure app settings and IaC config with the same value; retained connection names; effective `host.json`. A shell-only variable is insufficient evidence; a proposal shows intent only, and deployed state needs separate proof |
 | DI-14 | Current Functions project SDK and compatible build setup are effective | `Azure.Functions.Sdk` inline or effective `global.json`, no obsolete Worker.Sdk/indexing property, correct generated-helper handling and SDK-compatible output; apply target-required alias/config now even without a language update |
 | DI-15 | Packaging includes required host configuration and excludes local secrets/settings | Effective output/publish settings and applicable artifact inspection; no secret-bearing file in the diff; do not deploy to prove packaging |
 | DI-16 | Used binding, Durable, and shared-consumer contracts are preserved | Selected behavior/replay/consumer evidence; N/A only for absent surfaces with inventory proof; new Durable instances do not prove old history |
