@@ -13,9 +13,10 @@ This folder contains optional evaluation scenarios for individual skills.
 
 ## Layout
 
-Each scenario is in `evals/<skill-name>/<scenario>/`. The folder contains `eval.yaml`
-in the Vally format, the fixtures, and a `README.md` that tells what the scenario checks.
+Each skill suite is in `evals/<skill-name>/`. The folder contains `eval.yaml` in the
+Vally format, the fixtures, and a `README.md` that tells what the suite checks and how
+to run it with `vally eval`.
 
-| Skill | Scenario | Runner |
-| --- | --- | --- |
-| `azure-functions-update` | [dotnet-isolated](azure-functions-update/dotnet-isolated/README.md) | skill-bench (separate PR) |
+| Skill | Suite |
+| --- | --- |
+| `azure-functions-update` | [eval.yaml](azure-functions-update/README.md) |

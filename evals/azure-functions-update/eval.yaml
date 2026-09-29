@@ -1,0 +1,262 @@
+name: azure-functions-update-eval
+description: |
+  Optional evaluation suite for the azure-functions-update skill.
+  It checks the behaviors that matter most for a skill that changes customer code:
+  explicit-name selection, resume from a saved plan, model-only migration at the
+  current target framework, separate language and hosting stages, and the
+  definition-of-done report.
+
+  This suite is optional and manual. CI does not run it. See ../README.md.
+
+tags:
+  type: integration
+  skill: azure-functions-update
+
+defaults:
+  runs: 1
+  timeout: "15m"
+  executor: copilot-sdk
+  model: claude-sonnet-5.5
+
+scoring:
+  threshold: 0.8
+
+stimuli:
+  # ─────────────────────────────────────────────────────────────────
+  # Selection: the skill starts only when the user names it.
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Selection — a question does not start the skill"
+    prompt: |
+      How do I migrate an in-process function app to isolated?
+    tags:
+      area: routing
+    agent_environment: &app_env
+      skills:
+        - ../../templates/skills/azure-functions-update
+      files:
+        - src: fixtures/AGENTS.md
+          dest: AGENTS.md
+        - src: fixtures/app/UpgradeApp.csproj
+          dest: UpgradeApp.csproj
+        - src: fixtures/app/Hello.cs
+          dest: Hello.cs
+        - src: fixtures/app/Startup.cs
+          dest: Startup.cs
+        - src: fixtures/app/GreetingService.cs
+          dest: GreetingService.cs
+        - src: fixtures/app/QueueGreeting.cs
+          dest: QueueGreeting.cs
+        - src: fixtures/app/host.json
+          dest: host.json
+        - src: fixtures/app/trial.gitignore
+          dest: .gitignore
+    constraints:
+      max_turns: 10
+    graders:
+      - type: skill-invocation
+        config:
+          disallowed:
+            - azure-functions-update
+      - name: question-project-unchanged
+        type: file-matches
+        config:
+          path: UpgradeApp.csproj
+          pattern: "Microsoft\\.NET\\.Sdk\\.Functions"
+      - type: completed
+
+  - name: "Selection — a generic update request does not start the skill"
+    prompt: |
+      Update this Azure Functions project to the latest programming model.
+      For this run, give the plan only. Stop before you change files.
+    tags:
+      area: routing
+    agent_environment: *app_env
+    constraints:
+      max_turns: 15
+    graders:
+      - type: skill-invocation
+        config:
+          disallowed:
+            - azure-functions-update
+      - name: generic-project-unchanged
+        type: file-matches
+        config:
+          path: UpgradeApp.csproj
+          pattern: "Microsoft\\.NET\\.Sdk\\.Functions"
+      - type: completed
+
+  - name: "Selection — the named skill starts and saves a plan"
+    prompt: |
+      Use azure-functions-update to migrate this Azure Functions project to the
+      latest programming model. For this run, save the migration plan only.
+      Stop before you change project or source files.
+    tags:
+      area: routing
+    agent_environment: *app_env
+    constraints:
+      max_turns: 25
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-update
+      - name: plan-saved
+        type: file-matches
+        config:
+          path: "**/*.md"
+          pattern: "(?i)dotnet-isolated|isolated worker"
+      - name: named-project-unchanged
+        type: file-matches
+        config:
+          path: UpgradeApp.csproj
+          pattern: "Microsoft\\.NET\\.Sdk\\.Functions"
+      - name: keeps-current-tfm
+        type: output-matches
+        config:
+          pattern: "net8\\.0"
+      - type: completed
+
+  # ─────────────────────────────────────────────────────────────────
+  # Resume: continue from the saved plan, not from a new plan.
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Resume — continue from the saved plan"
+    prompt: |
+      Resume azure-functions-update from the existing plan.
+      For this run, tell me the next step and what it changes.
+      Stop before you change project or source files.
+    tags:
+      area: resume
+    agent_environment:
+      skills:
+        - ../../templates/skills/azure-functions-update
+      files:
+        - src: fixtures/AGENTS.md
+          dest: AGENTS.md
+        - src: fixtures/azure-functions-update-plan.md
+          dest: azure-functions-update-plan.md
+        - src: fixtures/app/UpgradeApp.csproj
+          dest: UpgradeApp.csproj
+        - src: fixtures/app/Hello.cs
+          dest: Hello.cs
+        - src: fixtures/app/Startup.cs
+          dest: Startup.cs
+        - src: fixtures/app/GreetingService.cs
+          dest: GreetingService.cs
+        - src: fixtures/app/QueueGreeting.cs
+          dest: QueueGreeting.cs
+        - src: fixtures/app/host.json
+          dest: host.json
+        - src: fixtures/app/trial.gitignore
+          dest: .gitignore
+    constraints:
+      max_turns: 20
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-update
+      - name: next-step-is-project-sdk
+        type: output-matches
+        config:
+          pattern: "(?i)Azure\\.Functions\\.Sdk|project SDK|project file"
+      - name: plan-kept
+        type: file-matches
+        config:
+          path: azure-functions-update-plan.md
+          pattern: "(?i)Plan revision"
+      - name: resume-project-unchanged
+        type: file-matches
+        config:
+          path: UpgradeApp.csproj
+          pattern: "Microsoft\\.NET\\.Sdk\\.Functions"
+      - type: completed
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stages: language-version and hosting-plan changes stay separate.
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Stages — .NET 10 and hosting plan requests stay separate"
+    prompt: |
+      Use azure-functions-update to migrate this Azure Functions project to the
+      latest programming model, update it to .NET 10, and move it to the Flex
+      Consumption plan. For this run, save the plan only.
+      Stop before you change project or source files.
+    tags:
+      area: scope
+    agent_environment: *app_env
+    constraints:
+      max_turns: 25
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-update
+      - name: language-stage-separate
+        type: output-matches
+        config:
+          pattern: "(?i)(separate|later|second|handoff|hand off)[^\\n]{0,80}(\\.NET 10|net10|language)|(\\.NET 10|net10|language)[^\\n]{0,80}(separate|later|second|handoff|hand off)"
+      - name: hosting-change-separate
+        type: output-matches
+        config:
+          pattern: "(?i)(Flex Consumption|hosting|plan change|SKU)[^\\n]{0,120}(Azure Skills|separate|out of scope|not part|handoff|hand off)|(Azure Skills|separate|out of scope|handoff|hand off)[^\\n]{0,120}(Flex Consumption|hosting|SKU)"
+      - name: stages-tfm-unchanged
+        type: file-matches
+        config:
+          path: UpgradeApp.csproj
+          pattern: "<TargetFramework>net8\\.0</TargetFramework>"
+      - type: completed
+
+  # ─────────────────────────────────────────────────────────────────
+  # Migration: model-only change at net8.0, with a per-ID report.
+  # Needs the .NET 8 SDK and a reachable NuGet feed.
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: "Migration — model-only change and definition-of-done report"
+    prompt: |
+      Use azure-functions-update to migrate this Azure Functions project to the
+      latest programming model. Complete the migration and give the final report.
+    tags:
+      area: migration
+    agent_environment: *app_env
+    constraints:
+      max_turns: 80
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-update
+      - name: in-process-package-removed
+        type: file-not-matches
+        config:
+          path: UpgradeApp.csproj
+          pattern: "Microsoft\\.NET\\.Sdk\\.Functions"
+      - name: migration-tfm-unchanged
+        type: file-matches
+        config:
+          path: UpgradeApp.csproj
+          pattern: "<TargetFramework>net8\\.0</TargetFramework>"
+      - name: worker-startup
+        type: file-matches
+        config:
+          path: "**/Program.cs"
+          pattern: "ConfigureFunctionsWorkerDefaults|ConfigureFunctionsWebApplication|FunctionsApplication\\.CreateBuilder"
+      - name: build-succeeds
+        type: run-command
+        config:
+          command: dotnet
+          args:
+            - build
+            - UpgradeApp.csproj
+          expected_exit_code: 0
+          timeout: 10m
+      - name: runtime-setting-stated
+        type: output-contains
+        config:
+          substring: "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated"
+      - name: per-id-status
+        type: output-matches
+        config:
+          pattern: "DI-13[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - type: completed
