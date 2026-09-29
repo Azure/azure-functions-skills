@@ -31,7 +31,7 @@ export interface GraderView {
 }
 
 export interface Diagnosis {
-  stage: 'passed' | 'execution' | 'grading' | 'ungraded' | 'skipped';
+  stage: 'passed' | 'execution' | 'grading' | 'grader-error' | 'ungraded' | 'skipped';
   message: string;
   hint: string | null;
 }
@@ -52,8 +52,15 @@ export interface ArmSummary {
   unexecuted: number;
   skipped: number;
   executionErrors: number;
+  /** Trials that completed and have a grader verdict. Only these count as evidence about the skill. */
+  graded: number;
+  /** Trials that completed with no grader verdict. */
+  ungraded: number;
+  /** Trials where a grader did not complete. The result is not a verdict about the skill. */
+  graderErrors: number;
   failed: number;
   passed: number;
+  /** passed / graded. Execution errors, grader errors, skipped, ungraded and unexecuted trials are not in it. */
   successRate: number | null;
   score: number | null;
   graderScores: Record<string, number | null>;
@@ -61,6 +68,17 @@ export interface ArmSummary {
   trials: TrialView[];
   workspace: string | null;
   results: string | null;
+}
+
+/**
+ * Whether the ON/OFF pair is evidence about the skill. A pair with an
+ * execution, infrastructure or grading problem in either arm is not comparable.
+ */
+export interface Evidence {
+  comparable: boolean;
+  /** The smallest number of graded trials in the two arms. */
+  samplesPerArm: number;
+  reasons: string[];
 }
 
 export interface Comparison {
@@ -71,14 +89,34 @@ export interface Comparison {
   prompt: string | null;
   on: ArmSummary | null;
   off: ArmSummary | null;
+  evidence: Evidence;
+}
+
+export interface ToolVersion {
+  skill: string;
+  plugin: string;
+  name: string;
+  version: string;
+}
+
+export interface EnvironmentView {
+  node: string;
+  platform: string;
+  tools: ToolVersion[];
+  warnings: string[];
 }
 
 export interface Benchmark {
   title: string;
   display: { models: Record<string, string>; skills: Record<string, string>; scenarios: Record<string, string> };
   provenance: { runId: string; planHash: string; vallyVersion: string; transport: 'vally-eval' };
+  /** Null for a manifest from an older skill-bench, which did not record it. */
+  environment: EnvironmentView | null;
   comparisons: Comparison[];
 }
+
+/** Below this number of graded trials per arm, a difference shows a direction only. */
+export const smallSample = 5;
 
 function check(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`skill-bench report: ${message}`);
@@ -145,22 +183,46 @@ export function relativeChange(on: number | null, off: number | null): number | 
 
 function summarize(planned: number, trials: TrialView[], workspace: string | null, results: string | null): ArmSummary {
   const executed = trials.filter(trial => trial.status !== 'skipped');
-  const passed = executed.filter(trial => trial.status === 'success' && trial.passed === true).length;
+  const completed = executed.filter(trial => trial.status === 'success');
+  const graded = completed.filter(trial => trial.passed !== null);
+  const passed = graded.filter(trial => trial.passed === true).length;
   const graderNames = [...new Set(executed.flatMap(trial => trial.graders.map(grader => grader.name)))];
   return {
     planned, samples: executed.length, unexecuted: planned - trials.length,
     skipped: trials.length - executed.length,
     executionErrors: executed.filter(trial => trial.status === 'error').length,
-    failed: executed.filter(trial => trial.status === 'success' && trial.passed === false).length,
+    graded: graded.length,
+    ungraded: completed.filter(trial => trial.passed === null && trial.diagnosis.stage !== 'grader-error').length,
+    graderErrors: completed.filter(trial => trial.diagnosis.stage === 'grader-error').length,
+    failed: graded.length - passed,
     passed,
-    successRate: executed.length === 0 || executed.some(trial => trial.status === 'success' && trial.passed === null)
-      ? null : passed / executed.length * 100,
+    successRate: graded.length === 0 ? null : passed / graded.length * 100,
     score: mean(executed.map(trial => trial.score)),
     graderScores: Object.fromEntries(graderNames.map(name => [name, mean(executed.map(trial =>
       trial.graders.find(grader => grader.name === name)?.score ?? null))])),
     metrics: Object.fromEntries(metricNames.map(key => [key, mean(executed.map(trial => trial.metrics[key]))])) as Metrics,
     trials, workspace, results,
   };
+}
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+/** A pair is evidence about the skill only when both arms have only graded trials. */
+export function evidence(on: ArmSummary | null, off: ArmSummary | null): Evidence {
+  const reasons: string[] = [];
+  for (const [label, arm] of [['OFF', off], ['ON', on]] as const) {
+    if (arm === null) {
+      reasons.push(`${label}: no cell`);
+      continue;
+    }
+    if (arm.unexecuted) reasons.push(`${label}: ${plural(arm.unexecuted, 'planned trial', 'planned trials')} with no result`);
+    if (arm.executionErrors) reasons.push(`${label}: ${plural(arm.executionErrors, 'execution error', 'execution errors')}`);
+    if (arm.skipped) reasons.push(`${label}: ${plural(arm.skipped, 'skipped trial', 'skipped trials')}`);
+    if (arm.graderErrors) reasons.push(`${label}: ${plural(arm.graderErrors, 'grader error', 'grader errors')}`);
+    if (arm.ungraded) reasons.push(`${label}: ${plural(arm.ungraded, 'trial', 'trials')} with no grader verdict`);
+  }
+  const samplesPerArm = Math.min(on?.graded ?? 0, off?.graded ?? 0);
+  return { comparable: reasons.length === 0 && samplesPerArm > 0, samplesPerArm, reasons };
 }
 
 // Free text from results can hold paths, tokens or log output. Show only a short, redacted form.
@@ -243,9 +305,15 @@ function executionDiagnosis(error: unknown): Diagnosis {
   return { stage: 'execution', message, hint: 'Open results.jsonl for this cell to read the full error.' };
 }
 
-function diagnose(status: string, passed: boolean | null, graders: GraderView[], error: unknown): Diagnosis {
+function diagnose(status: string, passed: boolean | null, graders: GraderView[], error: unknown,
+  graderErrors: string[] | null): Diagnosis {
   if (status === 'skipped') return { stage: 'skipped', message: 'The trial was skipped.', hint: null };
   if (status === 'error') return executionDiagnosis(error);
+  if (graderErrors) {
+    return { stage: 'grader-error',
+      message: graderErrors.length ? `A grader did not complete: ${graderErrors.join(', ')}.` : 'The grader did not complete.',
+      hint: 'Fix the grader or its environment, then run this cell again.' };
+  }
   if (passed === true) return { stage: 'passed', message: 'All graders passed.', hint: null };
   if (passed === null) return { stage: 'ungraded', message: 'No grader verdict was recorded.', hint: null };
   const bad = graders.filter(grader => grader.passed !== true);
@@ -262,7 +330,8 @@ function arms(comparison: Comparison): [string, ArmSummary][] {
 
 /** Short terminal lines that explain each cell that did not pass. */
 export function failureSummary(benchmark: Benchmark): string[] {
-  const lines: string[] = [];
+  const problems: string[] = [];
+  const skillResults: string[] = [];
   let total = 0;
   let attention = 0;
   for (const comparison of benchmark.comparisons) {
@@ -273,10 +342,11 @@ export function failureSummary(benchmark: Benchmark): string[] {
       if (bad.length === 0 && summary.unexecuted === 0) continue;
       attention += 1;
       if (summary.unexecuted > 0) {
-        lines.push(`${label}: ${summary.unexecuted} planned trial${summary.unexecuted === 1 ? ' has' : 's have'} no result. `
+        problems.push(`${label}: ${summary.unexecuted} planned trial${summary.unexecuted === 1 ? ' has' : 's have'} no result. `
           + 'The cell did not run or did not write results.');
       }
       for (const trial of bad) {
+        const lines = trial.diagnosis.stage === 'grading' ? skillResults : problems;
         lines.push(`${label}: ${trial.diagnosis.message}`);
         for (const item of trial.graders.flatMap(grader => grader.checks)) {
           if (item.status !== 'fail' && item.status !== 'blocked') continue;
@@ -284,11 +354,26 @@ export function failureSummary(benchmark: Benchmark): string[] {
             + `${item.title ? ` ${item.title}.` : ''}${item.reason ? ` ${item.reason}` : ''}`);
         }
         if (trial.diagnosis.hint) lines.push(`  hint: ${trial.diagnosis.hint}`);
+        if (summary.results) lines.push(`  results: ${summary.results}`);
       }
-      if (bad.length > 0 && summary.results) lines.push(`  results: ${summary.results}`);
     }
   }
-  return attention === 0 ? [`All ${total} cells passed.`] : [`${attention} of ${total} cells need attention.`, ...lines];
+  const lines = attention === 0 ? [`All ${total} cells passed.`] : [`${attention} of ${total} cells need attention.`];
+  if (problems.length) lines.push('Execution, infrastructure or grading problems (not evidence about the skill):', ...problems);
+  if (skillResults.length) lines.push('Skill results that did not pass:', ...skillResults);
+  const blocked = benchmark.comparisons.filter(comparison => !comparison.evidence.comparable);
+  if (blocked.length) {
+    lines.push(`Not comparable (ON/OFF): ${blocked.map(item => `${item.skill}/${item.scenario} ${item.model}`).join(', ')}. `
+      + 'Fix the problems above, then run these cells again.');
+  }
+  const sizes = benchmark.comparisons.filter(comparison => comparison.evidence.comparable)
+    .map(comparison => comparison.evidence.samplesPerArm);
+  if (sizes.length && Math.min(...sizes) < smallSample) {
+    const n = Math.min(...sizes);
+    lines.push(`Small sample: n=${n} graded trial${n === 1 ? '' : 's'} per arm. `
+      + 'The ON/OFF difference is not statistically significant.');
+  }
+  return lines;
 }
 
 function trialView(record: ObjectValue, id: string): TrialView {
@@ -301,12 +386,14 @@ function trialView(record: ObjectValue, id: string): TrialView {
   const trajectory = record.trajectory == null ? {} : object(record.trajectory);
   const metrics = trajectory.metrics == null ? {} : object(trajectory.metrics);
   const tokens = metrics.tokenUsage == null ? {} : object(metrics.tokenUsage);
-  const passed = gradeError ? false : verdict(grade.passed);
+  const passed = gradeError ? null : verdict(grade.passed);
   const graders = details.map(graderView);
+  const erroredGraders = gradeError
+    ? details.filter(item => item.status === 'error').map(item => identifier(item.name)) : null;
   return {
     id: hash(id), status, passed,
     score: gradeError ? (grade.score === 0 ? 0 : null) : number(grade.score),
-    graders, diagnosis: diagnose(status, passed, graders, record.error),
+    graders, diagnosis: diagnose(status, passed, graders, record.error, erroredGraders),
     metrics: Object.fromEntries(metricNames.map(name => [
       name, number(name === 'totalTokens' ? tokens.totalTokens : metrics[name]),
     ])) as Metrics,
@@ -467,6 +554,7 @@ export function readBenchmark(input: string): Benchmark {
       const comparison = comparisons.get(key) ?? {
         id: hash(`${skill}::${evalName}::${scenario}`), skill, scenario, model,
         prompt: prompt(prompts[scenario]), on: null, off: null,
+        evidence: { comparable: false, samplesPerArm: 0, reasons: [] },
       };
       check(comparison[arm] === null, 'duplicate model and scenario arm.');
       comparison[arm] = summarize(runs, found, workspace, resultsPath);
@@ -477,8 +565,42 @@ export function readBenchmark(input: string): Benchmark {
     title,
     display: { models: labels(display.models), skills: labels(display.skills), scenarios: labels(display.scenarios) },
     provenance,
-    comparisons: [...comparisons.values()].sort((a, b) => `${a.id}:${a.model}`.localeCompare(`${b.id}:${b.model}`)),
+    environment: environmentView(manifest.environment),
+    comparisons: [...comparisons.values()]
+      .map(comparison => ({ ...comparison, evidence: evidence(comparison.on, comparison.off) }))
+      .sort((a, b) => `${a.id}:${a.model}`.localeCompare(`${b.id}:${b.model}`)),
   };
+}
+
+function environmentView(value: unknown): EnvironmentView | null {
+  if (value === undefined || value === null) return null;
+  const fail = (message: string): never => { throw new Error(`skill-bench report: invalid environment: ${message}`); };
+  if (typeof value !== 'object' || Array.isArray(value)) fail('expected an object.');
+  const record = value as ObjectValue;
+  if (typeof record.node !== 'string' || !/^v\d{1,3}\.\d{1,4}\.\d{1,4}$/.test(record.node)) fail('unsafe Node version.');
+  if (typeof record.platform !== 'string' || !/^[a-z0-9]{1,20}$/.test(record.platform)) fail('unsafe platform.');
+  if (!Array.isArray(record.preflight) || !Array.isArray(record.warnings) || record.warnings.length > 50) fail('expected lists.');
+  const tools: ToolVersion[] = [];
+  for (const item of record.preflight as unknown[]) {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) fail('expected a preflight object.');
+    const entry = item as ObjectValue;
+    if (entry.tools === null || typeof entry.tools !== 'object' || Array.isArray(entry.tools)) fail('expected tools.');
+    let skill = '';
+    let plugin = '';
+    try {
+      skill = identifier(entry.skill);
+      plugin = identifier(entry.plugin);
+    } catch {
+      fail('unsafe skill or plugin name.');
+    }
+    for (const [name, version] of Object.entries(entry.tools as ObjectValue)) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)) fail('unsafe tool name.');
+      if (typeof version !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/.test(version)) fail('unsafe tool version.');
+      tools.push({ skill, plugin, name, version: version as string });
+    }
+  }
+  const warnings = (record.warnings as unknown[]).map(item => safeText(item, 500)).filter((item): item is string => item !== null);
+  return { node: record.node as string, platform: record.platform as string, tools, warnings };
 }
 
 function overlaps(a: string, b: string): boolean {

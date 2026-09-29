@@ -248,14 +248,15 @@ describe('eval specification', () => {
 });
 
 describe('skill-bench registration', () => {
-  it.skipIf(!hasSkill)('registers the scenario, the skill files, the grader plugin and the NuGet preflight', () => {
+  it.skipIf(!hasSkill)('registers the scenario, the skill files, the grader plugin and the preflights', () => {
     const config = loadConfig(join(example, 'skill-bench.config.json'));
     const entry = config.skills['azure-functions-update'];
     expect(entry.evals.map(item => item.id)).toEqual(['evals/azure-functions-update/dotnet-isolated/eval.yaml']);
     expect(entry.files).toEqual(['SKILL.md', 'references/dotnet-isolated.md']);
     expect(entry.graders.map(path => path.replaceAll('\\', '/'))).toEqual([expect.stringMatching(/plugins\/functions-code-review\.ts$/)]);
-    expect(entry.preflight).toHaveLength(1);
-    const options = entry.preflight[0].options as { targetFramework: string; sdk: string; packages: Record<string, string> };
+    expect(entry.preflight.map(item => item.module.replaceAll('\\', '/'))).toEqual([
+      expect.stringMatching(/plugins\/host-preflight\.ts$/), expect.stringMatching(/plugins\/nuget-preflight\.ts$/)]);
+    const options = entry.preflight[1].options as { targetFramework: string; sdk: string; packages: Record<string, string> };
     expect(options.targetFramework).toBe('net8.0');
     expect(options.sdk).toMatch(/^Azure\.Functions\.Sdk\/\d+(\.\d+){1,3}$/);
     expect(Object.keys(options.packages)).toContain('Microsoft.Azure.Functions.Worker');

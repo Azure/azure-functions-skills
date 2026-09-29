@@ -126,10 +126,79 @@ describe('readBenchmark', () => {
     f.records[3][0].gradeResult = { passed: true, score: 1, details: [{ name: 'completed', status: 'error', passed: true, score: 1 }] };
     f.save();
     const [a, b] = readBenchmark(f.input).comparisons;
-    expect(a.off).toMatchObject({ samples: 1, passed: 0, failed: 0, successRate: null, score: null });
+    expect(a.off).toMatchObject({ samples: 1, graded: 0, ungraded: 1, passed: 0, failed: 0, successRate: null, score: null });
     expect(a.on).toMatchObject({ skipped: 1, samples: 0, successRate: null });
-    expect(b.off).toMatchObject({ executionErrors: 1, passed: 0, successRate: 0 });
-    expect(b.on).toMatchObject({ failed: 1, passed: 0, successRate: 0 });
+    expect(b.off).toMatchObject({ executionErrors: 1, graded: 0, passed: 0, successRate: null });
+    expect(b.on).toMatchObject({ graderErrors: 1, ungraded: 0, failed: 0, graded: 0, passed: 0, successRate: null });
+    expect(a.evidence).toEqual({ comparable: false, samplesPerArm: 0,
+      reasons: ['OFF: 1 trial with no grader verdict', 'ON: 1 skipped trial'] });
+    expect(b.evidence).toEqual({ comparable: false, samplesPerArm: 0,
+      reasons: ['OFF: 1 execution error', 'ON: 1 grader error'] });
+  });
+
+  it('treats a grader error as a grading problem, not as a skill failure', () => {
+    const f = fixture();
+    f.records[1][0].gradeResult = { passed: false, score: 0, status: 'error',
+      details: [{ name: 'code-review', status: 'error', passed: false, score: 0 }] };
+    f.save();
+    const data = readBenchmark(f.input);
+    const [a] = data.comparisons;
+    expect(a.on).toMatchObject({ graderErrors: 1, graded: 0, failed: 0, successRate: null });
+    expect(a.on?.trials[0].diagnosis.stage).toBe('grader-error');
+    expect(a.evidence).toEqual({ comparable: false, samplesPerArm: 0, reasons: ['ON: 1 grader error'] });
+    const lines = failureSummary(data);
+    const problems = lines.indexOf('Execution, infrastructure or grading problems (not evidence about the skill):');
+    expect(problems).toBeGreaterThanOrEqual(0);
+    expect(lines[problems + 1]).toMatch(/alpha\/.* on model-a: A grader did not complete: code-review\./);
+    expect(lines).not.toContain('Skill results that did not pass:');
+  });
+
+  it('marks a complete ON/OFF pair as comparable, with the graded sample size', () => {
+    const [a] = readBenchmark(fixture().input).comparisons;
+    expect(a.evidence).toEqual({ comparable: true, samplesPerArm: 1, reasons: [] });
+  });
+
+  it('excludes execution errors from the success rate and marks the pair not comparable', () => {
+    const f = fixture();
+    f.records[1][0].status = 'error';
+    f.records[1][0].gradeResult = null;
+    f.cells[0].results = null;
+    f.save();
+    const [a] = readBenchmark(f.input).comparisons;
+    expect(a.on).toMatchObject({ executionErrors: 1, graded: 0, successRate: null });
+    expect(a.off).toMatchObject({ unexecuted: 1, graded: 0, successRate: null });
+    expect(a.evidence).toEqual({ comparable: false, samplesPerArm: 0,
+      reasons: ['OFF: 1 planned trial with no result', 'ON: 1 execution error'] });
+  });
+
+  it('keeps the runtime and the tool versions from the manifest', () => {
+    const f = fixture();
+    Object.assign(f.manifest, { environment: {
+      node: 'v22.18.0', platform: 'linux',
+      preflight: [{ skill: 'alpha', plugin: 'host-preflight', tools: { dotnet: '10.0.401', func: '4.15.1' } }],
+      warnings: ['host-preflight: func differs in C:\\Users\\PRIVATE-USER\\bin'],
+    } });
+    f.save();
+    expect(readBenchmark(f.input).environment).toEqual({
+      node: 'v22.18.0', platform: 'linux',
+      tools: [
+        { skill: 'alpha', plugin: 'host-preflight', name: 'dotnet', version: '10.0.401' },
+        { skill: 'alpha', plugin: 'host-preflight', name: 'func', version: '4.15.1' },
+      ],
+      warnings: ['host-preflight: func differs in <path>'],
+    });
+    expect(readBenchmark(fixture().input).environment).toBeNull();
+  });
+
+  it.each([
+    ['version', { node: 'v22.18.0', platform: 'linux', preflight: [{ skill: 'alpha', plugin: 'p', tools: { func: '<img>' } }], warnings: [] }],
+    ['tool name', { node: 'v22.18.0', platform: 'linux', preflight: [{ skill: 'alpha', plugin: 'p', tools: { '</script>': '1.0.0' } }], warnings: [] }],
+    ['node', { node: 'PRIVATE', platform: 'linux', preflight: [], warnings: [] }],
+  ])('rejects an environment with an unsafe %s', (_label, environment) => {
+    const f = fixture();
+    Object.assign(f.manifest, { environment });
+    f.save();
+    expect(() => readBenchmark(f.input)).toThrow(/environment/);
   });
 
   it.each([
@@ -295,18 +364,37 @@ describe('failure diagnostics', () => {
     const lines = failureSummary(readBenchmark(f.input));
     expect(lines.join('\n')).toBe([
       '4 of 4 cells need attention.',
+      'Execution, infrastructure or grading problems (not evidence about the skill):',
       'alpha/hello off model-a: 1 planned trial has no result. The cell did not run or did not write results.',
-      'alpha/hello on model-a: Failed graders: definition-of-done (exit-code, stdout-contains); migration-quality.',
-      '  - DI-13 fail: Runtime configuration. Missing in <path>',
-      '  hint: Document FUNCTIONS_WORKER_RUNTIME.',
-      '  results: model-a/on/results.jsonl',
       'alpha/hello off model-b: The model "model-b" is not available.',
       '  hint: Check the model ID in skill-bench.config.json. Make sure that the token account can use this model in GitHub Copilot.',
       '  results: model-b/off/results.jsonl',
       'alpha/hello on model-b: No grader verdict was recorded.',
       '  results: model-b/on/results.jsonl',
+      'Skill results that did not pass:',
+      'alpha/hello on model-a: Failed graders: definition-of-done (exit-code, stdout-contains); migration-quality.',
+      '  - DI-13 fail: Runtime configuration. Missing in <path>',
+      '  hint: Document FUNCTIONS_WORKER_RUNTIME.',
+      '  results: model-a/on/results.jsonl',
+      'Not comparable (ON/OFF): alpha/hello model-a, alpha/hello model-b. Fix the problems above, then run these cells again.',
     ].join('\n'));
-    expect(failureSummary(readBenchmark(fixture().input))).toEqual(['All 4 cells passed.']);
+    expect(failureSummary(readBenchmark(fixture().input))).toEqual([
+      'All 4 cells passed.',
+      'Small sample: n=1 graded trial per arm. The ON/OFF difference is not statistically significant.',
+    ]);
+  });
+
+  it('shows only the skill result group when every failure is a grader failure', () => {
+    const f = fixture();
+    f.records[1][0].gradeResult = { passed: false, score: 0, details: [{ name: 'completed', passed: false, score: 0 }] };
+    f.save();
+    expect(failureSummary(readBenchmark(f.input))).toEqual([
+      '1 of 4 cells need attention.',
+      'Skill results that did not pass:',
+      'alpha/hello on model-a: Failed graders: completed.',
+      '  results: model-a/on/results.jsonl',
+      'Small sample: n=1 graded trial per arm. The ON/OFF difference is not statistically significant.',
+    ]);
   });
 
   it('prints the failure summary after the report command', async () => {
@@ -332,6 +420,37 @@ describe('failure diagnostics', () => {
     expect(render(html, `?skill=${id}&model=model-b`).node('#app').innerHTML).toContain('is not available');
     const cards = render(html, '').node('#cards').innerHTML;
     expect(cards).toContain('need attention');
+  });
+
+  it('shows a pair with an execution problem as not comparable, not as a 0 pp difference', () => {
+    const f = fixture();
+    f.records[0][0].gradeResult = { passed: false, score: 0, details: [{ name: 'completed', passed: false, score: 0 }] };
+    f.records[1][0].status = 'error';
+    f.records[1][0].gradeResult = null;
+    f.records[1][0].error = 'Model "model-a" is not available.';
+    f.save();
+    const html = readFileSync(generateReport(f.input, join(f.root, 'site')), 'utf8');
+    const id = readBenchmark(f.input).comparisons[0].id;
+    const detail = render(html, `?skill=${id}&model=model-a`).node('#app').innerHTML;
+    expect(detail).toContain('Not evidence about the skill');
+    expect(detail).toContain('ON: 1 execution error');
+    expect(detail).not.toContain('0 pp');
+    const cards = render(html, '').node('#cards').innerHTML;
+    expect(cards).toContain('Not comparable');
+  });
+
+  it('shows the sample size and the tool versions for a comparable pair', () => {
+    const f = fixture();
+    Object.assign(f.manifest, { environment: { node: 'v22.18.0', platform: 'linux',
+      preflight: [{ skill: 'alpha', plugin: 'host-preflight', tools: { func: '4.15.1' } }], warnings: [] } });
+    f.save();
+    const html = readFileSync(generateReport(f.input, join(f.root, 'site')), 'utf8');
+    const id = readBenchmark(f.input).comparisons[0].id;
+    expect(render(html, '').node('#cards').innerHTML).toContain('n=1');
+    const detail = render(html, `?skill=${id}`).node('#app').innerHTML;
+    expect(detail).toContain('n=1');
+    expect(detail).toContain('func 4.15.1');
+    expect(detail).toContain('v22.18.0');
   });
 });
 

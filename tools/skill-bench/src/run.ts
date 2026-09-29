@@ -10,7 +10,7 @@ import { cellEnvironment, createCellDirectories, modelToken, saveWorkspaceSnapsh
 import type { Environment } from './env.ts';
 import { selectCells } from './plan.ts';
 import type { Selection } from './plan.ts';
-import { loadPreflights, validateSpecs, withRegistries } from './plugins.ts';
+import { loadPreflights, parsePreflightReport, validateSpecs, withRegistries } from './plugins.ts';
 import type { LoadedPreflight, PreflightTeardownContext } from './plugins.ts';
 import { assertCleanAncestors, hash, stageRun, verifyStagedRun } from './stage.ts';
 import type { StagedCell, StagedRun } from './stage.ts';
@@ -69,6 +69,20 @@ export interface ManifestCell {
   exitCode: number | null;
 }
 
+export interface PreflightRecord {
+  skill: string;
+  plugin: string;
+  tools: Record<string, string>;
+}
+
+/** The runtime and the tool versions of a paid run, so that two runs can be compared. */
+export interface EnvironmentRecord {
+  node: string;
+  platform: string;
+  preflight: PreflightRecord[];
+  warnings: string[];
+}
+
 export interface Manifest {
   type: 'skill-bench-matrix';
   version: 1;
@@ -78,6 +92,7 @@ export interface Manifest {
   title: string;
   display: BenchConfig['display'];
   cells: ManifestCell[];
+  environment?: EnvironmentRecord;
   /** Present only when skill-bench cannot remove the staged run root. */
   cleanup?: CleanupRecord;
 }
@@ -263,6 +278,7 @@ export async function runBench(options: RunOptions, source: NodeJS.ProcessEnv = 
       return { exitCode: 0, dryRun: true, cells: manifestCells };
     }
     const destination = output;
+    const environment: EnvironmentRecord = { node: process.version, platform: process.platform, preflight: [], warnings: [] };
     for (const [skill, loaded] of preflights) {
       for (const item of loaded) {
         if (!item.plugin.run) continue;
@@ -272,13 +288,21 @@ export async function runBench(options: RunOptions, source: NodeJS.ProcessEnv = 
         mkdirSync(join(root, 'work'));
         dependencies.log(`Preflight ${item.plugin.name} for ${skill}.`);
         const env = cellEnvironment(root, source, { paid: false, settings: run.settings, registry, fixed: config.env });
+        let report: ReturnType<typeof parsePreflightReport>;
         try {
-          await item.plugin.run({ options: item.options, workDir: join(root, 'work'), env });
+          report = parsePreflightReport(item.plugin.name,
+            await item.plugin.run({ options: item.options, workDir: join(root, 'work'), env }));
         } finally {
           await teardown([item], `preflight ${skill}`, { cellRoot: root, workspace: null, env }, dependencies.log);
         }
+        if (Object.keys(report.tools).length > 0) environment.preflight.push({ skill, plugin: item.plugin.name, tools: report.tools });
+        for (const warning of report.warnings) {
+          environment.warnings.push(`${item.plugin.name}: ${warning}`);
+          dependencies.log(`Warning: ${item.plugin.name}: ${warning}`);
+        }
       }
     }
+    manifest.environment = environment;
     mkdirSync(destination, { recursive: true, mode: 0o700 });
     const written = manifest;
     save = () => {

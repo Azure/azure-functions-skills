@@ -17,6 +17,17 @@
         "graders": ["plugins/functions-code-review.ts"],
         "preflight": [
           {
+            "module": "plugins/host-preflight.ts",
+            "options": {
+              "tools": {
+                "dotnet": { "args": ["--version"], "version": "10.0.401" },
+                "func": { "args": ["--version"], "version": "4.15.1" }
+              },
+              "ports": { "azurite-blob": 10000, "azurite-queue": 10001 },
+              "readyTimeoutSeconds": 60
+            }
+          },
+          {
             "module": "plugins/nuget-preflight.ts",
             "options": {
               "targetFramework": "net8.0",

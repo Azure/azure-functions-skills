@@ -35,6 +35,18 @@ export interface PreflightTeardownContext {
 }
 
 /**
+ * What a preflight `run` can report. skill-bench records it in the manifest,
+ * and the dashboard shows it. Use it for the versions of the tools that the
+ * scenario needs, so that two runs can be compared.
+ */
+export interface PreflightRunReport {
+  /** Tool name to installed version, for example `{ "func": "4.15.1" }`. */
+  tools?: Record<string, string>;
+  /** Short messages for the operator, for example a version that differs from the pin. */
+  warnings?: string[];
+}
+
+/**
  * A scenario plugin that prepares or checks the environment. A module exports
  * it as the named export `preflight`. `validate` and `prepareCell` also run in
  * a dry-run; `run` runs only in a paid run, before any model call.
@@ -45,8 +57,32 @@ export interface PreflightPlugin {
   name: string;
   validate?(options: unknown): void;
   prepareCell?(context: PreflightCellContext): void;
-  run?(context: PreflightRunContext): void | Promise<void>;
+  run?(context: PreflightRunContext): void | PreflightRunReport | Promise<void | PreflightRunReport>;
   teardownCell?(context: PreflightTeardownContext): void | Promise<void>;
+}
+
+const toolName = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const toolVersion = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/;
+
+/** Check the value that a preflight `run` returned. Only short, safe strings are kept. */
+export function parsePreflightReport(plugin: string, value: unknown): Required<PreflightRunReport> {
+  const fail = (message: string): never => { throw new Error(`skill-bench plugins: preflight ${plugin} ${message}`); };
+  if (value === undefined || value === null) return { tools: {}, warnings: [] };
+  if (typeof value !== 'object' || Array.isArray(value)) fail('must return nothing or an object with tools and warnings.');
+  const { tools = {}, warnings = [], ...rest } = value as Record<string, unknown>;
+  if (Object.keys(rest).length > 0) fail(`returned an unknown field ${Object.keys(rest)[0]}.`);
+  if (tools === null || typeof tools !== 'object' || Array.isArray(tools)) fail('must return tools as an object.');
+  const entries = Object.entries(tools as Record<string, unknown>);
+  if (entries.length > 50) fail('returned too many tools.');
+  for (const [name, version] of entries) {
+    if (!toolName.test(name)) fail(`returned an unsafe tool name ${JSON.stringify(name.slice(0, 40))}.`);
+    if (typeof version !== 'string' || !toolVersion.test(version)) fail(`returned an unsafe version for ${name}.`);
+  }
+  if (!Array.isArray(warnings) || warnings.length > 50
+    || !warnings.every(item => typeof item === 'string' && item.length > 0 && item.length <= 500)) {
+    fail('must return warnings as a list of short strings.');
+  }
+  return { tools: Object.fromEntries(entries) as Record<string, string>, warnings: warnings as string[] };
 }
 
 export interface LoadedPreflight {

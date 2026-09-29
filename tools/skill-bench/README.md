@@ -56,6 +56,7 @@ You need Node.js 22.18 or later and the tools that the scenario uses. The `azure
 Tips:
 
 - A model ID must be in `models` in the config, and your account must be able to use it. Else the cell fails with "Model ... is not available".
+- The update example stops before the first model call if your `dotnet` or `func` version differs from the pin, or if Azurite is not running. Install the pinned version. To continue with a different version, set `$env:SKILL_BENCH_ALLOW_TOOL_DRIFT = '1'`; the run records the difference as a warning.
 - If a Windows file lock stops the cleanup, the tool keeps the results and shows a warning. Delete the directory later: `Remove-Item -Recurse -Force Q:\sb-run\skill-bench-*`.
 - If you have more than one GitHub account (for example, EMU and public), use the account that can use Copilot: `gh auth token --hostname github.com --user <account>`.
 
@@ -109,18 +110,32 @@ interface PreflightPlugin {
   name: string;
   validate?(options: unknown): void;                 // dry-run and run
   prepareCell?(context: PreflightCellContext): void; // dry-run and run, for each cell
-  run?(context: PreflightRunContext): void | Promise<void>; // run only, one time for each skill
+  run?(context: PreflightRunContext): void | PreflightRunReport | Promise<void | PreflightRunReport>; // run only, one time for each skill
   teardownCell?(context: PreflightTeardownContext): void | Promise<void>; // run only, after each cell and after run
+}
+
+interface PreflightRunReport {
+  tools?: Record<string, string>; // for example { "func": "4.15.1" }
+  warnings?: string[];
 }
 ```
 
 Use `teardownCell` to stop processes that a trial started, for example build servers. The context has the cell root, the workspace (`null` after `run`), and the cell environment. An error in `teardownCell` gives a warning. It does not stop the run.
 
+`run` can return the versions of the tools that the scenario uses. The tool records them, the Node.js version, and the platform in `environment` in `matrix-manifest.json`. The dashboard shows them in **Comparison conditions**. Use this to find a tool change between two runs. An unsafe name or version stops the run before the first model call.
+
 Scenario plugins go in the example directory, not in `src/`.
 
 ## Failure diagnostics
 
-After `run` and `report`, the CLI prints a short list of the cells that did not pass. The dashboard shows the same data in the **Why it failed** panel of each comparison. A card row shows a warning when a trial needs attention.
+After `run` and `report`, the CLI prints a short list of the cells that did not pass. It puts them in two groups:
+
+- **Execution, infrastructure or grading problems**: the stages `execution`, `grader-error`, `ungraded` and `skipped`, and planned trials with no result. These are not evidence about the skill.
+- **Skill results that did not pass**: the stage `grading`.
+
+The dashboard shows the same data in the **Why it failed** panel of each comparison. A card row shows a warning when a trial needs attention.
+
+The success rate is `passed / graded`. A graded trial completed and has a grader verdict. If an arm has a problem from the first group, the ON/OFF pair is **Not comparable**. The dashboard and the CLI then show the reason and no difference. `n` is the smallest number of graded trials in the two arms. When `n` is less than 5, the difference shows a direction only. It is not statistically significant.
 
 Each trial gets a `diagnosis` in `benchmark.json`:
 
@@ -128,6 +143,7 @@ Each trial gets a `diagnosis` in `benchmark.json`:
 | --- | --- |
 | `execution` | The trial did not complete. For example, the model is not available, the token is not valid, or a timeout occurred. The message includes a hint. |
 | `grading` | The trial completed, but one or more graders failed. The message names the failed graders and their failed sub-checks. |
+| `grader-error` | The trial completed, but a grader did not complete (status `error`). This is not a verdict about the skill. |
 | `ungraded` | The trial completed, but no grader verdict was recorded. |
 | `skipped` | Vally skipped the trial. |
 | `passed` | All graders passed. |
@@ -152,7 +168,12 @@ The report never copies grader `evidence`, transcripts, or logs. It removes cont
 
 ## Examples
 
-- `examples/azure-functions-update/`: the .NET in-process to isolated worker migration. It has a NuGet preflight plugin and a code review grader plugin. The preflight plugin also stops the .NET build servers after each cell (`dotnet build-server shutdown`), and the config sets `MSBuildNodeReuse=false`, `DOTNET_CLI_USE_MSBUILD_SERVER=0`, and `UseSharedCompilation=false`. The paid run needs .NET, Azure Functions Core Tools, and Azurite.
+- `examples/azure-functions-update/`: the .NET in-process to isolated worker migration. It has three scenario plugins:
+  - `host-preflight`: before the first model call, it checks that the installed `dotnet` and `func` versions are equal to the pins in the config, and that Azurite accepts connections on ports 10000 and 10001 (60 s limit). It records the versions in the manifest.
+  - `nuget-preflight`: it isolates the NuGet settings of each cell and checks the package restore. It also stops the .NET build servers after each cell (`dotnet build-server shutdown`). The config sets `MSBuildNodeReuse=false`, `DOTNET_CLI_USE_MSBUILD_SERVER=0`, and `UseSharedCompilation=false`.
+  - `functions-code-review`: the code review grader.
+
+  The paid run needs the .NET SDK, Azure Functions Core Tools, PowerShell 7, and Azurite. See the [scenario README](examples/azure-functions-update/evals/dotnet-isolated/README.md) for the pinned versions and the fixture files.
 - `examples/azure-functions-create/`: the TypeScript HTTP function. It uses the root `evals/` directory.
 
 The examples point at skills in the root `templates/skills/` directory. If you move this tool to its own repository, change the `skillDir` and `evals` paths.

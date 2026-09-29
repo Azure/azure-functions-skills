@@ -3,6 +3,46 @@
 This case migrates a small in-process app to the isolated worker. The Functions
 model/configuration phase keeps `net8.0`. It does not update the language or hosting plan.
 
+These files are an example scenario for skill-bench. They are new with the tool. They
+are not a remainder of the root `src/evaluation` code.
+
+## Files in this folder
+
+| Path | Who sees it | Purpose |
+| --- | --- | --- |
+| `eval.yaml` | Vally | The prompt, the files for each arm, the graders, and the files for the grader only. |
+| `fixtures/*.cs`, `UpgradeApp.csproj`, `host.json`, `trial.gitignore` | Agent | The in-process app that the agent migrates. Both arms get the same copy. |
+| `fixtures/eval-boundaries.md` | Agent | The workspace and operation limits (copied as `AGENTS.md`). |
+| `fixtures/baseline/*.txt` | Grader only | An unchanged copy of the input app. See below. |
+| `fixtures/checks/*.ps1` | Grader only | The deterministic definition-of-done grader and the Azurite reset. |
+| `fixtures/definition-of-done.json` | Grader only | The 19 check IDs and their rules. |
+| `fixtures/review-basis.md` | Grader only | The fixed review notes for the code-only judge. |
+| `upstream-provenance.json` | People | The origin and hashes of the input app. |
+
+**Why a baseline copy.** The agent can change every file in its workspace. Thus the
+grader cannot use the workspace to learn the original values. `eval.yaml` copies
+`fixtures/baseline/*.txt` to `grading-evidence/baseline/` in the grading environment
+only; the agent never sees these files. `Invoke-DefinitionOfDone.ps1` compares the
+submitted app with them: the target framework, the `host.json`
+version, and the HTTP contract of `Hello`. The `.txt` extension stops the build from
+compiling a second copy of the app. The files are equal to the input files.
+
+## Pinned tools
+
+The `host-preflight` plugin stops a paid run before the first model call if a version
+differs from these pins, or if Azurite does not accept connections in 60 s. The manual
+benchmark workflow installs the same versions. Change the config and the workflow together.
+
+| Tool | Version | Where it is pinned |
+| --- | --- | --- |
+| .NET SDK | 10.0.401 (default `dotnet`), plus 8.0.425 for the `net8.0` runtime | `host-preflight` options; `actions/setup-dotnet` in the workflow |
+| Azure Functions Core Tools | 4.15.1 | `host-preflight` options; `npm install -g` in the workflow |
+| Azurite | 3.37.0 | The workflow. Locally, use a dedicated instance on ports 10000 and 10001. |
+
+To run locally with other versions, set `SKILL_BENCH_ALLOW_TOOL_DRIFT=1`. The run
+records the installed versions and a warning in `matrix-manifest.json` and in the
+dashboard.
+
 ## Input app
 
 The starting point is the app from
@@ -88,7 +128,7 @@ The local runner instead calls standalone `vally eval` with both plugin flags fo
 each cell. It saves original results and a separate `matrix-manifest.json` for
 reporting. It does not create a false native experiment manifest.
 
-Provide .NET SDK 8, Core Tools v4, PowerShell 7.2+, and a reachable NuGet source.
+Provide the pinned .NET SDK and Core Tools, PowerShell 7.2+, and a reachable NuGet source.
 Also provide a **dedicated Azurite instance** on loopback ports 10000 and 10001,
 using its public development account. Do not share it with another app or concurrent
 trial. The `greeting-requests` queue and `greeting-input`/`greeting-output` containers
@@ -107,10 +147,11 @@ folder with `SKILL.md`), `grading-evidence/`, build output, and dot folders, so
 the ON arm cannot pass only because the skill text is present.
 
 skill-bench stages only declared files into a clean external directory. The
-`nuget-preflight` plugin isolates NuGet settings and caches and checks the selected
-SDK/Worker restore path before a paid call. This is not a complete host or emulator
-readiness check. The operator must check the other prerequisites first. No
-installation or emulator start is automatic.
+`host-preflight` plugin checks the pinned `dotnet` and `func` versions and that Azurite
+accepts connections. The `nuget-preflight` plugin isolates NuGet settings and caches and
+checks the selected SDK/Worker restore path before a paid call. These checks do not
+prove that the host starts. skill-bench does not install tools or start Azurite; the
+operator or the workflow does that first.
 
 After code review, use existing clean external parent directories. Run these commands
 in `tools/skill-bench`. This example selects GPT-6 Astra and GPT-6 Sol, with one
@@ -145,8 +186,8 @@ as an empty successful migration.
 
 The source export excludes local settings, `.env` files, logs, hidden working
 directories, and generated output. It is separate from the code-only judge input.
-The manual CI workflow uploads it as `migrated-app-source-<run ID>` in addition to
-the existing private results. No CI run is started by this configuration change.
+The files stay in the run output directory. The manual benchmark workflow uploads
+only the dashboard.
 
 ## Dependencies and limits
 

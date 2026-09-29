@@ -265,6 +265,54 @@ export const preflight = {
     expect(logs.join('\n')).toMatch(/Warning: teardown probe for alpha\/basic\/off\/model-a failed: teardown failure/);
   });
 
+  it('records the runtime and the tool versions and warnings that a preflight returns', async () => {
+    put(root, 'bench/plugins/probe.ts', `export const preflight = {
+  name: 'probe',
+  run() { return { tools: { dotnet: '10.0.401', func: '4.15.1' }, warnings: ['func differs from the pin.'] }; },
+};
+`);
+    const config = writeProject(root, {
+      skills: { alpha: { skillDir: '../skills/alpha', evals: ['evals/basic/eval.yaml'],
+        plugins: { preflight: [{ module: 'plugins/probe.ts', options: {} }] } } },
+    });
+    const output = join(outParent, 'out');
+    const logs: string[] = [];
+    await runBench({ config, selection: { all: true, models: ['model-a'] }, dryRun: false, runRoot, trusted: true, output },
+      paidEnv, { ...fakeVally([]), log: message => logs.push(message) });
+    const manifest = JSON.parse(readFileSync(join(output, 'matrix-manifest.json'), 'utf8'));
+    expect(manifest.environment).toEqual({
+      node: process.version, platform: process.platform,
+      preflight: [{ skill: 'alpha', plugin: 'probe', tools: { dotnet: '10.0.401', func: '4.15.1' } }],
+      warnings: ['probe: func differs from the pin.'],
+    });
+    expect(logs.join('\n')).toContain('Warning: probe: func differs from the pin.');
+  });
+
+  it('records an empty tool list when no preflight reports versions', async () => {
+    const output = join(outParent, 'out');
+    await runBench({ config: writeProject(root), selection: { all: true, models: ['model-a'] }, dryRun: false, runRoot,
+      trusted: true, output }, paidEnv, fakeVally([]));
+    const manifest = JSON.parse(readFileSync(join(output, 'matrix-manifest.json'), 'utf8'));
+    expect(manifest.environment).toEqual({ node: process.version, platform: process.platform, preflight: [], warnings: [] });
+  });
+
+  it.each([
+    ['tool name', `{ tools: { 'bad name!': '1.0.0' } }`],
+    ['version', `{ tools: { func: '<script>' } }`],
+    ['warning', `{ warnings: [42] }`],
+    ['shape', `'1.0.0'`],
+  ])('rejects a preflight report with an invalid %s before any model call', async (_label, report) => {
+    put(root, 'bench/plugins/probe.ts', `export const preflight = { name: 'probe', run() { return ${report}; } };\n`);
+    const config = writeProject(root, {
+      skills: { alpha: { skillDir: '../skills/alpha', evals: ['evals/basic/eval.yaml'],
+        plugins: { preflight: [{ module: 'plugins/probe.ts', options: {} }] } } },
+    });
+    const calls: Call[] = [];
+    await expect(runBench({ config, selection: { all: true, models: ['model-a'] }, dryRun: false, runRoot, trusted: true,
+      output: join(outParent, 'out') }, paidEnv, fakeVally(calls))).rejects.toThrow(/preflight probe/);
+    expect(calls).toHaveLength(0);
+  });
+
   it('does not call teardownCell in a dry-run', async () => {
     put(root, 'bench/plugins/probe.ts', `export const preflight = {
   name: 'probe', teardownCell() { throw new Error('no teardown in a dry-run'); },
