@@ -6,7 +6,7 @@ tags:
   tier: local
 defaults:
   executor: copilot-sdk
-  model: claude-sonnet-5
+  model: claude-sonnet-5.5
   judge_model: gpt-6-astra
   judge_reasoning_effort: high
   runs: 1
