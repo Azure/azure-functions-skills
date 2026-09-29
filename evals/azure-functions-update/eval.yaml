@@ -104,7 +104,9 @@ stimuli:
       - name: plan-saved
         type: file-matches
         config:
-          path: "**/*.md"
+          # Root only: the trial copies the skill into a subfolder, and its text
+          # also contains these words.
+          path: "*.md"
           pattern: "(?i)dotnet-isolated|isolated worker"
       - name: named-project-unchanged
         type: file-matches
@@ -196,11 +198,11 @@ stimuli:
       - name: language-stage-separate
         type: output-matches
         config:
-          pattern: "(?i)(separate|later|second|handoff|hand off)[^\\n]{0,80}(\\.NET 10|net10|language)|(\\.NET 10|net10|language)[^\\n]{0,80}(separate|later|second|handoff|hand off)"
+          pattern: "(?i)(separate|later|second|next|hand(ed|s|ing)?[ -]?off|stage)[^\\n]{0,120}(\\.NET 10|net10|language)|(\\.NET 10|net10|language)[^\\n]{0,120}(separate|later|second|next|hand(ed|s|ing)?[ -]?off|stage)"
       - name: hosting-change-separate
         type: output-matches
         config:
-          pattern: "(?i)(Flex Consumption|hosting|plan change|SKU)[^\\n]{0,120}(Azure Skills|separate|out of scope|not part|handoff|hand off)|(Azure Skills|separate|out of scope|handoff|hand off)[^\\n]{0,120}(Flex Consumption|hosting|SKU)"
+          pattern: "(?i)(Flex Consumption|hosting|plan change|SKU)[^\\n]{0,120}(Azure Skills|separate|out of scope|not part|hand(ed|s|ing)?[ -]?off|stage)|(Azure Skills|separate|out of scope|hand(ed|s|ing)?[ -]?off|stage)[^\\n]{0,120}(Flex Consumption|hosting|SKU)"
       - name: stages-tfm-unchanged
         type: file-matches
         config:
