@@ -87,7 +87,7 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | --- | --- |
 | Local tools の setup または prerequisites verification | `azure-functions-setup` |
 | 新しい Functions project の作成、または既存 project への function 追加 | `azure-functions-create` |
-| `azure-functions-update` を名前で指定して使用・再開を依頼 | `azure-functions-update`（draft: model/config 移行。初版は C# in-process から isolated） |
+| `azure-functions-update` を名前で指定して使用・再開を依頼 | `azure-functions-update`（draft: model/config 移行のアンブレラ。現在のシナリオは C# in-process から isolated。ほかのシナリオも追加予定） |
 | 名前の指定なしで Functions のコード移行を依頼 | `azure-functions-update` を案内する。自動では開始しない |
 | Consumption から Flex など、hosting plan・SKU の変更 | Azure Skills。コード移行の開始依頼とはみなさない |
 | Markdown、Functions triggers、code、tools、HTTP、MCP を使う cloud-hosted な intelligent capability、Azure Functions Hosted Skills の build または変更 | `azure-functions-hosted-skills` |

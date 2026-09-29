@@ -1,6 +1,6 @@
 ---
 name: azure-functions-update
-description: "Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review."
+description: "Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Current scenario: C# in-process to .NET isolated worker; more scenarios are planned. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review."
 ---
 
 
@@ -31,6 +31,28 @@ does not authorize changing them together or installing external tools.
 Do not use this workflow for new apps, cross-cloud migration, deployment-only work,
 or updates to the skills CLI. Azure Skills owns platform changes, provisioning,
 deployment, and SKU decisions. Do not start a second migration plan during a handoff.
+
+## Scenario coverage
+
+This skill is the umbrella workflow for Azure Functions migration scenarios.
+The scenario table above is the registry. Each row points to one scenario reference.
+
+- Current coverage: the C# in-process to .NET isolated worker scenario only.
+- Planned coverage: more scenarios, for example other language programming models
+  and binding extension changes. A planned scenario is not available until its row exists.
+- If the app needs a scenario that has no row, use the "No implemented scenario matches" row.
+
+Select one row from the observed inventory facts in step 3. The user's words alone are
+not sufficient. If more than one row matches, ask the user which scenario to run first.
+Run one scenario in each phase.
+
+To add a scenario:
+
+1. Add one file under `references/`. Include the official sources, extra prerequisites,
+   migration steps, and a definition of done with stable IDs.
+2. Add one row to the scenario table with the observed condition that selects it.
+3. Add eval coverage for the new scenario.
+4. Keep the common workflow in this file. Put only scenario-specific rules in the reference.
 
 ## 1. Save an initial plan with state
 

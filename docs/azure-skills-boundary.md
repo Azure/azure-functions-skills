@@ -87,7 +87,7 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | --- | --- |
 | Set up local tools or verify prerequisites | `azure-functions-setup` |
 | Create a new Functions project or add a function to an existing project | `azure-functions-create` |
-| Explicitly ask to use or resume `azure-functions-update` by name | `azure-functions-update` (draft: model/config workflow; first scenario is C# in-process to isolated) |
+| Explicitly ask to use or resume `azure-functions-update` by name | `azure-functions-update` (draft: umbrella model/config workflow; the current scenario is C# in-process to isolated; more scenarios are planned) |
 | Request Functions code migration without selecting the update skill by name | Recommend `azure-functions-update`; do not start it automatically |
 | Change a hosting plan or SKU, including Consumption to Flex | Azure Skills; not an implicit code-migration request |
 | Build or modify Azure Functions Hosted Skills: cloud-hosted intelligent capabilities using Markdown, Functions triggers, code, tools, HTTP, or MCP | `azure-functions-hosted-skills` |
