@@ -94,7 +94,7 @@ export async function main(argv: string[], io: CliIo = consoleIo, source: NodeJS
     if (values.site && command !== 'run') throw new Error('--site is only for run.');
     const result = await runBench({
       config: values.config, selection: selection(values), dryRun: command === 'dry-run',
-      runRoot: values['run-root'], output: values.output, trusted: values.trusted, registry: values.registry,
+      runRoot: values['run-root'], output: values.output, site: values.site, trusted: values.trusted, registry: values.registry,
     }, source, { ...dependencies, log: io.out });
     if (result.output) {
       io.out(`Results: ${result.output}`);

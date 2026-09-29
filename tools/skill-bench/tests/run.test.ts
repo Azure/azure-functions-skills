@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SpawnSyncOptions, SpawnSyncReturns } from 'node:child_process';
 import { removeRunRoot, runBench } from '../src/run.ts';
@@ -39,6 +39,7 @@ function fakeVally(calls: Call[], behavior: (call: Call) => Behavior = () => 're
       if (kind === 'results') {
         put(value('--output-dir'), '20250101T000000/results.jsonl', JSON.stringify({ type: 'trial-result' }) + '\n');
         put(value('--workspace'), 'local.settings.json', JSON.stringify({ Values: { Secret: 'hidden' } }));
+        put(value('--workspace'), 'notes.txt', `copied ${(options.env as Record<string, string> | undefined)?.COPILOT_GITHUB_TOKEN}`);
       }
       return { status, signal: null, pid: 1, output: [], stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) } as SpawnSyncReturns<Buffer>;
     },
@@ -138,6 +139,9 @@ describe('runBench paid run', () => {
     expect(manifest.cells[0].prompts['alpha-basic-stimulus']).toContain('Say hello.');
     const snapshot = readFileSync(join(output, manifest.cells[1].workspace, 'local.settings.redacted.json'), 'utf8');
     expect(snapshot).not.toContain('hidden');
+    const saved = JSON.parse(readFileSync(join(output, manifest.cells[1].workspace, 'snapshot-manifest.json'), 'utf8'));
+    expect(saved.excluded).toContain('notes.txt:credential-like-content');
+    expect(existsSync(join(output, manifest.cells[1].workspace, 'notes.txt'))).toBe(false);
     expect(readdirSync(runRoot)).toEqual([]);
   });
 
@@ -213,6 +217,27 @@ describe('runBench cleanup and teardown', () => {
     const manifest = JSON.parse(readFileSync(join(output, 'matrix-manifest.json'), 'utf8'));
     expect(manifest.cleanup).toEqual({ removed: false, path: left, error: result.cleanup?.error });
     expect(manifest.cells.every((cell: { results: unknown }) => cell.results !== null)).toBe(true);
+  });
+
+  it('checks --site before any model call', async () => {
+    const calls: Call[] = [];
+    const errors: string[] = [];
+    const config = writeProject(root);
+    const output = join(outParent, 'out');
+    put(outParent, 'used-site/index.html', 'old');
+    // A link to the configuration directory, with missing directories below it.
+    symlinkSync(join(root, 'bench'), join(outParent, 'link'), process.platform === 'win32' ? 'junction' : 'dir');
+    for (const site of [join(outParent, 'used-site'), join(output, 'site'), join(runRoot, 'site'), join(root, 'bench', 'site'),
+      join(outParent, 'link', 'new', 'site')]) {
+      const code = await main(['run', '--config', config, '--all', '--model', 'model-a', '--trusted',
+        '--run-root', runRoot, '--output', output, '--site', site],
+      { out: () => {}, err: text => errors.push(text) }, paidEnv, fakeVally(calls));
+      expect(code).toBe(1);
+    }
+    expect(calls).toHaveLength(0);
+    expect(existsSync(output)).toBe(false);
+    expect(errors[0]).toMatch(/--site must be a new or empty directory/);
+    expect(errors.slice(1).every(text => /--site must not overlap/.test(text))).toBe(true);
   });
 
   it('still writes the dashboard with --site when cleanup fails', async () => {

@@ -85,7 +85,8 @@ $env:SKILL_BENCH_NUGET_SOURCE = '<approved-nuget-feed-url>'  # NuGet v3 index fo
 | `skills` | Yes | The measured skills. The key is the skill name. |
 | `skills.<name>.skillDir` | Yes | The skill directory. It must contain `SKILL.md`. |
 | `skills.<name>.files` | No | The files to copy from `skillDir`. If you do not set it, the tool copies all files. |
-| `skills.<name>.evals` | Yes | The Vally `eval.yaml` files. |
+| `skills.<name>.evals` | Yes | The Vally `eval.yaml` files. An entry is a path, or `{ "path": "...", "copies": [...] }`. |
+| `skills.<name>.evals[].copies` | No | Files to copy inside the staged eval: `{ "from": "fixtures/a.cs", "to": "grader-baseline/a.cs.txt" }`. Both paths are relative to the eval directory. The copy is only in the staged eval, not in your repository. Use it when a grader needs an unchanged copy of an input file. Vally refuses a grader file whose `src` is also an agent file. |
 | `skills.<name>.plugins.graders` | No | Vally grader plugin modules. |
 | `skills.<name>.plugins.executors` | No | Vally executor plugin modules. |
 | `skills.<name>.plugins.preflight` | No | Preflight plugins: `{ "module": "...", "options": {...} }`. |
@@ -162,14 +163,16 @@ The report never copies grader `evidence`, transcripts, or logs. It removes cont
 - Each cell gets an isolated workspace, HOME, and agent configuration. The OFF arm gets no measured skill. The ON arm gets only the target skill. Both arms get the shared skills. The tool verifies this before it runs a cell.
 - Each cell gets a minimal environment allowlist. Only a paid run gets the model token (`COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN`). The tool does not copy normal credential stores.
 - The tool refuses symbolic links and applies size limits when it copies files.
-- The tool redacts saved workspace snapshots.
+- The tool redacts saved workspace snapshots. It does not save a file that contains the model token or a token-shaped value (`gh*_`, `github_pat_`, a JWT, or a private key).
+- A paid run checks `--output` and `--site` before the first model call. Each must be a new or empty directory, and must not overlap the config, the skills, or the run root.
+- The cell `configHash` uses the content of the staged skills, the eval, the plugin modules and `env`, not the temporary paths. Equal inputs give equal hashes in different runs.
 - One trial, one worker, no retry for each cell.
 
 
 ## Examples
 
 - `examples/azure-functions-update/`: the .NET in-process to isolated worker migration. It has three scenario plugins:
-  - `host-preflight`: before the first model call, it checks that the installed `dotnet` and `func` versions are equal to the pins in the config, and that Azurite accepts connections on ports 10000 and 10001 (60 s limit). It records the versions in the manifest.
+  - `host-preflight`: before the first model call, it checks that the installed `dotnet` and `func` versions are equal to the pins in the config, that each pinned .NET SDK (the `installed` option, from `dotnet --list-sdks`) is installed, and that Azurite accepts connections on ports 10000 and 10001 (60 s limit). It records the versions in the manifest.
   - `nuget-preflight`: it isolates the NuGet settings of each cell and checks the package restore. It also stops the .NET build servers after each cell (`dotnet build-server shutdown`). The config sets `MSBuildNodeReuse=false`, `DOTNET_CLI_USE_MSBUILD_SERVER=0`, and `UseSharedCompilation=false`.
   - `functions-code-review`: the code review grader.
 

@@ -80,6 +80,31 @@ describe('host-preflight example plugin', () => {
       .toThrow(/dotnet printed no version/);
   });
 
+  const sdkOptions = { ...options, installed: { dotnet: { args: ['--list-sdks'], versions: ['10.0.401', '8.0.425'] } } };
+  const sdkList = (list: string): ToolSpawn => command => command === 'dotnet --list-sdks'
+    ? { status: 0, stdout: list } : { status: 0, stdout: command.startsWith('dotnet') ? '10.0.401\n' : '4.15.1\n' };
+
+  it('checks every pinned SDK in the installed list, not only the default SDK', () => {
+    const list = '8.0.425 [C:\\Program Files\\dotnet\\sdk]\n10.0.401 [C:\\Program Files\\dotnet\\sdk]\n';
+    expect(checkTools(parseOptions(sdkOptions), {}, {}, sdkList(list))).toEqual({
+      tools: { dotnet: '10.0.401', func: '4.15.1', 'dotnet-10.0': '10.0.401', 'dotnet-8.0': '8.0.425' }, warnings: [],
+    });
+  });
+
+  it('stops when a pinned SDK is missing, and accepts the same feature band only with drift allowed', () => {
+    expect(() => checkTools(parseOptions(sdkOptions), {}, {}, sdkList('10.0.401 [/usr/share/dotnet/sdk]\n')))
+      .toThrow(/dotnet 8\.0\.425 is not installed/);
+    const drift = { SKILL_BENCH_ALLOW_TOOL_DRIFT: '1' };
+    expect(() => checkTools(parseOptions(sdkOptions), {}, drift, sdkList('10.0.401 [/usr/share/dotnet/sdk]\n')))
+      .toThrow(/dotnet 8\.0\.425 is not installed/);
+    const result = checkTools(parseOptions(sdkOptions), {}, drift,
+      sdkList('8.0.419 [/usr/share/dotnet/sdk]\n10.0.401 [/usr/share/dotnet/sdk]\n'));
+    expect(result.tools['dotnet-8.0']).toBe('8.0.419');
+    expect(result.warnings).toEqual(['dotnet 8.0.419 is installed, but this scenario pins 8.0.425.']);
+    expect(() => parseOptions({ ...options, installed: { dotnet: { args: ['--list-sdks'], versions: ['8'] } } }))
+      .toThrow(/exact version/);
+  });
+
   it('accepts open loopback ports and names the closed one', async () => {
     const open = await listen();
     await expect(checkPorts({ blob: open }, 1_000)).resolves.toBeUndefined();
@@ -101,10 +126,14 @@ describe('host-preflight example plugin', () => {
       '../../examples/azure-functions-update/skill-bench.config.json', import.meta.url)), 'utf8'));
     const host = config.skills['azure-functions-update'].plugins.preflight
       .find((item: { module: string }) => item.module.endsWith('host-preflight.ts'));
-    const pins = parseOptions(host.options).tools;
+    const parsed = parseOptions(host.options);
+    const pins = parsed.tools;
     const workflow = readFileSync(workflowFile, 'utf8');
     expect(workflow).toContain(`azure-functions-core-tools@${pins.func.version}`);
-    expect(workflow).toMatch(new RegExp(`dotnet-version:[\\s\\S]*${pins.dotnet.version.replaceAll('.', '\\.')}`));
+    expect(parsed.installed.dotnet.versions).toContain(pins.dotnet.version);
+    for (const version of parsed.installed.dotnet.versions) {
+      expect(workflow).toMatch(new RegExp(`dotnet-version:[\\s\\S]*${version.replaceAll('.', '\\.')}`));
+    }
     expect(workflow).toMatch(/azurite@\d+\.\d+\.\d+/);
   });
 });

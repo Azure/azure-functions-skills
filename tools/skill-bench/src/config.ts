@@ -4,6 +4,13 @@ import { isReservedVariable } from './env.ts';
 
 export const identifier = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/;
 
+export interface StagedCopy {
+  /** Source file, relative to the eval directory. */
+  from: string;
+  /** Destination in the staged eval only, relative to the eval directory. */
+  to: string;
+}
+
 export interface EvalDefinition {
   /** Directory name of the eval; it names the scenario. */
   scenario: string;
@@ -11,6 +18,8 @@ export interface EvalDefinition {
   id: string;
   file: string;
   directory: string;
+  /** Files that staging copies inside the staged eval, for example a grader-only baseline. */
+  copies: StagedCopy[];
 }
 
 export interface PreflightDefinition {
@@ -143,6 +152,44 @@ function skillDirectory(base: string, entry: Json, name: string, label: string):
   return skillDir;
 }
 
+function relativePath(value: unknown, label: string): string {
+  check(typeof value === 'string' && value.length > 0 && !isAbsolute(value) && !value.includes('\\')
+    && value.split('/').every(part => part !== '' && part !== '.' && part !== '..'),
+  `${label} must use relative forward-slash paths inside the eval directory.`);
+  return value;
+}
+
+function stagedCopies(value: unknown, directory: string, label: string): StagedCopy[] {
+  if (value === undefined) return [];
+  check(Array.isArray(value), `${label} must be a list.`);
+  const copies = value.map((item, index) => {
+    const entry = object(item, `${label}[${index}]`);
+    keys(entry, `${label}[${index}]`, ['from', 'to']);
+    const from = relativePath(entry.from, `${label}[${index}].from`);
+    const to = relativePath(entry.to, `${label}[${index}].to`);
+    existing(directory, from, `${label}[${index}].from ${from}`, 'file');
+    check(!existsSync(join(directory, ...to.split('/'))), `${label}[${index}].to ${to} already exists in the eval directory.`);
+    return { from, to };
+  });
+  const targets = copies.map(copy => copy.to.toLowerCase());
+  check(new Set(targets).size === targets.length, `${label} has a duplicate destination.`);
+  return copies;
+}
+
+function evalDefinition(base: string, raw: unknown, name: string): EvalDefinition {
+  const label = `skills.${name}.evals`;
+  const entry = typeof raw === 'string' ? { path: raw } : object(raw, `${label} entry`);
+  keys(entry, `${label} entry`, ['path', 'copies']);
+  const path = entry.path;
+  check(typeof path === 'string' && basename(path) === 'eval.yaml', `${label} entries must point to <scenario>/eval.yaml.`);
+  const file = existing(base, path, `${label} entry ${path}`, 'file');
+  const scenario = basename(dirname(file));
+  check(identifier.test(scenario), `${label} scenario directory "${scenario}" must be an identifier.`);
+  const directory = dirname(file);
+  return { scenario, id: `evals/${name}/${scenario}/eval.yaml`, file, directory,
+    copies: stagedCopies(entry.copies, directory, `${label} entry ${path} copies`) };
+}
+
 function timeout(value: unknown): string {
   if (value === undefined) return '10m';
   check(typeof value === 'string' && /^[1-9]\d{0,3}[smh]$/.test(value), 'timeout must be a duration such as "10m".');
@@ -194,13 +241,8 @@ export function parseConfig(value: unknown, configPath: string): BenchConfig {
     keys(entry, `skills.${name}`, ['skillDir', 'files', 'evals', 'plugins']);
     const skillDir = skillDirectory(baseDir, entry, name, `skills.${name}`);
     const files = skillFiles(entry.files, skillDir, `skills.${name}.files`);
-    const evals = strings(entry.evals, `skills.${name}.evals`).map(path => {
-      check(basename(path) === 'eval.yaml', `skills.${name}.evals entries must point to <scenario>/eval.yaml.`);
-      const file = existing(baseDir, path, `skills.${name}.evals entry ${path}`, 'file');
-      const scenario = basename(dirname(file));
-      check(identifier.test(scenario), `skills.${name}.evals scenario directory "${scenario}" must be an identifier.`);
-      return { scenario, id: `evals/${name}/${scenario}/eval.yaml`, file, directory: dirname(file) };
-    });
+    check(Array.isArray(entry.evals) && entry.evals.length > 0, `skills.${name}.evals must be a nonempty list.`);
+    const evals = entry.evals.map(item => evalDefinition(baseDir, item, name));
     const scenarios = evals.map(item => item.scenario);
     check(new Set(scenarios).size === scenarios.length, `skills.${name}.evals has a duplicate scenario directory name.`);
     const plugins = entry.plugins === undefined ? {} : object(entry.plugins, `skills.${name}.plugins`);

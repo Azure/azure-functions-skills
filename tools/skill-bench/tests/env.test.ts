@@ -71,6 +71,28 @@ describe('saveWorkspaceSnapshot', () => {
     expect(existsSync(join(destination, 'local.settings.json'))).toBe(false);
   });
 
+  it('excludes files that hold the model token or a token-shaped value', () => {
+    const workspace = join(root, 'workspace');
+    const token = 'gho_' + 'A'.repeat(36);
+    put(workspace, 'Program.cs', 'class Program {}');
+    put(workspace, 'notes.txt', `token: ${token}`);
+    put(workspace, 'plain.md', 'secret: opaque-model-token-value-123');
+    put(workspace, 'pat.txt', 'github_pat_' + 'B'.repeat(40));
+    put(workspace, 'jwt.txt', 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
+    put(workspace, '.env', `A=1\n# ${token}\n`);
+    put(workspace, 'local.settings.json', JSON.stringify({ Values: { Token: 'opaque-model-token-value-123' } }));
+    const destination = join(root, 'snapshot');
+    saveWorkspaceSnapshot(workspace, destination, { keepValues: ['opaque-model-token-value-123'],
+      secrets: ['opaque-model-token-value-123'] });
+    const manifest = JSON.parse(readFileSync(join(destination, 'snapshot-manifest.json'), 'utf8'));
+    expect(manifest.copied).toEqual(['Program.cs']);
+    expect(manifest.excluded).toEqual(expect.arrayContaining(['notes.txt:credential-like-content',
+      'plain.md:credential-like-content', 'pat.txt:credential-like-content', 'jwt.txt:credential-like-content',
+      '.env:credential-like-content', 'local.settings.json:credential-like-content']));
+    expect(existsSync(join(destination, '.env.redacted'))).toBe(false);
+    expect(existsSync(join(destination, 'local.settings.redacted.json'))).toBe(false);
+  });
+
   it('never overwrites an existing destination', () => {
     const workspace = join(root, 'workspace');
     mkdirSync(workspace);

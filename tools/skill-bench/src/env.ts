@@ -92,6 +92,8 @@ export function createCellDirectories(root: string, settings: string): void {
 export interface SnapshotOptions {
   /** String values kept verbatim in redacted JSON; all other strings become [REDACTED]. */
   keepValues: string[];
+  /** Exact secret values, such as the model token. A file that holds one is never copied. */
+  secrets?: string[];
 }
 
 const snapshotExcludedDirectories = new Set([
@@ -104,7 +106,13 @@ const snapshotSensitiveNames = [
   /^\.env(?:\.|$)/i, /^\.npmrc$/i, /^appsettings(?:\.[^.]+)?\.json$/i,
   /\.publishsettings$/i, /\.(?:key|pem|pfx)$/i,
 ];
-const credentialContent = /AccountKey=|SharedAccessSignature=|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i;
+const credentialContent = new RegExp([
+  'AccountKey=', 'SharedAccessSignature=', '-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
+  // GitHub tokens (classic, OAuth, app, refresh and fine-grained) and JSON Web Tokens.
+  '\\bgh[pousr]_[A-Za-z0-9]{36,}', '\\bgithub_pat_[A-Za-z0-9_]{22,}',
+  '\\beyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}',
+].join('|'), 'i');
+const minimumSecretLength = 8;
 
 function redactJson(path: string, content: string, keep: Set<string>): string {
   let value: unknown;
@@ -140,11 +148,18 @@ export function saveWorkspaceSnapshot(source: string, destination: string, optio
   check(!existsSync(destination), 'workspace snapshot destination already exists.');
   mkdirSync(destination, { recursive: true, mode: 0o700 });
   const keep = new Set(options.keepValues);
+  const secrets = (options.secrets ?? []).filter(value => value.length >= minimumSecretLength);
+  const credential = (text: string) => credentialContent.test(text) || secrets.some(secret => text.includes(secret));
   const manifest = {
     version: 1, source: basename(source),
     copied: [] as string[], redacted: [] as string[], excluded: [] as string[], totalBytes: 0,
   };
+  // Check the redacted form: a comment or a kept value can still hold a secret.
   const write = (target: string, content: string, path: string) => {
+    if (credential(content)) {
+      manifest.excluded.push(`${path}:credential-like-content`);
+      return;
+    }
     writeFileSync(target, content, { mode: 0o600 });
     manifest.totalBytes += Buffer.byteLength(content);
     manifest.redacted.push(path);
@@ -181,7 +196,7 @@ export function saveWorkspaceSnapshot(source: string, destination: string, optio
           }
         } else {
           const content = readFileSync(input);
-          if (credentialContent.test(content.toString('utf8'))) {
+          if (credential(content.toString('utf8'))) {
             manifest.excluded.push(`${path}:credential-like-content`);
           } else {
             copyFileSync(input, join(output, entry.name));

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { loadEvalSpec } from '@microsoft/vally';
 import type { EnvironmentConfig, RawEvalSchema } from '@microsoft/vally';
 import { isInside } from './config.ts';
@@ -46,6 +46,33 @@ function check(condition: unknown, message: string): asserts condition {
 
 export function hash(text: string): string {
   return createHash('sha256').update(text).digest('hex').slice(0, 16);
+}
+
+/** A content hash of a staged tree. It uses relative paths, so the run root does not change it. */
+export function treeHash(directory: string): string {
+  const digest = createHash('sha256');
+  const visit = (current: string, prefix: string) => {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        digest.update(`dir ${path}\0`);
+        visit(join(current, entry.name), path);
+      } else {
+        digest.update(`file ${path}\0`).update(readFileSync(join(current, entry.name))).update('\0');
+      }
+    }
+  };
+  visit(directory, '');
+  return digest.digest('hex').slice(0, 16);
+}
+
+function pluginHash(config: BenchConfig, skill: string): string {
+  const definition = config.skills[skill];
+  const file = (path: string) => ({ module: relative(config.baseDir, path).replaceAll('\\', '/'), content: hash(readFileSync(path, 'utf8')) });
+  return hash(JSON.stringify({
+    graders: definition.graders.map(file), executors: definition.executors.map(file),
+    preflight: definition.preflight.map(item => ({ ...file(item.module), options: item.options })),
+  }));
 }
 
 /** Agents discover instructions and skills from ancestors, so a run root must have none. */
@@ -141,21 +168,34 @@ export async function stageRun(config: BenchConfig, cells: Cell[], runParent: st
   });
   const targets = new Map<string, string>();
   const evals = new Map<string, string>();
+  const contentHashes = new Map<string, string>(shared.map(target => [target, treeHash(target)]));
   for (const cell of cells) {
     const definition = config.skills[cell.skill];
     if (!targets.has(cell.skill)) {
       const target = join(inputs, 'skills', cell.skill);
       copyTree(definition.skillDir, target, definition.files);
       targets.set(cell.skill, target);
+      contentHashes.set(target, treeHash(target));
     }
     if (!evals.has(cell.evalId)) {
       const evaluation = definition.evals.find(item => item.id === cell.evalId);
       check(evaluation, `unknown eval ${cell.evalId}.`);
       const target = join(inputs, 'evals', cell.skill, cell.scenario);
       copyTree(evaluation.directory, target);
+      for (const copy of evaluation.copies) {
+        // Copy from the staged tree: it has no links and the size limits already apply to it.
+        const destination = join(target, ...copy.to.split('/'));
+        check(!existsSync(destination), `a staged copy would replace ${copy.to} in ${cell.evalId}.`);
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(join(target, ...copy.from.split('/')), destination);
+      }
       evals.set(cell.evalId, target);
+      contentHashes.set(target, treeHash(target));
     }
   }
+  // Staged paths contain a random directory name. Replace it, so equal inputs give equal hashes.
+  const inputsText = JSON.stringify(inputs).slice(1, -1);
+  const plugins = new Map([...targets.keys()].map(skill => [skill, pluginHash(config, skill)]));
   const staged: StagedCell[] = [];
   for (const cell of cells) {
     const directory = evals.get(cell.evalId) as string;
@@ -173,13 +213,18 @@ export async function stageRun(config: BenchConfig, cells: Cell[], runParent: st
     const specFile = join(directory, `.cell-${cell.index}.json`);
     check(!existsSync(specFile), 'a cell specification already exists; use a new run root.');
     writeFileSync(specFile, serialized);
+    const configHash = hash(JSON.stringify({
+      spec: serialized.split(inputsText).join('<inputs>'),
+      skills: skills.map(path => contentHashes.get(path)),
+      eval: contentHashes.get(directory), plugins: plugins.get(cell.skill), env: config.env,
+    }));
     const cellRoot = join(root, 'cells', String(cell.index));
     createCellDirectories(cellRoot, settings);
     staged.push({
       ...cell, evalFile: source, root: cellRoot, workspace: join(cellRoot, 'workspace'), specFile, skills,
       sharedSkills: shared, evalName: spec.name, stimuli: spec.stimuli.map(stimulus => stimulus.name),
       prompts: Object.fromEntries(spec.stimuli.map(stimulus => [stimulus.name, typeof stimulus.prompt === 'string' ? stimulus.prompt : ''])),
-      evalHash: hash(readFileSync(source, 'utf8')), configHash: hash(serialized),
+      evalHash: hash(readFileSync(source, 'utf8')), configHash,
     });
   }
   return { root, inputs, settings, cells: staged };

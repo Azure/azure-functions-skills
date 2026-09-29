@@ -43,6 +43,56 @@ describe('stageRun', () => {
     expect(() => verifyStagedRun(run, bench)).not.toThrow();
   });
 
+  it('gives the same hashes for the same inputs in a new run root, and new hashes for changed inputs', async () => {
+    const bench = config();
+    const cells = selectCells(bench, { all: true, models: ['model-a'] });
+    const first = await stageRun(bench, cells, runRoot, noAncestorCheck);
+    const second = await stageRun(bench, cells, runRoot, noAncestorCheck);
+    expect(first.root).not.toBe(second.root);
+    expect(second.cells.map(cell => cell.configHash)).toEqual(first.cells.map(cell => cell.configHash));
+    expect(first.cells[0].configHash).not.toBe(first.cells[1].configHash);
+    put(root, 'skills/alpha/references/notes.md', 'Changed notes.');
+    const skill = await stageRun(bench, cells, runRoot, noAncestorCheck);
+    expect(skill.cells[0].configHash).toBe(first.cells[0].configHash);
+    expect(skill.cells[1].configHash).not.toBe(first.cells[1].configHash);
+    put(root, 'bench/evals/basic/fixtures/app.txt', 'changed fixture');
+    const fixture = await stageRun(bench, cells, runRoot, noAncestorCheck);
+    expect(fixture.cells[0].configHash).not.toBe(skill.cells[0].configHash);
+    expect(fixture.cells[0].evalHash).toBe(skill.cells[0].evalHash);
+  });
+
+  it('includes plugin module content and fixed variables in the configuration hash', async () => {
+    put(root, 'bench/plugins/probe.ts', 'export const preflight = { name: "probe" };\n');
+    const make = (env: Record<string, string>) => loadConfig(writeProject(root, { env, skills: { alpha: {
+      skillDir: '../skills/alpha', evals: ['evals/basic/eval.yaml'],
+      plugins: { preflight: [{ module: 'plugins/probe.ts', options: {} }] } } } }));
+    const bench = make({ A: '1' });
+    const cells = selectCells(bench, { all: true, models: ['model-a'] });
+    const first = await stageRun(bench, cells, runRoot, noAncestorCheck);
+    put(root, 'bench/plugins/probe.ts', 'export const preflight = { name: "probe", run() {} };\n');
+    const plugin = await stageRun(make({ A: '1' }), cells, runRoot, noAncestorCheck);
+    expect(plugin.cells[0].configHash).not.toBe(first.cells[0].configHash);
+    const env = await stageRun(make({ A: '2' }), cells, runRoot, noAncestorCheck);
+    expect(env.cells[0].configHash).not.toBe(plugin.cells[0].configHash);
+  });
+
+  it('writes configured copies into the staged eval only, and hashes them', async () => {
+    const bench = loadConfig(writeProject(root, { skills: { alpha: {
+      skillDir: '../skills/alpha',
+      evals: [{ path: 'evals/basic/eval.yaml', copies: [{ from: 'fixtures/app.txt', to: 'grader-only/app.txt.txt' }] }],
+    } } }));
+    const cells = selectCells(bench, { all: true, models: ['model-a'] });
+    const run = await stageRun(bench, cells, runRoot, noAncestorCheck);
+    const staged = join(run.inputs, 'evals', 'alpha', 'basic');
+    expect(readFileSync(join(staged, 'grader-only', 'app.txt.txt'), 'utf8')).toBe('fixture');
+    expect(existsSync(join(root, 'bench', 'evals', 'basic', 'grader-only'))).toBe(false);
+    put(root, 'bench/evals/basic/fixtures/app.txt', 'changed fixture');
+    const changed = await stageRun(bench, cells, runRoot, noAncestorCheck);
+    expect(readFileSync(join(changed.inputs, 'evals', 'alpha', 'basic', 'grader-only', 'app.txt.txt'), 'utf8'))
+      .toBe('changed fixture');
+    expect(changed.cells[0].configHash).not.toBe(run.cells[0].configHash);
+  });
+
   it('detects a measured skill in the OFF arm', async () => {
     const bench = config();
     const run = await stageRun(bench, selectCells(bench, { all: true, models: ['model-a'] }), runRoot, noAncestorCheck);

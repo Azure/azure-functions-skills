@@ -171,6 +171,41 @@ function Set-Result {
     }
 }
 
+# Azure.Functions.Sdk sets the host version by default, so the skill can remove a redundant
+# AzureFunctionsVersion. Any other project must declare the expected version.
+function Get-HostVersionProblem {
+    param([string]$ProjectText, [string]$Expected)
+    $declared = [regex]::Match($ProjectText, '<AzureFunctionsVersion>\s*(?<v>[^<]+?)\s*</AzureFunctionsVersion>')
+    $functionsSdk = $ProjectText -match '<Project\s+Sdk="Azure\.Functions\.Sdk(/[^"]+)?"'
+    if ($declared.Success -and $declared.Groups['v'].Value -ne $Expected) {
+        return "The project must keep AzureFunctionsVersion $Expected; the submission has '$($declared.Groups['v'].Value)'."
+    }
+    if (-not $declared.Success -and -not $functionsSdk) {
+        return "The project must keep AzureFunctionsVersion $Expected, or use Azure.Functions.Sdk, which sets it by default."
+    }
+    return ''
+}
+
+# A harness failure (cleanup or an unexpected error in the checks) is not evidence about the
+# submission. Report it as blocked, so the grader returns an error and not a failed verdict.
+function Get-OverallStatus {
+    param([int]$Failed, [int]$Blocked, [string]$HarnessFailure = '')
+    if ($HarnessFailure) { return 'blocked' }
+    if ($Failed -ne 0) { return 'fail' }
+    if ($Blocked -ne 0) { return 'blocked' }
+    return 'pass'
+}
+
+# Agent output can be malformed. Return the parse error as text, so a check can fail with it.
+function Read-JsonFile {
+    param([string]$Path)
+    try {
+        return @{ value = (Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -ErrorAction Stop); error = '' }
+    } catch {
+        return @{ value = $null; error = "$Path is not valid JSON: $($_.Exception.Message)" }
+    }
+}
+
 # --- Shared observations -----------------------------------------------------
 
 $project = [string]$expected.project
@@ -355,15 +390,19 @@ foreach ($Requirement in $definition.requirements) {
     switch ($Requirement.check) {
         'supported-tuple-current-tfm' {
             $sdkVersion = (Invoke-Recorded -Name 'dotnet-version' -File 'dotnet' -ArgumentList @('--version')).Output
+            $projectHostVersion = [regex]::Match($projectText, '<AzureFunctionsVersion>\s*(?<v>[^<]+?)\s*</AzureFunctionsVersion>').Groups['v'].Value
+            $hostProblem = Get-HostVersionProblem -ProjectText $projectText -Expected ([string]$expected.hostVersion)
             $evidence = @("baseline target framework: $baselineTfm", "submitted target framework: $currentTfm",
                 "dotnet SDK: $sdkVersion", "operating system: $([Environment]::OSVersion.VersionString)",
-                "AzureFunctionsVersion in project: $([regex]::Match($projectText, '<AzureFunctionsVersion>\s*(?<v>[^<]+)').Groups['v'].Value)")
+                "AzureFunctionsVersion in project: '$projectHostVersion' (expected '$($expected.hostVersion)')")
             if (-not $projectPresent) {
                 Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence `
                     -Reason "$project is missing from the submitted workspace."
             } elseif ($currentTfm -ne $baselineTfm) {
                 Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence `
                     -Reason "The model phase must keep the current target framework $baselineTfm; the submission uses $currentTfm."
+            } elseif ($hostProblem) {
+                Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence -Reason $hostProblem
             } else {
                 Set-Result -Requirement $Requirement -Status 'pass' -Evidence $evidence
             }
@@ -537,8 +576,8 @@ foreach ($Requirement in $definition.requirements) {
         }
         'runtime-configuration' {
             $hasLocalSettings = Test-Path -LiteralPath 'local.settings.json'
-            $localSettings = $hasLocalSettings ?
-                (Get-Content -LiteralPath 'local.settings.json' -Raw | ConvertFrom-Json) : $null
+            $localSettingsFile = $hasLocalSettings ? (Read-JsonFile -Path 'local.settings.json') : @{ value = $null; error = '' }
+            $localSettings = $localSettingsFile.value
             $runtime = $localSettings ? [string]$localSettings.Values.FUNCTIONS_WORKER_RUNTIME : ''
             $instructions = @(Get-RuntimeInstruction -Root (Get-Location).Path)
             $workerConfigPath = Join-Path $publishDirectory 'worker.config.json'
@@ -559,7 +598,9 @@ foreach ($Requirement in $definition.requirements) {
             # A real local.settings.json must have the correct value. Without it, a written instruction is enough.
             $localRuntimeOk = $hasLocalSettings ? ($runtime -eq 'dotnet-isolated') : ($instructions.Count -gt 0)
             $problems = @()
-            if ($hasLocalSettings -and -not $localRuntimeOk) {
+            if ($localSettingsFile.error) {
+                $problems += $localSettingsFile.error
+            } elseif ($hasLocalSettings -and -not $localRuntimeOk) {
                 $problems += "local.settings.json sets FUNCTIONS_WORKER_RUNTIME to '$runtime', not dotnet-isolated."
             } elseif (-not $localRuntimeOk) {
                 $problems += 'No local.settings.json, settings example, README, or plan states FUNCTIONS_WORKER_RUNTIME=dotnet-isolated.'
@@ -567,7 +608,10 @@ foreach ($Requirement in $definition.requirements) {
             if ($connectionCount -lt 3) { $problems += "Only $connectionCount binding(s) use the AzureWebJobsStorage connection; 3 are expected." }
             if ($workerLanguage -ne 'dotnet-isolated') { $problems += "The published worker language is '$workerLanguage', not dotnet-isolated." }
             if ($hostVersion -ne $baselineVersion) { $problems += "host.json version '$hostVersion' differs from the baseline '$baselineVersion'." }
-            if (-not $publish -or $publish.ExitCode -ne 0) {
+            if ($localSettingsFile.error) {
+                # The submitted file is invalid, so the requirement fails whether or not publish ran.
+                Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence -Reason ($problems -join ' ')
+            } elseif (-not $publish -or $publish.ExitCode -ne 0) {
                 Set-Result -Requirement $Requirement -Status 'blocked' -Evidence $evidence `
                     -Reason 'No publish artifact: the effective worker runtime configuration could not be read.'
             } elseif ($problems.Count -eq 0) {
@@ -579,8 +623,8 @@ foreach ($Requirement in $definition.requirements) {
         'project-sdk-effective' {
             $sdkMatch = [regex]::Match($projectText, '<Project\s+Sdk="(?<sdk>[^"]+)"')
             $sdkValue = $sdkMatch.Success ? $sdkMatch.Groups['sdk'].Value : ''
-            $globalJson = (Test-Path -LiteralPath 'global.json') ?
-                (Get-Content -LiteralPath 'global.json' -Raw | ConvertFrom-Json) : $null
+            $globalJsonFile = (Test-Path -LiteralPath 'global.json') ? (Read-JsonFile -Path 'global.json') : @{ value = $null; error = '' }
+            $globalJson = $globalJsonFile.value
             $globalSdk = $globalJson ? [string]$globalJson.'msbuild-sdks'.'Azure.Functions.Sdk' : ''
             $obsolete = @($declaredPackages | Where-Object {
                 $_ -eq 'Microsoft.Azure.Functions.Worker.Sdk' -or $_ -eq 'Microsoft.NET.Sdk.Functions' })
@@ -589,7 +633,9 @@ foreach ($Requirement in $definition.requirements) {
                 "obsolete SDK packages: $((@($obsolete)) -join ', ')", "FunctionsEnableWorkerIndexing present: $indexing",
                 "build evidence: $($build ? $build.Log : 'none')")
             $sdkOk = ($sdkValue -match '^Azure\.Functions\.Sdk/.+$') -or ($sdkValue -eq 'Azure.Functions.Sdk' -and $globalSdk)
-            if ($sdkOk -and $obsolete.Count -eq 0 -and -not $indexing -and $build -and $build.ExitCode -eq 0) {
+            if ($globalJsonFile.error) {
+                Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence -Reason $globalJsonFile.error
+            } elseif ($sdkOk -and $obsolete.Count -eq 0 -and -not $indexing -and $build -and $build.ExitCode -eq 0) {
                 Set-Result -Requirement $Requirement -Status 'pass' -Evidence $evidence
             } elseif (-not $build -or $build.ExitCode -ne 0) {
                 Set-Result -Requirement $Requirement -Status 'fail' -Evidence $evidence `
@@ -672,7 +718,7 @@ foreach ($Requirement in $definition.requirements) {
 $requirements = @($definition.requirements | ForEach-Object { $state[$_.id] })
 $failed = @($requirements | Where-Object { $_.status -eq 'fail' })
 $blocked = @($requirements | Where-Object { $_.status -eq 'blocked' })
-$overall = ($failed.Count -ne 0 -or $cleanupFailure -or $executionFailure) ? 'fail' : ($blocked.Count -ne 0 ? 'blocked' : 'pass')
+$overall = Get-OverallStatus -Failed $failed.Count -Blocked $blocked.Count -HarnessFailure "$cleanupFailure$executionFailure"
 $report = [ordered]@{
     scenario     = $definition.scenario
     skill        = $definition.skill

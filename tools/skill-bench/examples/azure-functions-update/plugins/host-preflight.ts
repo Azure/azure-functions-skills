@@ -10,8 +10,15 @@ export interface ToolPin {
   version: string;
 }
 
+export interface InstalledPin {
+  args: string[];
+  versions: string[];
+}
+
 export interface HostOptions {
   tools: Record<string, ToolPin>;
+  /** Versions that must all be installed side by side, such as the .NET SDKs from `dotnet --list-sdks`. */
+  installed: Record<string, InstalledPin>;
   ports: Record<string, number>;
   readyTimeoutSeconds: number;
 }
@@ -37,7 +44,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 export function parseOptions(value: unknown): HostOptions {
   check(isObject(value), 'options must be an object.');
-  const { tools, ports = {}, readyTimeoutSeconds = 60, ...rest } = value;
+  const { tools, installed = {}, ports = {}, readyTimeoutSeconds = 60, ...rest } = value;
   check(Object.keys(rest).length === 0, `unknown option ${Object.keys(rest)[0]}.`);
   check(isObject(tools) && Object.keys(tools).length > 0, 'tools must map at least one tool name to a pin.');
   const parsed: Record<string, ToolPin> = {};
@@ -51,12 +58,25 @@ export function parseOptions(value: unknown): HostOptions {
       `the pin for ${name} must be an exact version, such as 4.15.1.`);
     parsed[name] = { args: args as string[], version };
   }
+  check(isObject(installed), 'installed must map tool names to version lists.');
+  const lists: Record<string, InstalledPin> = {};
+  for (const [name, pin] of Object.entries(installed)) {
+    check(safeName.test(name), `the tool name ${JSON.stringify(name)} is not safe.`);
+    check(isObject(pin), `the installed list for ${name} must be an object.`);
+    const { args, versions } = pin;
+    check(Array.isArray(args) && args.every(arg => typeof arg === 'string' && safeArg.test(arg)),
+      `args for ${name} must be a list of simple arguments, such as --list-sdks.`);
+    check(Array.isArray(versions) && versions.length > 0
+      && versions.every(version => typeof version === 'string' && exactVersion.test(version)),
+    `each installed version for ${name} must be an exact version, such as 8.0.425.`);
+    lists[name] = { args: args as string[], versions: versions as string[] };
+  }
   check(isObject(ports) && Object.entries(ports).every(([name, port]) => safeName.test(name)
     && typeof port === 'number' && Number.isInteger(port) && port > 0 && port < 65536),
   'ports must map names to TCP port numbers.');
   check(typeof readyTimeoutSeconds === 'number' && readyTimeoutSeconds > 0 && readyTimeoutSeconds <= 600,
     'readyTimeoutSeconds must be a number from 1 to 600.');
-  return { tools: parsed, ports: ports as Record<string, number>, readyTimeoutSeconds };
+  return { tools: parsed, installed: lists, ports: ports as Record<string, number>, readyTimeoutSeconds };
 }
 
 /** Parts are validated, so the command line has no user input and no shell syntax. */
@@ -93,7 +113,37 @@ export function checkTools(options: HostOptions, env: NodeJS.ProcessEnv, operato
       + 'SKILL_BENCH_ALLOW_TOOL_DRIFT=1 to continue. The run then records the installed version as a warning.');
     warnings.push(message);
   }
+  for (const [name, list] of Object.entries(options.installed)) {
+    const child = spawn(toolCommand(name, list.args), env);
+    check(!child.error && child.status === 0, `cannot list the installed versions of ${name}. Install ${name} and make sure that it is on PATH.`);
+    const found = [...child.stdout.matchAll(/^\s*(\d+)\.(\d+)\.(\d+)(-[A-Za-z0-9.]+)?(?=\s|$)/gm)].map(match => match[0].trim());
+    for (const version of list.versions) {
+      const band = version.split('.').slice(0, 2).join('.');
+      const key = `${name}-${band}`;
+      if (found.includes(version)) {
+        tools[key] = version;
+        continue;
+      }
+      const near = found.filter(item => item.startsWith(`${band}.`)).sort(compareVersions).at(-1);
+      const install = `${name} ${version} is not installed. Install ${name} ${version}`;
+      check(near, `${install}. This scenario needs it side by side with the other pinned versions.`);
+      check(operator.SKILL_BENCH_ALLOW_TOOL_DRIFT === '1',
+        `${install}, or set SKILL_BENCH_ALLOW_TOOL_DRIFT=1 to use ${near}. The run then records it as a warning.`);
+      tools[key] = near;
+      warnings.push(`${name} ${near} is installed, but this scenario pins ${version}.`);
+    }
+  }
   return { tools, warnings };
+}
+
+function compareVersions(a: string, b: string): number {
+  const parts = (value: string) => value.split(/[.-]/).map(part => Number.parseInt(part, 10) || 0);
+  const [left, right] = [parts(a), parts(b)];
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
 }
 
 function probe(port: number, timeoutMs: number): Promise<boolean> {

@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import type { SpawnSyncOptions, SpawnSyncReturns } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isInside, loadConfig } from './config.ts';
 import type { BenchConfig } from './config.ts';
@@ -26,6 +26,8 @@ export interface RunOptions {
   dryRun: boolean;
   runRoot?: string;
   output?: string;
+  /** Dashboard directory for a paid run. It is checked before the first model call. */
+  site?: string;
   trusted?: boolean;
   registry?: string;
 }
@@ -203,6 +205,28 @@ function checkOutput(config: BenchConfig, output: string, runRoot: string): stri
   return destination;
 }
 
+/** The dashboard is written after all cells, so check its directory before any model call. */
+function checkSite(config: BenchConfig, site: string, output: string, runRoot: string): void {
+  const target = resolve(site);
+  if (existsSync(target)) {
+    check(statSync(target).isDirectory() && readdirSync(target).length === 0,
+      '--site must be a new or empty directory; choose a new directory.');
+  }
+  // Resolve the nearest existing ancestor, so a linked ancestor cannot hide an overlap.
+  let existing = target;
+  const rest: string[] = [];
+  while (!existsSync(existing) && dirname(existing) !== existing) {
+    rest.unshift(basename(existing));
+    existing = dirname(existing);
+  }
+  const destination = join(realpathSync(existing), ...rest);
+  for (const protectedRoot of [config.baseDir, runRoot, output, ...Object.values(config.skills).map(skill => skill.skillDir),
+    ...config.sharedSkills.map(skill => skill.skillDir)]) {
+    check(!isInside(protectedRoot, destination) && !isInside(destination, protectedRoot),
+      `--site must not overlap the configuration, the run root, --output or a skill directory (${protectedRoot}).`);
+  }
+}
+
 function prepareCells(run: StagedRun, config: BenchConfig, preflights: Map<string, LoadedPreflight[]>): void {
   for (const cell of run.cells) {
     for (const loaded of preflights.get(cell.skill) ?? []) {
@@ -249,6 +273,7 @@ export async function runBench(options: RunOptions, source: NodeJS.ProcessEnv = 
   if (paid) {
     check(options.output, 'a paid run needs --output <new directory>.');
     output = checkOutput(config, options.output, runRoot);
+    if (options.site !== undefined) checkSite(config, options.site, output, runRoot);
     check(modelToken(source), 'set COPILOT_GITHUB_TOKEN (or GH_TOKEN / GITHUB_TOKEN) for a paid run.');
     checkVallyCli(dependencies.vallyCli);
   }
@@ -332,7 +357,8 @@ export async function runBench(options: RunOptions, source: NodeJS.ProcessEnv = 
       if (existsSync(cell.workspace)) {
         const snapshot = results ? join(dirname(results), 'workspace') : join(cellOutput, 'workspace');
         try {
-          saveWorkspaceSnapshot(cell.workspace, snapshot, { keepValues: config.keepValues });
+          saveWorkspaceSnapshot(cell.workspace, snapshot, { keepValues: config.keepValues,
+            secrets: [environments.get(cell.index)?.COPILOT_GITHUB_TOKEN ?? ''] });
           record.workspace = relative(destination, snapshot).replaceAll('\\', '/');
         } catch (error) {
           record.workspaceError = error instanceof Error ? error.message : String(error);

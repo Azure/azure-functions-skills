@@ -39,17 +39,17 @@ grading_environment:
       dest: grading-evidence/checks/Invoke-DefinitionOfDone.ps1
     - src: fixtures/checks/AzuriteContract.ps1
       dest: grading-evidence/checks/AzuriteContract.ps1
-    - src: fixtures/baseline/UpgradeApp.csproj.txt
+    - src: grader-baseline/UpgradeApp.csproj.txt
       dest: grading-evidence/baseline/UpgradeApp.csproj.txt
-    - src: fixtures/baseline/Hello.cs.txt
+    - src: grader-baseline/Hello.cs.txt
       dest: grading-evidence/baseline/Hello.cs.txt
-    - src: fixtures/baseline/host.json.txt
+    - src: grader-baseline/host.json.txt
       dest: grading-evidence/baseline/host.json.txt
-    - src: fixtures/baseline/Startup.cs.txt
+    - src: grader-baseline/Startup.cs.txt
       dest: grading-evidence/baseline/Startup.cs.txt
-    - src: fixtures/baseline/GreetingService.cs.txt
+    - src: grader-baseline/GreetingService.cs.txt
       dest: grading-evidence/baseline/GreetingService.cs.txt
-    - src: fixtures/baseline/QueueGreeting.cs.txt
+    - src: grader-baseline/QueueGreeting.cs.txt
       dest: grading-evidence/baseline/QueueGreeting.cs.txt
 scoring:
   threshold: 1

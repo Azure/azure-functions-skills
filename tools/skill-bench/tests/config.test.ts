@@ -24,7 +24,7 @@ describe('loadConfig', () => {
     expect(config.skills.alpha.skillDir).toBe(realpathSync(join(root, 'skills', 'alpha')));
     expect(config.skills.alpha.evals).toEqual([{
       scenario: 'basic', id: 'evals/alpha/basic/eval.yaml',
-      file: join(base, 'evals', 'basic', 'eval.yaml'), directory: join(base, 'evals', 'basic'),
+      file: join(base, 'evals', 'basic', 'eval.yaml'), directory: join(base, 'evals', 'basic'), copies: [],
     }]);
     expect(config.disabledSkills).toEqual(['unrelated-skill']);
     expect(config.timeout).toBe('10m');
@@ -77,6 +77,23 @@ describe('loadConfig', () => {
       (value.skills as Record<string, Record<string, unknown>>).alpha.evals = ['evals/basic/eval.yaml', 'more/basic/eval.yaml'];
     });
     expect(() => loadConfig(file)).toThrow(/duplicate scenario/);
+  });
+
+  it('accepts an eval entry with staged copies and rejects unsafe copy paths', () => {
+    const evalWith = (copies: unknown) => writeProject(root, { skills: { alpha: {
+      skillDir: '../skills/alpha', evals: [{ path: 'evals/basic/eval.yaml', copies }],
+    } } });
+    const config = loadConfig(evalWith([{ from: 'fixtures/app.txt', to: 'grader-only/app.txt.txt' }]));
+    expect(config.skills.alpha.evals[0]).toMatchObject({
+      scenario: 'basic', copies: [{ from: 'fixtures/app.txt', to: 'grader-only/app.txt.txt' }],
+    });
+    expect(() => loadConfig(evalWith([{ from: '../outside.txt', to: 'a.txt' }]))).toThrow(/relative forward-slash/);
+    expect(() => loadConfig(evalWith([{ from: 'fixtures/app.txt', to: 'x\\a.txt' }]))).toThrow(/relative forward-slash/);
+    expect(() => loadConfig(evalWith([{ from: 'fixtures/missing.txt', to: 'a.txt' }]))).toThrow(/missing\.txt/);
+    expect(() => loadConfig(evalWith([{ from: 'fixtures/app.txt', to: 'fixtures/app.txt' }]))).toThrow(/already exists/);
+    expect(() => loadConfig(evalWith([{ from: 'fixtures/app.txt', to: 'a.txt' }, { from: 'fixtures/app.txt', to: 'a.txt' }])))
+      .toThrow(/duplicate/);
+    expect(() => loadConfig(evalWith([{ from: 'fixtures/app.txt', to: 'a.txt', mode: 'x' }]))).toThrow(/unknown key "mode"/);
   });
 
   it('keeps shared, measured and disabled skill names distinct', () => {

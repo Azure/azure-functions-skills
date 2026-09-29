@@ -37,12 +37,32 @@ interface Provenance {
   commit: string;
   files: { path: string; blob: string }[];
   adapted: string[];
+  verification: string;
 }
 
 const checklist = json<Checklist>('fixtures', 'definition-of-done.json');
 const provenance = json<Provenance>('upstream-provenance.json');
 const script = read('fixtures', 'checks', 'Invoke-DefinitionOfDone.ps1');
 const specification = read('eval.yaml');
+const baselineFiles = ['UpgradeApp.csproj', 'Hello.cs', 'host.json', 'Startup.cs', 'GreetingService.cs', 'QueueGreeting.cs'];
+
+/** Build the grading baseline the same way eval.yaml stages it: each fixture file with a .txt name. */
+function stageBaseline(directory: string): string {
+  const baseline = join(directory, 'baseline');
+  mkdirSync(baseline, { recursive: true });
+  for (const file of baselineFiles) writeFileSync(join(baseline, `${file}.txt`), read('fixtures', file));
+  return baseline;
+}
+
+/** Run the deterministic checks in a workspace, with the baseline where eval.yaml puts it. */
+function grade(directory: string) {
+  const evidence = join(directory, 'grading-evidence');
+  return spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-File',
+    join(scenario, 'fixtures', 'checks', 'Invoke-DefinitionOfDone.ps1'),
+    '-Checklist', join(scenario, 'fixtures', 'definition-of-done.json'),
+    '-BaselineRoot', stageBaseline(evidence), '-EvidenceRoot', evidence],
+  { cwd: directory, encoding: 'utf8', timeout: 90_000 });
+}
 
 function gitBlob(path: string): string {
   const content = Buffer.from(readFileSync(path, 'utf8').replaceAll('\r\n', '\n'));
@@ -67,6 +87,8 @@ describe('azure-functions-update dotnet-isolated fixture provenance', () => {
     expect(provenance.repository).toBe('Azure/azure-functions-skills');
     expect(provenance.pullRequest).toBe(267);
     expect(provenance.commit).toMatch(/^[0-9a-f]{40}$/);
+    expect(provenance.verification).toContain('tools/skill-bench/tests/examples/azure-functions-update-scenario.test.ts');
+    expect(existsSync(fileURLToPath(new URL('./azure-functions-update-scenario.test.ts', import.meta.url)))).toBe(true);
     expect(provenance.files.map(file => file.path).sort()).toEqual([
       'fixtures/Hello.cs', 'fixtures/UpgradeApp.csproj', 'fixtures/host.json', 'fixtures/trial.gitignore',
     ]);
@@ -86,11 +108,24 @@ describe('azure-functions-update dotnet-isolated fixture provenance', () => {
     expect(read('fixtures', 'Hello.cs')).toContain('[FunctionName("Hello")]');
   });
 
-  it('keeps the grader baseline copy identical to the staged application fixture', () => {
-    for (const file of ['UpgradeApp.csproj', 'Hello.cs', 'host.json',
-      'Startup.cs', 'GreetingService.cs', 'QueueGreeting.cs']) {
-      expect(gitBlob(join(scenario, 'fixtures', 'baseline', `${file}.txt`)))
-        .toBe(gitBlob(join(scenario, 'fixtures', file)));
+  it('builds the grader baseline from the staged application fixture, with no committed copy', () => {
+    expect(existsSync(join(scenario, 'fixtures', 'baseline'))).toBe(false);
+    expect(existsSync(join(scenario, 'grader-baseline'))).toBe(false);
+    const config = JSON.parse(readFileSync(join(scenario, '..', '..', 'skill-bench.config.json'), 'utf8')) as {
+      skills: Record<string, { evals: Array<string | { path: string; copies?: Array<{ from: string; to: string }> }> }>;
+    };
+    const entry = config.skills['azure-functions-update'].evals
+      .find(item => typeof item !== 'string' && item.path === 'evals/dotnet-isolated/eval.yaml');
+    const copies = typeof entry === 'string' ? [] : entry?.copies ?? [];
+    expect(copies).toEqual(baselineFiles.map(file => ({ from: `fixtures/${file}`, to: `grader-baseline/${file}.txt` })));
+    const agentFiles = specification.split('agent_environment:')[1]?.split('grading_environment:')[0] ?? '';
+    const gradingFiles = specification.split('grading_environment:')[1]?.split('scoring:')[0] ?? '';
+    for (const file of baselineFiles) {
+      const name = file.replaceAll('.', '\\.');
+      expect(agentFiles).toMatch(new RegExp(`src: fixtures/${name}\\r?\\n`));
+      expect(agentFiles).not.toContain('grader-baseline');
+      expect(gradingFiles).toMatch(new RegExp(
+        `src: grader-baseline/${name}\\.txt\\r?\\n\\s+dest: grading-evidence/baseline/${name}\\.txt`));
     }
   });
 
@@ -433,12 +468,7 @@ describe('skill-bench registration', () => {
     it('emits every ID and blocks unexecuted bindings when the app is missing', () => {
       const directory = mkdtempSync(join(tmpdir(), 'functions-update-grader-'));
       try {
-        const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-File',
-          join(scenario, 'fixtures', 'checks', 'Invoke-DefinitionOfDone.ps1'),
-          '-Checklist', join(scenario, 'fixtures', 'definition-of-done.json'),
-          '-BaselineRoot', join(scenario, 'fixtures', 'baseline'),
-          '-EvidenceRoot', join(directory, 'grading-evidence')],
-        { cwd: directory, encoding: 'utf8', timeout: 30_000 });
+        const result = grade(directory);
         expect(result.status).toBe(1);
         const report = JSON.parse(readFileSync(join(directory, 'grading-evidence', 'checklist.json'), 'utf8'));
         expect(report.overall).toBe('fail');
@@ -451,5 +481,82 @@ describe('skill-bench registration', () => {
         rmSync(directory, { recursive: true, force: true });
       }
     }, 60_000);
+
+    it('fails DI-13 and DI-14 for malformed agent JSON and still writes the checklist', () => {
+      const directory = mkdtempSync(join(tmpdir(), 'functions-update-grader-'));
+      try {
+        writeFileSync(join(directory, 'local.settings.json'), '{ "Values": { "FUNCTIONS_WORKER_RUNTIME": ');
+        writeFileSync(join(directory, 'global.json'), '{ "msbuild-sdks": ');
+        const result = grade(directory);
+        expect(result.status).toBe(1);
+        const report = JSON.parse(readFileSync(join(directory, 'grading-evidence', 'checklist.json'), 'utf8'));
+        const byId = (id: string) => report.requirements.find((item: { id: string }) => item.id === id);
+        expect(byId('DI-13')).toMatchObject({ status: 'fail', reason: expect.stringMatching(/local\.settings\.json is not valid JSON/) });
+        expect(byId('DI-14')).toMatchObject({ status: 'fail', reason: expect.stringMatching(/global\.json is not valid JSON/) });
+        expect(report.executionFailure).toBe('');
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }, 60_000);
+
+    it('fails DI-01 when the project does not keep the Functions host version', () => {
+      const directory = mkdtempSync(join(tmpdir(), 'functions-update-grader-'));
+      try {
+        // No SDK: restore fails at once with no network access. DI-01 reads only the project text.
+        writeFileSync(join(directory, 'UpgradeApp.csproj'),
+          '<Project><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>');
+        grade(directory);
+        const report = JSON.parse(readFileSync(join(directory, 'grading-evidence', 'checklist.json'), 'utf8'));
+        const di01 = report.requirements.find((item: { id: string }) => item.id === 'DI-01');
+        expect(di01).toMatchObject({ status: 'fail', reason: expect.stringMatching(/AzureFunctionsVersion v4/) });
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }, 120_000);
+  });
+
+  describe.skipIf(!hasPowerShell)('overall status (harness failures)', () => {
+    const grader = join(scenario, 'fixtures', 'checks', 'Invoke-DefinitionOfDone.ps1').replaceAll("'", "''");
+    const overall = (failed: number, blocked: number, harness: string) => {
+      const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', `
+        $ErrorActionPreference = 'Stop'
+        $ast = [Management.Automation.Language.Parser]::ParseFile('${grader}', [ref]$null, [ref]$null)
+        $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+          $node.Name -eq 'Get-OverallStatus' }, $true)
+        if (-not $function) { throw 'Overall status helper is missing.' }
+        & $function.Body.GetScriptBlock() -Failed ${failed} -Blocked ${blocked} -HarnessFailure '${harness}'
+      `], { encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+
+    it('reports a harness failure as blocked, so it is not a verdict about the skill', () => {
+      expect(overall(0, 0, '')).toBe('pass');
+      expect(overall(2, 1, '')).toBe('fail');
+      expect(overall(0, 1, '')).toBe('blocked');
+      expect(overall(0, 0, 'Storage: cleanup failed')).toBe('blocked');
+      expect(overall(3, 0, 'Host process 12: access denied')).toBe('blocked');
+    });
+
+    it('accepts the Azure.Functions.Sdk default host version, and rejects a changed or missing one', () => {
+      const problem = (project: string) => {
+        const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', `
+          $ErrorActionPreference = 'Stop'
+          $ast = [Management.Automation.Language.Parser]::ParseFile('${grader}', [ref]$null, [ref]$null)
+          $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'Get-HostVersionProblem' }, $true)
+          if (-not $function) { throw 'Host version helper is missing.' }
+          & $function.Body.GetScriptBlock() -ProjectText '${project}' -Expected 'v4'
+        `], { encoding: 'utf8' });
+        expect(result.status, result.stderr).toBe(0);
+        return result.stdout.trim();
+      };
+      expect(problem('<Project Sdk="Azure.Functions.Sdk/1.0.0"><PropertyGroup /></Project>')).toBe('');
+      expect(problem('<Project Sdk="Azure.Functions.Sdk"><PropertyGroup /></Project>')).toBe('');
+      expect(problem('<Project Sdk="Microsoft.NET.Sdk"><AzureFunctionsVersion>v4</AzureFunctionsVersion></Project>')).toBe('');
+      expect(problem('<Project Sdk="Azure.Functions.Sdk/1.0.0"><AzureFunctionsVersion>v3</AzureFunctionsVersion></Project>'))
+        .toMatch(/AzureFunctionsVersion v4; the submission has 'v3'/);
+      expect(problem('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup /></Project>')).toMatch(/AzureFunctionsVersion v4/);
+    });
   });
 });

@@ -12,7 +12,19 @@
     "azure-functions-update": {
       "skillDir": "../../../../templates/skills/azure-functions-update",
       "files": ["SKILL.md", "references/dotnet-isolated.md"],
-      "evals": ["evals/dotnet-isolated/eval.yaml"],
+      "evals": [
+        {
+          "path": "evals/dotnet-isolated/eval.yaml",
+          "copies": [
+            { "from": "fixtures/UpgradeApp.csproj", "to": "grader-baseline/UpgradeApp.csproj.txt" },
+            { "from": "fixtures/Hello.cs", "to": "grader-baseline/Hello.cs.txt" },
+            { "from": "fixtures/host.json", "to": "grader-baseline/host.json.txt" },
+            { "from": "fixtures/Startup.cs", "to": "grader-baseline/Startup.cs.txt" },
+            { "from": "fixtures/GreetingService.cs", "to": "grader-baseline/GreetingService.cs.txt" },
+            { "from": "fixtures/QueueGreeting.cs", "to": "grader-baseline/QueueGreeting.cs.txt" }
+          ]
+        }
+      ],
       "plugins": {
         "graders": ["plugins/functions-code-review.ts"],
         "preflight": [
@@ -22,6 +34,9 @@
               "tools": {
                 "dotnet": { "args": ["--version"], "version": "10.0.401" },
                 "func": { "args": ["--version"], "version": "4.15.1" }
+              },
+              "installed": {
+                "dotnet": { "args": ["--list-sdks"], "versions": ["10.0.401", "8.0.425"] }
               },
               "ports": { "azurite-blob": 10000, "azurite-queue": 10001 },
               "readyTimeoutSeconds": 60

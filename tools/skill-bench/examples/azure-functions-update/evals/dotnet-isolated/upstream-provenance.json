@@ -25,5 +25,5 @@
       "reason": "The upstream review basis requires a .NET 10 destination in the Functions phase. This scenario keeps the current target framework and moves the language stage to a separate handoff, so the review basis was rewritten as fixtures/review-basis.md."
     }
   ],
-  "verification": "tests/evaluation-update-scenario.test.ts checks unchanged upstream files, identifies adapted files, and compares all grading baseline text copies with the current fixture. The blob hashes above describe the upstream version, not the adapted version."
+  "verification": "tools/skill-bench/tests/examples/azure-functions-update-scenario.test.ts checks unchanged upstream files and identifies adapted files. skill-bench stages the grading baseline from the current fixture (config copies), so there is no committed copy. The blob hashes above describe the upstream version, not the adapted version."
 }

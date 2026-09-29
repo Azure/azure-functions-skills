@@ -13,24 +13,27 @@ are not a remainder of the root `src/evaluation` code.
 | `eval.yaml` | Vally | The prompt, the files for each arm, the graders, and the files for the grader only. |
 | `fixtures/*.cs`, `UpgradeApp.csproj`, `host.json`, `trial.gitignore` | Agent | The in-process app that the agent migrates. Both arms get the same copy. |
 | `fixtures/eval-boundaries.md` | Agent | The workspace and operation limits (copied as `AGENTS.md`). |
-| `fixtures/baseline/*.txt` | Grader only | An unchanged copy of the input app. See below. |
 | `fixtures/checks/*.ps1` | Grader only | The deterministic definition-of-done grader and the Azurite reset. |
 | `fixtures/definition-of-done.json` | Grader only | The 19 check IDs and their rules. |
 | `fixtures/review-basis.md` | Grader only | The fixed review notes for the code-only judge. |
 | `upstream-provenance.json` | People | The origin and hashes of the input app. |
 
-**Why a baseline copy.** The agent can change every file in its workspace. Thus the
-grader cannot use the workspace to learn the original values. `eval.yaml` copies
-`fixtures/baseline/*.txt` to `grading-evidence/baseline/` in the grading environment
-only; the agent never sees these files. `Invoke-DefinitionOfDone.ps1` compares the
-submitted app with them: the target framework, the `host.json`
-version, and the HTTP contract of `Hello`. The `.txt` extension stops the build from
-compiling a second copy of the app. The files are equal to the input files.
+**Grader baseline.** The agent can change every file in its workspace. Thus the
+grader cannot use the workspace to learn the original values. The config entry for
+this eval has `copies`: when skill-bench stages the eval, it copies each input fixture
+to `grader-baseline/<file>.txt`. `eval.yaml` gives these copies to the grading
+environment only, as `grading-evidence/baseline/<file>.txt`; the agent never sees
+them. There is no committed copy. Vally refuses a grader file whose `src` is also an
+agent file, so the copy must have a different path. `Invoke-DefinitionOfDone.ps1`
+compares the submitted app with them: the target
+framework, the `host.json` version, and the HTTP contract of `Hello`. The `.txt`
+extension stops the build from compiling a second copy of the app.
 
 ## Pinned tools
 
 The `host-preflight` plugin stops a paid run before the first model call if a version
-differs from these pins, or if Azurite does not accept connections in 60 s. The manual
+differs from these pins, if a pinned .NET SDK is not installed (`dotnet --list-sdks`),
+or if Azurite does not accept connections in 60 s. The manual
 benchmark workflow installs the same versions. Change the config and the workflow together.
 
 | Tool | Version | Where it is pinned |
@@ -66,8 +69,6 @@ The design reference is
 [fabiocav/azure-functions-dotnet-migration](https://github.com/fabiocav/azure-functions-dotnet-migration/tree/767350e51ca1d5972eb79544608b11c18f92354b).
 This fixture uses its DI pattern as a reference; it does not copy its implementation.
 `upstream-provenance.json` records original hashes and deliberate changes.
-The `baseline/*.txt` copies are the current input for grading. Their text extensions
-prevent the build from compiling a second copy of the app.
 
 ## Definition-of-done grading
 
