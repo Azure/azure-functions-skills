@@ -56,7 +56,7 @@ To add a scenario:
 1. Add one file under `references/`. Include the official sources, extra prerequisites,
    migration steps, and a definition of done with stable IDs.
 2. Add one row to the scenario table with the observed condition that selects it.
-3. Add eval coverage for the new scenario.
+3. Optional: add an evaluation under `evals/azure-functions-update/` when the scenario needs one.
 4. Keep the common workflow in this file. Put only scenario-specific rules in the reference.
 
 ## 1. Save an initial plan with state
