@@ -19,82 +19,58 @@ skill-bench report  --input <run output> --output <new or empty dir>
 - `run` does the paid run. It runs one Vally trial for each cell, with 1 worker, the configured timeout, and no retry. A missing result gives exit code 2.
 - `report` reads a run output and writes `benchmark.json` and `index.html`. A missing result stays missing. The report does not make up values.
 
-`--run-root` must be an existing, clean directory. Do not put it below your user profile, a Git repository, or a directory that has agent configuration. The tool deletes the staged cells when it completes. If the tool cannot delete them (for example, a Windows file lock), it keeps the results and shows a warning. See [Read the results](#read-the-results).
+`--run-root` must be an existing, clean directory. Do not put it below your user profile, a Git repository, or a directory that has agent configuration. The tool deletes the staged cells when it completes. If the tool cannot delete them (for example, a Windows file lock), it keeps the results and shows a warning. See [How to run a benchmark](#how-to-run-a-benchmark).
 
 ## How to run a benchmark
 
-The examples use PowerShell and the `azure-functions-update` example. From the repository root, you can also use `npm --prefix tools/skill-bench <script>`.
+You need Node.js 22.18 or later and the tools that the scenario uses. The `azure-functions-update` example uses the .NET SDK, Azure Functions Core Tools (`func`), PowerShell 7 (`pwsh`), and Azurite. For a paid run, you also need the GitHub CLI (`gh`) and a GitHub account that can use Copilot.
 
-### Prerequisites
+1. Install and do a free check. This does not call a model:
 
-- Node.js 22.18 or later. Node.js must run `.ts` files directly (type stripping), because Vally loads the plugin files with `import()`.
-- The tools that the scenario needs. The `azure-functions-update` example needs the .NET SDK, Azure Functions Core Tools (`func`), PowerShell 7 (`pwsh`), and Azurite.
-- For a paid run only: a GitHub account that has access to GitHub Copilot, and the GitHub CLI (`gh`).
+   ```powershell
+   cd tools/skill-bench
+   npm ci --ignore-scripts
+   New-Item -ItemType Directory -Force Q:\sb-run   # outside your user profile and outside a repository
+   node bin/skill-bench.js dry-run --config examples/azure-functions-update/skill-bench.config.json `
+     --skill azure-functions-update --model gpt-6-sol --trusted --run-root Q:\sb-run
+   ```
 
-### Install
+2. Get approval for the paid run: the models, the number of cells, and the budget. Each cell is one paid trial (2 cells for each model: skill OFF and skill ON).
 
-1. `cd tools/skill-bench`
-2. `npm ci --ignore-scripts`
-
-The `.npmrc` file in this directory sets the public npm registry (`https://registry.npmjs.org/`) for the install. If your network cannot get to it, see [Microsoft internal networks](#microsoft-internal-networks).
-
-### Free check (no model call)
-
-1. `npm test && npm run typecheck`
-2. Show the cells: `node bin/skill-bench.js plan --config examples/azure-functions-update/skill-bench.config.json --skill azure-functions-update --model gpt-6-sol`
-3. Make an empty run root outside your user profile and outside a repository, for example `New-Item -ItemType Directory Q:\sb-run`.
-4. Stage and validate the cells: `node bin/skill-bench.js dry-run --config examples/azure-functions-update/skill-bench.config.json --all --trusted --run-root Q:\sb-run`
-
-### Paid run
-
-Before a paid run, get approval for the models, the number of cells, the budget, and the cleanup of the resources that the run makes. Each cell is one paid trial.
-
-1. Set the token. Do not show it on the screen:
+3. Do the paid run. `--output` and `--site` must be new directories:
 
    ```powershell
    $env:COPILOT_GITHUB_TOKEN = gh auth token --hostname github.com
-   if (-not $env:COPILOT_GITHUB_TOKEN) { throw 'No token. Run gh auth login --hostname github.com.' }
-   ```
+   if (-not $env:COPILOT_GITHUB_TOKEN) { throw 'No token' }
 
-2. Run the cells. `--output` and `--site` must be new directories:
-
-   ```powershell
    node bin/skill-bench.js run --config examples/azure-functions-update/skill-bench.config.json `
      --skill azure-functions-update --model gpt-6-sol --trusted `
      --run-root Q:\sb-run --output Q:\sb-out\run1 --site Q:\sb-out\site1
+
+   start Q:\sb-out\site1\index.html
+   Remove-Item Env:COPILOT_GITHUB_TOKEN
    ```
 
-3. Remove the token when you complete the run: `Remove-Item Env:COPILOT_GITHUB_TOKEN`
+4. Read the results. The CLI prints the cells that did not pass and the reason. In the dashboard, the **Why it failed** panel shows the failed checks and hints. To make the dashboard again, use `node bin/skill-bench.js report --input Q:\sb-out\run1 --output <new dir>`.
 
-### Read the results
+Tips:
 
-- The CLI prints a summary after the run. It shows the cells that did not pass and the reason.
-- `<output>/matrix-manifest.json` lists each cell, its exit code, and the path of its `results.jsonl` and workspace snapshot.
-- Open `<site>/index.html` to see the dashboard. The **Why it failed** panel of each comparison shows the failed checks and hints. See [Failure diagnostics](#failure-diagnostics).
-- To make the dashboard again from an existing run output: `node bin/skill-bench.js report --input Q:\sb-out\run1 --output <new or empty dir>`
-- On Windows, a process that a trial started can keep a file open for some seconds. The tool tries to delete the staged cells again, with a longer wait each time. If the delete still fails, the tool keeps the results, writes the `--site` dashboard, and shows a warning with the directory path. The exit code comes from the trials only. The manifest gets a `cleanup` record. Delete the directory manually when the processes stop, for example `Remove-Item -Recurse -Force Q:\sb-run\skill-bench-*`.
+- A model ID must be in `models` in the config, and your account must be able to use it. Else the cell fails with "Model ... is not available".
+- If a Windows file lock stops the cleanup, the tool keeps the results and shows a warning. Delete the directory later: `Remove-Item -Recurse -Force Q:\sb-run\skill-bench-*`.
+- If you have more than one GitHub account (for example, EMU and public), use the account that can use Copilot: `gh auth token --hostname github.com --user <account>`.
 
 ### Microsoft internal networks
 
-On some Microsoft devices and networks, you cannot get to the public npm registry or to nuget.org directly. In that case, use an internal mirror that your team approved (for example, an Azure Artifacts feed with upstream sources). Get the URL from the internal documentation of your team. Do not write internal feed URLs in this repository.
+If your network cannot get to the public npm registry or nuget.org, set these variables before step 1 and step 3. Get the URLs of the approved mirrors from your team. Do not commit them.
 
-- Install the tool: `npm ci --ignore-scripts --registry <approved-npm-feed-url>`
-- npm in the cells: use `--registry <approved-npm-feed-url>` or set `$env:SKILL_BENCH_NPM_REGISTRY = '<approved-npm-feed-url>'`.
-- NuGet in the cells (`azure-functions-update` example): set `$env:SKILL_BENCH_NUGET_SOURCE = '<approved-nuget-feed-url>'`. It must be a NuGet v3 service index URL.
-- Set these values in environment variables only. Do not commit them to a file.
+```powershell
+$env:npm_config_registry      = '<approved-npm-feed-url>'    # npm ci for the tool
+$env:SKILL_BENCH_NPM_REGISTRY = '<approved-npm-feed-url>'    # npm in the cells
+$env:SKILL_BENCH_NUGET_SOURCE = '<approved-nuget-feed-url>'  # NuGet v3 index for the .NET example
+```
 
-Limits. Know these before you select a feed:
-
-- The tool accepts only an HTTPS URL without a user name, password, query, or fragment.
-- Each cell gets its own HOME and app data directories, and an npm user configuration path in that HOME with no credentials. The NuGet preflight plugin of the `azure-functions-update` example writes a `NuGet.Config` for each cell with one feed and no credentials. The tool does not copy your `~/.npmrc`, your NuGet configuration, or credential provider plugins into a cell. The config `env` refuses names that look like secrets or that start with `NPM_CONFIG_`.
-- Thus a feed that needs authentication (for example, a private Azure Artifacts feed) does not work in the cells. Use a mirror that permits anonymous read access, or run on a network that can get to the public registries.
-- The cells do not get proxy variables (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`). If your network needs an explicit proxy, the cells cannot use it. Issue #278 tracks generic feed and proxy options.
-
-Other problems:
-
-- If `npm ci` fails with `E401`, your user `~/.npmrc` can have an expired Azure Artifacts token. Use an empty user configuration (`npm ci --ignore-scripts --userconfig <empty file>`), or get a new token.
-- If you have a GitHub EMU account and a public GitHub account, use the token of the account that has access to Copilot: `gh auth token --hostname github.com --user <account>`. To see your accounts, use `gh auth status`.
-- Run only trusted, reviewed code. Do not run skill-bench in CI that a pull request starts. See [Security](#security).
+- The feed must permit anonymous read access. The cells do not get credentials or proxy variables, so a feed that needs a sign-in or an explicit proxy does not work (see issue #278).
+- If `npm ci` fails with `E401`, your `~/.npmrc` can have an expired token. Use `npm ci --ignore-scripts --userconfig <empty file>`.
 ## Configuration
 
 `skill-bench.config.json` has these keys. All paths are relative to the config file.
