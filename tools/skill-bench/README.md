@@ -177,6 +177,6 @@ The report never copies grader `evidence`, transcripts, or logs. It removes cont
   - `functions-code-review`: the code review grader.
 
   The paid run needs the .NET SDK, Azure Functions Core Tools, PowerShell 7, and Azurite. See the [scenario README](examples/azure-functions-update/evals/dotnet-isolated/README.md) for the pinned versions and the fixture files.
-- `examples/azure-functions-create/`: the TypeScript HTTP function. It uses the root `evals/` directory.
+- `examples/azure-functions-create/`: the TypeScript HTTP function. It has no plugins.
 
 The examples point at skills in the root `templates/skills/` directory. If you move this tool to its own repository, change the `skillDir` and `evals` paths.

@@ -12,7 +12,7 @@
     "azure-functions-create": {
       "skillDir": "../../../../templates/skills/azure-functions-create",
       "files": ["SKILL.md", "references/go-project.md", "references/language-snippets.md"],
-      "evals": ["../../../../evals/azure-functions-create/typescript-http/eval.yaml"]
+      "evals": ["evals/typescript-http/eval.yaml"]
     }
   },
   "env": { "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT": "1" },

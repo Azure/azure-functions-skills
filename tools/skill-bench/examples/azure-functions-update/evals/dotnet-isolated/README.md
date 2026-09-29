@@ -3,8 +3,7 @@
 This case migrates a small in-process app to the isolated worker. The Functions
 model/configuration phase keeps `net8.0`. It does not update the language or hosting plan.
 
-These files are an example scenario for skill-bench. They are new with the tool. They
-are not a remainder of the root `src/evaluation` code.
+These files are an example scenario for skill-bench.
 
 ## Files in this folder
 
@@ -33,14 +32,14 @@ extension stops the build from compiling a second copy of the app.
 
 The `host-preflight` plugin stops a paid run before the first model call if a version
 differs from these pins, if a pinned .NET SDK is not installed (`dotnet --list-sdks`),
-or if Azurite does not accept connections in 60 s. The manual
-benchmark workflow installs the same versions. Change the config and the workflow together.
+or if Azurite does not accept connections in 60 s. Install these versions before a
+paid run. If you change a pin, change the config and this table together.
 
 | Tool | Version | Where it is pinned |
 | --- | --- | --- |
-| .NET SDK | 10.0.401 (default `dotnet`), plus 8.0.425 for the `net8.0` runtime | `host-preflight` options; `actions/setup-dotnet` in the workflow |
-| Azure Functions Core Tools | 4.15.1 | `host-preflight` options; `npm install -g` in the workflow |
-| Azurite | 3.37.0 | The workflow. Locally, use a dedicated instance on ports 10000 and 10001. |
+| .NET SDK | 10.0.401 (default `dotnet`), plus 8.0.425 for the `net8.0` runtime | `host-preflight` options |
+| Azure Functions Core Tools | 4.15.1 | `host-preflight` options |
+| Azurite | 3.37.0 (recommended) | Not checked. Use a dedicated instance on ports 10000 and 10001. |
 
 To run locally with other versions, set `SKILL_BENCH_ALLOW_TOOL_DRIFT=1`. The run
 records the installed versions and a warning in `matrix-manifest.json` and in the
@@ -152,7 +151,7 @@ skill-bench stages only declared files into a clean external directory. The
 accepts connections. The `nuget-preflight` plugin isolates NuGet settings and caches and
 checks the selected SDK/Worker restore path before a paid call. These checks do not
 prove that the host starts. skill-bench does not install tools or start Azurite; the
-operator or the workflow does that first.
+operator does that first.
 
 After code review, use existing clean external parent directories. Run these commands
 in `tools/skill-bench`. This example selects GPT-6 Astra and GPT-6 Sol, with one
@@ -187,8 +186,7 @@ as an empty successful migration.
 
 The source export excludes local settings, `.env` files, logs, hidden working
 directories, and generated output. It is separate from the code-only judge input.
-The files stay in the run output directory. The manual benchmark workflow uploads
-only the dashboard.
+The files stay in the run output directory. The dashboard does not include them.
 
 ## Dependencies and limits
 

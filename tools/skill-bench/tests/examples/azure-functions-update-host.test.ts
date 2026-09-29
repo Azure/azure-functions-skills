@@ -1,14 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createServer } from 'node:net';
 import type { Server } from 'node:net';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   checkPorts, checkTools, parseOptions, preflight, toolCommand,
 } from '../../examples/azure-functions-update/plugins/host-preflight.ts';
 import type { ToolSpawn } from '../../examples/azure-functions-update/plugins/host-preflight.ts';
-
-const workflowFile = fileURLToPath(new URL('../../../../.github/workflows/skill-benchmark.yml', import.meta.url));
 
 const options = {
   tools: { dotnet: { args: ['--version'], version: '10.0.401' }, func: { args: ['--version'], version: '4.15.1' } },
@@ -120,20 +118,17 @@ describe('host-preflight example plugin', () => {
     expect(() => preflight.validate?.({ tools: {} })).toThrow(/tools/);
   });
 
-  // The workflow is outside the tool. Skip this check when the tool is used alone.
-  it.skipIf(!existsSync(workflowFile))('pins the same versions as the benchmark workflow', () => {
+  it('keeps the example pins consistent with the scenario README', () => {
     const config = JSON.parse(readFileSync(fileURLToPath(new URL(
       '../../examples/azure-functions-update/skill-bench.config.json', import.meta.url)), 'utf8'));
     const host = config.skills['azure-functions-update'].plugins.preflight
       .find((item: { module: string }) => item.module.endsWith('host-preflight.ts'));
     const parsed = parseOptions(host.options);
-    const pins = parsed.tools;
-    const workflow = readFileSync(workflowFile, 'utf8');
-    expect(workflow).toContain(`azure-functions-core-tools@${pins.func.version}`);
-    expect(parsed.installed.dotnet.versions).toContain(pins.dotnet.version);
-    for (const version of parsed.installed.dotnet.versions) {
-      expect(workflow).toMatch(new RegExp(`dotnet-version:[\\s\\S]*${version.replaceAll('.', '\\.')}`));
+    const readme = readFileSync(fileURLToPath(new URL(
+      '../../examples/azure-functions-update/evals/dotnet-isolated/README.md', import.meta.url)), 'utf8');
+    expect(parsed.installed.dotnet.versions).toContain(parsed.tools.dotnet.version);
+    for (const version of [...parsed.installed.dotnet.versions, parsed.tools.func.version]) {
+      expect(readme).toContain(version);
     }
-    expect(workflow).toMatch(/azurite@\d+\.\d+\.\d+/);
   });
 });
