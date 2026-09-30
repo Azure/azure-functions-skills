@@ -20,10 +20,33 @@ changes customer code. It is manual. CI does not run it.
 Prerequisites: `gh auth login`, and for the Migration stimulus, the .NET 8 SDK and a
 reachable NuGet feed. The suite does not use Azure, Azurite, or Docker.
 
+Run the commands from the repository root. Put the output and the workspaces outside
+the repository.
+
 ```powershell
 npx @microsoft/vally-cli@0.16.0 lint --eval-spec evals/azure-functions-update/eval.yaml
-npx @microsoft/vally-cli@0.16.0 eval --eval-spec evals/azure-functions-update/eval.yaml
+npx @microsoft/vally-cli@0.16.0 eval --eval-spec evals/azure-functions-update/eval.yaml `
+  --output-dir <out-dir> --workspace <workspace-dir>
 ```
 
 `lint` is free. `eval` calls a model and has a cost. Get approval for the model,
 the budget, and the number of runs before you run `eval`.
+
+- `--output-dir` keeps the results. The default is `./vally-results` in the current folder.
+- `--workspace` keeps the agent workspace of each stimulus, so that you can examine the changed files.
+- To run only some stimuli, add `--tag area=<area>`. The areas are `routing`, `resume`,
+  `scope` (Stages), and `migration`.
+
+### Grade the saved results again
+
+After you change a grader, you can grade the saved results again. This step does not
+call a model and is free.
+
+```powershell
+$run = '<out-dir>\<run-timestamp>'
+Get-Content "$run\results.jsonl" | Where-Object { $_ -match '"type":"trial-result"' } |
+  npx @microsoft/vally-cli@0.16.0 grade --eval-spec evals/azure-functions-update/eval.yaml --run-dir $run
+```
+
+To grade one stimulus, select its line with the `stimulus` field, for example
+`Where-Object { ($_ | ConvertFrom-Json).stimulus -like 'Stages*' }`.
