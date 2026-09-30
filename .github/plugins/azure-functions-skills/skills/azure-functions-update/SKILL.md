@@ -253,6 +253,8 @@ Doctor/inventory helpers are advisory and not assumed read-only; inspect their e
 
 Report achieved scope by app and phase, current artifact, requirement evidence, unresolved
 work, blockers, optional improvements, handoff status, cleanup, and resume/rollback point.
+Write one row for each required ID, with its outcome and its evidence.
+Do not put two or more IDs in one row, for example `DI-06 to DI-09`.
 Use these final per-ID outcomes:
 
 | Outcome | Meaning |

@@ -258,8 +258,8 @@ stimuli:
         type: output-contains
         config:
           substring: "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated"
-      # One grader per definition-of-done ID. DI-POST-01 also matches a grouped row
-      # such as "DI-POST-01 to 03 | not-applicable".
+      # One grader per definition-of-done ID. The skill tells the agent to write
+      # one row for each ID, so a grouped row such as "DI-06 to DI-09" fails.
       - name: status-di-01
         type: output-matches
         config:
@@ -328,4 +328,12 @@ stimuli:
         type: output-matches
         config:
           pattern: "DI-POST-01[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-post-02
+        type: output-matches
+        config:
+          pattern: "DI-POST-02[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-post-03
+        type: output-matches
+        config:
+          pattern: "DI-POST-03[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
       - type: completed
