@@ -19,7 +19,8 @@ defaults:
   model: claude-sonnet-5.5
 
 scoring:
-  threshold: 0.8
+  # Each grader must pass. A missing definition-of-done ID fails the stimulus.
+  threshold: 1.0
 
 stimuli:
   # ─────────────────────────────────────────────────────────────────
@@ -257,8 +258,74 @@ stimuli:
         type: output-contains
         config:
           substring: "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated"
-      - name: per-id-status
+      # One grader per definition-of-done ID. DI-POST-01 also matches a grouped row
+      # such as "DI-POST-01 to 03 | not-applicable".
+      - name: status-di-01
+        type: output-matches
+        config:
+          pattern: "DI-01[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-02
+        type: output-matches
+        config:
+          pattern: "DI-02[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-03
+        type: output-matches
+        config:
+          pattern: "DI-03[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-04
+        type: output-matches
+        config:
+          pattern: "DI-04[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-05
+        type: output-matches
+        config:
+          pattern: "DI-05[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-06
+        type: output-matches
+        config:
+          pattern: "DI-06[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-07
+        type: output-matches
+        config:
+          pattern: "DI-07[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-08
+        type: output-matches
+        config:
+          pattern: "DI-08[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-09
+        type: output-matches
+        config:
+          pattern: "DI-09[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-10
+        type: output-matches
+        config:
+          pattern: "DI-10[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-11
+        type: output-matches
+        config:
+          pattern: "DI-11[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-12
+        type: output-matches
+        config:
+          pattern: "DI-12[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-13
         type: output-matches
         config:
           pattern: "DI-13[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-14
+        type: output-matches
+        config:
+          pattern: "DI-14[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-15
+        type: output-matches
+        config:
+          pattern: "DI-15[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-16
+        type: output-matches
+        config:
+          pattern: "DI-16[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
+      - name: status-di-post-01
+        type: output-matches
+        config:
+          pattern: "DI-POST-01[^\\n]*\\b(pass|fail|blocked|not-applicable)\\b"
       - type: completed

@@ -10,10 +10,12 @@ changes customer code. It is manual. CI does not run it.
 | Selection — named skill | The named skill starts, saves a plan, and keeps `net8.0`. |
 | Resume | The skill continues from the saved plan in `fixtures/azure-functions-update-plan.md`. |
 | Stages | .NET 10 and hosting plan requests stay separate stages. The project keeps `net8.0`. |
-| Migration | The model-only migration builds at `net8.0`, states `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated`, and reports a status for each definition-of-done ID. |
+| Migration | The model-only migration builds at `net8.0`, states `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated`, and reports a status for each definition-of-done ID. One grader checks each ID from `DI-01` to `DI-16`, and one grader checks `DI-POST-01`. |
 
 `fixtures/app` is a small C# in-process app with HTTP, queue, and blob functions and
 `FunctionsStartup` DI. `fixtures/AGENTS.md` sets the workspace limits for the agent.
+
+The scoring threshold is `1.0`. A stimulus passes only when each of its graders passes.
 
 ## Run
 
