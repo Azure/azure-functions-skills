@@ -153,17 +153,17 @@ azd up
 After `azd up` completes:
 
 1. Run `azd env get-values` and capture useful outputs.
-2. If connectors are present, open the Connector Namespace portal deep link at
-  `https://connectors.azure.com/<subscription-id>/<resource-group>/<connector-gateway-name>/overview`
-  and ask the user to authorize the connections. Do not use the generic Azure portal resource
-  blade URL for connector authorization.
-3. Check connection status after authorization.
+2. If a new connector is present, hand connection authorization and identity verification to
+   `azure-functions-connector-create`.
+3. Hand metadata-derived MCP publication to `azure-functions-connector-mcp`, then run
+   `azure-functions-connector-validate` before enabling connector automation.
 4. Open or provide the built-in chat URL only when the app intentionally includes built-in chat UI
   or chat API endpoints.
 5. Manually trigger timer/non-HTTP agents with the admin endpoint when practical.
 6. After manual triggers or external events, query Application Insights requests, traces, and
   exceptions to confirm the function fired and whether the agent/tool run succeeded.
-7. Summarize what was deployed, what was verified, and what still requires user action.
+7. Summarize what was deployed, which connector lifecycle handoffs completed, what was verified,
+   and what still requires user action.
 
 For optional email delivery:
 

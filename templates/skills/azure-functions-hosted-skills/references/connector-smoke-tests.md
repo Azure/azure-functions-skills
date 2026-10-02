@@ -1,5 +1,9 @@
 # Connector Smoke Tests
 
+This is low-level connector evidence used by `azure-functions-connector-validate`. The Hosted
+Skills authoring workflow should hand release-gate validation to that skill rather than running
+these checks as an implicit part of ordinary agent authoring.
+
 Use these checks before trusting an agent to perform a user-visible connector action. A Function
 run can succeed while the downstream side effect, such as a Teams message or Outlook draft, did
 not happen.
