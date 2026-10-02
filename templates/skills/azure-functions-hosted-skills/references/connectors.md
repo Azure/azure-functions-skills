@@ -17,17 +17,20 @@ Load the more specific connector reference for the task at hand:
 
 ## Current Pattern
 
-For connector tools that agents call:
+For connector tools that Hosted Skills call:
 
-1. Bicep creates a `Microsoft.Web/connectorGateways` resource.
-2. Bicep creates a nested connector connection, such as Office 365 Outlook.
-3. Bicep creates access policies for the function app managed identity, the deployer user, and
-   the Connector Gateway identity.
-4. Bicep creates an MCP server config that allow-lists only the connector operations the agent
-   needs.
-5. `mcp.json` points to the MCP endpoint URL and uses Microsoft Entra auth.
-6. Agent frontmatter uses `mcp: true`, `mcp: false`, or `mcp.exclude` to control which MCP
-   servers an agent can see.
+1. `azure-functions-connector-create` uses Bicep and `azd` for stable infrastructure: the
+   `Microsoft.Web/connectorGateways` resource, nested connection, identities, access policies,
+   non-secret settings, and outputs.
+2. A human completes delegated authorization when the selected authentication scheme requires it.
+3. `azure-functions-connector-mcp` discovers authoritative operation metadata, generates the
+   complete least-privilege MCP configuration, registers it through the supported API, and
+   retrieves the platform-generated endpoint.
+4. `mcp.json` points to that endpoint through an app setting and uses Microsoft Entra auth.
+5. Agent frontmatter uses `mcp: true`, `mcp: false`, or `mcp.exclude` to control which MCP servers
+   a Hosted Skill can see.
+6. `azure-functions-connector-validate` verifies the connection, identity, deployed MCP contract,
+   connector side effects, and Hosted Skill integration before automation is enabled.
 
 For connector triggers that start agents from external events, add a trigger config resource after
 the function app has started and created the `connector_extension` system key.
@@ -149,7 +152,7 @@ or service outage.
 ## Bicep Files
 
 Use `infra/app/connector-gateway.bicep` from the retrieved `ai-serverless-agents-python` template
-as the current example. It creates:
+as a fixed Office 365 quickstart example. It creates:
 
 - `Microsoft.Web/connectorGateways@2026-05-01-preview`
 - `Microsoft.Web/connectorGateways/connections@2026-05-01-preview`
@@ -166,8 +169,11 @@ product-owner words such as `microsoft` in resource names. Display names and des
 friendly product names like Microsoft Teams or Office 365 Outlook.
 
 The asset's connection resource works as-is for Office 365 Outlook, which does not need an
-explicit `parameterValueSet`. When adapting it to a different connector, check
-[Connection Authentication Schemes](#connection-authentication-schemes) above first — do not
+explicit `parameterValueSet`. Its MCP operation schema is a static, verified quickstart example;
+do not use that hand-authored schema as the generic pattern for another connector. When adapting
+the template, let `azure-functions-connector-create` own the connection and let
+`azure-functions-connector-mcp` replace the MCP configuration with metadata-derived operations.
+Check [Connection Authentication Schemes](#connection-authentication-schemes) above first — do not
 assume every connector behaves like Office 365 Outlook.
 
 ## Safety Boundary
@@ -192,16 +198,12 @@ business apps. That is powerful, but unsafe if overexposed. For user-delegated c
 
 ## Common Next Steps
 
-- Before creating a connection for a new connector, check whether it needs an explicit
-  [`parameterValueSet`](#connection-authentication-schemes) — do not assume it behaves like
-  Office 365 Outlook.
-- Before deploying MCP server configs, validate operation IDs and parameter schemas with
-  [connector-schemas.md](./connector-schemas.md).
+- Use `azure-functions-connector-create` to discover authentication requirements, create the
+  connection and access policies, and complete authorization.
+- Use `azure-functions-connector-mcp` to discover operation IDs and schemas, generate the complete
+  MCP configuration, register it, and wire the generated endpoint.
 - For Teams posts, parse Teams links and choose the correct Teams target shape with
   [connector-teams.md](./connector-teams.md).
-- When adding connector MCP tools to an app, configure the server and authorization flow with
-  [connector-mcp.md](./connector-mcp.md).
-- Before relying on a user-visible connector action, run the side-effect checks in
-  [connector-smoke-tests.md](./connector-smoke-tests.md).
+- Use `azure-functions-connector-validate` before relying on a user-visible connector action.
 - When adding connector-triggered agents, use [connector-triggers.md](./connector-triggers.md) for
   the preview bundle, `generic_trigger` shape, system key, callback URL, and trigger config flow.

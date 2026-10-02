@@ -90,6 +90,22 @@ Load only the files needed for the task:
 | Diagnostics and common failures | [troubleshooting.md](./references/troubleshooting.md) |
 | Official Azure Functions Hosted Skills quickstart template and Learn article | [quickstart-reference.md](./references/quickstart-reference.md) |
 
+## Connector Lifecycle Handoffs
+
+This skill owns how a Hosted Skill consumes connector tools: agent instructions, `mcp.json`,
+frontmatter access, triggers, fallbacks, and application-level behavior. Use the focused connector
+skills for privileged control-plane work:
+
+| Connector task | Skill |
+| --- | --- |
+| Discover authentication requirements, create the Connector Namespace connection, grant access policies, and complete authorization | `azure-functions-connector-create` |
+| Select operations, derive complete schemas from connector metadata, register the MCP server config, and wire its endpoint | `azure-functions-connector-mcp` |
+| Run connection, identity, MCP contract, side-effect, and Hosted Skill release gates | `azure-functions-connector-validate` |
+
+Do not make an ordinary Hosted Skill runtime invocation discover connectors, create connections,
+grant access, register new tools, or complete OAuth consent. Dynamic tool choice through MCP
+`tools/list` is limited to tools already published by an approved connector control-plane workflow.
+
 ## Assess the Workspace
 
 Before editing, inspect the app. Look for:
@@ -360,14 +376,15 @@ Unless the user explicitly asks for continuous deployment, deploy from the local
 `azd up`. Do not create GitHub Actions workflows, CI/CD pipeline files, repository secrets, or run
 `azd pipeline config` for a normal app deployment request.
 
-After deployment, verify outputs with `azd env get-values`, open or provide the relevant app URL,
-show the user how to get the default function key only when built-in chat UI/API endpoints are
-present, open Connector Namespace authorization links when connectors are present, check
-connection status, and run a smoke test when practical. For timer or other non-HTTP agents,
-manually trigger the function with the admin endpoint after deployment, then query Application
-Insights requests, traces, and exceptions for that run. For built-in chat agents, open or provide
-the `/agents/<slug>/` URL and call the chat API if useful. Do not rely on `az functionapp log tail`
-for Flex Consumption agent diagnostics.
+After deployment, verify outputs with `azd env get-values` and open or provide the relevant app
+URL. Show the user how to get the default function key only when built-in chat UI/API endpoints
+are present. When a new connector is present, hand connection authorization and identity checks to
+`azure-functions-connector-create`, MCP publication to `azure-functions-connector-mcp`, and release
+gates to `azure-functions-connector-validate`. For timer or other non-HTTP agents, manually trigger
+the function with the admin endpoint after deployment, then query Application Insights requests,
+traces, and exceptions for that run. For built-in chat agents, open or provide the
+`/agents/<slug>/` URL and call the chat API if useful. Do not rely on `az functionapp log tail` for
+Flex Consumption agent diagnostics.
 
 When a manual trigger starts a timer/background agent, tell the user what to expect before waiting:
 the admin endpoint often returns `202 Accepted`, the agent may run for several minutes, and
@@ -377,13 +394,14 @@ appears stuck past its expected duration, say so and switch to troubleshooting i
 waiting or repeatedly triggering the function.
 
 For connector actions with visible side effects, such as Teams posts or Outlook messages, verify
-the downstream side effect after the first run. If the user reports it is missing, do not keep
-triggering the agent. Inspect the recorded tool result/session and run a focused connector smoke
-test with the same arguments before changing model settings or rerunning the full workflow.
+the downstream side effect through `azure-functions-connector-validate`. If the user reports it is
+missing, do not keep triggering the agent. Preserve the recorded tool result and arguments for the
+validation workflow instead of changing model settings or rerunning the full Hosted Skill.
 
 Be hands-on after scaffolding. Do not stop at a command list when the next command is safe and the
-user already approved the direction. Run `azd up`, open authorization URLs, run `azd env
-get-values`, test deployed endpoints, and report the results. Stop only for user-only actions such
+user already approved the direction. Run `azd up`, run `azd env get-values`, test deployed Hosted
+Skill endpoints, and report the results. Use the connector lifecycle skills for connection
+authorization, MCP publication, and connector release gates. Stop only for user-only actions such
 as signing in to authorize a connector, selecting an ambiguous option, or entering secrets.
 
 After a supported command **fully succeeds** — a complete `azd up`, or a standalone `azd provision`

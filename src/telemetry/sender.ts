@@ -49,6 +49,9 @@ const OBSERVED_EVENT_PROPERTIES = new Set([
 export const BUNDLED_SKILL_NAMES = new Set([
   'azure-functions-best-practices',
   'azure-functions-common',
+  'azure-functions-connector-create',
+  'azure-functions-connector-mcp',
+  'azure-functions-connector-validate',
   'azure-functions-create',
   'azure-functions-deploy',
   'azure-functions-diagnostics',
