@@ -184,18 +184,21 @@ Use **manifest discovery + MCP primary retrieval** when Azure MCP tools are avai
 
 1. Fetch the Azure Functions template manifest from
    `https://cdn.functions.azure.com/public/templates-manifest/manifest.json` and find
-   `ai-serverless-agents-python`. Use its catalog metadata (`priority`, `categories`, `tags`,
+   `ai-hosted-skills-python`. Use its catalog metadata (`priority`, `categories`, `tags`,
    `whatsIncluded`) to explain why this is the correct Azure Functions Hosted Skills scaffold. Keep
    `repositoryUrl`, `folderPath`, and `gitRef` for fallback.
 2. Call Azure MCP `functions_template_get` with `language: python` and
-   `template: ai-serverless-agents-python`. This is the primary source for the complete project
+   `template: ai-hosted-skills-python`. This is the primary source for the complete project
    files.
 3. Write the returned `files` array into the target project. If the output is truncated or saved to
    a temporary file, read the complete JSON response before deciding retrieval failed.
 4. If MCP returns an actual tool error, cannot retrieve the template, or returns an empty/zero-file
    result after reading the complete response, fall back to the manifest `repositoryUrl`,
    `folderPath`, and `gitRef` using direct GitHub download first and `git clone --depth 1` only if
-   downloads fail. Tell the user that MCP retrieval failed and GitHub fallback was used.
+   downloads fail. An older MCP catalog can list only the former ID
+   `ai-serverless-agents-python`. In that case, use the current manifest's GitHub coordinates, not
+   the former template ID. Keep the manifest's `gitRef` so the retrieved files match the selected
+   release. Tell the user that MCP retrieval failed and GitHub fallback was used.
 
 When Azure MCP tools are not available, skip directly to the manifest/GitHub fallback above. Do not
 invent a project structure from memory.

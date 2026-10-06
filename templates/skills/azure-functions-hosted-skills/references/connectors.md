@@ -151,7 +151,7 @@ or service outage.
 
 ## Bicep Files
 
-Use `infra/app/connector-gateway.bicep` from the retrieved `ai-serverless-agents-python` template
+Use `infra/app/connector-gateway.bicep` from the retrieved `ai-hosted-skills-python` template
 as a fixed Office 365 quickstart example. It creates:
 
 - `Microsoft.Web/connectorGateways@2026-05-01-preview`

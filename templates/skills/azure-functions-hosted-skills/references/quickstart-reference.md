@@ -1,18 +1,27 @@
 # Official Quickstart Template
 
 The canonical Azure Functions Hosted Skills scaffold is the Azure MCP / Azure Functions template whose
-current catalog identifier is `ai-serverless-agents-python`, backed by:
+current catalog identifier is `ai-hosted-skills-python`, backed by:
 
 - Microsoft Learn: <https://learn.microsoft.com/azure/azure-functions/scenario-serverless-agents-runtime>
-- Template repository: <https://github.com/Azure-Samples/functions-quickstart-serverless-agents-azd>
+- Template repository: <https://github.com/Azure-Samples/functions-daily-blog-hosted-skills-azd>
+- Manifest release: `refs/tags/v1.0.2`, with `folderPath: "."`
 
 Do not use a bundled copy of the template. Retrieve the template through Azure MCP
 `functions_template_get` first, then fall back to the manifest `repositoryUrl`, `folderPath`, and
 `gitRef` if MCP retrieval fails.
 
-Use the exact template identifier `ai-serverless-agents-python` for MCP and CDN manifest lookup.
+Use the exact template identifier `ai-hosted-skills-python` for MCP and CDN manifest lookup.
 The skill name and user-facing brand can change independently from this catalog identifier; do not
 derive or rename the lookup value from `azure-functions-hosted-skills`.
+
+The former catalog identifier was `ai-serverless-agents-python`. If an older MCP catalog rejects
+the current identifier and lists only the former one, use the current manifest's GitHub fallback.
+Use its `gitRef`, not the repository's default branch. Do not retrieve the former template instead.
+Use the coordinates from the live manifest when a later release is published.
+
+The sample uses Hosted Skills branding, but runtime identifiers are unchanged: keep `.agent.md`,
+`agents.config.yaml`, `azurefunctions-agents-runtime`, environment variables, and HTTP routes.
 
 The official template includes:
 
@@ -23,7 +32,9 @@ The official template includes:
 - `src/host.json` with a 30-minute function timeout for background-capable scaffolds
 - `src/agents.config.yaml`
 - `src/main.agent.md`
-- `src/daily_microsoft_blog_summary.agent.md` with a 30-minute timer-agent timeout
+- `src/daily_microsoft_blog_summary.agent.md` for the daily digest. The sample inherits
+  `timeout: 900` from `agents.config.yaml`; set `timeout: 1800` in this agent file when tailoring
+  the app to match this skill's background-agent default.
 - `src/mcp.json`
 - `src/local.settings.json.sample`
 - `src/requirements.txt` with `azurefunctions-agents-runtime[monitor]` so Application Insights
@@ -39,7 +50,10 @@ For a new app, retrieve the template files into the project root, then tailor:
 3. Keep `main.agent.md` only when the user asks for a chat bot, debug chat UI, chat API, streaming
   API, or built-in MCP endpoint. Remove it for scheduled-only or background-only apps.
 4. Keep dynamic sessions when any agent needs web browsing or code execution.
-5. Keep the Office 365 connector path only when an agent needs email tools.
+5. Keep the Office 365 connector path only when an agent needs email tools. In the sample,
+   `TO_EMAIL` enables the optional Outlook resources. With no recipient, the timer Hosted Skill
+   returns the digest in its final response for Function logs or Application Insights. The chat
+   Hosted Skill uses `mcp: false` and does not have access to the Outlook tool.
 6. Copy `src/local.settings.json.sample` to `src/local.settings.json` for local runs and update
    app-specific env vars in `src/local.settings.json` and `infra/main.parameters.json`.
 7. Keep `gpt-4.1` default unless intentionally upgrading to a reasoning-capable model.
