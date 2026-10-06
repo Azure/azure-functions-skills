@@ -1,6 +1,6 @@
 # Infrastructure, Deployment, and Local Development
 
-Use the Bicep retrieved with the official `ai-serverless-agents-python` template as the baseline.
+Use the Bicep retrieved with the official `ai-hosted-skills-python` template as the baseline.
 It provisions Foundry, Flex Consumption, identity-based storage settings, Application Insights,
 dynamic sessions, and optional Connector Namespace MCP resources.
 
