@@ -60,6 +60,7 @@ export const BUNDLED_SKILL_NAMES = new Set([
   'azure-functions-health-status',
   'azure-functions-help',
   'azure-functions-hosted-skills',
+  'azure-functions-hosted-skills-migrate',
   'azure-functions-inventory',
   'azure-functions-setup',
   'azure-functions-update',

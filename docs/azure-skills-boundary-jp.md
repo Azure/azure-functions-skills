@@ -91,6 +91,7 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | 名前の指定なしで Functions のコード移行を依頼 | `azure-functions-update` を案内する。自動では開始しない |
 | Consumption から Flex など、hosting plan・SKU の変更 | Azure Skills。コード移行の開始依頼とはみなさない |
 | Markdown、Functions triggers、code、tools、HTTP、MCP を使う cloud-hosted な intelligent capability、Azure Functions Hosted Skills の build または変更 | `azure-functions-hosted-skills` |
+| 既存のローカルコーディングエージェント用スキルと依存関係を Hosted Skill に変換 | `azure-functions-hosted-skills-migrate` から Hosted Skills・Connector の各スキルへ引き継ぐ |
 | Hosted Skill 用の Connector Namespace connection の作成と認可 | `azure-functions-connector-create` |
 | connector operation metadata から connector-backed MCP tools を生成して登録 | `azure-functions-connector-mcp` |
 | connector identity、MCP contract、side effect、Hosted Skill integration を検証 | `azure-functions-connector-validate` |

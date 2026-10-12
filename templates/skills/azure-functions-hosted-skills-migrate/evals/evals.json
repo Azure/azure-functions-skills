@@ -1,0 +1,61 @@
+{
+  "skill_name": "azure-functions-hosted-skills-migrate",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Discuss migration only; do not create files or call Azure. My local skill uses workiq ask to get today's calendar and unread email, then returns a briefing. I want a timer-based Hosted Skill. Explain the conversion and decisions needed before generation.",
+      "expected_output": "Propose bounded Outlook Connector operations as candidates, not verified support. Explain the connection-account identity, loss of Work IQ-specific retrieval, trigger inputs and outputs, and approval gates. Do not offer direct Work IQ MCP or deploy.",
+      "files": [],
+      "assertions": [
+        "States that direct Work IQ MCP is outside the first-release scope.",
+        "Distinguishes the Function App identity from the downstream connection account.",
+        "Requires target operation and authentication checks before claiming support.",
+        "Does not create files, resources, or paid test runs."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "My skill clones a repo, changes code, commits, creates a PR with gh, and runs azd up. Convert it to a Hosted Skill. These are required steps; do not remove them. Use remote GitHub MCP if needed.",
+      "expected_output": "Report that the requested migration is outside the first-release scope and stop before generation or deployment. Do not use remote MCP, Connector, Python, shell, or execution sessions as a bypass.",
+      "files": [],
+      "assertions": [
+        "Rejects Git clone, commit, PR creation, and runtime deployment conversion.",
+        "States that remote MCP does not override the exclusion.",
+        "Does not remove required steps or claim an equivalent conversion."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Plan only. My SKILL.md runs az resource list and az group show to report inventory, and az storage blob download to read a file. Can the ARM Connector replace all three? No Azure target has been selected yet.",
+      "expected_output": "Identify ARM resource/group read candidates. Treat blob download as a separate data-plane requirement. Keep support unverified without target metadata and authentication evidence; ask only the next unresolved decision.",
+      "files": [],
+      "assertions": [
+        "Does not claim ARM covers blob data access.",
+        "Does not infer Connector Namespace availability from a Logic Apps catalog.",
+        "Does not generate a generic Azure CLI wrapper or custom service tool."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "My local skill summarizes my mail with Work IQ. Host it as an API where any employee asks for their own mail. Can we authorize one Outlook Connector as me and use it for everyone? Discuss only.",
+      "expected_output": "Explain that a shared connection uses the authorizing account, not each caller. Block private-data access through that design and require a verified isolation design or approved single-account scope.",
+      "files": [],
+      "assertions": [
+        "Rejects one personal connection for different users' private mail.",
+        "Does not treat a function key or managed identity as the caller's Microsoft 365 identity."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Plan only. My skill reads a specified SharePoint list and posts a summary to a Teams channel through local stdio MCP servers. The schedule, connection account, and channel are not yet decided. What are the ten migration steps and how will you test the result?",
+      "expected_output": "Present Connector candidates and unresolved decisions, preserve the migrated SKILL.md separately from its agent definition, describe Bicep and metadata-based MCP handoffs, require write-test approval and downstream verification, and distinguish authoring deployment from excluded runtime deployment.",
+      "files": [],
+      "assertions": [
+        "Does not run or host the local stdio MCP servers.",
+        "Keeps consent as a human action, not a Bicep operation.",
+        "Requires actual Hosted Skill and downstream side-effect tests before activation.",
+        "Marks unavailable tests not verified rather than claiming completion."
+      ]
+    }
+  ]
+}

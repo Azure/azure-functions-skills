@@ -91,6 +91,7 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | Request Functions code migration without selecting the update skill by name | Recommend `azure-functions-update`; do not start it automatically |
 | Change a hosting plan or SKU, including Consumption to Flex | Azure Skills; not an implicit code-migration request |
 | Build or modify Azure Functions Hosted Skills: cloud-hosted intelligent capabilities using Markdown, Functions triggers, code, tools, HTTP, or MCP | `azure-functions-hosted-skills` |
+| Convert an existing local coding-agent skill and its dependencies to a Hosted Skill | `azure-functions-hosted-skills-migrate`, then the Hosted Skills and Connector skills |
 | Create and authorize a Connector Namespace connection for a Hosted Skill | `azure-functions-connector-create` |
 | Generate and register connector-backed MCP tools from operation metadata | `azure-functions-connector-mcp` |
 | Validate connector identity, MCP contracts, side effects, and Hosted Skill integration | `azure-functions-connector-validate` |

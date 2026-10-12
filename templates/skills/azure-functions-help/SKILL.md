@@ -14,6 +14,10 @@ Use this skill when the user asks what Azure Functions capabilities are availabl
 3. Recommend at most three matching skills, with one short reason for each.
 4. Invoke or direct the user to the best match.
 
+For conversion of an existing local `SKILL.md` and its dependencies to a Hosted Skill, use
+`azure-functions-hosted-skills-migrate`. For a new Hosted Skill with no source skill, use
+`azure-functions-hosted-skills`. This conversion is not a Functions programming-model update.
+
 Exception: `azure-functions-update` requires the user to name it and ask to use or
 resume it. For an unnamed migration request, recommend it and give an explicit-use
 example; do not invoke it automatically. A question or quoted mention is not a run
