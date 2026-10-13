@@ -23,6 +23,8 @@ Record:
 - Completed steps, evidence, blockers, and next required action.
 - Definition of Done item statuses, applicability reasons, current evidence, repair actions,
   and downstream checks made stale by a repair.
+  Use exact HSM IDs, not a single status for each step. At delivery, missing required proof is
+  `blocked`; test-gate `not-verified` is not a passing HSM result.
 
 Show this table before target generation. Use one row per operation.
 

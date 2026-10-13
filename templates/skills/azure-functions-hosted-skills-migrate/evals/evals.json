@@ -2,6 +2,19 @@
   "skill_name": "azure-functions-hosted-skills-migrate",
   "evals": [
     {
+      "id": 16,
+      "prompt": "Review completion only. All ten migration steps were marked done. The Python formatter compiles but was never called by the Hosted runtime. A child SKILL.md was copied but its relative reference is missing. The old deployed artifact returned 200, and Connector creation succeeded without account consent. Reconcile every HSM Definition of Done ID against this evidence.",
+      "expected_output": "Produce an ID-based review covering HSM-01 through HSM-28. Identify missing reference proof, missing Python runtime/behavior proof, unauthorized Connector, stale deployment, and missing actual Hosted business output under their concrete IDs. Mark missing required evidence blocked, observed mismatches fail, and only genuinely absent surfaces not-applicable. Return to affected steps without unapproved live repairs.",
+      "files": [],
+      "assertions": [
+        "Uses all stable HSM IDs instead of accepting completed step labels.",
+        "Checks HSM-11 for actual relative links and HSM-13/15 for Python call and output evidence.",
+        "Does not pass HSM-20 based on successful resource creation.",
+        "Does not pass HSM-22/24 using an old artifact or HTTP 200.",
+        "Keeps missing required evidence blocked rather than not-applicable or pass."
+      ]
+    },
+    {
       "id": 13,
       "prompt": "Check completion only; do not deploy or run paid tests. A generated app has its parent skill, but a required child was not copied and the child's required JavaScript formatter was skipped. The root HTTP endpoint returned 200. Can the agent report migration complete?",
       "expected_output": "Fail the dependency and conversion items. Treat HTTP success as insufficient. Return to source/dependency inspection and approved generation/conversion, repair the missing child and Python formatter, and invalidate affected tests. Do not claim completion or run unapproved work.",
