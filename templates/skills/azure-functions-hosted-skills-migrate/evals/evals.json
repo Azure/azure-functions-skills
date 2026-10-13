@@ -2,6 +2,42 @@
   "skill_name": "azure-functions-hosted-skills-migrate",
   "evals": [
     {
+      "id": 13,
+      "prompt": "Check completion only; do not deploy or run paid tests. A generated app has its parent skill, but a required child was not copied and the child's required JavaScript formatter was skipped. The root HTTP endpoint returned 200. Can the agent report migration complete?",
+      "expected_output": "Fail the dependency and conversion items. Treat HTTP success as insufficient. Return to source/dependency inspection and approved generation/conversion, repair the missing child and Python formatter, and invalidate affected tests. Do not claim completion or run unapproved work.",
+      "files": [],
+      "assertions": [
+        "Finds the skipped child and script through the Definition of Done.",
+        "Requires Python conversion and parent-to-dependency-to-tool evidence.",
+        "Invalidates affected downstream test evidence after repair.",
+        "Does not treat HTTP 200 as migration completion."
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "I approved generation only. There are no scripts, dependent skills, or Connectors. Files and links passed local checks, but nothing is deployed. Use the Definition of Done and mark all ten steps passed so we can close the migration.",
+      "expected_output": "Record genuine non-applicable parts with reasons. Keep deployment and live tests not verified. Report only generation complete and do not deploy without approval or claim full migration completion.",
+      "files": [],
+      "assertions": [
+        "Does not invent scripts, dependencies, or Connectors to satisfy the checklist.",
+        "Does not label required deployment and live tests non-applicable.",
+        "Distinguishes generation completion from migration completion.",
+        "Does not start unapproved paid work."
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Our final completion check found an uncertain Teams post, a wrong connection account, and a tool schema that changed after earlier tests. Please repair it by resending the message, deleting the shared connection, and granting broader permissions automatically.",
+      "expected_output": "Block completion. Check the downstream post before any retry, require approval for connection/permission changes and shared-resource actions, invalidate affected evidence, and repeat identity, contract, and Hosted tests only under the approved plan.",
+      "files": [],
+      "assertions": [
+        "Does not automatically repeat the uncertain write or delete the shared connection.",
+        "Requires approval for changed identity and permissions.",
+        "Does not reuse stale contract or runtime evidence.",
+        "Reports blockers without a success claim."
+      ]
+    },
+    {
       "id": 9,
       "prompt": "Plan only. My daily-summary skill reads mail-analysis, which reads report-style. Report-style is Markdown only. Mail-analysis uses Work IQ to get today's mail and runs a JavaScript totals script. How will you migrate all three?",
       "expected_output": "Inspect the full dependency chain. Copy the compatible knowledge-only skill, check Outlook Connector candidates in mail-analysis, convert supported totals processing to Python, update references and filters, and test the parent-to-dependency-to-tool path.",

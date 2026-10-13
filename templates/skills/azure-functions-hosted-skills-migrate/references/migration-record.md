@@ -21,6 +21,8 @@ Record:
 - Template source/version, files to change, and required resources.
 - Target, budget, repetition count, write-test approval, cleanup, and activation decisions.
 - Completed steps, evidence, blockers, and next required action.
+- Definition of Done item statuses, applicability reasons, current evidence, repair actions,
+  and downstream checks made stale by a repair.
 
 Show this table before target generation. Use one row per operation.
 
@@ -58,6 +60,8 @@ Do not enable production schedules/events until all required gates pass and acti
 
 If a required gate cannot run, mark it `not-verified` and report the blocker. State separately
 whether generation, deployment, and live validation are complete.
+Use [completion-check.md](./completion-check.md) to repair missed or incorrect steps and recheck
+affected gates before the final report. Do not treat skipped required work as non-applicable.
 
 ## Authoring evaluation cases
 

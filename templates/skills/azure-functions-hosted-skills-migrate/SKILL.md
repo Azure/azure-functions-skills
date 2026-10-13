@@ -53,6 +53,12 @@ Do not invent a replacement workflow. Keep one migration record across all hando
 
 ## Ten-step workflow
 
+After each step, check its completion item below and record evidence. If the item fails or lacks
+evidence, repair the gap before starting dependent work. Step 8 prepares the deployment files;
+planning approval does not authorize live provisioning. For generation-only work or missing live
+approval, record step 9 and live step 10 items as `not-verified`; do not perform them as a repair.
+Repeat the full check after the last approved step and after step 10 when live work is approved.
+
 ### 1. Read the source skill
 
 Ask for the source `SKILL.md` or skill directory if it is not known. Read its frontmatter,
@@ -230,8 +236,36 @@ Enable automation only after all required gates pass and the user approves activ
 Report the source/target locations, approved behavior changes, excluded operations, and test
 results. If only generation is complete, say so; do not call the migration complete.
 
-## Completion rule
+## Definition of Done
+
+Read [completion-check.md](./references/completion-check.md) for evidence, applicability, and
+repair rules. Check the current artifacts and runtime results, not only the record of actions.
+
+| Step | Completion item |
+| --- | --- |
+| 1 | The source goal, files, required scripts, and full required skill dependency graph are known. Source files remain unchanged. |
+| 2 | Every required operation has an owning skill, support status, input/output contract, identity scope, and evidence. No required dependency is hidden or unresolved. |
+| 3 | Required blockers are resolved within policy. Removals, replacements, and goal changes have explicit approval. |
+| 4 | Trigger, inputs, outputs, connection account, data boundary, and side-effect approval path match the approved plan. |
+| 5 | The configuration/code decision covers all required script processing. Python mappings, packages, expected results, and tests are defined. |
+| 6 | The official template source is recorded. The parent and dependent skills have valid target files, names, and links. The agent definition selects the approved skill set. |
+| 7 | Approved conversions are implemented. Python tools and callers are wired. No obsolete local calls or excluded operations remain. |
+| 8 | Required Connector Bicep, identity/access configuration, consent handoff, and metadata-based MCP registration plan are complete. No guessed schemas or secret literals remain. |
+| 9 | Target, budget, repetition count, cleanup, and write-target approvals are recorded. Approved resources are deployed and required connections are authorized as the correct account. Runtime identity and settings are verified. Business automation stays disabled until required gates pass. |
+| 10 | All applicable required test gates pass with evidence, including script and dependent-skill use, downstream results, and cleanup. Activation is recorded; automation is enabled only after the gates pass and the user approves it. |
+
+Record `pass`, `fail`, or `not-verified` for each required item. A missing test or skipped required
+step is not a pass. Record non-applicable parts with a reason; absence of a Connector or script
+does not require creating one. Generation-only approval leaves deployment and live tests
+`not-verified`; it does not make the migration complete.
+
+If a gap is found, identify the earliest affected step, repair it within the approved scope, and
+repeat affected downstream checks. Mark prior evidence `not-verified` when the repair changes
+what it tested. Ask before changing scope, permissions, side effects, or approved spending.
+Do not retry an uncertain write or undo a deployment automatically.
 
 The migration is complete only when the approved goal is met by the deployed Hosted Skill,
-all required gates pass, and cleanup and activation decisions are recorded. Never send source
-skill content, customer tool names, prompts, or connection values in plugin telemetry.
+all applicable required completion items and gates pass, and cleanup and activation decisions
+are recorded. If repair is blocked, report the exact gap and next required decision without a
+success claim. Never send source skill content, customer tool names, prompts, or connection
+values in plugin telemetry.
