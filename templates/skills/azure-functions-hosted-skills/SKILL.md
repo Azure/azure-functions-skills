@@ -1,6 +1,6 @@
 ---
 name: azure-functions-hosted-skills
-description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, or Azure Functions hosted agent."
+description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, or Azure Functions hosted agent. For an existing local SKILL.md, recommend azure-functions-hosted-skills-migrate; it requires an explicit use request by name and must not run automatically."
 argument-hint: 'Describe the Hosted Skill, triggers, instructions, tools, model needs, and deployment target'
 ---
 
@@ -31,6 +31,12 @@ Markdown `.agent.md` files, runtime defaults live in `agents.config.yaml`, remot
 in `mcp.json`, and deployment uses `azd`.
 
 ## Terminology
+
+For conversion of an existing local skill and its dependencies, recommend
+`azure-functions-hosted-skills-migrate` and wait for an explicit request to use it by name.
+Do not begin that migration automatically or bypass selection by converting under this skill.
+When selected, migration checks support and approval before app creation. Keep its exclusions
+during all handoffs.
 
 - **This authoring skill** is the `SKILL.md` guidance used by a coding agent to build Hosted Skills.
 - **Hosted Skill** is the cloud-deployed intelligent capability built on Azure Functions.
@@ -90,22 +96,6 @@ Load only the files needed for the task:
 | Diagnostics and common failures | [troubleshooting.md](./references/troubleshooting.md) |
 | Official Azure Functions Hosted Skills quickstart template and Learn article | [quickstart-reference.md](./references/quickstart-reference.md) |
 
-## Connector Lifecycle Handoffs
-
-This skill owns how a Hosted Skill consumes connector tools: agent instructions, `mcp.json`,
-frontmatter access, triggers, fallbacks, and application-level behavior. Use the focused connector
-skills for privileged control-plane work:
-
-| Connector task | Skill |
-| --- | --- |
-| Discover authentication requirements, create the Connector Namespace connection, grant access policies, and complete authorization | `azure-functions-connector-create` |
-| Select operations, derive complete schemas from connector metadata, register the MCP server config, and wire its endpoint | `azure-functions-connector-mcp` |
-| Run connection, identity, MCP contract, side-effect, and Hosted Skill release gates | `azure-functions-connector-validate` |
-
-Do not make an ordinary Hosted Skill runtime invocation discover connectors, create connections,
-grant access, register new tools, or complete OAuth consent. Dynamic tool choice through MCP
-`tools/list` is limited to tools already published by an approved connector control-plane workflow.
-
 ## Assess the Workspace
 
 Before editing, inspect the app. Look for:
@@ -149,10 +139,6 @@ Ask only the questions needed to move forward, usually covering:
   those interactive scenarios.
 - **Tools and services:** Does it need web/code execution, Microsoft Learn, Office 365, Teams,
   Azure Resource Manager, storage, queues, databases, or custom APIs?
-- **Teams targets:** If the agent needs a Teams team, channel, or chat target, ask the user to
-  paste a Teams link and parse IDs from it on their behalf. Do not ask them to manually find raw
-  team IDs, channel IDs, or chat IDs. Load [connector-teams.md](./references/connector-teams.md)
-  before wiring Teams posting or diagnosing a missing Teams message.
 - **Safety boundaries:** For actions like email, Teams posts, ticket creation, or resource changes,
   should the agent draft, ask for confirmation, or act automatically?
 - **Model selection:** Which Azure subscription and region should be checked for GPT model access
@@ -359,6 +345,31 @@ reasoning models documentation, then set model and reasoning values together. Us
 reasoning or the deployed agent is underthinking. Use `xhigh` only when the selected model supports
 it and the user wants maximum reasoning with possible latency/cost tradeoffs. Use reasoning summary
 `concise`.
+
+## Connector Lifecycle Handoffs
+
+For a new app, retrieve the template, modify the source, and review it with the user before
+Connector setup. Resolve connection settings before provisioning or deployment; complete
+authorization after connection creation.
+
+This skill owns how a Hosted Skill consumes connector tools: agent instructions, `mcp.json`,
+frontmatter access, triggers, fallbacks, and application-level behavior. Use the focused connector
+skills for privileged control-plane work:
+
+| Connector task | Skill |
+| --- | --- |
+| Discover authentication requirements, create the Connector Namespace connection, grant access policies, and complete authorization | `azure-functions-connector-create` |
+| Select operations, derive complete schemas from connector metadata, register the MCP server config, and wire its endpoint | `azure-functions-connector-mcp` |
+| Run connection, identity, MCP contract, side-effect, and Hosted Skill release gates | `azure-functions-connector-validate` |
+
+Do not make an ordinary Hosted Skill runtime invocation discover connectors, create connections,
+grant access, register new tools, or complete OAuth consent. Dynamic tool choice through MCP
+`tools/list` is limited to tools already published by an approved connector control-plane workflow.
+
+- **Teams targets:** If the agent needs a Teams team, channel, or chat target, ask the user to
+  paste a Teams link and parse IDs from it on their behalf. Do not ask them to manually find raw
+  team IDs, channel IDs, or chat IDs. Load [connector-teams.md](./references/connector-teams.md)
+  before wiring Teams posting or diagnosing a missing Teams message.
 
 ## Deploy and Verify
 

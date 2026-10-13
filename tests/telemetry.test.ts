@@ -51,6 +51,15 @@ describe('parseTelemetryEvent', () => {
     expect(parseTelemetryEvent(EVENT)).toEqual(EVENT);
   });
 
+  it('accepts the hosted skill migration name without customer skill content', () => {
+    const event = { ...EVENT, skillName: 'azure-functions-hosted-skills-migrate' };
+    expect(parseTelemetryEvent(event)).toEqual(event);
+    expect(() => parseTelemetryEvent({
+      ...event,
+      sourceSkill: 'customer-runbook',
+    })).toThrow('Unsupported telemetry property: sourceSkill');
+  });
+
   it('rejects raw or unknown properties', () => {
     expect(() => parseTelemetryEvent({
       ...EVENT,
