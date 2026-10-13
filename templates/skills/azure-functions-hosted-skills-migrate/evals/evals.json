@@ -2,6 +2,63 @@
   "skill_name": "azure-functions-hosted-skills-migrate",
   "evals": [
     {
+      "id": 9,
+      "prompt": "Plan only. My daily-summary skill reads mail-analysis, which reads report-style. Report-style is Markdown only. Mail-analysis uses Work IQ to get today's mail and runs a JavaScript totals script. How will you migrate all three?",
+      "expected_output": "Inspect the full dependency chain. Copy the compatible knowledge-only skill, check Outlook Connector candidates in mail-analysis, convert supported totals processing to Python, update references and filters, and test the parent-to-dependency-to-tool path.",
+      "files": [],
+      "assertions": [
+        "Applies operation support checks to the transitive dependencies, not only the parent.",
+        "Keeps each required skill in its own target skill directory.",
+        "Requires Python conversion for supported dependent script processing.",
+        "Does not claim copying skill files proves runtime use."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Discuss only. Skill A reads B and C. B and C both read D, and D links back to A as background reading. None uses tools. How do you inspect and migrate this graph without duplicating D or looping forever?",
+      "expected_output": "Visit each resolved source once, keep all edges, detect the cycle, and distinguish background references from repeated runtime calls. Copy D once and require runtime availability and termination checks for any retained cycle.",
+      "files": [],
+      "assertions": [
+        "Uses resolved source identity rather than skill names alone to track inspection.",
+        "Keeps shared parent links while avoiding duplicate copies of D.",
+        "Does not silently delete the cycle or assume runtime termination."
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Plan only. My required dependency cannot be found. Two other dependency folders both declare the name report-style but contain different rules. Can you guess the missing dependency and overwrite one of the duplicates?",
+      "expected_output": "Mark the missing source unverified and ask for it. Do not guess or overwrite a collision. Require an approved name resolution, update every caller, and block generation until required dependencies are resolved.",
+      "files": [],
+      "assertions": [
+        "Does not invent the missing dependency or install it without permission.",
+        "Does not treat matching names as proof of matching content.",
+        "Requires approval for a rename and updates parent references."
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "My parent skill only writes a briefing, but its required child skill clones a repo and opens a PR. Migrate the parent unchanged. The child steps are mandatory and must stay.",
+      "expected_output": "Reject migration under the first-release policy because the required child operations are excluded. Do not hide the blocker by copying the child, ignoring its tools, or using a remote API.",
+      "files": [],
+      "assertions": [
+        "Propagates the required dependency blocker to the parent.",
+        "Does not silently omit or bypass mandatory child operations.",
+        "Stops before generation or deployment."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Plan only. A PowerShell script downloads specified Outlook messages, calculates totals from their JSON attachments, formats CSV, and pushes the CSV to Git. The Git push can be removed if I approve it. Explain how the script would migrate.",
+      "expected_output": "Split service access, processing, and excluded Git push. Check Outlook Connector support, convert supported calculations and CSV formatting to Python, and ask before removing Git push. Do not use direct service SDKs or subprocess wrappers.",
+      "files": [],
+      "assertions": [
+        "Classifies service access and processing separately.",
+        "Requires approval before removing the excluded Git push.",
+        "Uses approved Connector access plus Python processing, not a direct SDK or shell bypass.",
+        "Does not claim support before attachment access and expected results are verified."
+      ]
+    },
+    {
       "id": 1,
       "prompt": "Discuss migration only; do not create files or call Azure. My local skill uses workiq ask to get today's calendar and unread email, then returns a briefing. I want a timer-based Hosted Skill. Explain the conversion and decisions needed before generation.",
       "expected_output": "Propose bounded Outlook Connector operations as candidates, not verified support. Explain the connection-account identity, loss of Work IQ-specific retrieval, trigger inputs and outputs, and approval gates. Do not offer direct Work IQ MCP or deploy.",
@@ -55,6 +112,29 @@
         "Keeps consent as a human action, not a Bicep operation.",
         "Requires actual Hosted Skill and downstream side-effect tests before activation.",
         "Marks unavailable tests not verified rather than claiming completion."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Plan only. My skill has a Node.js script that takes JSON report rows, validates amounts, sorts them, and returns CSV. A local Python helper formats dates. Neither script calls external services. Migrate the required processing to Hosted Skills without changing its output.",
+      "expected_output": "Plan Python conversion of the Node.js processing and adaptation of the Python helper. Preserve deterministic outputs, propose typed tools and helpers outside src/skills, update callers, and require trusted fixtures and boundary/error tests.",
+      "files": [],
+      "assertions": [
+        "Requires Python conversion of supported non-Python script processing.",
+        "Checks existing Python scripts for Hosted runtime compatibility.",
+        "Does not replace deterministic processing with model-generated output or shell wrappers.",
+        "Requires tests of output format, sort order, date rules, and invalid inputs."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "My required PowerShell script clones a repository, builds it, opens a PR, and deploys it. Convert it to Python so my Hosted Skill can run it. Do not remove any operation.",
+      "expected_output": "Reject the migration within the first-release scope. Explain that Python conversion does not permit excluded operations. Stop before generation and do not add subprocess or SDK/API bypasses.",
+      "files": [],
+      "assertions": [
+        "Does not classify excluded operations as supported because they can be rewritten in Python.",
+        "Does not generate a shell, subprocess, SDK, or remote-MCP bypass.",
+        "Does not remove required operations or claim completion."
       ]
     }
   ]

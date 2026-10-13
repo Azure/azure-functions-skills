@@ -15,6 +15,9 @@ Record:
 - Functions trigger, input source, output destination, and approval path for side effects.
 - Connection account purpose, tenant boundary, data scope, and intended runtime identity.
 - Code-generation decision and required packages.
+- Source scripts, language, Python tool/helper mapping, approved contract changes, and test fixtures.
+- Required dependency graph, source locations/revisions, source-to-target names, shared reuse,
+  approved renames, cycle decisions, and owning skills for operation rows.
 - Template source/version, files to change, and required resources.
 - Target, budget, repetition count, write-test approval, cleanup, and activation decisions.
 - Completed steps, evidence, blockers, and next required action.
@@ -37,8 +40,10 @@ Use `pass`, `fail`, or `not-verified`. Each required gate needs evidence, not on
 | --- | --- |
 | Source goal | Each approved required step has an implementation and an observable result. |
 | Files | Source files are unchanged; Hosted skill name/frontmatter and relative Markdown links are valid; runtime discovers and uses the migrated skill. |
+| Dependent skills | Every required transitive dependency has a checked source and target. Names and links resolve, shared copies are consistent, and filters allow required access. Parent-to-dependency-to-tool tests pass. Retained cycles terminate; unresolved required dependencies block completion. |
 | Runtime boundary | No obsolete local paths, CLI/MCP launch commands, or calls to unavailable local skills remain. No excluded Git, PR, deployment, or shell tools are exposed. |
 | Input/output | Representative input produces the required fields, format, destination, and data scope. Empty results and failures are explicit, not success-shaped defaults. |
+| Script conversion | Required supported processing is converted to Python outside `src/skills/`. Service access uses approved Connector/MCP operations, not direct SDK or shell calls. Tests cover normal, empty, invalid, and boundary inputs. Imports and tool discovery work, dependencies resolve, callers use the converted tools, and the Hosted result matches trusted expected behavior. |
 | Authentication | The deployed identity can access each integration. The downstream connector account matches the approved purpose and data scope. Local developer success is insufficient. |
 | Connector contract | Connector validation passes status, identity, initialization, exact tool allowlist, full schemas, and safe business-operation tests. |
 | Remote MCP contract | Deployed runtime initializes the server, finds only allowed tools, calls a safe representative operation, and handles its result with supported authentication. |

@@ -6,6 +6,11 @@ app-specific behavior and reusable domain knowledge.
 Use dynamic sessions, not custom tools, for generic web browsing, page fetching, browser
 automation, code execution, data analysis, and file transformation.
 
+For local-skill migration, fixed app-specific processing of approved trigger input or tool results
+can use a Python custom tool. This includes deterministic validation and report formatting.
+This is not general-purpose code execution or file transformation. The migration skill does not
+enable dynamic sessions to run source scripts or bypass its operation exclusions.
+
 ## Custom Python Tools
 
 Put tools in `src/tools/`. Use one tool per file for predictable discovery.

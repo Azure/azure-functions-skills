@@ -38,6 +38,15 @@ The service operation references below are discovery sources, not proof of Names
 | Arbitrary shell, local executable, desktop automation, local credential cache | None | `out-of-scope`; do not add shell/CLI tools or execution sessions. |
 | Local file read/write | Approved trigger input/output or explicit cloud storage operation | `change-required`; a laptop path is not a cloud path. Check transfer, persistence, format, and access. |
 | In-memory formatting of approved input data | Instructions or bounded app code | Candidate; code cannot add a service operation excluded by this policy. |
+| Required script with supported app-specific processing | Converted Python tool/helper | Candidate; preserve deterministic behavior and test it. Adapt existing Python scripts. Do not run the original language through a wrapper. |
+| Required knowledge-only skill | Its own `src/skills/<name>/` directory | Candidate after content, name, reference, and runtime-access checks. |
+| Required skill with tools, scripts, or further skill dependencies | Recursive inspection and approved conversion | Apply this policy to every operation. Missing or blocked required dependencies block the parent migration. |
+
+Read [script-conversion.md](./script-conversion.md) for required Python conversion. Split scripts
+with service calls or side effects into individual operations. A Python rewrite does not make
+Git, PR, deployment, shell, or unsupported service operations supported.
+Read [dependent-skills.md](./dependent-skills.md) for recursive inspection, shared dependencies,
+name collisions, and cycles.
 
 ## Work IQ and identity
 

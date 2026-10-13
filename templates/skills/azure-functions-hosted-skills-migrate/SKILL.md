@@ -36,6 +36,9 @@ allowed operation in the generated Hosted Skill.
 
 Read [conversion-support.md](./references/conversion-support.md) before classifying dependencies.
 Use [migration-record.md](./references/migration-record.md) for the approval record and test gates.
+Read [script-conversion.md](./references/script-conversion.md) when the source includes scripts.
+Read [dependent-skills.md](./references/dependent-skills.md) when the source reads or calls
+another skill.
 
 | Task | Existing skill |
 | --- | --- |
@@ -61,12 +64,23 @@ commands, load another skill, or change resources.
 Record the goal, required steps, inputs, outputs, and success criteria. Find host-provided tools
 and other skills that the source assumes are present. Flag missing files or unknown dependencies.
 Do not run source scripts or install their packages to discover what they do.
+List each required script, its language, entry point, arguments, and callers. Include scripts
+called by other scripts. Existing Python scripts still need a Hosted runtime compatibility check.
+
+Read required dependent skills recursively, without invoking them. Record each source location,
+revision when known, and parent-to-dependency link. Inspect each skill's references, scripts,
+tools, MCP servers, and CLIs. Visit each resolved source once; detect shared dependencies and cycles.
+Ask for missing or ambiguous sources instead of assuming that local skills exist in Azure.
 
 ### 2. Identify dependencies
 
 For each required operation, record the source tool/MCP/CLI, inputs, output fields, data scope,
 authentication, local file access, and side effects. Separate business operations from source
 setup commands. Trace script and reference use far enough to find indirect dependencies.
+
+Apply the same support policy to every required dependent skill. Include the owning skill in each
+operation row. A supported parent does not make its dependency supported. Knowledge-only skills
+can be copied after content and reference checks; tool/script dependencies need conversion.
 
 Show the dependency table from the migration record. Classify each row as `supported`,
 `change-required`, `unverified`, or `out-of-scope`. Record evidence and its date. Documentation
@@ -80,6 +94,8 @@ replacement or removal is acceptable. Do not remove a step without approval.
 If a required operation remains blocked, stop before generation or deployment. If removal would
 break the goal, report that the skill cannot migrate as requested. A user can approve a smaller
 goal, but that is a changed scope, not an equivalent conversion.
+Apply this stop rule to required transitive dependencies too. Obtain approval before removing
+a dependency or changing its behavior, resolving a name collision, or breaking a runtime cycle.
 
 ### 4. Clarify the target behavior
 
@@ -104,7 +120,13 @@ test plan. Obtain approval before creating the target.
 
 Choose configuration-only conversion when Connector or remote MCP operations meet the goal.
 Add code only for required Functions trigger/input/output handling or a bounded transformation
-of data already obtained through approved tools. Record dependencies and tests for that code.
+of approved trigger input or data already obtained through approved tools. Record dependencies
+and tests for that code. File access still needs an approved input/output or storage conversion.
+
+If required source scripts contain supported processing, plan their conversion to Python.
+Do not omit the processing or replace deterministic script results with model-generated results.
+Separate service calls from processing: use approved Connector/MCP operations for service access,
+and Python for supported app-specific processing. Classify each part before choosing a target.
 
 Do not generate custom API/SDK tools for an unsupported service operation in this release.
 Do not port executable skill scripts into `src/skills/`. If their behavior cannot fit this
@@ -121,6 +143,10 @@ steps; retain the source name when valid and unique. Ask before renaming it. Cop
 Markdown references and fix relative links. For non-Markdown assets, choose an explicit supported
 input or storage path, or report a blocker.
 
+Place each approved dependent skill in `src/skills/<dependency-name>/` once. Keep knowledge-only
+Markdown content unchanged where compatible. Use the recorded name/path mapping to resolve
+collisions without overwriting files. Keep dependent source skills unchanged too.
+
 Create `src/<name>.agent.md` to use that skill and define its trigger, inputs, result handling,
 and allowed tools. Keep model defaults and shared settings in the template's runtime configuration.
 Check that the runtime discovers the migrated skill. Do not replace it with only an agent prompt.
@@ -134,6 +160,17 @@ verify transport and authentication, not just endpoint existence.
 For Connector rows, pass exact required capabilities and excluded operations to steps 8 and 9.
 After publication, use the actual tool names from `tools/list`. Remove obsolete local paths,
 CLI commands, MCP launch commands, and assumptions about other local skills.
+
+Convert supported script processing to Python using the script-conversion reference. Put callable
+agent operations in `src/tools/` with the runtime's supported tool contract. Put shared code in
+an importable app module outside `src/skills/`. Update the Hosted instructions and callers to use
+these operations, not `python` shell commands. Adapt existing Python scripts to the same contract.
+Add required Python packages to `requirements.txt` and test the converted input/output behavior.
+
+Update every migrated dependent skill's tool names, script calls, skill references, and relative
+links. Replace local skill-loader commands with the runtime's supported skill access. Check the
+current runtime contract; do not invent a skill-invocation API. Ensure the consuming agent's
+skill/tool/MCP filters permit exactly the approved dependency set.
 
 Limit each agent's tool and skill access. Do not leave sample email tools, broad connectors, or
 template business actions enabled unless the approved goal requires them.
@@ -178,6 +215,15 @@ Do not add chat endpoints only to test a background workflow.
 Check exact output fields and business results, source-goal coverage, data boundaries, failure
 handling, and absence of excluded tools. Test bounded approved writes only against approved
 targets; verify and clean up their downstream effects. Do not repeat ambiguous writes.
+
+For converted scripts, check representative, empty, invalid, and boundary inputs against trusted
+expected results. Verify error behavior, formats, encodings, and required packages. Show that the
+Hosted Skill calls the converted tool and uses its result; a Python syntax check is not enough.
+
+Verify each required dependency is present and available to its consuming agent. Test the path
+from the parent instructions through the dependent skill to its converted tools and result.
+Check shared dependencies, approved renames, and cycle handling. Missing or unverified required
+dependencies block completion; a directory copy alone is not proof of use.
 
 Report each required gate as `pass`, `fail`, or `not-verified`, with evidence and blockers.
 Enable automation only after all required gates pass and the user approves activation.
