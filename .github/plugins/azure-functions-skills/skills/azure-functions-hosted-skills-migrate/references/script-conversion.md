@@ -1,70 +1,48 @@
 # Convert Source Scripts to Python
 
-Use this reference when a source skill depends on executable scripts. Convert required supported
-processing to Python. Keep the original scripts unchanged in the source directory. Do not copy
-Bash, PowerShell, JavaScript, or other source scripts into the Hosted app for runtime execution.
-Existing Python scripts need adaptation when their paths, entry points, or dependencies differ.
+Convert required supported processing to Python; adapt existing Python too. Preserve originals.
+Apply the main workflow's read permissions. Do not execute source scripts to discover behavior.
 
-## Inspect before conversion
+## Inspect and split
 
-Read the script and its callers without executing them. Record arguments, defaults, environment
-variables, input/output formats, error behavior, dependencies, file access, and side effects.
-Inspect imported helpers and child scripts that are needed to understand its operations.
-If code is missing, obfuscated, or cannot be understood, mark the conversion `unverified`.
-Do not guess its behavior or run it to discover what it does.
+Read required scripts, imported helpers, child scripts, and callers. Record arguments/defaults,
+environment variables, inputs/outputs, errors, dependencies, file access, and side effects.
+Missing, obfuscated, or unclear required code is `unverified`; ask for a trusted specification.
+Split mixed scripts into operations before applying [conversion-support.md](conversion-support.md).
 
-Split a mixed script into operations. For example, a script that gets mail and formats a report
-has two requirements: approved service access and deterministic report processing. Classify
-both through the conversion-support reference before generation.
-
-## First-release conversion
-
-| Source behavior | Target |
+| Source operation | Target |
 | --- | --- |
-| App-specific filtering, calculation, validation, or report formatting on approved input | Python tool or shared Python helper |
-| Supported service access | Approved Connector or remote HTTP MCP operation; pass its result to the Python processing |
-| Existing Python processing | Adapt to the Hosted tool contract and check runtime compatibility |
-| Laptop file path | Approved trigger input/output or supported storage operation; obtain approval for the path change |
-| Git/PR, build, deployment, arbitrary commands, or unsupported service access | Out of scope; Python does not remove the exclusion |
+| App-specific filtering, calculation, validation, report formatting | Python tool/helper on approved inputs or tool results |
+| Supported service access | Approved Connector/remote HTTP MCP, then Python processing |
+| Existing Python | Adapt paths, entry points, dependencies, and Hosted contract |
+| Laptop files | Approved trigger input/output or verified storage operation; obtain approval |
+| Git/PR/build/deploy, shell, unsupported service access | Excluded; return to step 3 |
 
-Do not add direct HTTP/SDK service access to make an unsupported operation work.
-Do not use subprocess calls, a shell, an embedded language interpreter, a CLI wrapper, or execution
-sessions to run the original script. General-purpose browsing or arbitrary code execution remains
-outside this migration scope. Use Python only for the approved app-specific processing.
+Do not replace deterministic results with model-generated output. Do not add direct HTTP/SDK
+service access, subprocess/shell calls, embedded interpreters, CLI wrappers, or execution sessions
+to bypass exclusions or run the old language. Generic browsing/arbitrary code execution is not
+part of this migration.
 
-If a script cannot be converted within these rules, return to step 3. Explain the blocker and
-ask about removal or a supported replacement. Do not silently drop required processing.
+## Implement
 
-## Implement the Python contract
+Follow the Hosted Skills custom-tool reference. Write tests before implementation.
+Expose callable operations in `src/tools/`, one per file, with the supported `@tool` contract,
+explicit types, and Pydantic schemas when needed. Put shared helpers in importable app modules
+outside `src/skills/`; check discovery/imports in the actual template runtime.
+Preserve fields, defaults, ordering, formats, and error behavior. Record flag/exit-code mappings
+to typed inputs/explicit errors. Obtain approval for contract changes, such as stdout becoming
+structured output. Return JSON-serializable results; surface invalid input and failures.
 
-Follow the current `azure-functions-hosted-skills` custom-tool reference.
+Add compatible runtime packages to `requirements.txt`; check Python version/imports. Use
+environment settings and approved secret storage. Keep test packages separate. Use the target's
+test layout/runner; agree on a setup if absent. Update all callers to exact discovered tool names,
+not script paths or `python` shell commands.
 
-1. Write tests for expected behavior before the implementation.
-2. Expose an agent-callable operation under `src/tools/` with the supported `@tool` contract.
-   Use one tool per file, explicit parameter types, and a Pydantic schema when needed.
-3. Put shared helpers in importable app modules outside the Markdown skill directory. Check
-   imports and tool discovery in the actual template runtime; do not assume a package is loaded.
-4. Preserve required input fields, defaults, output fields, ordering, formats, and error behavior.
-   Explain and obtain approval for changes such as stdout text becoming structured tool output.
-5. Return JSON-serializable results. Surface invalid inputs and processing failures explicitly.
-6. Add required packages to `requirements.txt`. Check Python version and dependency compatibility.
-   Keep configuration in environment settings and secrets in approved secret storage.
-   Use the target project's existing test layout and runner. If neither exists, agree on a Python
-   test setup. Keep test-only packages separate from runtime requirements.
-7. Update the Hosted skill's instructions and all callers to use exact discovered tool names.
-   Remove source script paths and shell invocation instructions from the Hosted copy.
+## Verify
 
-The source script is not a tool contract. For example, flags and exit codes may need to become
-typed inputs and explicit errors. Record that mapping instead of assuming a literal translation.
-
-## Verify behavior
-
-Use trusted expected results from the source specification or user-approved fixtures. Do not run
-unreviewed original scripts to obtain a baseline. If expected behavior is unknown, ask for evidence.
-
-Check representative, empty, invalid, and boundary inputs. Include relevant date/time-zone rules,
-numeric precision, sort order, Unicode encoding, file format, and size limits. Confirm dependencies
-are available and the callable tool produces the expected result in the Hosted runtime.
-
-Test the actual Hosted Skill's use of the tool, not only helper functions or Python syntax.
-Keep service-side tests under the Connector/MCP approval and cleanup rules.
+Use trusted specification results or approved fixtures; ask if expected behavior is unknown.
+Test representative/empty/invalid/boundary cases, including dates/time zones, precision, sort
+order, Unicode, format, and size limits when applicable. Verify packages/imports and runtime
+calls. Test the actual Hosted Skill using the converted tool and result, not only Python syntax
+or helper functions. Service tests remain subject to approval/cleanup.
+Use HSM-12 through HSM-15 and HSM-24/25 in the common DoD; do not keep a second checklist.

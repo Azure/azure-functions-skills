@@ -1,6 +1,6 @@
 ---
 name: azure-functions-hosted-skills
-description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, or Azure Functions hosted agent. For conversion of an existing local SKILL.md and its dependencies, use azure-functions-hosted-skills-migrate first."
+description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, or Azure Functions hosted agent. For an existing local SKILL.md, recommend azure-functions-hosted-skills-migrate; it requires an explicit use request by name and must not run automatically."
 argument-hint: 'Describe the Hosted Skill, triggers, instructions, tools, model needs, and deployment target'
 ---
 
@@ -32,9 +32,11 @@ in `mcp.json`, and deployment uses `azd`.
 
 ## Terminology
 
-For conversion of an existing local coding-agent skill and its dependencies, start with
-`azure-functions-hosted-skills-migrate`. It checks first-release operation support and approval
-before this skill creates the Hosted app. Keep its exclusions during all handoffs.
+For conversion of an existing local skill and its dependencies, recommend
+`azure-functions-hosted-skills-migrate` and wait for an explicit request to use it by name.
+Do not begin that migration automatically or bypass selection by converting under this skill.
+When selected, migration checks support and approval before app creation. Keep its exclusions
+during all handoffs.
 
 - **This authoring skill** is the `SKILL.md` guidance used by a coding agent to build Hosted Skills.
 - **Hosted Skill** is the cloud-deployed intelligent capability built on Azure Functions.

@@ -91,7 +91,8 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | 名前の指定なしで Functions のコード移行を依頼 | `azure-functions-update` を案内する。自動では開始しない |
 | Consumption から Flex など、hosting plan・SKU の変更 | Azure Skills。コード移行の開始依頼とはみなさない |
 | Markdown、Functions triggers、code、tools、HTTP、MCP を使う cloud-hosted な intelligent capability、Azure Functions Hosted Skills の build または変更 | `azure-functions-hosted-skills` |
-| 既存のローカルコーディングエージェント用スキルと依存関係を Hosted Skill に変換 | `azure-functions-hosted-skills-migrate` から Hosted Skills・Connector の各スキルへ引き継ぐ |
+| `azure-functions-hosted-skills-migrate` を名前で指定して使用・再開を依頼 | `azure-functions-hosted-skills-migrate` から Hosted Skills・Connector の各スキルへ引き継ぐ |
+| 名前の指定なしで既存のローカルスキルの変換を依頼 | `azure-functions-hosted-skills-migrate` を案内する。別スキル経由も含め、自動では変換を開始しない |
 | Hosted Skill 用の Connector Namespace connection の作成と認可 | `azure-functions-connector-create` |
 | connector operation metadata から connector-backed MCP tools を生成して登録 | `azure-functions-connector-mcp` |
 | connector identity、MCP contract、side effect、Hosted Skill integration を検証 | `azure-functions-connector-validate` |
@@ -104,7 +105,8 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 
 User intent が Functions 固有 context を含まない汎用 Azure deployment である場合は、Azure Skills に route します。Workspace または prompt が Azure Functions を明確に示す場合は、まず Azure Functions Skills に route し、必要なときだけ共通 Azure execution を Azure Skills に委譲します。
 
-`azure-functions-update` の明示指定は、自動ルーティングの例外です。名前を含む質問・引用・
+`azure-functions-update` と `azure-functions-hosted-skills-migrate` の明示指定は、
+自動ルーティングの例外です。名前を含む質問・引用・
 ファイル参照・レビューは移行の開始依頼ではありません。選択済みの実行中に行う通常の応答では、
 名前を毎回指定する必要はありません。Update は Functions の model/config 変更と必要な証拠を担当し、
 言語・TFM 更新は別の言語更新スキルへ引き継ぎます。Azure Skills は承認済みの
