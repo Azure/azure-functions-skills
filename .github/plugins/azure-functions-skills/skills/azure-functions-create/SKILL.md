@@ -150,9 +150,16 @@ Follow this manifest-based fallback algorithm:
 
 ```
 1. FETCH MANIFEST
-   GET https://cdn.functions.azure.com/public/templates-manifest/manifest.json
-   If fetch fails → fall back to:
-     https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json
+    Fetch the raw response with an HTTP client from:
+       https://cdn.functions.azure.com/public/templates-manifest/manifest.json
+    Do not use webpage extraction, summarization, or HTML parsing for this URL. The CDN can
+    return the JSON payload as `application/octet-stream`. Verify a successful HTTP status;
+    if the client exposes a byte buffer, decode it as UTF-8 text; then parse the text as JSON.
+    Before filtering, verify that the parsed object contains a top-level `templates` array.
+    Treat an HTTP error, JSON parse failure, or missing `templates` array as a fetch failure.
+    If the CDN fetch fails → download the raw GitHub file from:
+       https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json
+    Do not use the GitHub `/blob/` page URL because it returns HTML rather than raw JSON.
    If both fail → fall back to known-good Azure-Samples/functions-quickstart-* repos
    If all fail → report error and ask user to retry later
 
