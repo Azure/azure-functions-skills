@@ -1,4 +1,5 @@
 import applicationInsights from 'applicationinsights';
+import CorrelationIdManager from 'applicationinsights/out/Library/CorrelationIdManager.js';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,7 @@ export const DEPLOYMENT_OBSERVED_EVENT_NAME = 'azure_deployment_observed';
 export const DEFAULT_TIMEOUT_MS = 5_000;
 const CONNECTION_STRING_PLACEHOLDER = '__APPLICATIONINSIGHTS_CONNECTION_STRING__';
 const BUNDLED_SKILLS_ROOT = fileURLToPath(new URL('../../templates/skills/', import.meta.url));
+declare const __BUNDLED_SKILL_FILES__: readonly string[] | undefined;
 const ALLOWED_PROPERTIES = new Set([
   'timestamp',
   'eventType',
@@ -326,9 +328,21 @@ function deploymentObservedProperties(event: DeploymentObservedEvent): Record<st
 
 export function createApplicationInsightsClient(connectionString: string): ApplicationInsightsClient {
   const client = new applicationInsights.TelemetryClient(connectionString);
+  // SDK 1.8 starts a profile lookup in its constructor. Custom events need no
+  // correlation profile, so cancel the pending request before its timer runs.
+  const callback: unknown = Reflect.get(client.config, 'setCorrelationId');
+  if (!isCorrelationCallback(callback)) {
+    throw new Error('Cannot disable the Application Insights correlation profile lookup.');
+  }
+  CorrelationIdManager.cancelCorrelationIdQuery(client.config, callback);
+  client.channel.setUseDiskRetryCaching(false);
   stripHostContextTags(client);
   installEnvelopeTagAllowlist(client);
   return client;
+}
+
+function isCorrelationCallback(value: unknown): value is (correlationId: string) => void {
+  return typeof value === 'function';
 }
 
 function installEnvelopeTagAllowlist(client: unknown): void {
@@ -462,6 +476,9 @@ function isBundledFileReference(fileReference: string): boolean {
   const [skillName] = normalized.split('/');
   if (!BUNDLED_SKILL_NAMES.has(skillName) || !normalized.includes('/')) {
     return false;
+  }
+  if (typeof __BUNDLED_SKILL_FILES__ !== 'undefined') {
+    return __BUNDLED_SKILL_FILES__.includes(normalized);
   }
   const bundledPath = join(BUNDLED_SKILLS_ROOT, ...normalized.split('/'));
   return existsSync(bundledPath) && statSync(bundledPath).isFile();

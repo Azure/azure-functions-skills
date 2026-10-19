@@ -6,6 +6,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildPluginMarketplaces, buildPluginPayload } from './build-target.js';
 import { loadHooks, loadMcpServers, loadSkills } from './loader.js';
+import { buildTelemetryRuntime } from './telemetry-runtime.js';
 import type { BuildData } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -22,7 +23,7 @@ function loadBuildData(): BuildData {
   return {
     skills: loadSkills(join(TEMPLATES_DIR, 'skills')),
     mcpServers: loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')),
-    hooks: loadHooks(join(TEMPLATES_DIR, 'hooks')),
+    hooks: loadHooks(join(TEMPLATES_DIR, 'hooks'), buildTelemetryRuntime(join(TEMPLATES_DIR, 'skills'))),
     packageVersion: readPackageVersion(),
   };
 }

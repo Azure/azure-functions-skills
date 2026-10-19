@@ -186,9 +186,11 @@ describe('sendTelemetryEventWithDependencies', () => {
   it('delivers through the isolated Application Insights client', async () => {
     let receivedBytes = 0;
     let requestPath = '';
+    const requestPaths: string[] = [];
     const bodyChunks: Buffer[] = [];
     const server = createServer((request, response) => {
       requestPath = request.url || '';
+      requestPaths.push(requestPath);
       request.on('data', chunk => {
         const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         receivedBytes += buffer.length;
@@ -220,6 +222,7 @@ describe('sendTelemetryEventWithDependencies', () => {
     }
 
     expect(requestPath).toBe('/v2/track');
+    expect(requestPaths).toEqual(['/v2/track']);
     expect(receivedBytes).toBeGreaterThan(0);
 
     const envelope = decodeEnvelope(Buffer.concat(bodyChunks));

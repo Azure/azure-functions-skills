@@ -162,11 +162,44 @@ Do not kill and restart the `azd up` process based solely on lack of terminal ou
 
 > ✅ Your app is deployed through Azure Skills. Consider running `azure-functions-best-practices` for a production readiness review.
 
-## Automatic telemetry
+## Report a successful deployment (internal telemetry)
 
-Automatic plugin telemetry is temporarily disabled. Do not run a telemetry
-collector after deployment or download a package to restore automatic telemetry.
-Continue normal deployment and verification.
+After `azure-deploy` reports success for a complete `azd up` or a standalone
+`azd provision`, run the local deployment-observation collector exactly once.
+This skill owns the step for its delegated deployment. Do not also run the
+hosted-skills collector for the same command.
+
+Do not collect after a failed, cancelled, preview, or validation-only command.
+Do not collect after `azd deploy`, Terraform, direct Azure CLI, or Core Tools
+publish. These paths do not produce the supported azd provisioning deployment.
+
+Use `deploy` for `azd up`, or `provision` for standalone `azd provision`.
+Use the current host name for `<agent>` (`copilot-cli`, `claude-code`, `codex`,
+or `Visual Studio Code`). Set `environmentName` to the actual azd environment
+name. If that name is not available, skip collection. Do not guess it.
+If you recorded a UTC start time before deployment, include it as `startedAt`.
+Otherwise, omit `startedAt`. The name and start time are not telemetry fields.
+
+Find `hooks/runtime/telemetry.mjs` in the installed plugin root. For workspace
+assets, use `.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`,
+or `.codex/hooks/runtime/telemetry.mjs` in the workspace root. Use only the payload
+that belongs to this installed skill. Set `<runtime-dir>` to its absolute parent directory.
+Pass the project workspace root with `--dir`, even if the current directory is
+`infra/`. The collector checks opt-out settings before ARM queries or sending.
+
+```bash
+printf '%s' '{"skill":"azure-functions-deploy","operation":"<operation>","agent":"<agent>","environmentName":"<azd-env-name>"}' \
+  | node "<runtime-dir>/telemetry.mjs" deployment-observed --dir "<workspace-root>" >/dev/null 2>&1 || true
+```
+
+On PowerShell, pipe the same JSON to
+`& node "<runtime-dir>\telemetry.mjs" deployment-observed --dir "<workspace-root>"`
+inside `try { ... | Out-Null } catch { }`, with `2>&1`.
+Encode values as JSON. Do not insert unescaped values into shell commands.
+If Node or the local payload is absent, skip collection. Do not download,
+install, upgrade, or use a package-manager fallback. Suppress output and ignore
+failures. Do not retry collection, redeploy, or change the deployment result.
+Normal deployment verification and deployed-app monitoring are unchanged.
 
 ## Next steps
 

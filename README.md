@@ -95,18 +95,19 @@ npx @azure/functions-skills template apply --template <id> --dir ./my-app
 
 ## Telemetry
 
-**Automatic plugin telemetry is temporarily disabled.** The hooks return
-`{"continue":true}` without reading events, downloading packages, or sending data.
-The deployment skills do not run the deployment-observation collector or its ARM
-queries. This does not change normal skill use, deployment, or Application
-Insights monitoring in deployed applications.
+The plugin and built workspace assets include a local telemetry runtime with the
+Application Insights SDK and its required dependencies. Hooks use Node.js 18 or
+later to run that payload. They do not run npm or npx, download packages, or load
+project modules. If Node or the payload is absent, the hook does nothing and
+returns `{"continue":true}`. There is no download or install fallback.
 
 Update installed plugins and previously applied workspace assets to receive this
 change. Existing copies do not update when this source changes.
 
-The telemetry library and CLI commands remain available for explicit use. The
-following sections describe those retained features, not automatic collection
-in this release.
+The same local payload supports deployment observations from the two deployment
+skills. The telemetry library and CLI commands also remain available for explicit
+use. Normal deployment and Application Insights monitoring in deployed applications
+are unchanged.
 
 Usage events accept allowlisted skill/tool names, relative allowlisted Azure
 Functions skill-file paths, client name, session id, and timestamp. They do not
@@ -116,7 +117,7 @@ not Azure MCP.
 
 ### Deployment observation event
 
-The retained collector supports an `azure_deployment_observed` event for a successful `azd up` or standalone `azd provision`. The deployment skills do not invoke it while automatic telemetry is disabled. It carries only seven categorical properties: `skill`, `operation` (`deploy` or `provision`), `result` (constant `success`), `resourceTypes` (a sorted, de-duplicated list of Microsoft resource-provider types such as `microsoft.web/sites`), `deploymentKind` (`function-app` or `hosted-agent`), `agent` (normalized client, or `unknown`), and `skillsVersion` (or `unknown`). The mechanism only *observes* a successful deployment; it cannot prove a skill caused it.
+The collector supports an `azure_deployment_observed` event after a successful `azd up` or standalone `azd provision`. Each deployment skill calls its local collector once for its own supported command. It carries only seven categorical properties: `skill`, `operation` (`deploy` or `provision`), `result` (constant `success`), `resourceTypes` (a sorted, de-duplicated list of Microsoft resource-provider types such as `microsoft.web/sites`), `deploymentKind` (`function-app` or `hosted-agent`), `agent` (normalized client, or `unknown`), and `skillsVersion` (or `unknown`). The mechanism only *observes* a successful deployment; it cannot prove a skill caused it.
 
 To confirm success and derive the resource-type breakdown, the collector reads the named Azure Resource Manager deployment's state using your existing Azure CLI sign-in. The azd environment name (which is the deployment name), subscription, resource group, and deployment IDs are sent to Azure Resource Manager only to perform that lookup. They are not included in the telemetry event and are not printed. The event contains no customer names, identifiers, secrets, paths, environment values, or correlation IDs.
 
@@ -126,12 +127,17 @@ This is an adoption/observation trend, not exact accounting. Phase 1 limitations
 
 - The collector looks up the subscription-scope ARM deployment by the environment name and validates it against a bounded 30-minute recency window. The environment name is required for a usable observation, but a missing or invalid name is a valid skip, not an input error: the collector returns `skipped` before any Azure query. A deployment older than the window or a resource-group-scope deployment also records nothing. Selecting by name makes cross-deployment misattribution unlikely, but re-running after another deployment that reuses the same environment name still refers to the newest deployment of that name.
 - Duplicate collector calls are possible; there is no exactly-once delivery, no durable de-duplication, and no exact funnel or conversion rate.
-- The retained collector supports only the two canonical skills' `azd`/Bicep paths. Automatic collection is disabled.
+- The collector supports only the two canonical skills' `azd`/Bicep paths.
 
 Application telemetry content is categorical, but HTTPS necessarily exposes the client's network address to the receiving service. This does not promise anonymous transport; the receiving Application Insights service's privacy policy and IP handling apply.
 
 To opt out, set either `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or
 `AZURE_MCP_COLLECT_TELEMETRY=false` in the environment.
+The local runtime also checks its installed `telemetry.config.json` and workspace
+settings under `.github/hooks/`, `.claude/hooks/`, and `.codex/hooks/`. An
+`"enabled": false` setting, or an unreadable configuration file, stops collection
+before queries or sends. The public plugin contains only a non-secret
+instrumentation key and ingestion endpoint. It does not contain release credentials.
 
 ## Skills
 
