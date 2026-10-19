@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe('automatic telemetry suspension', () => {
-  it.each(['bash', 'powershell'] as const)(
+  it.each([process.platform === 'win32' ? 'powershell' : 'bash'] as const)(
     '%s hooks do not run a package command in a workspace with a registry override',
     (shell) => {
       const tempDir = createTempDir('af-skills-hook-suspended-');
