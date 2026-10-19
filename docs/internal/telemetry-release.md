@@ -76,6 +76,11 @@ git push origin v<version>
 
 ## Runtime telemetry hook
 
+**Automatic plugin telemetry is temporarily disabled.** The Bash and PowerShell
+hooks return `{"continue":true}` and exit successfully. They do not read events,
+run a package command, query Azure, or send data. The hook files and registrations
+remain in place for compatibility.
+
 The npm package ships Copilot, Claude, and Codex telemetry-hook manifests plus
 PowerShell and Bash scripts in two places:
 
@@ -85,38 +90,39 @@ PowerShell and Bash scripts in two places:
 `npm run build` also writes the telemetry assets into each host's native hook
 directory in the agent-specific layouts under `dist/workspace/`.
 
-The scripts filter and normalize hook input, then send one sanitized JSON object
-over stdin to the package's hidden telemetry command:
-
-```text
-npx -y @azure/functions-skills@latest telemetry
-```
-
-The hidden command calls the exported `@azure/functions-skills/telemetry`
+The retained CLI command calls the exported `@azure/functions-skills/telemetry`
 library API. That API creates an isolated Application Insights client, sends
 only the custom event, flushes it, and stops waiting after five seconds. It
 does not enable automatic request, dependency, exception, performance, or
 console collection.
 
 The connection string exists only inside the CI-built npm package. It is not
-set in the coding agent's environment or persisted by a hook. If the compatible
-package is not yet published, cannot be downloaded, lacks the hidden command,
-or fails to send, the hook ignores that telemetry-only failure. This supports
-releasing the plugin before the package without affecting agent tool use.
+set in the coding agent's environment or persisted by a hook. The library and CLI
+remain available for explicit use, but no automatic hook invokes them.
 
-Users can opt out by setting either
+Earlier hooks downloaded and ran the package from the session workspace.
+Workspace npm configuration could select the package source. Do not restore
+runtime package downloads in hooks. A fixed version alone does not prevent a
+workspace registry override. Automatic telemetry must remain disabled until a
+safe distribution design is approved.
+
+Release the updated plugin and workspace assets, and tell users to update their
+installed copies. A source change does not stop hooks in existing installations.
+
+For explicit CLI use, users can opt out by setting either
 `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or
-`AZURE_MCP_COLLECT_TELEMETRY=false`. The hook scripts also honor a
-`telemetry.config.json` next to the hooks with `"enabled": false`.
+`AZURE_MCP_COLLECT_TELEMETRY=false`. The deployment collector also honors workspace
+`telemetry.config.json` files with `"enabled": false`. The suspended hooks do
+nothing regardless of these settings.
 
 ## Deployment-observation collector
 
-The two canonical deployment skills invoke a second hidden subcommand exactly
-once after a supported command reports success:
+The two canonical deployment skills no longer invoke the deployment-observation
+collector. They perform no extra ARM queries or sends for plugin telemetry.
+Application Insights monitoring in deployed applications is unchanged.
 
-```text
-npx -y @azure/functions-skills@latest telemetry deployment-observed
-```
+The following contract describes the retained `telemetry deployment-observed`
+CLI subcommand for explicit use, not an automatic skill step.
 
 It reads one bounded JSON object on stdin (16 KiB max) with `skill`,
 `operation`, `agent`, `environmentName`, optional `skillsVersion`, and optional
@@ -150,21 +156,6 @@ work is bounded to 20 s and 50 requests. It honors the same opt-out preferences
 before any ARM query or send. The environment name, subscription, resource
 group, and deployment IDs are sent to Azure Resource Manager only to perform
 these queries. They are not included in the telemetry event and are not printed.
-
-### Rollout ordering
-
-The skill snippets may ship before a published `@azure/functions-skills` CLI
-that supports `telemetry deployment-observed`. During that window the command is a
-verified silent no-op that emits nothing. A published bin without the
-subcommand matches `command === 'telemetry'`, ignores the `deployment-observed`
-argument, and pipes stdin into the old `parseTelemetryEvent`, whose strict
-property allowlist rejects our payload's first key (`skill`) with
-`Unsupported telemetry property: skill` and exit `1`; a version predating the
-`telemetry` command prints `Unknown command` and exits `1`. Either way no
-usage event is sent, `environmentName` is not included in any telemetry event, and the snippets'
-`>/dev/null 2>&1 || true` swallows the stderr and non-zero exit. This is
-intended behavior — do not "fix" the snippets or the old parser to make the
-subcommand appear to run on older releases.
 
 ### Data governance
 

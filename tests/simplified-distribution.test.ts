@@ -38,13 +38,7 @@ describe('simplified distribution', () => {
     expect(existsSync(join(root, '.mcp.json'))).toBe(true);
     expect(existsSync(join(root, 'hooks', 'copilot-hooks.json'))).toBe(true);
     expect(existsSync(join(root, 'hooks', 'hooks.json'))).toBe(true);
-    const telemetryScript = readFileSync(
-      join(root, 'hooks', 'scripts', 'track-telemetry.sh'),
-      'utf-8',
-    );
-    expect(telemetryScript).toContain('@azure/functions-skills@latest');
-    expect(telemetryScript).toContain(' telemetry');
-    expect(telemetryScript).not.toContain('@azure/mcp');
+    expectSuspendedTelemetry(root, 'hooks', 'skills');
     expect(existsSync(join(root, 'agents'))).toBe(false);
     expect(existsSync(join(root, 'prompts'))).toBe(false);
 
@@ -72,12 +66,7 @@ describe('simplified distribution', () => {
       expect(existsSync(join(targetRoot, mcpPath))).toBe(true);
       expect(existsSync(join(targetRoot, hookPath))).toBe(true);
       const hookRoot = target === 'ghcp' ? '.github' : target === 'claude' ? '.claude' : '.codex';
-      const telemetryScript = readFileSync(
-        join(targetRoot, hookRoot, 'hooks', 'scripts', 'track-telemetry.sh'),
-        'utf-8',
-      );
-      expect(telemetryScript).toContain('@azure/functions-skills@latest');
-      expect(telemetryScript).not.toContain('@azure/mcp');
+      expectSuspendedTelemetry(targetRoot, join(hookRoot, 'hooks'), skillsPath);
       expect(existsSync(join(targetRoot, 'AGENTS.md'))).toBe(false);
       expect(existsSync(join(targetRoot, 'CLAUDE.md'))).toBe(false);
       expect(existsSync(join(targetRoot, '.github', 'agents'))).toBe(false);
@@ -86,3 +75,21 @@ describe('simplified distribution', () => {
   );
 
 });
+
+function expectSuspendedTelemetry(root: string, hooksPath: string, skillsPath: string): void {
+  for (const script of ['track-telemetry.sh', 'track-telemetry.ps1']) {
+    const content = readFileSync(join(root, hooksPath, 'scripts', script), 'utf-8');
+    expect(content).toContain('{"continue":true}');
+    expect(content).not.toMatch(/\b(?:npx|npm|node|curl|wget)\b/);
+  }
+  for (const path of [
+    join(skillsPath, 'azure-functions-deploy', 'SKILL.md'),
+    join(skillsPath, 'azure-functions-hosted-skills', 'SKILL.md'),
+    join(skillsPath, 'azure-functions-hosted-skills', 'references', 'infra-and-deployment.md'),
+  ]) {
+    const content = readFileSync(join(root, path), 'utf-8');
+    expect(content).not.toContain('telemetry deployment-observed');
+    expect(content).not.toContain('perform the one-time internal deployment-observation');
+    expect(content).toContain('Automatic plugin telemetry is temporarily disabled.');
+  }
+}
