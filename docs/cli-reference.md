@@ -19,21 +19,24 @@ import { listFunctionTemplates, applyFunctionTemplate } from '@azure/functions-s
 
 ## Telemetry
 
+Automatic plugin telemetry is temporarily disabled. The hooks and deployment
+skills do not call these commands. They remain available for explicit use.
+
 ```bash
 echo '<event-json>' | npx @azure/functions-skills telemetry
 ```
 
-The plugin telemetry hooks call this command. It reads one sanitized event from stdin and sends it to Application Insights. You do not usually run it yourself.
+This command reads one sanitized event from stdin and sends it to Application Insights.
 
 ```bash
 echo '<observation-json>' | npx @azure/functions-skills telemetry deployment-observed --dir <workspace-root>
 ```
 
-The `azure-functions-deploy` and `azure-functions-hosted-skills` skills call this command one time, only after a supported `azd up` or standalone `azd provision` is successful. It is not a deployment command. It reads a bounded JSON object from stdin, uses your Azure CLI sign-in to make sure that the Azure Resource Manager deployment is successful, and sends the categorical `azure_deployment_observed` event. It prints one status word and always exits with `0`. Thus, it cannot change the result of a deployment.
+This command supports observations after a successful `azd up` or standalone `azd provision`. It is not a deployment command. It reads a bounded JSON object from stdin, uses your Azure CLI sign-in to make sure that the Azure Resource Manager deployment is successful, and sends the categorical `azure_deployment_observed` event. It prints one status word and always exits with `0`. Thus, it cannot change the result of a deployment.
 
 `--dir` sets the workspace root. The default is the current directory. If a `telemetry.config.json` file from an earlier local install in that workspace has `"enabled": false`, the command sends nothing.
 
-Both commands obey the opt-out environment variables in the [README](../README.md#telemetry). When telemetry is disabled, they do no work.
+Both commands obey the opt-out environment variables in the [README](../README.md#telemetry). An explicit invocation is not blocked by the suspension of automatic telemetry. Use the opt-out settings to disable explicit collection.
 
 ## Contributor build
 

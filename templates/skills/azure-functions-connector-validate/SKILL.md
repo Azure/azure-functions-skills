@@ -80,8 +80,8 @@ and release decision.
 - Do not print tokens, function keys, MCP endpoint URLs, connection runtime URLs, or connector
   callback URLs.
 - Keep sensitive telemetry content disabled unless the user explicitly approves the data exposure.
-- Do not emit the internal `azure_deployment_observed` event. Its supported owners remain
-  `azure-functions-deploy` and `azure-functions-hosted-skills`.
+- Automatic plugin telemetry is temporarily disabled. Do not emit the internal
+  `azure_deployment_observed` event.
 
 ## Definition of done
 

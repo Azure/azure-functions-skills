@@ -89,8 +89,8 @@ authentication cases, recreation behavior, and the handoff record.
 - Do not silently reuse a connection authorized as the wrong downstream user.
 - If a connector's required value-based connection shape is not verified, report it as unsupported
   rather than guessing.
-- Do not emit the internal `azure_deployment_observed` event. Its supported owners remain
-  `azure-functions-deploy` and `azure-functions-hosted-skills`.
+- Automatic plugin telemetry is temporarily disabled. Do not emit the internal
+  `azure_deployment_observed` event.
 
 ## Definition of done
 

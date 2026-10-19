@@ -1,180 +1,82 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  chmodSync,
-  existsSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createTempDir, removeDir } from './helpers/fs.js';
-import { buildTarget } from '../src/build/build-target.js';
-import { loadHooks, loadMcpServers, loadSkills } from '../src/build/loader.js';
 
 const ROOT = join(import.meta.dirname, '..');
 const TEMP_DIRS: string[] = [];
-const POWERSHELL_PROCESS_TIMEOUT_MS = 45_000;
-const HOOK_TEST_TIMEOUT_MS = process.platform === 'win32' ? 50_000 : 5_000;
-const HOOK_INPUT = JSON.stringify({
-  toolName: 'skill',
-  sessionId: 'session-123',
-  toolArgs: {
-    skill: 'azure-functions-help',
-    path: 'customer-secret.txt',
-  },
-});
+const HOOK_INPUTS = [
+  JSON.stringify({ toolName: 'skill', toolArgs: { skill: 'azure-functions-help' } }),
+  JSON.stringify({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'Skill',
+    tool_input: { skill: 'azure-functions-skills:azure-functions-deploy' },
+  }),
+  JSON.stringify({ toolName: 'functions_project_get' }),
+  JSON.stringify({
+    toolName: 'Read',
+    tool_input: { file_path: '/workspace/.github/skills/azure-functions-help/SKILL.md' },
+  }),
+  '{invalid-json',
+  '',
+];
 
 afterEach(() => {
   for (const dir of TEMP_DIRS.splice(0)) removeDir(dir);
 });
 
-describe('telemetry hook transport', () => {
-  it('sends only sanitized fields and ignores a failing package command', () => {
-    const tempDir = createTempDir('af-skills-hook-');
-    TEMP_DIRS.push(tempDir);
-    const capturePath = join(tempDir, 'payload.json');
-    const argsPath = join(tempDir, 'args.json');
-    const captureScript = join(tempDir, 'capture.mjs');
-    writeFileSync(captureScript, [
-      "import { writeFileSync } from 'node:fs';",
-      "let input = '';",
-      "for await (const chunk of process.stdin) input += chunk;",
-      "writeFileSync(process.env.TELEMETRY_CAPTURE, input);",
-      "writeFileSync(process.env.TELEMETRY_ARGS, JSON.stringify(process.argv.slice(2)));",
-      "process.exit(Number.parseInt(process.env.TELEMETRY_EXIT_CODE || '0', 10));",
-      '',
-    ].join('\n'));
-
-    const environment = {
-      ...process.env,
-      COPILOT_CLI: '1',
-      FAKE_NPX_CAPTURE: captureScript,
-      TELEMETRY_CAPTURE: capturePath,
-      TELEMETRY_ARGS: argsPath,
-      TELEMETRY_EXIT_CODE: '17',
-      PATH: `${tempDir}${delimiter}${process.env.PATH || ''}`,
-    };
-
-    const result = process.platform === 'win32'
-      ? runPowerShellHook(tempDir, environment)
-      : runShellHook(tempDir, environment);
-
-    expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe('{"continue":true}');
-    expect(JSON.parse(readFileSync(argsPath, 'utf-8'))).toEqual([
-      '-y',
-      '@azure/functions-skills@latest',
-      'telemetry',
-    ]);
-    expect(JSON.parse(readFileSync(capturePath, 'utf-8'))).toEqual({
-      timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/),
-      eventType: 'skill_invocation',
-      clientName: 'copilot-cli',
-      pluginName: 'azure-functions-skills',
-      sessionId: 'session-123',
-      skillName: 'azure-functions-help',
-    });
-  }, HOOK_TEST_TIMEOUT_MS);
-
-  it('does not invoke the package command when telemetry is disabled in the config', () => {
-    const tempDir = createTempDir('af-skills-hook-opt-out-');
-    TEMP_DIRS.push(tempDir);
-    const templatesDir = join(ROOT, 'templates');
-    buildTarget('ghcp', {
-      skills: loadSkills(join(templatesDir, 'skills')),
-      mcpServers: loadMcpServers(join(templatesDir, 'mcp', 'servers.yaml')),
-      hooks: loadHooks(join(templatesDir, 'hooks')),
-    }, tempDir);
-    const hooksDir = join(tempDir, 'ghcp', '.github', 'hooks');
-    writeFileSync(join(hooksDir, 'telemetry.config.json'), JSON.stringify({ enabled: false }));
-
-    const capturePath = join(tempDir, 'payload.json');
-    const environment = {
-      ...process.env,
-      COPILOT_CLI: '1',
-      TELEMETRY_CAPTURE: capturePath,
-      PATH: `${tempDir}${delimiter}${process.env.PATH || ''}`,
-    };
-    if (process.platform === 'win32') {
-      writeFileSync(join(tempDir, 'npx.cmd'), '@echo off\r\necho invoked>"%TELEMETRY_CAPTURE%"\r\n');
-    } else {
+describe('automatic telemetry suspension', () => {
+  it.each(['bash', 'powershell'] as const)(
+    '%s hooks do not run a package command in a workspace with a registry override',
+    (shell) => {
+      const tempDir = createTempDir('af-skills-hook-suspended-');
+      TEMP_DIRS.push(tempDir);
+      const scriptsDir = join(tempDir, 'hooks', 'scripts');
+      mkdirSync(scriptsDir, { recursive: true });
+      const scriptName = shell === 'bash' ? 'track-telemetry.sh' : 'track-telemetry.ps1';
+      const script = join(scriptsDir, scriptName);
+      copyFileSync(join(ROOT, 'templates', 'hooks', 'scripts', scriptName), script);
+      writeFileSync(join(tempDir, 'package.json'), '{"name":"hook-test","version":"1.0.0"}');
+      writeFileSync(join(tempDir, '.npmrc'), '@azure:registry=http://127.0.0.1:9/\n');
+      const marker = join(tempDir, 'package-command-ran');
       const npxPath = join(tempDir, 'npx');
-      writeFileSync(npxPath, '#!/usr/bin/env sh\nprintf invoked > "$TELEMETRY_CAPTURE"\n');
+      writeFileSync(npxPath, '#!/bin/sh\nprintf invoked > "$TELEMETRY_CAPTURE"\n');
       chmodSync(npxPath, 0o755);
-    }
+      writeFileSync(join(tempDir, 'npx.cmd'), '@echo off\r\necho invoked>"%TELEMETRY_CAPTURE%"\r\n');
 
-    const script = join(
-      hooksDir,
-      'scripts',
-      process.platform === 'win32' ? 'track-telemetry.ps1' : 'track-telemetry.sh',
-    );
-    const result = process.platform === 'win32'
-      ? spawnSync('pwsh', ['-NoLogo', '-NoProfile', '-NonInteractive', '-File', script], {
-        cwd: tempDir,
-        encoding: 'utf-8',
-        env: environment,
-        input: HOOK_INPUT,
-      })
-      : spawnSync('bash', [script], {
-        cwd: tempDir,
-        encoding: 'utf-8',
-        env: environment,
-        input: HOOK_INPUT,
-      });
+      for (const enabled of [true, false]) {
+        writeFileSync(join(tempDir, 'hooks', 'telemetry.config.json'), JSON.stringify({ enabled }));
+        for (const input of HOOK_INPUTS) {
+          const args = shell === 'bash'
+            ? [script]
+            : [
+              '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+              'function npx { [IO.File]::WriteAllText($env:TELEMETRY_CAPTURE, "invoked") }; & $env:TELEMETRY_HOOK',
+            ];
+          const result = spawnSync(shell === 'bash' ? 'bash' : 'pwsh', args, {
+            cwd: tempDir,
+            encoding: 'utf-8',
+            env: {
+              ...process.env,
+              PATH: `${tempDir}${delimiter}${process.env.PATH || ''}`,
+              TELEMETRY_HOOK: script,
+              TELEMETRY_CAPTURE: marker,
+              AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: String(enabled),
+              AZURE_MCP_COLLECT_TELEMETRY: String(enabled),
+            },
+            input,
+            timeout: 10_000,
+          });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe('{"continue":true}');
-    expect(existsSync(capturePath)).toBe(false);
-  });
+          expect(result.error).toBeUndefined();
+          expect(result.status).toBe(0);
+          expect(result.stdout.trim()).toBe('{"continue":true}');
+          expect(result.stderr).toBe('');
+          expect(existsSync(marker)).toBe(false);
+        }
+      }
+    },
+    60_000,
+  );
 });
-
-function runPowerShellHook(tempDir: string, environment: NodeJS.ProcessEnv) {
-  const hookScript = join(ROOT, 'templates', 'hooks', 'scripts', 'track-telemetry.ps1');
-  const harness = [
-    'function npx {',
-    '  $payload = @($input) -join [Environment]::NewLine',
-    '  $arguments = @($args)',
-    '  [IO.File]::WriteAllText($env:TELEMETRY_CAPTURE, $payload)',
-    '  [IO.File]::WriteAllText($env:TELEMETRY_ARGS, (ConvertTo-Json -Compress -InputObject $arguments))',
-    '  $global:LASTEXITCODE = 17',
-    '}',
-    '& $env:TELEMETRY_HOOK',
-    '',
-  ].join('\n');
-  return spawnSync(
-    'pwsh',
-    [
-      '-NoLogo',
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      harness,
-    ],
-    {
-      cwd: ROOT,
-      encoding: 'utf-8',
-      env: {
-        ...environment,
-        TELEMETRY_HOOK: hookScript,
-      },
-      input: HOOK_INPUT,
-      timeout: POWERSHELL_PROCESS_TIMEOUT_MS,
-    },
-  );
-}
-
-function runShellHook(tempDir: string, environment: NodeJS.ProcessEnv) {
-  const npxPath = join(tempDir, 'npx');
-  writeFileSync(npxPath, '#!/usr/bin/env sh\nnode "$FAKE_NPX_CAPTURE" "$@"\n');
-  chmodSync(npxPath, 0o755);
-  return spawnSync(
-    'bash',
-    [join(ROOT, 'templates', 'hooks', 'scripts', 'track-telemetry.sh')],
-    {
-      cwd: ROOT,
-      encoding: 'utf-8',
-      env: environment,
-      input: HOOK_INPUT,
-    },
-  );
-}
