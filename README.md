@@ -136,7 +136,10 @@ To opt out, set either `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or
 The local runtime also checks its installed `telemetry.config.json` and workspace
 settings under `.github/hooks/`, `.claude/hooks/`, and `.codex/hooks/`. An
 `"enabled": false` setting, or an unreadable configuration file, stops collection
-before queries or sends. The public plugin contains only a non-secret
+before queries or sends.
+The runtime also checks these configuration paths in ancestor directories, so
+running from a project subdirectory does not bypass the workspace opt-out.
+The public plugin contains only a non-secret
 instrumentation key and ingestion endpoint as separate settings, not a stored
 connection string. It does not contain release credentials.
 

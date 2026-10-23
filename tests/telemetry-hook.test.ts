@@ -100,9 +100,10 @@ async function run(
   root: string,
   input: string,
   environment: NodeJS.ProcessEnv = {},
+  cwd: string = root,
 ): Promise<{ status: number | null; stdout: string; stderr: string }> {
   const child = spawn(file, args, {
-    cwd: root,
+    cwd,
     windowsHide: true,
     env: {
       ...process.env,
@@ -159,6 +160,8 @@ describe('distributed telemetry runtime', () => {
       const first = requests.length;
       for (const input of [
         INPUT,
+        JSON.stringify({ toolName: 'skill', toolArgs: JSON.stringify({ skill: 'azure-functions-help', secret: 'private-input' }) }),
+        JSON.stringify({ toolName: 'view', toolArgs: JSON.stringify({ path: '.github/skills/azure-functions-help/SKILL.md' }) }),
         JSON.stringify({ tool_name: 'functions_project_get', hook_event_name: 'PostToolUse' }),
         JSON.stringify({
           tool_name: 'Read',
@@ -169,7 +172,7 @@ describe('distributed telemetry runtime', () => {
         expect(result, layout.name).toEqual({ status: 0, stdout: expect.stringMatching(/^\{"continue":true\}\r?\n$/), stderr: '' });
       }
       const sent = requests.slice(first);
-      expect(sent, layout.name).toHaveLength(3);
+      expect(sent, layout.name).toHaveLength(5);
       for (const request of sent) {
         expect(request.path).toBe('/v2/track');
         expect(request.method).toBe('POST');
@@ -197,6 +200,88 @@ describe('distributed telemetry runtime', () => {
       expect(existsSync(join(layout.root, 'az-calls.jsonl'))).toBe(false);
     }
   }, 90_000);
+
+  it.each(SHELLS)('%s hooks honor ancestor opt-out in nested directories for all layouts', async shell => {
+    const project = join(tempDir, `nested project ${shell}`);
+    const nested = join(project, 'infra', 'nested');
+    mkdirSync(nested, { recursive: true });
+    poisonWorkspace(project);
+    mkdirSync(join(nested, '.github', 'hooks'), { recursive: true });
+    writeFileSync(join(nested, '.github', 'hooks', 'telemetry.config.json'), '{"enabled":true}');
+    const first = requests.length;
+    for (const host of ['.github', '.claude', '.codex']) {
+      const config = join(project, host, 'hooks', 'telemetry.config.json');
+      mkdirSync(join(project, host, 'hooks'), { recursive: true });
+      try {
+        for (const content of ['{"enabled":false}', '{invalid-config']) {
+          writeFileSync(config, content);
+          for (const layout of layouts) {
+            const result = await run(shell === 'bash' ? 'bash' : 'pwsh',
+              hookArgs(shell, layout.hooks), project, INPUT, {}, nested);
+            expect(result).toEqual({
+              status: 0, stdout: expect.stringMatching(/^\{"continue":true\}\r?\n$/), stderr: '',
+            });
+          }
+          expect(requests).toHaveLength(first);
+        }
+      } finally {
+        rmSync(config);
+      }
+    }
+    // No disabled ancestor remains: nested execution can send again.
+    const result = await run(shell === 'bash' ? 'bash' : 'pwsh',
+      hookArgs(shell, layouts[0].hooks), project, INPUT, {}, nested);
+    expect(result.status).toBe(0);
+    expect(requests.slice(first)).toHaveLength(1);
+  }, 60_000);
+
+  it.each(SHELLS)('%s hooks accept a full bundled Read response but bound hook input', async shell => {
+    const layout = layouts[0];
+    const content = readFileSync(join(ROOT, 'templates', 'skills', 'azure-functions-hosted-skills', 'SKILL.md'), 'utf-8');
+    const event = {
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Read',
+      tool_input: { file_path: '/repo/.agents/skills/azure-functions-hosted-skills/SKILL.md' },
+      tool_response: { content: `${content}\nprivate-output-marker` },
+    };
+    const input = JSON.stringify(event);
+    expect(Buffer.byteLength(input)).toBeGreaterThan(16 * 1024);
+    const first = requests.length;
+    const result = await run(shell === 'bash' ? 'bash' : 'pwsh', hookArgs(shell, layout.hooks), layout.root, input);
+    expect(result).toEqual({ status: 0, stdout: expect.stringMatching(/^\{"continue":true\}\r?\n$/), stderr: '' });
+    expect(requests.slice(first)).toHaveLength(1);
+    expect(requests[first].body).toContain('azure-functions-hosted-skills');
+    expect(requests[first].body).not.toContain('private-output-marker');
+    const atLimit = input + ' '.repeat(1024 * 1024 - Buffer.byteLength(input));
+    expect(Buffer.byteLength(atLimit)).toBe(1024 * 1024);
+    const accepted = await run(shell === 'bash' ? 'bash' : 'pwsh', hookArgs(shell, layout.hooks), layout.root, atLimit);
+    expect(accepted.status).toBe(0);
+    expect(requests.slice(first)).toHaveLength(2);
+    const oversized = `${atLimit} `;
+    const rejected = await run(shell === 'bash' ? 'bash' : 'pwsh', hookArgs(shell, layout.hooks), layout.root, oversized);
+    expect(rejected.status).toBe(0);
+    expect(rejected.stdout).toContain('{"continue":true}');
+    expect(requests.slice(first)).toHaveLength(2);
+  }, 30_000);
+
+  it('keeps the deployment input limit at 16 KiB before any ARM request', async () => {
+    const layout = layouts[0];
+    const callsPath = join(layout.root, 'az-calls.jsonl');
+    const input = JSON.stringify({
+      skill: 'azure-functions-deploy', operation: 'deploy', agent: 'codex', environmentName: 'private-env',
+    });
+    const args = [
+      join(layout.hooks, 'runtime', 'telemetry.mjs'), 'deployment-observed',
+    ];
+    const accepted = await run(process.execPath, args, layout.root, input.padEnd(16 * 1024, ' '));
+    expect(accepted).toEqual({ status: 0, stdout: 'sent\n', stderr: '' });
+    const before = readFileSync(callsPath, 'utf-8');
+    const first = requests.length;
+    const result = await run(process.execPath, args, layout.root, input.padEnd(16 * 1024 + 1, ' '));
+    expect(result).toEqual({ status: 0, stdout: 'failed\n', stderr: '' });
+    expect(requests).toHaveLength(first);
+    expect(existsSync(callsPath) ? readFileSync(callsPath, 'utf-8') : '').toBe(before);
+  });
 
   it.each(SHELLS)('%s hooks preserve success for opt-out and invalid input', async shell => {
     const layout = layouts[0];

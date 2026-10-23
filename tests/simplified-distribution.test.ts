@@ -131,5 +131,11 @@ function expectLocalTelemetry(root: string, hooksPath: string, skillsPath: strin
       expect(content).toContain('deployment-observed');
       expect(content).not.toContain('npx -y @azure/functions-skills');
     }
+    for (const skill of ['azure-functions-connector-create', 'azure-functions-connector-mcp', 'azure-functions-connector-validate']) {
+      const content = readFileSync(join(root, skillsPath, skill, 'SKILL.md'), 'utf-8');
+      expect(content).not.toContain('Automatic plugin telemetry is temporarily disabled.');
+      expect(content).toContain('Do not run a deployment collector from this connector skill.');
+      expect(content).toContain('azure-functions-hosted-skills');
+    }
   }
 }

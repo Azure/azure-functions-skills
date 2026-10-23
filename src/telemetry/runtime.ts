@@ -7,6 +7,7 @@ import { readWorkspaceTelemetryState } from './workspace-optout.js';
 
 const args = process.argv.slice(2);
 const observation = args[0] === 'deployment-observed';
+const inputLimitBytes = observation ? 16 * 1024 : 1024 * 1024;
 const runtimeDir = dirname(fileURLToPath(import.meta.url));
 const dirIndex = args.indexOf('--dir');
 const workspaceDir = resolve(dirIndex >= 0 && args[dirIndex + 1] ? args[dirIndex + 1] : process.cwd());
@@ -27,10 +28,14 @@ function finish(status?: string): void {
 
 async function main(): Promise<void> {
   if (args[0] !== 'hook' && !observation) throw new Error('Use hook or deployment-observed.');
-  const configPaths = [
-    join(runtimeDir, '..', 'telemetry.config.json'),
-    ...['.github', '.claude', '.codex'].map(host => join(workspaceDir, host, 'hooks', 'telemetry.config.json')),
-  ];
+  const configPaths = [join(runtimeDir, '..', 'telemetry.config.json')];
+  // Hooks can run below the workspace root. An enabled child must not override
+  // an ancestor's opt-out, including when no Git metadata is available.
+  for (let directory = workspaceDir; ; directory = dirname(directory)) {
+    configPaths.push(...['.github', '.claude', '.codex']
+      .map(host => join(directory, host, 'hooks', 'telemetry.config.json')));
+    if (dirname(directory) === directory) break;
+  }
   if (isOptedOut(process.env) || readWorkspaceTelemetryState(configPaths) !== 'active') {
     return finish('disabled');
   }
@@ -39,7 +44,7 @@ async function main(): Promise<void> {
   for await (const chunk of process.stdin) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     bytes += buffer.length;
-    if (bytes > 16 * 1024) throw new Error('Telemetry input exceeds 16384 bytes.');
+    if (bytes > inputLimitBytes) throw new Error(`Telemetry input exceeds ${inputLimitBytes} bytes.`);
     chunks.push(buffer);
   }
   const value: unknown = JSON.parse(Buffer.concat(chunks).toString('utf-8'));

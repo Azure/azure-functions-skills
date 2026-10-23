@@ -143,7 +143,15 @@ directory, without reading project files to validate a reference.
 Usage sends retain the five-second timeout. The usage process deadline is
 5.5 seconds, including stdin. Observation processes have a 26-second deadline
 for bounded input, the 20-second ARM budget, and the five-second send.
-Both modes accept at most 16 KiB of input.
+Hook mode accepts at most 1 MiB of input, including tool responses. It uses only
+allowed event metadata; it never sends tool output. Observation mode retains
+its 16 KiB input limit. Copilot tool arguments can be objects or JSON strings.
+Malformed serialized arguments do not produce an event.
+
+Before reading input, the runtime checks the installed configuration and all
+three host configurations in the selected directory and each ancestor up to the
+filesystem root. A disabled or unreadable ancestor configuration stops collection
+even if a child configuration is enabled. Git metadata is not required.
 
 No runtime npm configuration is read. Earlier hooks ran a downloaded package
 from the workspace, where registry overrides could change the package source.

@@ -48,10 +48,15 @@ The plugin uses `hooks/runtime/telemetry.mjs`. Built workspace assets use
 `.codex/hooks/runtime/telemetry.mjs`. Hooks call `node "<runtime>" hook`.
 The two deployment skills call
 `node "<runtime>" deployment-observed --dir "<workspace-root>"` once after a
-supported successful command. Both modes read at most 16 KiB from stdin.
+supported successful command. Hook mode reads at most 1 MiB from stdin to allow
+tool responses such as a full bundled skill read. Observation mode keeps its
+16 KiB input limit. Tool output is not included in telemetry.
 
 The local runtime checks its installed hook configuration and all three workspace
-hook configuration paths. A false or unreadable setting stops collection.
+hook configuration paths in the selected directory and each ancestor up to the
+filesystem root. This also applies when a hook runs in a project subdirectory
+without Git metadata. A false or unreadable setting stops collection; an enabled
+child setting does not override an ancestor opt-out.
 Environment opt-out also stops collection before ARM queries or sending.
 Usage sends wait at most five seconds; a process deadline of 5.5 seconds also
 bounds input reads. Deployment observations have a 26-second process deadline,

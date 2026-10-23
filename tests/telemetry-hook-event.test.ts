@@ -47,6 +47,28 @@ describe('parseHookEvent', () => {
   });
 
   it.each([
+    ['skill', { skill: 'azure-functions-help', secret: 'private-input' }, {
+      eventType: 'skill_invocation', skillName: 'azure-functions-help',
+    }],
+    ['view', { path: '.github/skills/azure-functions-hosted-skills/references/infra-and-deployment.md' }, {
+      eventType: 'reference_file_read', fileReference: 'azure-functions-hosted-skills/references/infra-and-deployment.md',
+    }],
+  ])('decodes serialized %s arguments without keeping raw input', (toolName, toolArgs, event) => {
+    const parsed = parseHookEvent({ toolName, toolArgs: JSON.stringify(toolArgs) }, {});
+    expect(parsed).toMatchObject(event);
+    expect(parsed).not.toHaveProperty('toolArgs');
+    expect(parsed).not.toHaveProperty('secret');
+  });
+
+  it.each(['{invalid', 'null', '[]', '"private"', '123'])(
+    'does not create an event from invalid serialized arguments: %s',
+    toolArgs => {
+      expect(parseHookEvent({ toolName: 'skill', toolArgs }, {})).toBeUndefined();
+      expect(parseHookEvent({ toolName: 'view', toolArgs }, {})).toBeUndefined();
+    },
+  );
+
+  it.each([
     null, [], {}, { toolName: 'Bash', toolArgs: { command: 'private' } },
     { toolName: 'skill', toolArgs: { skill: 'azure-functions-private-customer' } },
     { toolName: 'Read', tool_input: { file_path: '/private/azure-functions-help/SKILL.md' } },

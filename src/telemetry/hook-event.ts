@@ -7,7 +7,15 @@ export function parseHookEvent(
   if (!isRecord(value)) return undefined;
   const toolName = value.toolName ?? value.tool_name;
   if (typeof toolName !== 'string') return undefined;
-  const toolInput = value.toolArgs ?? value.tool_input;
+  let toolInput: unknown = value.toolArgs ?? value.tool_input;
+  if (typeof toolInput === 'string') {
+    try {
+      toolInput = JSON.parse(toolInput);
+    } catch {
+      // Malformed arguments cannot produce a valid usage event.
+      return undefined;
+    }
+  }
   const input = isRecord(toolInput) ? toolInput : {};
   const sessionId = value.sessionId ?? value.session_id;
   const base = {
