@@ -1,9 +1,32 @@
 # Telemetry and internal release pipeline
 
-This repository keeps the telemetry destination out of source control. The
-committed package contains only `__APPLICATIONINSIGHTS_CONNECTION_STRING__` in
-`src/telemetry/config.ts`; the internal 1ES mirror pipeline replaces the
-compiled placeholder immediately before `npm pack`.
+The public plugin uses a non-secret instrumentation key and ingestion endpoint
+from `src/telemetry/public-config.ts`. These are separate fields, not a stored
+connection string. The SDK receives the key in its constructor and the ingestion
+endpoint through `config.endpointUrl`. Only these two fields are public.
+The source was the published `@azure/functions-skills@0.0.6-preview` artifact
+from the existing public Azure Functions npm feed:
+
+```text
+https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/npm/registry/@azure/functions-skills/-/functions-skills-0.0.6-preview.tgz
+SHA-1: cf755495ceaddf78921f192e319cb218ddc6945d
+```
+
+The artifact was read as data and checked against the exact version's registry
+digest. Its code was not run. Do not copy other release connection-string fields,
+credentials, or secrets into public configuration.
+
+The library still contains `__APPLICATIONINSIGHTS_CONNECTION_STRING__` in
+`src/telemetry/config.ts`. The internal 1ES pipeline replaces the compiled
+placeholder before `npm pack`. The plugin bundle instead selects the public
+configuration at build time, so GitHub plugin installation does not depend on
+internal release injection.
+
+This follows the public configuration pattern in
+[`microsoft/vscode-azurefunctions`](https://github.com/microsoft/vscode-azurefunctions/blob/271b6d24fa4d003b2c10bfeb0250df82372641b6/package.json),
+which stores its telemetry key in `aiKey`. This plugin keeps its existing
+Application Insights SDK and explicit privacy controls. Separate fields do not
+guarantee that a secret scanner will accept the configuration.
 
 ## Release flow
 
@@ -13,8 +36,8 @@ compiled placeholder immediately before `npm pack`.
 3. The official and prerelease pipelines require the secret variable
    `ApplicationInsightsConnectionString` and inject it into
    `dropInput/lib/telemetry/config.js`. Public PR/CI builds do not receive the
-   secret and compile out the injection step. Hook and plugin files never
-   contain the destination.
+   secret and compile out the injection step. This step does not change the
+   public plugin bundle. Its destination contains only the approved public fields.
 4. The build runs `npm pack --ignore-scripts` and publishes the `.tgz` as the
    official `drop` pipeline artifact through the 1ES template.
 5. The official drop is mirrored to the Azure SDK partner drops storage account
@@ -76,53 +99,91 @@ git push origin v<version>
 
 ## Runtime telemetry hook
 
-**Automatic plugin telemetry is temporarily disabled.** The Bash and PowerShell
-hooks return `{"continue":true}` and exit successfully. They do not read events,
-run a package command, query Azure, or send data. The hook files and registrations
-remain in place for compatibility.
+The Bash and PowerShell hooks call only the adjacent
+`hooks/runtime/telemetry.mjs` payload through Node.js 18 or later.
+They always return `{"continue":true}` and exit successfully.
+Missing Node or payload files cause no collection. No package-manager, download,
+or install fallback is permitted.
 
-The npm package ships Copilot, Claude, and Codex telemetry-hook manifests plus
-PowerShell and Bash scripts in two places:
+Canonical hook scripts and manifests are in `templates/hooks/`.
+The build emits Copilot, Claude, Cursor, and Codex-compatible hook assets in:
 
-- `templates/hooks/`, used by the build system;
-- `dist/plugin/azure-functions-skills/hooks/`, used in the built plugin payload.
+- `.github/plugins/azure-functions-skills/hooks/`, for GitHub plugin installation;
+- `dist/plugin/azure-functions-skills/hooks/`, for the built plugin payload.
 
 `npm run build` also writes the telemetry assets into each host's native hook
 directory in the agent-specific layouts under `dist/workspace/`.
 
-The retained CLI command calls the exported `@azure/functions-skills/telemetry`
-library API. That API creates an isolated Application Insights client, sends
-only the custom event, flushes it, and stops waiting after five seconds. It
-does not enable automatic request, dependency, exception, performance, or
-console collection.
+`src/build/telemetry-runtime.ts` uses the pinned build-only esbuild dependency
+to combine the ESM runtime, existing sender, Application Insights SDK 1.8.10,
+and required production dependencies into one ESM file. Authored code remains
+ESM and strict TypeScript. SDK CommonJS modules are compiled into the payload;
+the compatibility loader accepts Node built-in modules only. It cannot resolve
+a package from the workspace or `NODE_PATH`. The unused optional native-metrics
+module is not shipped and cannot be loaded.
 
-The connection string exists only inside the CI-built npm package. It is not
-set in the coding agent's environment or persisted by a hook. The library and CLI
-remain available for explicit use, but no automatic hook invokes them.
+The bundle disables diagnostic-channel patching at build time. It never calls
+SDK `setup` or `start`. The sender creates an isolated client, cancels the SDK's
+automatic correlation-profile lookup, disables disk retries, allows only the
+custom event fields, and removes all envelope tags except the SDK version.
+There is no automatic request, dependency, exception, performance, or console
+collection. SDK package metadata is shipped beside the bundle for its version
+lookup. A bundle-local SDK directory also keeps its application-version lookup
+inside the runtime payload, not the workspace. License notices are shipped in
+`THIRD-PARTY-NOTICES.txt`.
 
-Earlier hooks downloaded and ran the package from the session workspace.
-Workspace npm configuration could select the package source. Do not restore
-runtime package downloads in hooks. A fixed version alone does not prevent a
-workspace registry override. Automatic telemetry must remain disabled until a
-safe distribution design is approved.
+The published CLI `build` command copies the runtime from its shipped
+`dist/plugin/` payload. It does not need source files or development dependencies.
+Repository builds instead generate that payload from source. A missing packaged
+payload is a build error, not a reason to download code.
+
+The build embeds the canonical relative skill-file allowlist. Reference events
+therefore work in every layout, including Codex's separate `.agents/skills`
+directory, without reading project files to validate a reference.
+Usage sends retain the five-second timeout. The usage process deadline is
+5.5 seconds, including stdin. Observation processes have a 26-second deadline
+for bounded input, the 20-second ARM budget, and the five-second send.
+Hook mode accepts at most 1 MiB of input, including tool responses. It uses only
+allowed event metadata; it never sends tool output. Observation mode retains
+its 16 KiB input limit. Copilot tool arguments can be objects or JSON strings.
+Malformed serialized arguments do not produce an event.
+
+Before reading input, the runtime checks the installed configuration and all
+three host configurations in the selected directory and each ancestor up to the
+filesystem root. A disabled or unreadable ancestor configuration stops collection
+even if a child configuration is enabled. Git metadata is not required.
+
+No runtime npm configuration is read. Earlier hooks ran a downloaded package
+from the workspace, where registry overrides could change the package source.
+Do not restore that path, even with a fixed version.
 
 Release the updated plugin and workspace assets, and tell users to update their
 installed copies. A source change does not stop hooks in existing installations.
 
-For explicit CLI use, users can opt out by setting either
+Users can opt out by setting either
 `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or
-`AZURE_MCP_COLLECT_TELEMETRY=false`. The deployment collector also honors workspace
-`telemetry.config.json` files with `"enabled": false`. The suspended hooks do
-nothing regardless of these settings.
+`AZURE_MCP_COLLECT_TELEMETRY=false`. Both local modes also honor the installed
+hook `telemetry.config.json` and workspace files under `.github/hooks/`,
+`.claude/hooks/`, and `.codex/hooks/`. A false or unreadable setting stops
+collection before queries or sends.
+
+Runtime tests build the actual plugin and all workspace layouts in isolated paths
+with spaces. A trusted test-only preload routes SDK requests to a local server.
+It supplies ARM responses without running Azure CLI. Hostile workspace `.npmrc`,
+project modules, SDK configuration, and package-manager stubs must never run.
+Tests check both shells on Windows and Bash elsewhere; static checks cover both
+scripts on all platforms. Tests do not send real telemetry.
 
 ## Deployment-observation collector
 
-The two canonical deployment skills no longer invoke the deployment-observation
-collector. They perform no extra ARM queries or sends for plugin telemetry.
+Each canonical deployment skill invokes its installed local collector once after
+its own supported `azd up` or standalone `azd provision` succeeds. Do not collect
+twice for a delegated deployment, after a failure, or after an unsupported command.
+Do not retry a telemetry failure or change the deployment result.
 Application Insights monitoring in deployed applications is unchanged.
 
-The following contract describes the retained `telemetry deployment-observed`
-CLI subcommand for explicit use, not an automatic skill step.
+The local `deployment-observed` mode and the retained
+`telemetry deployment-observed` CLI subcommand share the following contract.
 
 It reads one bounded JSON object on stdin (16 KiB max) with `skill`,
 `operation`, `agent`, `environmentName`, optional `skillsVersion`, and optional
@@ -161,7 +222,8 @@ these queries. They are not included in the telemetry event and are not printed.
 
 This event introduces **no new destination, credential, or service**. It is
 written to the same Application Insights resource, through the same
-release-injected connection string, as the existing usage event, so its
+approved public key and endpoint in the plugin (or the release-injected library
+configuration), as the existing usage event, so its
 governance is the governance already applying to that resource (FRD-0003 D-019).
 Recording concrete owner, retention, access, and privacy-review values is a
 sign-off gate (AC-012).

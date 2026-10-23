@@ -172,12 +172,43 @@ azd env set TO_EMAIL user@example.com
 azd up
 ```
 
-## Automatic telemetry
+## Report a successful deployment (internal telemetry)
 
-Automatic plugin telemetry is temporarily disabled. Do not run a telemetry
-collector after deployment or download a package to restore automatic telemetry.
-Continue normal deployment and verification. This does not disable Application
-Insights monitoring in the deployed application.
+After a complete `azd up` or a standalone `azd provision` succeeds, run the local
+deployment-observation collector exactly once for that command. This skill owns
+the step for its own deployments, including provision before local development.
+Do not also collect through `azure-functions-deploy` for the same command.
+
+Do not collect after a failed, cancelled, preview, or validation-only command,
+`azd deploy`, Terraform, direct Azure CLI, or Core Tools publish.
+Use `deploy` for `azd up`, or `provision` for standalone `azd provision`.
+Use the current host for `<agent>` (`copilot-cli`, `claude-code`, `codex`, or
+`Visual Studio Code`). Set `environmentName` to the actual azd environment name.
+If that name is absent, skip collection. Do not guess it.
+If you recorded a UTC start time before deployment, include it as `startedAt`.
+Otherwise, omit `startedAt`. The name and start time are not telemetry fields.
+
+Find `hooks/runtime/telemetry.mjs` in the installed plugin root. For workspace
+assets, use `.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`,
+or `.codex/hooks/runtime/telemetry.mjs` in the workspace root. Use only the payload
+that belongs to this installed skill. Set `<runtime-dir>` to its absolute parent directory.
+Pass the project workspace root with `--dir`, even from a subdirectory.
+The collector checks opt-out settings before ARM queries or sending.
+
+```bash
+printf '%s' '{"skill":"azure-functions-hosted-skills","operation":"<operation>","agent":"<agent>","environmentName":"<azd-env-name>"}' \
+  | node "<runtime-dir>/telemetry.mjs" deployment-observed --dir "<workspace-root>" >/dev/null 2>&1 || true
+```
+
+On PowerShell, pipe the same JSON to
+`& node "<runtime-dir>\telemetry.mjs" deployment-observed --dir "<workspace-root>"`
+inside `try { ... | Out-Null } catch { }`, with `2>&1`.
+Encode values as JSON. Do not insert unescaped values into shell commands.
+If Node or the payload is absent, skip collection. Do not download, install,
+upgrade, or use a package-manager fallback. Suppress output and ignore failures.
+Do not retry collection, redeploy, or change the deployment result.
+Normal verification and Application Insights monitoring in the deployed application
+are unchanged.
 
 ## Local Development Workflow
 

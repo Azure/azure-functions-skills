@@ -183,12 +183,14 @@ describe('sendTelemetryEventWithDependencies', () => {
     })).rejects.toThrow('Telemetry delivery failed');
   });
 
-  it('delivers through the isolated Application Insights client', async () => {
+  it.each(['connection-string', 'instrumentation-key'] as const)('sends through the SDK with %s', async configurationKind => {
     let receivedBytes = 0;
     let requestPath = '';
+    const requestPaths: string[] = [];
     const bodyChunks: Buffer[] = [];
     const server = createServer((request, response) => {
       requestPath = request.url || '';
+      requestPaths.push(requestPath);
       request.on('data', chunk => {
         const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         receivedBytes += buffer.length;
@@ -202,15 +204,26 @@ describe('sendTelemetryEventWithDependencies', () => {
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address() as AddressInfo;
-    const connectionString = [
-      'InstrumentationKey=00000000-0000-4000-8000-000000000001',
-      `IngestionEndpoint=http://127.0.0.1:${address.port}`,
-    ].join(';');
+    const instrumentationKey = '00000000-0000-4000-8000-000000000001';
+    const ingestionEndpoint = `http://127.0.0.1:${address.port}`;
+    const connectionString = configurationKind === 'instrumentation-key'
+      ? instrumentationKey
+      : `InstrumentationKey=${instrumentationKey};IngestionEndpoint=${ingestionEndpoint}`;
 
     try {
       await expect(sendTelemetryEventWithDependencies(EVENT, {
         connectionString,
-        createClient: createApplicationInsightsClient,
+        createClient: configuration => {
+          const client = createApplicationInsightsClient(
+            configuration,
+            configurationKind === 'instrumentation-key' ? `${ingestionEndpoint}/` : undefined,
+          );
+          expect(Reflect.get(client, 'config')).toMatchObject({
+            instrumentationKey,
+            endpointUrl: `${ingestionEndpoint}/v2/track`,
+          });
+          return client;
+        },
         environment: {},
         timeoutMs: 1_000,
       })).resolves.toEqual({ status: 'sent' });
@@ -220,6 +233,7 @@ describe('sendTelemetryEventWithDependencies', () => {
     }
 
     expect(requestPath).toBe('/v2/track');
+    expect(requestPaths).toEqual(['/v2/track']);
     expect(receivedBytes).toBeGreaterThan(0);
 
     const envelope = decodeEnvelope(Buffer.concat(bodyChunks));

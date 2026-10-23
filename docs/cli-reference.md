@@ -19,8 +19,11 @@ import { listFunctionTemplates, applyFunctionTemplate } from '@azure/functions-s
 
 ## Telemetry
 
-Automatic plugin telemetry is temporarily disabled. The hooks and deployment
-skills do not call these commands. They remain available for explicit use.
+Automatic hooks and deployment skills use the installed
+`hooks/runtime/telemetry.mjs` payload with Node.js 18 or later. The payload
+includes the Application Insights SDK and its required dependencies. It does not
+run npm or npx, read project modules, or download a missing payload.
+The commands below remain available for explicit CLI use.
 
 ```bash
 echo '<event-json>' | npx @azure/functions-skills telemetry
@@ -36,7 +39,32 @@ This command supports observations after a successful `azd up` or standalone `az
 
 `--dir` sets the workspace root. The default is the current directory. If a `telemetry.config.json` file from an earlier local install in that workspace has `"enabled": false`, the command sends nothing.
 
-Both commands obey the opt-out environment variables in the [README](../README.md#telemetry). An explicit invocation is not blocked by the suspension of automatic telemetry. Use the opt-out settings to disable explicit collection.
+Both commands obey the opt-out environment variables in the [README](../README.md#telemetry).
+
+### Local automatic runtime
+
+The plugin uses `hooks/runtime/telemetry.mjs`. Built workspace assets use
+`.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`, or
+`.codex/hooks/runtime/telemetry.mjs`. Hooks call `node "<runtime>" hook`.
+The two deployment skills call
+`node "<runtime>" deployment-observed --dir "<workspace-root>"` once after a
+supported successful command. Hook mode reads at most 1 MiB from stdin to allow
+tool responses such as a full bundled skill read. Observation mode keeps its
+16 KiB input limit. Tool output is not included in telemetry.
+
+The local runtime checks its installed hook configuration and all three workspace
+hook configuration paths in the selected directory and each ancestor up to the
+filesystem root. This also applies when a hook runs in a project subdirectory
+without Git metadata. A false or unreadable setting stops collection; an enabled
+child setting does not override an ancestor opt-out.
+Environment opt-out also stops collection before ARM queries or sending.
+Usage sends wait at most five seconds; a process deadline of 5.5 seconds also
+bounds input reads. Deployment observations have a 26-second process deadline,
+which includes the existing 20-second ARM and five-second send budgets.
+Hooks always return `{"continue":true}` and exit with `0`. The observation mode
+prints one status word and exits with `0`. Missing Node or payload files do not
+trigger an install or download. Normal deployment and deployed-app monitoring
+are unchanged.
 
 ## Contributor build
 
