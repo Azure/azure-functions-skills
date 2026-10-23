@@ -1,7 +1,9 @@
 # Telemetry and internal release pipeline
 
 The public plugin uses a non-secret instrumentation key and ingestion endpoint
-from `src/telemetry/public-config.ts`. Only these two fields are public.
+from `src/telemetry/public-config.ts`. These are separate fields, not a stored
+connection string. The SDK receives the key in its constructor and the ingestion
+endpoint through `config.endpointUrl`. Only these two fields are public.
 The source was the published `@azure/functions-skills@0.0.6-preview` artifact
 from the existing public Azure Functions npm feed:
 
@@ -19,6 +21,12 @@ The library still contains `__APPLICATIONINSIGHTS_CONNECTION_STRING__` in
 placeholder before `npm pack`. The plugin bundle instead selects the public
 configuration at build time, so GitHub plugin installation does not depend on
 internal release injection.
+
+This follows the public configuration pattern in
+[`microsoft/vscode-azurefunctions`](https://github.com/microsoft/vscode-azurefunctions/blob/271b6d24fa4d003b2c10bfeb0250df82372641b6/package.json),
+which stores its telemetry key in `aiKey`. This plugin keeps its existing
+Application Insights SDK and explicit privacy controls. Separate fields do not
+guarantee that a secret scanner will accept the configuration.
 
 ## Release flow
 

@@ -3,7 +3,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PUBLIC_TELEMETRY_CONNECTION_STRING } from '../telemetry/public-config.js';
+import {
+  PUBLIC_TELEMETRY_INGESTION_ENDPOINT,
+  PUBLIC_TELEMETRY_INSTRUMENTATION_KEY,
+} from '../telemetry/public-config.js';
 
 export interface TelemetryRuntime {
   readonly code: string;
@@ -30,7 +33,8 @@ export function buildTelemetryRuntime(skillsDir: string): TelemetryRuntime {
     legalComments: 'none',
     external: ['applicationinsights-native-metrics'],
     define: {
-      __PUBLIC_TELEMETRY_CONNECTION_STRING__: JSON.stringify(PUBLIC_TELEMETRY_CONNECTION_STRING),
+      __PUBLIC_TELEMETRY_INSTRUMENTATION_KEY__: JSON.stringify(PUBLIC_TELEMETRY_INSTRUMENTATION_KEY),
+      __PUBLIC_TELEMETRY_INGESTION_ENDPOINT__: JSON.stringify(PUBLIC_TELEMETRY_INGESTION_ENDPOINT),
       __BUNDLED_SKILL_FILES__: JSON.stringify(listSkillFiles(skillsDir)),
       'process.env.APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL': '"true"',
       __dirname: 'sdkContextDirectory',

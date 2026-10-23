@@ -18,6 +18,10 @@ if (process.env.AF_TEST_DELAY_STDOUT === '1') {
 const request = http.request;
 const localRequest = (options, callback) => request({
   ...options,
+  headers: {
+    ...options.headers,
+    'x-af-test-original-host': options.hostname || options.host,
+  },
   host: '127.0.0.1',
   hostname: '127.0.0.1',
   port: Number(process.env.AF_TEST_PORT),

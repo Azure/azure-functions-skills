@@ -14,7 +14,9 @@ const ROOT = join(import.meta.dirname, '..');
 const INPUT = JSON.stringify({ toolName: 'skill', toolArgs: { skill: 'azure-functions-help', secret: 'private-input' } });
 const PRELOAD = join(ROOT, 'tests', 'fixtures', 'telemetry', 'local-transport.mjs');
 const SHELLS = process.platform === 'win32' ? ['bash', 'powershell'] as const : ['bash'] as const;
-const requests: Array<{ path: string; method: string; body: string }> = [];
+const PUBLIC_KEY = 'a5ea7fbd-8657-4d92-8dd1-c059329b11e8';
+const PUBLIC_ENDPOINT = 'https://westus2-2.in.applicationinsights.azure.com';
+const requests: Array<{ path: string; method: string; originalHost: string; body: string }> = [];
 const layouts: Array<{ name: string; root: string; hooks: string }> = [];
 let tempDir: string;
 let port: number;
@@ -26,6 +28,7 @@ const server = createServer((request, response) => {
     requests.push({
       path: request.url || '',
       method: request.method || '',
+      originalHost: String(request.headers['x-af-test-original-host'] || ''),
       body: (request.headers['content-encoding'] === 'gzip' ? gunzipSync(bytes) : bytes).toString('utf-8'),
     });
     if (request.url === '/test-hang') return;
@@ -112,6 +115,8 @@ async function run(
       AF_TEST_AZ_CALLS: join(root, 'az-calls.jsonl'),
       AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'true',
       AZURE_MCP_COLLECT_TELEMETRY: 'true',
+      APPLICATIONINSIGHTS_CONNECTION_STRING:
+        'InstrumentationKey=00000000-0000-4000-8000-000000000099;IngestionEndpoint=https://project.invalid',
       http_proxy: '',
       https_proxy: '',
       ...environment,
@@ -140,6 +145,15 @@ function hookArgs(shell: 'bash' | 'powershell', hooks: string): string[] {
 }
 
 describe('distributed telemetry runtime', () => {
+  it('bundles the public key and endpoint without a public connection string', () => {
+    for (const layout of layouts) {
+      const bundle = readFileSync(join(layout.hooks, 'runtime', 'telemetry.mjs'), 'utf-8');
+      expect(bundle.includes(PUBLIC_KEY), layout.name).toBe(true);
+      expect(bundle.includes(PUBLIC_ENDPOINT), layout.name).toBe(true);
+      expect(bundle.includes(`InstrumentationKey=${PUBLIC_KEY}`), layout.name).toBe(false);
+    }
+  });
+
   it.each(SHELLS)('%s hooks send through the bundled SDK in all layouts', async shell => {
     for (const layout of layouts) {
       const first = requests.length;
@@ -159,13 +173,16 @@ describe('distributed telemetry runtime', () => {
       for (const request of sent) {
         expect(request.path).toBe('/v2/track');
         expect(request.method).toBe('POST');
+        expect(request.originalHost).toBe(new URL(PUBLIC_ENDPOINT).hostname);
         expect(request.body).not.toContain('private-input');
         expect(request.body).not.toContain(hostname());
         expect(request.body).not.toContain('99.0.0');
         const envelope = JSON.parse(request.body.trim()) as {
+          iKey: string;
           tags: Record<string, string>;
           data: { baseType: string; baseData: { name: string; properties: Record<string, string> } };
         };
+        expect(envelope.iKey).toBe(PUBLIC_KEY);
         expect(Object.keys(envelope.tags)).toEqual(['ai.internal.sdkVersion']);
         expect(envelope.tags['ai.internal.sdkVersion']).toBe('node:1.8.10');
         expect(envelope.data.baseType).toBe('EventData');
@@ -217,12 +234,17 @@ describe('distributed telemetry runtime', () => {
         }), { AF_TEST_RUNTIME: runtime, AF_TEST_WORKSPACE: layout.root });
         expect(result, layout.name).toEqual({ status: 0, stdout: 'sent\n', stderr: '' });
         expect(requests.slice(first)).toHaveLength(1);
+        expect(requests[first].originalHost).toBe(new URL(PUBLIC_ENDPOINT).hostname);
         const body = requests[first].body;
         expect(body).toContain('azure_deployment_observed');
         expect(body).not.toContain('private-env');
         expect(body).not.toContain('/subscriptions/');
         expect(body).not.toContain(hostname());
-        const envelope = JSON.parse(body.trim()) as { data: { baseData: { properties: Record<string, string> } } };
+        const envelope = JSON.parse(body.trim()) as {
+          iKey: string;
+          data: { baseData: { properties: Record<string, string> } };
+        };
+        expect(envelope.iKey).toBe(PUBLIC_KEY);
         expect(Object.keys(envelope.data.baseData.properties).sort()).toEqual([
           'agent', 'deploymentKind', 'operation', 'resourceTypes', 'result', 'skill', 'skillsVersion',
         ]);

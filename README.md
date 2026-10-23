@@ -137,7 +137,8 @@ The local runtime also checks its installed `telemetry.config.json` and workspac
 settings under `.github/hooks/`, `.claude/hooks/`, and `.codex/hooks/`. An
 `"enabled": false` setting, or an unreadable configuration file, stops collection
 before queries or sends. The public plugin contains only a non-secret
-instrumentation key and ingestion endpoint. It does not contain release credentials.
+instrumentation key and ingestion endpoint as separate settings, not a stored
+connection string. It does not contain release credentials.
 
 ## Skills
 
