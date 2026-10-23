@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -102,11 +102,13 @@ async function run(
   environment: NodeJS.ProcessEnv = {},
   cwd: string = root,
 ): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  const inherited = Object.fromEntries(Object.entries(process.env)
+    .filter(([key]) => !/^https?_proxy$/i.test(key)));
   const child = spawn(file, args, {
     cwd,
     windowsHide: true,
     env: {
-      ...process.env,
+      ...inherited,
       PATH: `${join(root, 'fake tools')}${delimiter}${process.env.PATH || ''}`,
       NODE_PATH: join(root, 'node_modules'),
       NODE_OPTIONS: `--import="${pathToFileURL(PRELOAD).href}"`,
@@ -118,8 +120,6 @@ async function run(
       AZURE_MCP_COLLECT_TELEMETRY: 'true',
       APPLICATIONINSIGHTS_CONNECTION_STRING:
         'InstrumentationKey=00000000-0000-4000-8000-000000000099;IngestionEndpoint=https://project.invalid',
-      http_proxy: '',
-      https_proxy: '',
       ...environment,
     },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -152,6 +152,42 @@ describe('distributed telemetry runtime', () => {
       expect(bundle.includes(PUBLIC_KEY), layout.name).toBe(true);
       expect(bundle.includes(PUBLIC_ENDPOINT), layout.name).toBe(true);
       expect(bundle.includes(`InstrumentationKey=${PUBLIC_KEY}`), layout.name).toBe(false);
+    }
+  });
+
+  it.each(SHELLS)('%s isolates the test transport from inherited proxy settings', async shell => {
+    const layout = layouts[0];
+    const first = requests.length;
+    vi.stubEnv('HTTP_PROXY', 'http://127.0.0.1:9');
+    vi.stubEnv('HTTPS_PROXY', 'http://127.0.0.1:9');
+    try {
+      const result = await run(shell === 'bash' ? 'bash' : 'pwsh',
+        hookArgs(shell, layout.hooks), layout.root, INPUT);
+      expect(result).toEqual({ status: 0, stdout: expect.stringMatching(/^\{"continue":true\}\r?\n$/), stderr: '' });
+      expect(requests.slice(first)).toHaveLength(1);
+      expect(requests[first].path).toBe('/v2/track');
+      expect(requests[first].originalHost).toBe(new URL(PUBLIC_ENDPOINT).hostname);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it.skipIf(process.platform !== 'win32')('PowerShell hooks use the first Node application on PATH', async () => {
+    const layout = layouts[0];
+    const shim = join(layout.root, 'fake tools', 'node.cmd');
+    const marker = join(layout.root, 'selected-node');
+    writeFileSync(shim, `@echo off\r\necho selected>"%AF_TEST_NODE_SELECTION%"\r\n"${process.execPath}" %*\r\n`);
+    try {
+      const first = requests.length;
+      const result = await run('pwsh', hookArgs('powershell', layout.hooks), layout.root, INPUT, {
+        AF_TEST_NODE_SELECTION: marker,
+      });
+      expect(result).toEqual({ status: 0, stdout: expect.stringMatching(/^\{"continue":true\}\r?\n$/), stderr: '' });
+      expect(requests.slice(first)).toHaveLength(1);
+      expect(readFileSync(marker, 'utf-8').trim()).toBe('selected');
+    } finally {
+      rmSync(shim);
+      rmSync(marker, { force: true });
     }
   });
 
