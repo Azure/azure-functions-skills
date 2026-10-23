@@ -1,0 +1,28 @@
+{
+  "name": "skill-bench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Measure one agent skill ON and OFF across models with Vally.",
+  "type": "module",
+  "bin": {
+    "skill-bench": "bin/skill-bench.js"
+  },
+  "scripts": {
+    "skill-bench": "node bin/skill-bench.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@microsoft/vally": "0.16.0",
+    "@microsoft/vally-cli": "0.16.0",
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}
