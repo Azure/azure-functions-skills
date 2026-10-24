@@ -6,10 +6,10 @@ app-specific behavior and reusable domain knowledge.
 Use dynamic sessions, not custom tools, for generic web browsing, page fetching, browser
 automation, code execution, data analysis, and file transformation.
 
-For local-skill migration, fixed app-specific processing of approved trigger input or tool results
-can use a Python custom tool. This includes deterministic validation and report formatting.
-This is not general-purpose code execution or file transformation. The migration skill does not
-enable dynamic sessions to run source scripts or bypass its operation exclusions.
+For workflow migration, use the user's approved Connector, remote MCP, or Python tool choices.
+Python tools can provide fixed app-specific processing or narrowly scoped API/SDK operations
+under the migration support policy. Do not expose generic URL/method/SDK dispatch, run source
+scripts in dynamic sessions, or bypass migration exclusions.
 
 ## Custom Python Tools
 

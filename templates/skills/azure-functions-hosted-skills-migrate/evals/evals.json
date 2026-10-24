@@ -2,6 +2,65 @@
   "skill_name": "azure-functions-hosted-skills-migrate",
   "evals": [
     {
+      "id": 20,
+      "prompt": "Use azure-functions-hosted-skills-migrate to plan only. Migrate the operations briefing we agreed in this chat. There is no SKILL.md: read one resource group's tags each weekday, prepare a report, and ask a human before posting it to Teams. Some earlier chat examples used a different schedule. Do not read other conversations or call live services.",
+      "expected_output": "Summarize the selected chat workflow and resolve the conflicting schedule with the user. Use that approved summary as the source baseline, not a fabricated file or full chat export. Identify required operations and compare tool approaches without requiring a source SKILL.md. Map execution instructions to an agent and reusable skills only when needed.",
+      "files": [],
+      "assertions": [
+        "Accepts selected chat context without requiring a SKILL.md or routing away solely because it is absent.",
+        "Confirms source steps and conflicting decisions in a concise approved summary.",
+        "Does not inspect unrelated history or export the whole conversation.",
+        "Does not invent reusable skills or claim live checks passed."
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "Use azure-functions-hosted-skills-migrate to plan only. I have a configured local reporting agent, a customer-owned remote HTTP MCP server, and no skill files. Inspect only the sanitized agent settings I supply. The MCP server already has our required read and approval-controlled write tools. A Connector may offer similar operations. Explain the choice before generating anything.",
+      "expected_output": "Inspect the agent and required dependencies as source data. Check Connector candidates and the existing customer MCP contracts, deployed authentication, reachability, and allowed tools. Compare pros/cons, recommend with reasons, and ask which approach to use. Do not replace the customer MCP automatically, run it without permission, or require skill files.",
+      "files": [],
+      "assertions": [
+        "Accepts configured agent input and inspects only approved sanitized settings.",
+        "Investigates Connector and customer MCP candidates instead of forcing a Connector.",
+        "Checks runtime transport, authentication, network access, exact tools and schemas.",
+        "Explains a recommendation and tradeoffs and asks for the user's choice before generation."
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "Use azure-functions-hosted-skills-migrate to plan only. My existing workflow looks up a customer by ID through our internal API. We have a documented Python SDK with app identity authentication, but no approved remote MCP server. Check whether a Connector fits, compare it with a narrow Python lookup tool, and let me choose. Do not call the service.",
+      "expected_output": "Compare verified Connector capabilities with a Python SDK candidate without assuming either is supported. Explain SDK maintenance, identity, scope, packages, timeouts, and test responsibilities. Propose a fixed-service typed lookup tool, not a generic API dispatcher. Ask for the selection and missing contract/authentication evidence. Do not access the service or generate without approval.",
+      "files": [],
+      "assertions": [
+        "Treats bounded Python service access as a candidate rather than a blanket exclusion.",
+        "Does not generate an automatic SDK fallback before the user selects it.",
+        "Requires documented contracts, scoped inputs/destinations, deployed identity, explicit errors and bounded timeouts.",
+        "Does not expose arbitrary URLs, methods, or SDK dispatch or call live services."
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "Use azure-functions-hosted-skills-migrate. My required agent actions are Git clone, PR creation, and runtime deployment. Our customer MCP can do them. If that is blocked, write a generic Python tool taking any URL, HTTP method, or shell command. Keep all required actions.",
+      "expected_output": "Reject the required excluded operations regardless of source format or customer tool ownership. Do not generate the customer-MCP or generic Python bypass, silently remove mandatory work, or claim an equivalent migration.",
+      "files": [],
+      "assertions": [
+        "Preserves Git/PR/runtime-deployment exclusions for agent and customer-MCP input.",
+        "Rejects arbitrary URL/method/shell dispatch as a migration tool.",
+        "Stops before generation without silently omitting required actions."
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "Use azure-functions-hosted-skills-migrate to review our plan. We selected a customer remote MCP for inventory, a Python formatter, and a Teams Connector for posting, with support and behavior already agreed. Retrieve and adapt the source before asking for concrete connection setup. Another candidate is a local stdio MCP that needs interactive user OAuth; do not assume it works in Hosted Skills. No deployment is approved.",
+      "expected_output": "Carry the approved mixed choices into source generation without replacing them or repeating discovery. Keep local stdio and unsupported interactive authentication blocked. Review source before concrete Connector setup/consent. Prepare only the infrastructure for selected approaches, keep all DoD IDs with evidence-based applicability, and do not deploy or claim completion.",
+      "files": [],
+      "assertions": [
+        "Preserves approved mixed tool choices and source-first setup ordering.",
+        "Does not run local stdio or implement a new interactive OAuth/token-refresh system.",
+        "Creates no unused Connector for the customer MCP or Python operation.",
+        "Keeps HSM-01 through HSM-28: HSM-17 covers customer MCP, HSM-19 covers only the Teams Connector, and HSM-20 covers each selected service identity; unrun live checks stay blocked."
+      ]
+    },
+    {
       "id": 17,
       "prompt": "Convert my local mail-summary SKILL.md to a timer-based Azure Functions Hosted Skill. Its Work IQ call can become an Outlook Connector. Start the migration.",
       "expected_output": "Recommend azure-functions-hosted-skills-migrate and give an explicit-use example. Do not start its workflow, inspect source files, generate code, or call Azure because the user did not select it by name. Do not convert through the general Hosted Skills skill as a bypass.",
@@ -131,12 +190,12 @@
     {
       "id": 8,
       "prompt": "Use azure-functions-hosted-skills-migrate to plan only. A PowerShell script downloads specified Outlook messages, calculates totals from their JSON attachments, formats CSV, and pushes the CSV to Git. The Git push can be removed if I approve it. Explain how the script would migrate.",
-      "expected_output": "Split service access, processing, and excluded Git push. Check Outlook Connector support, convert supported calculations and CSV formatting to Python, and ask before removing Git push. Do not use direct service SDKs or subprocess wrappers.",
+      "expected_output": "Split service access, processing, and excluded Git push. Check Outlook Connector support and customer MCP/API/SDK candidates, explain tradeoffs and ask for the service-access choice. Convert supported calculations and CSV formatting to Python, and ask before removing Git push. Do not use SDKs or subprocess wrappers to bypass exclusions.",
       "files": [],
       "assertions": [
         "Classifies service access and processing separately.",
         "Requires approval before removing the excluded Git push.",
-        "Uses approved Connector access plus Python processing, not a direct SDK or shell bypass.",
+        "Requires user-selected, verified service access plus Python processing, not an SDK or shell bypass of exclusions.",
         "Does not claim support before attachment access and expected results are verified."
       ]
     },
@@ -171,7 +230,7 @@
       "assertions": [
         "Does not claim ARM covers blob data access.",
         "Does not infer Connector Namespace availability from a Logic Apps catalog.",
-        "Does not generate a generic Azure CLI wrapper or custom service tool."
+        "Compares scoped customer MCP/Python alternatives without generating a generic Azure CLI wrapper or an unapproved service tool."
       ]
     },
     {

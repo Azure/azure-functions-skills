@@ -17,7 +17,22 @@ Do not convert an arbitrary `az`, `workiq`, or MCP command as one generic tool.
 
 ## Candidate matrix
 
-All Connector candidates need target-region discovery through `azure-functions-connector-create`.
+Compare options per required operation, not per original tool name. Check Connector candidates
+first, then the customer's existing MCP, API, SDK, or code under approved inspection permissions.
+An installed local tool is not proof of Hosted compatibility. Ask for missing sanitized details;
+do not scan unrelated configuration or call services without permission.
+
+| Option | Advantages | Checks and costs |
+| --- | --- | --- |
+| Connector | Less API client code; managed connection and consent lifecycle | Exact operations, target-region support, account/data scope, service limits and cost |
+| Customer remote HTTP MCP | Reuses existing business contracts and operations | Hosted reachability, supported auth, exact tool/schema allowlist, owner, reliability and cost |
+| Python custom tool | Fits a bounded API/SDK or app-specific contract | App owns dependencies, authentication, validation, errors, timeouts, testing and maintenance |
+
+Show viable options, support evidence, a recommendation with pros/cons, and the user's choice.
+Do not assume Connector-first means Connector-only. Reuse an approved customer service when it
+fits better; keep incompatible options blocked. Mixed implementations are allowed.
+
+All selected Connector candidates need target-region discovery through `azure-functions-connector-create`.
 The service operation references below are discovery sources, not proof of Namespace availability.
 
 | Source requirement | Candidate | First-release decision |
@@ -27,12 +42,12 @@ The service operation references below are discovery sources, not proof of Names
 | Work IQ: read a known SharePoint file/list | SharePoint Connector | Candidate; check site/library scope, content format, file size, and access. |
 | Work IQ: cross-service semantic search, organizational context, or Copilot reasoning | No equivalent general Connector replacement | `change-required` only if a narrower goal is acceptable; otherwise `out-of-scope`. |
 | Work IQ CLI or direct Work IQ MCP | Direct connection | `out-of-scope`; do not implement delegated OAuth for this release. |
-| Azure CLI: resource/group list or show | Azure Resource Manager Connector (`arm`) | Candidate; permit only verified read operations with narrow resource scope. |
-| Azure CLI: service data reads, logs, or queries | Corresponding service Connector or compatible remote HTTP MCP | `unverified` until the exact operation, output, and authentication are checked. ARM is not a replacement for every data-plane API. |
-| Mail send, Teams post, or bounded business-record update | Corresponding Connector | Candidate only after operation and side-effect approval; preserve required confirmation. |
+| Azure CLI: resource/group list or show | ARM Connector, customer remote MCP, or scoped Python ARM client | Candidate; permit only verified read operations with narrow resource scope. |
+| Azure CLI: service data reads, logs, or queries | Corresponding Connector, customer remote MCP, or Python service client | `unverified` until the exact operation, output, and authentication are checked. ARM is not a replacement for every data-plane API. |
+| Mail send, Teams post, or bounded business-record update | Corresponding Connector, customer remote MCP, or Python service client | Candidate only after operation and side-effect approval; preserve required confirmation. |
 | Existing public remote HTTP MCP | Same endpoint | Candidate; check exact tools, contract, transport, and data exposure. |
 | Existing authenticated remote HTTP MCP | Same endpoint | Candidate only if the deployed runtime supports its authentication without a new user OAuth flow. |
-| Local stdio MCP wrapper | Corresponding approved Connector or remote HTTP MCP | Check each required operation. The local process itself is `out-of-scope`. |
+| Local stdio MCP wrapper | Approved Connector, remote HTTP MCP, or Python implementation of required actions | Check each required operation. The local process itself is `out-of-scope`. |
 | Git clone, branch, commit, push, PR creation, or a coding/build pipeline | None in this release | `out-of-scope`, including GitHub/Azure DevOps Connector or MCP alternatives for these operations. |
 | `azd`, deployment, resource writes/deletes, RBAC changes, or package publishing | None as a Hosted runtime operation | `out-of-scope`; ARM deployment actions do not override this rule. |
 | Arbitrary shell, local executable, desktop automation, local credential cache | None | `out-of-scope`; do not add shell/CLI tools or execution sessions. |
@@ -47,6 +62,21 @@ with service calls or side effects into individual operations. A Python rewrite 
 Git, PR, deployment, shell, or unsupported service operations supported.
 Read [dependent-skills.md](./dependent-skills.md) for recursive inspection, shared dependencies,
 name collisions, and cycles.
+
+## Python service tools
+
+Use the Hosted Skills custom-tool pattern only for selected, approved business operations.
+Require a documented API/SDK contract, typed inputs/results, fixed service destinations and
+operation scope, supported runtime dependencies, and a verified Hosted authentication design.
+Prefer managed identity when the service supports it; otherwise use approved secret storage.
+Developer login does not establish deployed access or caller-specific identity.
+
+Do not expose arbitrary URLs, HTTP methods, shell commands, or generic SDK dispatch to the model.
+Validate resource scope and inputs, use bounded pagination and timeouts, surface explicit errors,
+and define write confirmation, result verification, and uncertain-outcome handling.
+Do not build a new interactive OAuth/token-refresh/OBO system or host a new MCP server here.
+Apply existing exclusions even when an API or SDK could perform the operation.
+Plan contract, denial, timeout, pagination, and side-effect tests before implementation.
 
 ## Work IQ and identity
 

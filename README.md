@@ -126,7 +126,7 @@ For contributor guidance on the product boundary between Azure Skills and Azure 
 | [`azure-functions-setup`](templates/skills/azure-functions-setup/SKILL.md) | Verify local prerequisites (Azure CLI, Core Tools, runtimes, Azure Skills) |
 | [`azure-functions-create`](templates/skills/azure-functions-create/SKILL.md) | Create new Functions projects or add functions via Azure MCP templates |
 | [`azure-functions-hosted-skills`](templates/skills/azure-functions-hosted-skills/SKILL.md) | Build cloud-hosted, event-driven intelligent capabilities with Markdown, Functions triggers, code, tools, HTTP, and MCP |
-| [`azure-functions-hosted-skills-migrate`](templates/skills/azure-functions-hosted-skills-migrate/SKILL.md) | Explicit use by name only: convert an existing local skill, check support, configure Connectors, deploy, and test |
+| [`azure-functions-hosted-skills-migrate`](templates/skills/azure-functions-hosted-skills-migrate/SKILL.md) | Explicit use by name only: migrate existing skills, chat workflows, agents, code, or instructions; compare Connector/MCP/Python tools, deploy, and test |
 | [`azure-functions-connector-create`](templates/skills/azure-functions-connector-create/SKILL.md) | Create and authorize least-privilege Connector Namespace connections for Hosted Skills |
 | [`azure-functions-connector-mcp`](templates/skills/azure-functions-connector-mcp/SKILL.md) | Generate and register connector MCP tools from authoritative operation metadata |
 | [`azure-functions-connector-validate`](templates/skills/azure-functions-connector-validate/SKILL.md) | Validate connector identity, MCP contracts, side effects, and Hosted Skill integration |

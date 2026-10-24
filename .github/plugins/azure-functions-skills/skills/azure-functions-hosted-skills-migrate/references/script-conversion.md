@@ -13,13 +13,14 @@ Split mixed scripts into operations before applying [conversion-support.md](conv
 | Source operation | Target |
 | --- | --- |
 | App-specific filtering, calculation, validation, report formatting | Python tool/helper on approved inputs or tool results |
-| Supported service access | Approved Connector/remote HTTP MCP, then Python processing |
+| Supported service access | User-selected Connector, remote HTTP MCP, or bounded Python API/SDK tool |
 | Existing Python | Adapt paths, entry points, dependencies, and Hosted contract |
 | Laptop files | Approved trigger input/output or verified storage operation; obtain approval |
 | Git/PR/build/deploy, shell, unsupported service access | Excluded; return to step 3 |
 
-Do not replace deterministic results with model-generated output. Do not add direct HTTP/SDK
-service access, subprocess/shell calls, embedded interpreters, CLI wrappers, or execution sessions
+Do not replace deterministic results with model-generated output. Direct HTTP/SDK service access
+requires the user's selected operation and the custom-tool checks in the support reference.
+Do not use it, subprocess/shell calls, embedded interpreters, CLI wrappers, or execution sessions
 to bypass exclusions or run the old language. Generic browsing/arbitrary code execution is not
 part of this migration.
 
