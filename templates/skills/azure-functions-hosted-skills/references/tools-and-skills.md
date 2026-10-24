@@ -6,6 +6,11 @@ app-specific behavior and reusable domain knowledge.
 Use dynamic sessions, not custom tools, for generic web browsing, page fetching, browser
 automation, code execution, data analysis, and file transformation.
 
+For workflow migration, use the user's approved Connector, remote MCP, or Python tool choices.
+Python tools can provide fixed app-specific processing or narrowly scoped API/SDK operations
+under the migration support policy. Do not expose generic URL/method/SDK dispatch, run source
+scripts in dynamic sessions, or bypass migration exclusions.
+
 ## Custom Python Tools
 
 Put tools in `src/tools/`. Use one tool per file for predictable discovery.
