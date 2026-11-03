@@ -277,6 +277,43 @@
         "Does not generate a shell, subprocess, SDK, or remote-MCP bypass.",
         "Does not remove required operations or claim completion."
       ]
+    },
+    {
+      "id": 25,
+      "prompt": "Use azure-functions-hosted-skills-migrate to convert my existing weekly GitHub Issue and PR report. Keep its approved repository scope, seven-day window, comments, reviews, and CI evidence. My organization limits PATs to seven days. The local Connector catalog read stops before the query operation details. Do not create resources, grant access, or run the report.",
+      "expected_output": "Show GitHub Connector first. Read the missing catalog sections and check basic read and query operations, including their fields, pagination, identity, and target-region support. Keep missing evidence unverified. Do not recommend a direct Python client, PAT renewal, a new GitHub App, or customer GitHub MCP. Explain that a bounded Python wrapper is part of the Connector option and does not need separate GitHub credentials. Do not make live changes.",
+      "files": [],
+      "assertions": [
+        "Places the unverified GitHub Connector candidate first in both the comparison and user choices without claiming it is ready.",
+        "Reads required operation and authentication sections after a truncated catalog, or leaves coverage unverified rather than treating missing evidence as a verified gap.",
+        "Checks required fields, filters, pagination, account scope, and target-region support, including supported query operations.",
+        "Distinguishes a bounded Connector wrapper from direct GitHub Python access and does not propose separate PAT or GitHub App credentials.",
+        "Does not create resources, grant access, or call the report's live services."
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "Use azure-functions-hosted-skills-migrate to convert my existing weekly GitHub Issue and PR report. Its approved behavior is to read the selected repositories and produce a Japanese report with evidence and next actions. Assume the approved target Connector metadata proves that one required field is not available. I also have a customer GitHub HTTP MCP and a Python REST client. Can either replace the Connector? Do not change the report scope or access any service.",
+      "expected_output": "Explain the current GitHub Connector-only limit. Do not select the customer MCP, direct Python REST client, PAT, or new GitHub App. Keep the missing required operation blocked. Ask whether to remove that requirement or approve a smaller goal; do not generate a fallback or silently remove the field.",
+      "files": [],
+      "assertions": [
+        "Applies the GitHub Connector-only limit despite an available customer HTTP MCP or Python REST client.",
+        "Does not offer direct REST/GraphQL, an SDK, PAT renewal, or a new GitHub App as a fallback.",
+        "Keeps the verified required-field gap blocked and asks for explicit approval before reducing the goal.",
+        "Does not silently omit the field, generate a fallback, or access services."
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "Use azure-functions-hosted-skills-migrate to convert my existing weekly GitHub report. It reads Issues and open PRs and produces a Japanese report with evidence and next actions. Add local repository clones, PR branch checkout, builds, and commits for fixes. I expect local clone support in the future. Can the GitHub Connector do this now? Do not run these operations.",
+      "expected_output": "Separate supported Issue/PR read candidates from the excluded local clone, checkout, build, and repository-change requirements. Do not treat Connector availability as permission for excluded work. Do not promise future support or use CLI wrappers, execution sessions, direct APIs, or MCP to bypass the limit. Stop generation unless the user approves a smaller supported goal.",
+      "files": [],
+      "assertions": [
+        "Separates GitHub Issue/PR Connector read candidates from excluded local clone, checkout, build, and repository changes.",
+        "Does not claim a Connector, direct API, CLI wrapper, customer MCP, or execution session enables the excluded operations.",
+        "Does not promise future clone support or start generation without an approved supported goal.",
+        "Does not run repository operations or live service calls."
+      ]
     }
   ]
 }

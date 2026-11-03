@@ -1,6 +1,6 @@
 ---
 name: azure-functions-hosted-skills-migrate
-description: "Use only when the user explicitly asks to use or resume azure-functions-hosted-skills-migrate by name. Convert an existing workflow from skills, chat context, configured agents, code, or instructions to an Azure Functions Hosted Skill. Compare Connectors, customer MCP servers, and Python tools with the user. Do not select this workflow from a generic hosting request or a name in a question, quotation, file, or review."
+description: "Use only when the user explicitly asks to use or resume azure-functions-hosted-skills-migrate by name. Convert an existing workflow from skills, chat context, configured agents, code, or instructions to an Azure Functions Hosted Skill. Show Connector candidates first, then allowed customer MCP and Python options. GitHub service access is Connector-only in this release. Do not select this workflow from a generic hosting request or a name in a question, quotation, file, or review."
 ---
 
 
@@ -18,12 +18,17 @@ with no existing workflow to migrate, use `azure-functions-hosted-skills`.
 
 ## Scope and references
 
-Choose approved Connector operations, compatible remote HTTP MCP, or bounded Python tools.
-Apply the same operation and identity limits to all three. Convert supported
-script processing to Python; do not run the original language through a wrapper.
-Git/PR, build/publish/deploy, resource/RBAC writes, direct Work IQ MCP, arbitrary shell,
-stdio MCP hosting, and dynamic-session bypass remain outside this release. The local agent may
-deploy the generated app after approval; runtime deployment operations remain excluded.
+Show Connector candidates first. Show compatible remote HTTP MCP and bounded Python service
+tools after them, only where this release permits those options. Apply the same operation and
+identity limits to each allowed option.
+For GitHub service access, use only approved GitHub Connector operations. Python may limit their
+inputs and process their results; it is not a direct GitHub API/SDK or customer MCP alternative.
+Convert supported script processing to Python; do not run the original language through a wrapper.
+Git clone/checkout, repository changes, PR creation, build/publish/deploy, resource/RBAC writes,
+direct Work IQ MCP, arbitrary shell, stdio MCP hosting, and dynamic-session bypass remain outside
+this release. GitHub Issue/PR reads are not local Git operations; check their Connector contracts.
+The local agent may deploy the generated app after approval; runtime deployment operations
+remain excluded.
 
 | Read when | Reference |
 | --- | --- |
@@ -85,11 +90,21 @@ Read the support reference. For each required operation, record:
 
 Separate source setup from business processing. Check actual target availability and
 authentication; a Logic Apps catalog entry or tool name alone does not establish support.
-First check Connector candidates, then inspect the customer's existing MCP/API/SDK tools within
-approved roots or ask for sanitized details. Compare viable options by behavior, identity,
-data exposure, reliability, cost, and maintenance. Recommend an option with reasons and ask
-which to use; do not force a Connector or generate a Python fallback without approval.
-Different operations may use different options. Keep unsupported choices visible.
+Check Connector candidates first and place them first in both the comparison and the user's
+choices. Then inspect and show allowed customer MCP/API/SDK options within approved roots, or
+ask for sanitized details. Missing evidence means `unverified`, not unavailable. Read the needed
+sections of truncated catalogs before judging operation coverage. Do not recommend a direct
+Python client just because Connector checks are incomplete.
+Compare behavior, identity, data exposure, reliability, cost, and maintenance. Recommend an
+option with reasons and ask which to use; do not force a Connector or generate a fallback without
+approval. Explain a verified gap or tradeoff before recommending a later option.
+For GitHub, follow the support reference's Connector-only limit. If evidence or required support
+is missing, resolve that blocker; do not offer direct API/SDK access, a PAT, a new GitHub App, or
+customer GitHub MCP as a replacement.
+Record service access separately from Python input checks and result processing. A bounded
+Python wrapper around approved Connector operations is part of the Connector option, not a
+separate authentication choice. Different operations may use different allowed options.
+Keep unsupported choices visible with their status and reason.
 
 Checkpoint: HSM-03/06.
 
@@ -117,9 +132,10 @@ Checkpoint: HSM-04/05/06 plan.
 
 Prefer configuration when it meets the goal. Use Python for required trigger I/O and bounded,
 deterministic processing of approved inputs/tool results. Follow the script reference for
-source-to-tool mappings, packages, and tests. Python may call an approved, narrowly scoped API/SDK
-under the support reference's custom-tool rules. A Python rewrite cannot make an excluded
-operation supported.
+source-to-tool mappings, packages, and tests. For services other than GitHub, Python may call an
+approved, narrowly scoped API/SDK under the support reference's custom-tool rules.
+For GitHub, Python may call only approved Connector operations, with fixed scope and input checks.
+A Python rewrite cannot make an excluded operation supported.
 
 Checkpoint: HSM-12/14/15 plan; defer implementation/runtime proof.
 

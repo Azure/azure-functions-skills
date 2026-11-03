@@ -18,25 +18,39 @@ Do not convert an arbitrary `az`, `workiq`, or MCP command as one generic tool.
 ## Candidate matrix
 
 Compare options per required operation, not per original tool name. Check Connector candidates
-first, then the customer's existing MCP, API, SDK, or code under approved inspection permissions.
+first and show them first in the comparison and the user's choices. Show allowed customer MCP
+and Python options after them. Apply the GitHub limit below before offering any alternative.
+Inspect existing MCP, API, SDK, or code only under approved permissions.
 An installed local tool is not proof of Hosted compatibility. Ask for missing sanitized details;
 do not scan unrelated configuration or call services without permission.
 
 | Option | Advantages | Checks and costs |
 | --- | --- | --- |
 | Connector | Less API client code; managed connection and consent lifecycle | Exact operations, target-region support, account/data scope, service limits and cost |
-| Customer remote HTTP MCP | Reuses existing business contracts and operations | Hosted reachability, supported auth, exact tool/schema allowlist, owner, reliability and cost |
-| Python custom tool | Fits a bounded API/SDK or app-specific contract | App owns dependencies, authentication, validation, errors, timeouts, testing and maintenance |
+| Customer remote HTTP MCP | Reuses existing business contracts and operations | Not a GitHub alternative in this release; otherwise check Hosted reachability, supported auth, exact tool/schema allowlist, owner, reliability and cost |
+| Python custom tool | Fits a bounded API/SDK or app-specific contract | Direct GitHub API/SDK access is excluded; otherwise the app owns dependencies, authentication, validation, errors, timeouts, testing and maintenance |
 
-Show viable options, support evidence, a recommendation with pros/cons, and the user's choice.
-Do not assume Connector-first means Connector-only. Reuse an approved customer service when it
-fits better; keep incompatible options blocked. Mixed implementations are allowed.
+Show support status, evidence, a recommendation with pros/cons, and the user's choice.
+Keep an unverified Connector candidate first with its missing checks; do not present it as ready
+to use. If no Connector candidate is available, show the evidence for that finding before any
+allowed alternatives. A truncated page, missing metadata, or a failed discovery tool is not proof
+that a Connector cannot meet the requirement. Read the needed operation and authentication
+sections, or leave the candidate `unverified`. Do not recommend Python only because Connector
+checks are incomplete.
+For services other than GitHub, an approved customer service or Python client can be recommended
+with a verified reason, such as a contract gap or an unacceptable identity scope.
+Do not force an unsuitable Connector. Mixed implementations are allowed within the service policy.
+
+Separate service access and authentication from code that limits inputs or processes results.
+A Python wrapper that calls approved Connector operations remains the Connector option.
+It does not require a separate PAT or GitHub App registration for GitHub access.
 
 All selected Connector candidates need target-region discovery through `azure-functions-connector-create`.
 The service operation references below are discovery sources, not proof of Namespace availability.
 
 | Source requirement | Candidate | First-release decision |
 | --- | --- | --- |
+| GitHub: read Issues, PRs, or the connected user; run scoped read queries | GitHub Connector only | Candidate; verify exact fields, filters, pagination, account, permissions, and target-region support. Check supported query operations if basic reads lack required fields. No direct API/SDK or customer GitHub MCP replacement. |
 | Work IQ: get bounded mail or calendar data | Office 365 Outlook Connector | Candidate; check filters, fields, time zone, pagination, and account. |
 | Work IQ: get messages from a specified chat/channel | Teams Connector | Candidate; check chat/channel type, read operation, replies, and access. |
 | Work IQ: read a known SharePoint file/list | SharePoint Connector | Candidate; check site/library scope, content format, file size, and access. |
@@ -45,10 +59,10 @@ The service operation references below are discovery sources, not proof of Names
 | Azure CLI: resource/group list or show | ARM Connector, customer remote MCP, or scoped Python ARM client | Candidate; permit only verified read operations with narrow resource scope. |
 | Azure CLI: service data reads, logs, or queries | Corresponding Connector, customer remote MCP, or Python service client | `unverified` until the exact operation, output, and authentication are checked. ARM is not a replacement for every data-plane API. |
 | Mail send, Teams post, or bounded business-record update | Corresponding Connector, customer remote MCP, or Python service client | Candidate only after operation and side-effect approval; preserve required confirmation. |
-| Existing public remote HTTP MCP | Same endpoint | Candidate; check exact tools, contract, transport, and data exposure. |
-| Existing authenticated remote HTTP MCP | Same endpoint | Candidate only if the deployed runtime supports its authentication without a new user OAuth flow. |
-| Local stdio MCP wrapper | Approved Connector, remote HTTP MCP, or Python implementation of required actions | Check each required operation. The local process itself is `out-of-scope`. |
-| Git clone, branch, commit, push, PR creation, or a coding/build pipeline | None in this release | `out-of-scope`, including GitHub/Azure DevOps Connector or MCP alternatives for these operations. |
+| Existing public remote HTTP MCP | Same endpoint, where this service policy permits it | Candidate; check exact tools, contract, transport, and data exposure. A customer GitHub MCP is `out-of-scope` in this release. |
+| Existing authenticated remote HTTP MCP | Same endpoint, where this service policy permits it | Candidate only if the deployed runtime supports its authentication without a new user OAuth flow. A customer GitHub MCP is `out-of-scope` in this release. |
+| Local stdio MCP wrapper | Approved Connector, remote HTTP MCP, or Python implementation of required actions, within the service policy | Check each required operation. GitHub service access must use its Connector. The local process itself is `out-of-scope`. |
+| Git clone, checkout, branch, commit, push, PR creation, or a coding/build pipeline | None in this release | `out-of-scope`, including GitHub/Azure DevOps Connector or MCP alternatives for these operations. |
 | `azd`, deployment, resource writes/deletes, RBAC changes, or package publishing | None as a Hosted runtime operation | `out-of-scope`; ARM deployment actions do not override this rule. |
 | Arbitrary shell, local executable, desktop automation, local credential cache | None | `out-of-scope`; do not add shell/CLI tools or execution sessions. |
 | Local file read/write | Approved trigger input/output or explicit cloud storage operation | `change-required`; a laptop path is not a cloud path. Check transfer, persistence, format, and access. |
@@ -59,13 +73,50 @@ The service operation references below are discovery sources, not proof of Names
 
 Read [script-conversion.md](./script-conversion.md) for required Python conversion. Split scripts
 with service calls or side effects into individual operations. A Python rewrite does not make
-Git, PR, deployment, shell, or unsupported service operations supported.
+excluded repository operations, PR creation, deployment, shell, or unsupported service operations
+supported. Issue/PR reads are evaluated separately under the GitHub Connector policy.
 Read [dependent-skills.md](./dependent-skills.md) for recursive inspection, shared dependencies,
 name collisions, and cycles.
+
+## GitHub service access
+
+This release permits GitHub service access only through approved GitHub Connector operations.
+This limit also applies to scripts, dependent skills, existing MCP servers, and implementation
+handoffs. It takes precedence over the general Python and remote-MCP options.
+
+Map `gh` or other source tools to their required business operations. Reading Issues and PRs is
+not the same as cloning or changing a Git repository. The public Connector catalog lists
+`GetIssues`, `GetPullRequests`, `GetUser`, and `SearchGithubWithQuery`; these are discovery
+candidates, not proof of target Namespace support or complete report coverage.
+Check the full operation metadata for required fields, filters, pagination, errors, and limits.
+If basic reads are insufficient, inspect supported query operations before rejecting the
+Connector. Verify the query language and fields; do not infer them from an operation name.
+
+When a query operation meets the requirement, Python may call it through the Connector with
+fixed read-only query templates, approved repository scope, typed inputs, and bounded pagination.
+Do not expose raw queries, arbitrary URLs, or generic MCP dispatch to the model.
+Python input checks and result processing do not change who owns service authentication.
+Do not export Connector credentials or call GitHub directly from this wrapper.
+
+Use the Connector-create skill to check the target region, authentication scheme, connection
+account, organization policy, and full consent scope before selecting the connection design.
+The connection service manages its credentials; do not promise permanent access or no future
+reauthorization. A tool allowlist does not reduce the connection's OAuth permissions.
+Publish only the approved operations and verify the deployed identity and exact tool contracts.
+
+Do not offer direct REST/GraphQL clients, PAT renewal, new GitHub App registration, or customer
+GitHub MCP as alternatives in this release, even if they could supply missing data.
+Missing metadata is `unverified`; a verified Connector gap blocks the required operation.
+Ask whether to remove the requirement or approve a smaller goal. Keep the original requirement
+blocked until that decision; do not silently omit fields or generate a direct-access fallback.
+Connector support does not remove the exclusions for local clone/checkout, repository changes,
+PR creation, or coding/build pipelines.
 
 ## Python service tools
 
 Use the Hosted Skills custom-tool pattern only for selected, approved business operations.
+The direct API/SDK option below applies to services other than GitHub. For GitHub, use only
+the bounded Connector wrapper described above.
 Require a documented API/SDK contract, typed inputs/results, fixed service destinations and
 operation scope, supported runtime dependencies, and a verified Hosted authentication design.
 Prefer managed identity when the service supports it; otherwise use approved secret storage.
@@ -104,6 +155,8 @@ Caller-specific private data is blocked unless a supported isolation design is v
 
 ## Remote MCP checks
 
+These checks apply only to allowed MCP candidates. A GitHub Connector's generated MCP endpoint
+is part of the Connector option; a customer GitHub MCP is not a replacement in this release.
 The Hosted Skills runtime supports remote HTTP MCP in `mcp.json`, not local `command`/`args`
 processes. Check the current Hosted Skills remote-MCP reference for supported fields.
 
@@ -120,6 +173,7 @@ the source and date so a future run can recheck preview behavior.
 
 - [Connector Namespace overview](https://learn.microsoft.com/en-us/azure/connector-namespace/connector-namespace-overview)
 - [Create MCP server connectors](https://learn.microsoft.com/en-us/azure/connector-namespace/create-mcp-server-connectors)
+- [GitHub operations](https://learn.microsoft.com/en-us/connectors/github/)
 - [Office 365 Outlook operations](https://learn.microsoft.com/en-us/connectors/office365/)
 - [Microsoft Teams operations](https://learn.microsoft.com/en-us/connectors/teams/)
 - [SharePoint operations](https://learn.microsoft.com/en-us/connectors/sharepointonline/)
@@ -128,4 +182,5 @@ the source and date so a future run can recheck preview behavior.
 - [Work IQ permissions](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/permissions)
 - [Work IQ Foundry authentication](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/mcp/quickstart/foundry)
 
-These sources were checked during design on 2026-10-12. Recheck them during migration.
+The GitHub operation reference and MCP connector guide were checked on 2026-11-03 (UTC).
+The other sources were checked during design on 2026-10-12. Recheck them during migration.

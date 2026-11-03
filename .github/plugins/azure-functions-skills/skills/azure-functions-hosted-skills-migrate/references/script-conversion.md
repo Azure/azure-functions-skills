@@ -13,16 +13,19 @@ Split mixed scripts into operations before applying [conversion-support.md](conv
 | Source operation | Target |
 | --- | --- |
 | App-specific filtering, calculation, validation, report formatting | Python tool/helper on approved inputs or tool results |
-| Supported service access | User-selected Connector, remote HTTP MCP, or bounded Python API/SDK tool |
+| Supported service access | Connector first, then allowed remote HTTP MCP or bounded Python API/SDK options; GitHub service access uses only its Connector |
 | Existing Python | Adapt paths, entry points, dependencies, and Hosted contract |
 | Laptop files | Approved trigger input/output or verified storage operation; obtain approval |
-| Git/PR/build/deploy, shell, unsupported service access | Excluded; return to step 3 |
+| Git clone/checkout, repository changes, PR creation, build/deploy, shell, unsupported service access | Excluded; return to step 3 |
 
 Do not replace deterministic results with model-generated output. Direct HTTP/SDK service access
-requires the user's selected operation and the custom-tool checks in the support reference.
-Do not use it, subprocess/shell calls, embedded interpreters, CLI wrappers, or execution sessions
-to bypass exclusions or run the old language. Generic browsing/arbitrary code execution is not
-part of this migration.
+for services other than GitHub requires the user's selected operation and the custom-tool checks
+in the support reference. For GitHub, Python may call only approved Connector operations and
+process their results; do not retain a source script's direct GitHub API/SDK calls or credentials.
+This wrapper belongs to the Connector option, not a separate PAT or GitHub App design.
+Do not use direct service access, subprocess/shell calls, embedded interpreters, CLI wrappers,
+or execution sessions to bypass exclusions or run the old language.
+Generic browsing/arbitrary code execution is not part of this migration.
 
 ## Implement
 
