@@ -19,21 +19,52 @@ import { listFunctionTemplates, applyFunctionTemplate } from '@azure/functions-s
 
 ## Telemetry
 
+Automatic hooks and deployment skills use the installed
+`hooks/runtime/telemetry.mjs` payload with Node.js 18 or later. The payload
+includes the Application Insights SDK and its required dependencies. It does not
+run npm or npx, read project modules, or download a missing payload.
+The commands below remain available for explicit CLI use.
+
 ```bash
 echo '<event-json>' | npx @azure/functions-skills telemetry
 ```
 
-The plugin telemetry hooks call this command. It reads one sanitized event from stdin and sends it to Application Insights. You do not usually run it yourself.
+This command reads one sanitized event from stdin and sends it to Application Insights.
 
 ```bash
 echo '<observation-json>' | npx @azure/functions-skills telemetry deployment-observed --dir <workspace-root>
 ```
 
-The `azure-functions-deploy` and `azure-functions-hosted-skills` skills call this command one time, only after a supported `azd up` or standalone `azd provision` is successful. It is not a deployment command. It reads a bounded JSON object from stdin, uses your Azure CLI sign-in to make sure that the Azure Resource Manager deployment is successful, and sends the categorical `azure_deployment_observed` event. It prints one status word and always exits with `0`. Thus, it cannot change the result of a deployment.
+This command supports observations after a successful `azd up` or standalone `azd provision`. It is not a deployment command. It reads a bounded JSON object from stdin, uses your Azure CLI sign-in to make sure that the Azure Resource Manager deployment is successful, and sends the categorical `azure_deployment_observed` event. It prints one status word and always exits with `0`. Thus, it cannot change the result of a deployment.
 
 `--dir` sets the workspace root. The default is the current directory. If a `telemetry.config.json` file from an earlier local install in that workspace has `"enabled": false`, the command sends nothing.
 
-Both commands obey the opt-out environment variables in the [README](../README.md#telemetry). When telemetry is disabled, they do no work.
+Both commands obey the opt-out environment variables in the [README](../README.md#telemetry).
+
+### Local automatic runtime
+
+The plugin uses `hooks/runtime/telemetry.mjs`. Built workspace assets use
+`.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`, or
+`.codex/hooks/runtime/telemetry.mjs`. Hooks call `node "<runtime>" hook`.
+The two deployment skills call
+`node "<runtime>" deployment-observed --dir "<workspace-root>"` once after a
+supported successful command. Hook mode reads at most 1 MiB from stdin to allow
+tool responses such as a full bundled skill read. Observation mode keeps its
+16 KiB input limit. Tool output is not included in telemetry.
+
+The local runtime checks its installed hook configuration and all three workspace
+hook configuration paths in the selected directory and each ancestor up to the
+filesystem root. This also applies when a hook runs in a project subdirectory
+without Git metadata. A false or unreadable setting stops collection; an enabled
+child setting does not override an ancestor opt-out.
+Environment opt-out also stops collection before ARM queries or sending.
+Usage sends wait at most five seconds; a process deadline of 5.5 seconds also
+bounds input reads. Deployment observations have a 26-second process deadline,
+which includes the existing 20-second ARM and five-second send budgets.
+Hooks always return `{"continue":true}` and exit with `0`. The observation mode
+prints one status word and exits with `0`. Missing Node or payload files do not
+trigger an install or download. Normal deployment and deployed-app monitoring
+are unchanged.
 
 ## Contributor build
 

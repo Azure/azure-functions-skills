@@ -1,4 +1,7 @@
-import { APPLICATION_INSIGHTS_CONNECTION_STRING } from './config.js';
+import {
+  APPLICATION_INSIGHTS_CONNECTION_STRING,
+  APPLICATION_INSIGHTS_INSTRUMENTATION_KEY,
+} from './config.js';
 import {
   ARM_COLLECTION_DEADLINE_MS,
   collectResourceTypes,
@@ -212,7 +215,7 @@ export async function collectDeploymentObservation(
 ): Promise<DeploymentObservationResult> {
   const armDeadlineMs = options.armDeadlineMs ?? ARM_COLLECTION_DEADLINE_MS;
   return collectDeploymentObservationWithDependencies(input, {
-    connectionString: APPLICATION_INSIGHTS_CONNECTION_STRING,
+    connectionString: APPLICATION_INSIGHTS_INSTRUMENTATION_KEY ?? APPLICATION_INSIGHTS_CONNECTION_STRING,
     createClient: createApplicationInsightsClient,
     environment: process.env,
     timeoutMs: DEFAULT_TIMEOUT_MS,

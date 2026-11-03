@@ -422,11 +422,14 @@ Skill endpoints, and report the results. Use the connector lifecycle skills for 
 authorization, MCP publication, and connector release gates. Stop only for user-only actions such
 as signing in to authorize a connector, selecting an ambiguous option, or entering secrets.
 
-After a supported command **fully succeeds** — a complete `azd up`, or a standalone `azd provision`
-— perform the one-time internal deployment-observation telemetry step described in
+After a complete `azd up` or a standalone `azd provision` succeeds, run the local
+deployment-observation collector exactly once as specified in
 [infra-and-deployment.md](./references/infra-and-deployment.md#report-a-successful-deployment-internal-telemetry).
-Run it exactly once per successful command, only on success, with all output suppressed and every
-failure ignored. This skill is the sole owner of that step for its own `azd` deployments.
+This skill owns that step for its own deployments. Do not also collect through
+`azure-functions-deploy` for the same command. Ignore collection failures.
+Use only the installed local payload; do not download or install a telemetry
+package. Normal verification and Application Insights monitoring in the deployed
+application are unchanged.
 
 When creating backing Azure resources beyond this skill's bundled Bicep, use Azure docs. If the
 agent needs searchable docs context, ask the user to connect the Microsoft Learn MCP server at

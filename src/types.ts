@@ -1,3 +1,5 @@
+import type { TelemetryRuntime } from './build/telemetry-runtime.js';
+
 export type BuildTargetName = 'ghcp' | 'claude' | 'codex';
 
 export interface Skill {
@@ -28,6 +30,7 @@ export interface HookDefinitions {
   telemetryConfig: string;
   trackTelemetryPowerShell: string;
   trackTelemetryShell: string;
+  runtime: TelemetryRuntime;
 }
 
 export interface BuildData {

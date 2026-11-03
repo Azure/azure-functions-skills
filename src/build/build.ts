@@ -10,8 +10,8 @@
 
 import { isAbsolute, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, rmSync, mkdirSync } from 'node:fs';
-import { loadSkills, loadMcpServers, loadHooks } from './loader.js';
+import { existsSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
+import { loadSkills, loadMcpServers, loadHooks, loadTelemetryRuntime } from './loader.js';
 import { buildPluginMarketplaces, buildPluginPayload, buildTarget } from './build-target.js';
 import type { BuildData, BuildTargetName } from '../types.js';
 
@@ -54,7 +54,11 @@ function resolveFromRoot(path: string): string {
 console.log('Loading canonical sources...');
 const skills = loadSkills(join(TEMPLATES_DIR, 'skills'));
 const mcpServers = loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml'));
-const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'));
+// Published packages ship the built payload, not source or build dependencies.
+const runtime = existsSync(join(ROOT, 'src', 'telemetry', 'runtime.ts'))
+  ? (await import('./telemetry-runtime.js')).buildTelemetryRuntime(join(TEMPLATES_DIR, 'skills'))
+  : loadTelemetryRuntime(join(ROOT, 'dist', 'plugin', 'azure-functions-skills', 'hooks', 'runtime'));
+const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'), runtime);
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')) as { version: string };
 
 console.log(`  ${skills.length} skills loaded`);

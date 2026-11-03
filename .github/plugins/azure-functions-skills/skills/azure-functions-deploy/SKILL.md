@@ -164,23 +164,42 @@ Do not kill and restart the `azd up` process based solely on lack of terminal ou
 
 ## Report a successful deployment (internal telemetry)
 
-After the delegated Azure Skills deployment (`azure-deploy`) reports success, run the one-time internal deployment-observation collector **exactly once**. It records a categorical "observed successful Azure deployment" signal and is best-effort: it independently reads the named Azure Resource Manager deployment (by the environment name) to confirm success and never changes the deployment outcome.
+After `azure-deploy` reports success for a complete `azd up` or a standalone
+`azd provision`, run the local deployment-observation collector exactly once.
+This skill owns the step for its delegated deployment. Do not also run the
+hosted-skills collector for the same command.
 
-- This skill is the **sole owner** of the collection step for the delegated deployment path. The `azure-functions-hosted-skills` skill must not also emit it for the same work.
-- Run it once, and only after the delegated deployment reports success. Never run it after a failed, cancelled, preview, or validation-only run, and never re-run it to "retry" a telemetry failure.
-- Run it only when the command that succeeded was a complete `azd up` or a standalone `azd provision`. Do not run it after a code-only `azd deploy`, a Terraform deployment, a direct `az deployment` command, or a fallback publish such as Azure Functions Core Tools. These paths do not create the azd provisioning deployment that the collector confirms.
-- Replace `<operation>` with `deploy` for a full deployment (`azd up`), or `provision` if only a standalone `azd provision` was delegated.
-- Replace `<agent>` with the current host (`copilot-cli`, `claude-code`, `codex`, or `Visual Studio Code`); unrecognized hosts are normalized automatically.
-- `environmentName` is required for a usable observation: set it to the azd environment name (the ARM deployment name used for the deployment). The collector looks the deployment up by this name. If the name is missing or invalid, the collector accepts the input and returns `skipped` before any Azure query. This is a valid skip, not an error. Never guess or invent a value; if the name is genuinely unavailable, skip the collector. The collector sends the name to Azure Resource Manager only to look up the deployment. The name is not included in the telemetry event and is not printed.
-- `startedAt` is **optional**: if you captured an ISO-8601 UTC instant immediately before you started the deployment command, include it as a lower bound on which deployment can be selected. It is used only locally to select the deployment. It is not sent to Azure, not included in the telemetry event, and not printed. If you did not capture it, omit it; a missing or malformed value must never cause a retry or an error.
-- Pass `--dir "<workspace-root>"` with the project's workspace root so the workspace telemetry opt-out is resolved correctly. Without it the flag defaults to the current working directory, so running from a subdirectory such as `infra/` could miss a workspace opt-out.
-- Suppress all output and ignore failures. A telemetry error must never trigger a redeploy or change the reported result.
-- Older published versions do not have this subcommand. In that case doing nothing is the correct outcome. Never install, upgrade, reinstall, or work around the package, never try an alternative invocation, and never report a telemetry problem to the user.
+Do not collect after a failed, cancelled, preview, or validation-only command.
+Do not collect after `azd deploy`, Terraform, direct Azure CLI, or Core Tools
+publish. These paths do not produce the supported azd provisioning deployment.
+
+Use `deploy` for `azd up`, or `provision` for standalone `azd provision`.
+Use the current host name for `<agent>` (`copilot-cli`, `claude-code`, `codex`,
+or `Visual Studio Code`). Set `environmentName` to the actual azd environment
+name. If that name is not available, skip collection. Do not guess it.
+If you recorded a UTC start time before deployment, include it as `startedAt`.
+Otherwise, omit `startedAt`. The name and start time are not telemetry fields.
+
+Find `hooks/runtime/telemetry.mjs` in the installed plugin root. For workspace
+assets, use `.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`,
+or `.codex/hooks/runtime/telemetry.mjs` in the workspace root. Use only the payload
+that belongs to this installed skill. Set `<runtime-dir>` to its absolute parent directory.
+Pass the project workspace root with `--dir`, even if the current directory is
+`infra/`. The collector checks opt-out settings before ARM queries or sending.
 
 ```bash
-printf '%s' '{"skill":"azure-functions-deploy","operation":"<operation>","agent":"<agent>","environmentName":"<azd-env-name>","startedAt":"<iso-8601-utc-before-deploy>"}' \
-  | npx -y @azure/functions-skills@latest telemetry deployment-observed --dir "<workspace-root>" >/dev/null 2>&1 || true
+printf '%s' '{"skill":"azure-functions-deploy","operation":"<operation>","agent":"<agent>","environmentName":"<azd-env-name>"}' \
+  | node "<runtime-dir>/telemetry.mjs" deployment-observed --dir "<workspace-root>" >/dev/null 2>&1 || true
 ```
+
+On PowerShell, pipe the same JSON to
+`& node "<runtime-dir>\telemetry.mjs" deployment-observed --dir "<workspace-root>"`
+inside `try { ... | Out-Null } catch { }`, with `2>&1`.
+Encode values as JSON. Do not insert unescaped values into shell commands.
+If Node or the local payload is absent, skip collection. Do not download,
+install, upgrade, or use a package-manager fallback. Suppress output and ignore
+failures. Do not retry collection, redeploy, or change the deployment result.
+Normal deployment verification and deployed-app monitoring are unchanged.
 
 ## Next steps
 

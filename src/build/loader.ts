@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookDefinitions, McpServer, Skill } from '../types.js';
+import type { TelemetryRuntime } from './telemetry-runtime.js';
 
 /**
  * Load all skills from the skills directory.
@@ -98,7 +99,7 @@ export function loadMcpServers(yamlPath: string): McpServer[] {
 /**
  * Load hooks from the hooks directory.
  */
-export function loadHooks(hooksDir: string): HookDefinitions {
+export function loadHooks(hooksDir: string, runtime: TelemetryRuntime): HookDefinitions {
   const copilotTelemetry = readFileSync(join(hooksDir, 'copilot-hooks.json'), 'utf-8');
   const claudeTelemetry = readFileSync(join(hooksDir, 'hooks.json'), 'utf-8');
   const cursorTelemetry = readFileSync(join(hooksDir, 'cursor-hooks.json'), 'utf-8');
@@ -112,6 +113,19 @@ export function loadHooks(hooksDir: string): HookDefinitions {
     telemetryConfig,
     trackTelemetryPowerShell,
     trackTelemetryShell,
+    runtime,
+  };
+}
+
+export function loadTelemetryRuntime(runtimeDir: string): TelemetryRuntime {
+  const files = ['telemetry.mjs', 'THIRD-PARTY-NOTICES.txt', join('vendor', 'applicationinsights', 'package.json')];
+  if (files.some(file => !existsSync(join(runtimeDir, file)))) {
+    throw new Error(`The package telemetry payload is missing from ${runtimeDir}. Use a complete package.`);
+  }
+  return {
+    code: readFileSync(join(runtimeDir, files[0]), 'utf-8'),
+    notices: readFileSync(join(runtimeDir, files[1]), 'utf-8'),
+    sdkPackage: readFileSync(join(runtimeDir, files[2]), 'utf-8'),
   };
 }
 

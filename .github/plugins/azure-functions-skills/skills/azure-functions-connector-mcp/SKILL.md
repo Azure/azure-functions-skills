@@ -87,8 +87,9 @@ rules, intent manifests, and the publication handoff.
 - Do not commit endpoint values tied to an environment when an app setting can hold them.
 - Do not register a schema assembled from operation names alone.
 - Do not enable a configuration until the validation skill confirms its deployed contract.
-- Do not emit the internal `azure_deployment_observed` event. Its supported owners remain
-  `azure-functions-deploy` and `azure-functions-hosted-skills`.
+- Do not run a deployment collector from this connector skill. The
+  `azure-functions-hosted-skills` skill owns the internal `azure_deployment_observed`
+  event after its supported deployment command succeeds. Do not duplicate that event.
 
 ## Definition of done
 

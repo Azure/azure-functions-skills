@@ -18,6 +18,7 @@ export default [
       'dist-test*/**',
       'lib/**',
       'node_modules/**',
+      '.github/plugins/**/hooks/runtime/**',
       'coverage/**',
     ],
   },
