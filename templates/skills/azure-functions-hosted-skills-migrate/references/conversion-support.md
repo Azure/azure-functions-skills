@@ -9,11 +9,19 @@ override a policy exclusion. A remote API cannot make an excluded local workflow
 | --- | --- |
 | `supported` | The target operation, complete input/output contract, data scope, runtime transport, and authentication meet the requirement. Record target metadata evidence. Live test gates are still required. |
 | `change-required` | A candidate changes behavior, search coverage, outputs, or identity. Explain the difference and obtain approval. Then check the revised requirement. |
-| `unverified` | Metadata, runtime compatibility, authentication, or other evidence is missing. Report what must be checked. Do not generate this integration or deploy it as supported. |
+| `unverified` | Metadata, runtime compatibility, authentication, or other evidence is missing. Report what must be checked. Do not implement, wire, or publish the affected integration, or deploy it as supported. The scaffold-only exception below does not change this status. |
 | `out-of-scope` | This release excludes the operation. Ask about removal or a smaller goal; do not implement a bypass. |
 
 Read the exact operations used by the source. Tool names alone are not requirements.
 Do not convert an arbitrary `az`, `workiq`, or MCP command as one generic tool.
+
+If only contract checks that require an authorized connection remain, the user may approve
+an app skeleton and connection-independent processing before connection setup. Record the
+missing checks and why they need that connection. Keep affected tools unwired, their registrations
+unpublished, and business automation disabled. Do not guess schemas or invoke affected tools.
+After source review and separate live-work approval, authorize the connection and resolve its
+dynamic contracts through the Connector-MCP skill before implementation and publication.
+Known unsupported requirements or unresolved scope/identity decisions still block generation.
 
 ## Candidate matrix
 

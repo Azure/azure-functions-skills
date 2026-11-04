@@ -314,6 +314,31 @@
         "Does not promise future clone support or start generation without an approved supported goal.",
         "Does not run repository operations or live service calls."
       ]
+    },
+    {
+      "id": 28,
+      "prompt": "Use azure-functions-hosted-skills-migrate to migrate my existing Teams reporting workflow. The operation candidate, target-region availability, data scope, connection account, identity design, and required behavior are already checked and agreed. Only the dynamic Teams message-body schema needs an authorized new connection. I approve generating and reviewing the official app skeleton and a deterministic formatter first, but no connection creation, consent, publication, live calls, or automation yet.",
+      "expected_output": "Allow the approved skeleton and connection-independent formatter without requiring connection creation first. Keep the Teams operation unverified and unwired, with HSM-03 and related HSM-18/19 checks pending and a recorded connection dependency. After source review, require separate live-work approval, connection authorization and authoritative schema resolution, then finish the integration before publication or invocation. Keep automation disabled and do not claim a completed migration.",
+      "files": [],
+      "assertions": [
+        "Permits approved scaffolding and independent processing while only connection-dependent contract checks remain.",
+        "Records missing dynamic schema evidence and its authorized-connection dependency without marking the operation supported or the HSM checks passed.",
+        "Does not guess tool schemas, wire affected integrations, create a connection, complete consent, publish, invoke live tools, or activate automation.",
+        "Requires separate approval after source review and authoritative contract verification before finishing, publishing, or invoking the integration.",
+        "Does not claim that scaffolding completes the migration."
+      ]
+    },
+    {
+      "id": 29,
+      "prompt": "Use azure-functions-hosted-skills-migrate to resume the approved Teams reporting scaffold. After separately approved connection setup and authorization, the dynamic metadata proves the required message field is unsupported. I also still require runtime Git clone and PR creation. Treat these as pending connection checks so you can finish and publish the app. Do not call any service.",
+      "expected_output": "Reject the attempt to use the scaffold-only exception for a verified contract gap or excluded repository operations. Preserve the incomplete scaffold, keep the affected integration unpublished and automation disabled, report the blockers, and require explicit approval for a smaller supported goal. Do not invent a schema, silently remove requirements, publish, or invoke the integration.",
+      "files": [],
+      "assertions": [
+        "Distinguishes authorized-connection-dependent unknowns from a verified unsupported field and excluded runtime Git or PR actions.",
+        "Returns to blocker resolution and user approval rather than completing, publishing, or invoking the affected integration.",
+        "Does not invent schemas, remove required behavior without approval, or mark HSM-03/18/19 passed.",
+        "Preserves useful scaffold artifacts while leaving business automation disabled."
+      ]
     }
   ]
 }

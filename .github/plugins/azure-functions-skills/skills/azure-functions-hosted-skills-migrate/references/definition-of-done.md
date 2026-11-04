@@ -3,7 +3,12 @@
 Use these stable IDs in the plan, checkpoints, final review, and evaluation. At delivery, check
 every ID against current artifacts and results; do not replace them with step summaries.
 Record `pass`, `fail`, `blocked`, or `not-applicable`, with proof and applicability reason.
-Future checks may be pending during work. Missing/stale required proof is blocked at delivery.
+Future checks may be pending during work. During approved scaffold-only work, connection-dependent
+parts of HSM-03/18/19 may remain pending until connection authorization and schema retrieval.
+Record the dependency, keep affected tools unwired and their registrations unpublished, and keep business
+automation disabled. Verify contracts and registration schemas before publication, then check
+published tools before runtime invocation;
+scaffolding does not prove support. Missing/stale required proof is blocked at delivery.
 External test-gate `not-verified` also maps to blocked. N/A requires the condition below,
 not missing tools, permission, time, or access.
 

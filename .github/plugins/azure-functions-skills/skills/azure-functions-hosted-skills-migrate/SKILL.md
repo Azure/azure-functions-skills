@@ -112,6 +112,12 @@ Checkpoint: HSM-03/06.
 
 Explain unsupported or unknown operations, including those in required dependencies.
 Ask about removal or a supported replacement. If mandatory work remains blocked, stop generation.
+Exception: if only contract checks that require an authorized connection remain, obtain approval
+to scaffold the app and implement connection-independent processing. Record the affected rows as
+`unverified`, the missing checks, and their connection dependency. Do not invent schemas, wire or
+publish affected tools, invoke the integration, or enable business automation.
+This exception does not cover excluded operations, known contract gaps, or unresolved scope or
+identity decisions.
 Obtain approval for narrower goals, behavior changes, renames, and runtime-cycle changes.
 Do not silently remove work or describe changed scope as an equivalent conversion.
 
@@ -122,8 +128,9 @@ Checkpoint: HSM-04 and remaining HSM-02/03 blockers.
 Ask only unresolved decisions, one at a time: trigger, inputs, output destination, replacements,
 connection account/data scope, and confirmation for side effects. Distinguish skill selection
 from the Functions trigger. Shared connections act as their authorizing account, not each caller.
-Approve the selected tool approach and plan before generation. Carry those choices into the Hosted
-handoff. Defer concrete connection setup and consent until source review, before deployment;
+Approve the selected tool approach and plan before generation, including any scaffold-only limit
+from step 3. Carry those choices and pending contract checks into the Hosted handoff.
+Defer concrete connection setup and consent until source review, before deployment;
 do not defer support or identity decisions that change the design.
 
 Checkpoint: HSM-04/05/06 plan.
@@ -150,12 +157,16 @@ under `src/skills/<name>/SKILL.md`.
 Resolve names, links, and non-Markdown assets under the approved mapping.
 Create `src/<name>.agent.md` for the trigger, skill use, results, and tool restrictions.
 Keep shared settings in the template's runtime configuration, not duplicated agent instructions.
+For scaffold-only work, leave affected integrations unwired and business automation disabled.
+Source review does not mark pending operation contracts as supported.
 
 Checkpoint: HSM-07 through HSM-11 artifacts; defer runtime discovery proof.
 
 ### 7. Implement conversions
 
-Apply approved operation rows. Use `src/tools/` for callable Python tools and importable app
+Apply approved, verified operation rows. Defer connection-dependent integrations until step 9
+resolves their contracts; continue only approved independent work.
+Use `src/tools/` for callable Python tools and importable app
 modules for helpers, outside `src/skills/`. Add runtime packages to `requirements.txt`.
 Update all parent/dependent callers, links, and skill/tool filters. Remove local paths,
 skill-loader commands, CLI/stdio launches, and unused sample actions.
@@ -170,6 +181,7 @@ For selected Connectors, use the Connector-create skill for verified authenticat
 policies, and the human consent handoff. Reuse connections only after checking owner and consumers.
 Use the Connector-MCP skill for metadata-based schemas and complete registration configuration.
 Bicep owns stable resources/settings; bootstrap/post-provision owns generated operation schemas.
+Prepare retrieval steps for connection-dependent schemas, not guessed registration payloads.
 Do not guess schemas, embed secret values/endpoints, or provision before step 9 approval.
 For customer MCP or Python service tools, prepare only their required identity, network,
 settings, packages, and least-privilege access. Do not create an unused Connector.
@@ -181,6 +193,13 @@ Checkpoint: HSM-19 files/metadata; keep HSM-20 live consent/access proof pending
 Confirm target subscription/resource group/region, budget, repetition count, and cleanup separately.
 Confirm write-test targets separately. Use the Hosted Skills deployment workflow and applicable Connector
 handoffs for consent, publication, and settings. Resource creation is not proof of authorization.
+Approved provisioning may create app and connection resources with business automation disabled;
+it does not permit publication or calls for unverified operations.
+After connection authorization, resolve pending contracts through authoritative metadata and
+return to steps 2, 7, and 8 to complete the affected integration. Verify its contracts (HSM-03)
+and registration schemas (HSM-19) before publication, then check published `tools/list` (HSM-18)
+before runtime invocation. If verification finds a gap or a design change, return to steps 3
+and 4 for a supported choice and approval; do not silently change the goal.
 Keep business automation disabled while required checks remain open; use controlled trigger tests.
 For generation-only work, stop before live actions and report live checks as blocked.
 This skill does not emit `azure_deployment_observed`; its existing owners remain unchanged.
