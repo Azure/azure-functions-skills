@@ -91,6 +91,8 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | Request Functions code migration without selecting the update skill by name | Recommend `azure-functions-update`; do not start it automatically |
 | Change a hosting plan or SKU, including Consumption to Flex | Azure Skills; not an implicit code-migration request |
 | Build or modify Azure Functions Hosted Skills: cloud-hosted intelligent capabilities using Markdown, Functions triggers, code, tools, HTTP, or MCP | `azure-functions-hosted-skills` |
+| Explicitly ask to use or resume `azure-functions-hosted-skills-migrate` by name | `azure-functions-hosted-skills-migrate`, then the Hosted Skills and Connector skills |
+| Convert an existing local skill without selecting the migration skill by name | Recommend `azure-functions-hosted-skills-migrate`; do not start it or convert under another skill automatically |
 | Create and authorize a Connector Namespace connection for a Hosted Skill | `azure-functions-connector-create` |
 | Generate and register connector-backed MCP tools from operation metadata | `azure-functions-connector-mcp` |
 | Validate connector identity, MCP contracts, side effects, and Hosted Skill integration | `azure-functions-connector-validate` |
@@ -103,7 +105,8 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 
 When the user intent is generic Azure deployment with no Functions-specific context, route to Azure Skills. When the workspace or prompt clearly identifies Azure Functions, route to Azure Functions Skills first and delegate common Azure execution only when needed.
 
-The explicit-use rule for `azure-functions-update` is an exception to automatic routing.
+The explicit-use rules for `azure-functions-update` and `azure-functions-hosted-skills-migrate`
+are exceptions to automatic routing.
 A question, quotation, file reference, or review that contains the name does not request
 a migration. Normal replies in an active, user-selected run do not need the name again.
 The update workflow owns Functions model/configuration changes and required evidence.
