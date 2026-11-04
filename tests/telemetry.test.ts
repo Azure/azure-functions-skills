@@ -192,7 +192,12 @@ describe('sendTelemetryEventWithDependencies', () => {
     })).rejects.toThrow('Telemetry delivery failed');
   });
 
-  it.each(['connection-string', 'instrumentation-key'] as const)('sends through the SDK with %s', async configurationKind => {
+  it.each([
+    { configurationKind: 'connection-string', inheritedProxy: false },
+    { configurationKind: 'instrumentation-key', inheritedProxy: false },
+    { configurationKind: 'connection-string', inheritedProxy: true },
+    { configurationKind: 'instrumentation-key', inheritedProxy: true },
+  ])('sends through the SDK with $configurationKind (inherited proxy: $inheritedProxy)', async ({ configurationKind, inheritedProxy }) => {
     let receivedBytes = 0;
     let requestPath = '';
     const requestPaths: string[] = [];
@@ -220,6 +225,10 @@ describe('sendTelemetryEventWithDependencies', () => {
       : `InstrumentationKey=${instrumentationKey};IngestionEndpoint=${ingestionEndpoint}`;
 
     try {
+      if (inheritedProxy) {
+        vi.stubEnv('http_proxy', 'http://127.0.0.1:9');
+        vi.stubEnv('https_proxy', 'http://127.0.0.1:9');
+      }
       await expect(sendTelemetryEventWithDependencies(EVENT, {
         connectionString,
         createClient: configuration => {
@@ -227,7 +236,14 @@ describe('sendTelemetryEventWithDependencies', () => {
             configuration,
             configurationKind === 'instrumentation-key' ? `${ingestionEndpoint}/` : undefined,
           );
-          expect(Reflect.get(client, 'config')).toMatchObject({
+          const config: unknown = Reflect.get(client, 'config');
+          if (typeof config !== 'object' || config === null) {
+            throw new Error('SDK client configuration is not available.');
+          }
+          // Local test requests must not use the host proxy.
+          Reflect.set(config, 'proxyHttpUrl', undefined);
+          Reflect.set(config, 'proxyHttpsUrl', undefined);
+          expect(config).toMatchObject({
             instrumentationKey,
             endpointUrl: `${ingestionEndpoint}/v2/track`,
           });
@@ -237,6 +253,9 @@ describe('sendTelemetryEventWithDependencies', () => {
         timeoutMs: 1_000,
       })).resolves.toEqual({ status: 'sent' });
     } finally {
+      if (inheritedProxy) {
+        vi.unstubAllEnvs();
+      }
       server.close();
       await once(server, 'close');
     }
