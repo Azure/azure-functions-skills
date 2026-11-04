@@ -26,6 +26,17 @@ Validate the full repository before opening a pull request:
 npm run check
 ```
 
+## Temporary minimatch Override
+
+`package.json` overrides minimatch with version `11.0.2` to address the
+globparts amplification denial-of-service issue in versions below `11.0.1`.
+ESLint, `@eslint/config-array`, and `@typescript-eslint/typescript-estree` still
+request minimatch 10. This override is outside their declared version ranges.
+Remove it when these dependencies accept a patched version without an override.
+Before you change the override, compare file selection, ignore patterns, partial
+directory matches, and project-service file patterns with the previous version.
+Run `npm ci`, `npm ls minimatch`, and `npm run check`.
+
 ## Key Directories
 
 ```text
