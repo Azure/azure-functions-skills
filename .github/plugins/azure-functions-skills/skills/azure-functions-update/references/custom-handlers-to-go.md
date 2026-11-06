@@ -48,7 +48,8 @@ plan; refresh on a conflict, changed target, or missing detail.
 The core worker v1.0.0 is generally available on Linux Flex Consumption. Linux
 Elastic Premium and Dedicated support is a preview rollout: confirm availability
 for the actual plan, SKU, and region. Do not force a move to Flex or promise all
-preview targets are available. Windows and Linux Consumption are not native Go targets.
+preview targets are available. Windows-hosted Azure apps and Linux Consumption
+are not native Go targets; Windows local development is supported.
 
 Reviewed minimums: Go 1.24 for the core worker, Core Tools 4.12 for Flex, and Azure
 CLI 2.87.0 when approved Azure operations need it. Use Core Tools 4.16.0 or later
@@ -58,7 +59,9 @@ Extension modules can require Go 1.25
 or later; inspect the selected modules' `go.mod` files. An unmet version floor needs
 a separately approved toolchain stage, not a silent version change.
 
-Additional input bindings and non-HTTP output bindings need agreed Azure SDK
-replacements. HTTP responses remain supported through `http.ResponseWriter`.
+Unsupported additional input bindings and non-HTTP output bindings need agreed Azure SDK
+replacements. The preview Durable middleware's `durabletask.ClientInput()` registers
+a supported `durableClient` input binding; verify its compatibility and preview
+requirements separately. HTTP responses remain supported through `http.ResponseWriter`.
 Durable orchestrations and activities are a separate preview capability, not a
 feature to introduce during migration. Durable entities are not supported.

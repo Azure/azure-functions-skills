@@ -1,6 +1,10 @@
 # Creating a Go Azure Functions project
 
-Load this file only when the user asks for Go. It is not needed for any other language.
+This file covers the native Go worker, not Go custom handlers. For an existing app,
+confirm the model from configuration and Go source/modules before using these
+templates or registration APIs. Adding a function to a custom handler must preserve
+its handler, runtime `custom`, `host.json.customHandler`, and `function.json` metadata;
+use **azure-functions-update** only for an explicitly requested migration.
 
 Go support is generally available on Linux Flex Consumption. Linux Elastic Premium
 and Dedicated support is a preview rollout; confirm availability for the target
@@ -141,10 +145,10 @@ func hello(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-Rules that differ from every other language:
+Native Go rules:
 
-- **Never author `function.json`.** Worker-driven indexing means the registration options in code are the only source of truth. A `function.json` file does not belong in a Go project.
-- **Additional input bindings and non-HTTP output bindings are not supported.** HTTP responses use `http.ResponseWriter`. Other service I/O uses the Azure SDK for Go.
+- **Never author `function.json` for native Go.** Worker-driven indexing means the registration options in code are the only source of truth. Go custom handlers still require their metadata.
+- **General additional input bindings and non-HTTP output bindings are not supported.** The preview Durable middleware's `durabletask.ClientInput()` is a supported exception that registers a `durableClient` input binding. Verify its version/extension requirements below. HTTP responses use `http.ResponseWriter`. Other service I/O uses the Azure SDK for Go.
 - `FUNCTIONS_WORKER_RUNTIME` is `native`. It is never `go` or `golang`.
 - The extension bundle is still required, because Go is a non-.NET runtime.
 - Do not commit `local.settings.json`.
@@ -200,7 +204,10 @@ Consult that module's documentation when requested; do not generate legacy Durab
 func start
 ```
 
-`func start` runs `go build -o bin/app .` itself before starting the host, so a compile error surfaces as a host start failure. Do not prefix it with a separate build step.
+`func start` builds for the local OS before starting the host: `bin\app.exe` on
+Windows, or `bin/app` on Linux/macOS. A compile error surfaces as a host start
+failure. Do not prefix it with a separate build step. Windows local development
+does not imply Windows hosting support in Azure; deployment packaging targets Linux.
 
 On a healthy start, verify worker initialization and the expected indexed function
 list. Exact log text can vary by version. An empty list can indicate missing
@@ -213,7 +220,11 @@ Then perform real end-to-end verification, not just a successful start:
 
 A `webjobs.storage` unhealthy warning is expected when `AzureWebJobsStorage` is empty or points at the storage emulator while Azurite is not running. It does not block HTTP triggers, but non-HTTP triggers need a real storage endpoint.
 
-## Adding a function to an existing Go project
+## Adding a function to an existing native Go project
+
+Confirm native Go from configuration and Go source/modules first. If the app is
+a Go custom handler, extend its existing handler and `function.json` instead;
+do not introduce `app.*` registrations or change its runtime as part of adding a function.
 
 Use an MCP template with `output: Add` when a suitable template is available, merging
 only the needed function pattern, dependencies, and settings. Otherwise use the
