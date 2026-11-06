@@ -34,16 +34,19 @@ Start with the Go developer reference. Use the worker documentation and selected
 
 ## Identifying a Go app
 
-`FUNCTIONS_WORKER_RUNTIME` is **`native`** for Go apps. It is never `go` or `golang`. If you find either of those values, that is the misconfiguration, and the fix is to set `native`.
+`FUNCTIONS_WORKER_RUNTIME` is **`native`** for native Go apps. It is never `go` or
+`golang` for that model. Confirm the model before fixing a runtime value: a Go
+custom handler legitimately uses `custom` and `host.json.customHandler`.
 
 Core Tools resolves the `native` worker to Go when a `go.mod` file is present, so `native` alone does not prove the app is Go. Confirm with at least one secondary signal before loading Go-specific guidance:
 
 - `go.mod` in the project root, especially requiring `github.com/azure/azure-functions-golang-worker`.
 - `main.go` calling `sdk.FunctionApp()` and `worker.Start(app)`.
 - `FUNCTIONS_CLI_NATIVE_LANGUAGE` set to `go` in `local.settings.json`. Core Tools writes this when scaffolding with `func init --worker-runtime go`.
-- A compiled binary as the deployment entry point. Core Tools builds `bin/app` locally and places it at the root of the deployment package as `app`.
+- A compiled binary as the deployment entry point, corroborated by native Go source/configuration. Core Tools builds `bin\app.exe` locally on Windows or `bin/app` on Linux/macOS; Azure packaging builds a Linux binary at `bin/app` and places it at the package root as `app`. Custom handlers can also use compiled binaries.
 
-If none of these are present, the app is more likely a custom handler. Use custom-handler guidance instead.
+If native Go cannot be confirmed, inspect the custom-handler configuration and its
+executable/source before selecting guidance; do not infer either model from missing signals.
 
 > **Module path casing.** The GitHub repository is `Azure/azure-functions-golang-worker`, but the Go module path is lowercase, `github.com/azure/azure-functions-golang-worker`. Go module paths are case-sensitive, so `go get` and every import must use the lowercase form.
 
@@ -55,7 +58,7 @@ These come from the Go developer reference and change what is even possible, so 
 
 - Go is GA on Flex Consumption; Linux Elastic Premium and Dedicated are preview targets whose availability must be confirmed.
 - Core Tools 4.12 is the Flex minimum. Use 4.16.0+ for Elastic Premium/Dedicated: [4.16.0 release notes](https://github.com/Azure/azure-functions-core-tools/releases/tag/4.16.0) confirm support. This is a verified baseline, not a claim about the earliest supporting release.
-- Go function apps run on **Linux only** in Azure.
+- Native Go function apps run on **Linux only** in Azure. Windows local development is supported; the developer OS is not the Azure hosting OS.
 - Durable orchestrations and activities are in preview through `middleware/durabletask`; they require Go 1.25+ and Durable Task extension 3.15.0+. Entities are not supported.
 - **`func new` is not supported.** Functions are added by editing `main.go`.
 - Check the selected worker release for trigger support; the tables below are starting points, not a permanent catalog.
@@ -64,7 +67,7 @@ These come from the Go developer reference and change what is even possible, so 
 ## Programming model essentials
 
 - **Worker-driven indexing.** Native Go declares triggers in code, not `function.json`. A Go custom handler still needs its metadata until an approved migration; do not flag it as a misconfigured native app.
-- **Binding limits.** Additional input bindings and non-HTTP output bindings are not supported. HTTP responses use `http.ResponseWriter`. Other service I/O uses the Azure SDK for Go.
+- **Binding limits.** General additional input bindings and non-HTTP output bindings are not supported. The preview Durable middleware's `durabletask.ClientInput()` registers a supported `durableClient` input binding; verify its middleware/extension compatibility and preview acceptance separately. HTTP responses use `http.ResponseWriter`. Other service I/O uses the Azure SDK for Go.
 - **Registration shape.** `app := sdk.FunctionApp()`, then `app.HTTP(...)` / `app.Timer(...)` and so on, then `worker.Start(app)`.
 - **HTTP handlers** use standard `http.ResponseWriter` and `*http.Request`. HTTP streaming is supported through `http.Flusher`.
 - **Extension bundles still apply.** Go is a non-.NET runtime, so non-HTTP triggers resolve their extensions through the bundle in `host.json`.
@@ -106,12 +109,45 @@ chasing phantom packaging problems.
 
 | Command | What it does |
 |---|---|
-| `func start` | Runs `go build -o bin/app .` for the local OS, then starts the host. A compile error surfaces as a host start failure. |
+| `func start` | Builds for the local OS to `bin\app.exe` on Windows or `bin/app` on Linux/macOS, then starts the host. A compile error surfaces as a host start failure. |
 | `func azure functionapp publish <APP_NAME>` | Builds, packages, and deploys to an existing function app. |
 | `func pack` | Builds for Linux x64 and produces a deployable zip. The binary is placed at the package root as `app`. |
-| `func pack --no-build` | Skips the build. Only in this case must the binary be cross-compiled first with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/app .`. |
+| `func pack --no-build` | Skips the build and requires an existing Linux x64 binary at `bin/app` (also on Windows, without `.exe`). Use the shell-specific commands below if a manual build is needed. |
 
 A package produced by `func pack` is ready to run, so a remote build should not be requested when deploying it.
+
+### Manual cross-compilation
+
+Prefer `func pack`, which sets the target for its build without changing the shell
+environment. If using `func pack --no-build`, build a Linux x64 binary first.
+These paths and settings target Azure, not the developer's local OS.
+
+Bash:
+
+```bash
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/app .
+```
+
+PowerShell (restore the previous environment even if the build fails):
+
+```powershell
+$previousCgo = $env:CGO_ENABLED
+$previousGoos = $env:GOOS
+$previousGoarch = $env:GOARCH
+try {
+    $env:CGO_ENABLED = '0'
+    $env:GOOS = 'linux'
+    $env:GOARCH = 'amd64'
+    go build -o bin\app .
+} finally {
+    $env:CGO_ENABLED = $previousCgo
+    $env:GOOS = $previousGoos
+    $env:GOARCH = $previousGoarch
+}
+```
+
+Check the build exit code before packaging. The binary must be Linux ELF x64,
+not the local Windows `bin\app.exe`.
 
 ## Common failure modes
 
@@ -133,6 +169,6 @@ A package produced by `func pack` is ready to run, so a remote build should not 
 - Confirm the worker module version against published releases and `go.mod`. Version `v1.0.0` is the first GA core-worker release; extension modules can have separate versions and Go requirements. Do not assume every tag is a preview or depend on `main`.
 - For crashes, look for whole-worker termination rather than a single failed invocation. That pattern points at goroutine panics, and the fix is propagating panics as errors with `sdk.RecoverTo` rather than adding handler-level recovery.
 - For trigger problems, verify the Go registration call and the `host.json` extension bundle together. There is no `function.json` to inspect.
-- Treat additional input/non-HTTP output bindings in a native Go app as unsupported configuration requiring an agreed SDK replacement. Do not flag the supported implicit HTTP response.
+- Treat unsupported additional input/non-HTTP output bindings in a native Go app as requiring an agreed SDK replacement. Do not flag the supported implicit HTTP response or the preview Durable middleware's `durableClient` input from `durabletask.ClientInput()`; validate its compatibility and preview requirements separately.
 - Include `azure-functions-host` when trigger indexing, host startup, scale, or cross-worker behavior is involved.
 - Prefer the worker repository's samples over hand-written registration when reproducing an issue.

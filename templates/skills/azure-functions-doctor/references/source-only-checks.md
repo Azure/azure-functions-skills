@@ -51,7 +51,7 @@ Do these checks first in every analysis. They need only the project files. `RT-0
   evidence of a vulnerable or malicious package.
 - `AS-001` valid `FUNCTIONS_WORKER_RUNTIME` values include `native`. Confirm Go from source/modules, not this setting alone. Native Go uses `native`, not `go` or `golang`; a Go custom handler legitimately uses `custom` until migrated.
 - `DP-003` does not apply to native Go. It deploys a compiled binary and indexes from code. A leftover `function.json` in a confirmed native Go project is a finding; a source custom handler still needs its metadata.
-- `DP-002` native Go registers triggers in code and supports HTTP responses through `http.ResponseWriter`. Additional input/non-HTTP output bindings require SDK replacements; do not apply these limits as defects in an unmigrated custom handler.
+- `DP-002` native Go registers triggers in code and supports HTTP responses through `http.ResponseWriter`. The preview Durable middleware's `durabletask.ClientInput()` registers a supported `durableClient` input binding; check its compatibility/preview requirements rather than rejecting all additional inputs. Other unsupported input/non-HTTP output bindings require SDK replacements; do not apply these limits as defects in an unmigrated custom handler.
 - The extension bundle range is commonly written with a wildcard, `[4.*, 5.0.0)`. That is the documented form and must not be reported as outdated.
 - For `RT-004`, recommend the bundle `Microsoft.Azure.Functions.ExtensionBundle` with the range `[4.*, 5.0.0)`. A range that starts at major version 4 or higher is current.
 

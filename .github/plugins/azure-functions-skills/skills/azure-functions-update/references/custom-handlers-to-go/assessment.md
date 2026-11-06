@@ -37,7 +37,7 @@ registration and handler shape, preserved settings, validation, and status:
 - **Direct mapping**: supported trigger and compatible payload/HTTP contract.
 - **Code adaptation**: protocol parsing, middleware, or service I/O needs an agreed rewrite.
 - **Blocked**: unsupported trigger, unverified parity, missing source, or no agreed
-  replacement for an additional input/non-HTTP output binding.
+  replacement for an unsupported additional input/non-HTTP output binding.
 
 Preserve batch cardinality explicitly. An Event Hubs batch maps to
 `app.EventHubBatch`, not a single-message handler with a cardinality option.
@@ -55,9 +55,10 @@ native Go app creation has succeeded. Use `azure-functions-create` only for an
 approved empty local comparison/target project, not to reinitialize the source.
 
 Separate local conversion from Go/tool upgrades, Azure configuration/provisioning,
-deployment, and traffic/event cutover. Windows requires a supported Linux hosting target;
+deployment, and traffic/event cutover. A Windows-hosted Azure app requires a supported Linux hosting target;
 changing a worker setting does not change an app's OS. Confirm preview availability
-before proposing Premium/Dedicated as ready to deploy. Record unavailable cloud
+before proposing Premium/Dedicated as ready to deploy. Windows local development
+does not require changing the developer's OS. Record unavailable cloud
 evidence as unverified, not as a reason to block unrelated local analysis.
 
 For assessment or plan-only requests, save the plan and stop without source changes,

@@ -30,7 +30,12 @@ Keep exact function names unless renaming is separately approved.
 | Single Service Bus queue/topic | `app.ServiceBusQueue` / `app.ServiceBusTopic` with `bindings.ServiceBusMessage` |
 | Batched Service Bus queue/topic | `app.ServiceBusQueueBatch` / `app.ServiceBusTopicBatch` with `[]bindings.ServiceBusMessage` |
 | Other triggers | Find the actual supported registration/type; unsupported or unproven parity remains blocked |
-| Additional input or non-HTTP output binding | Agreed Azure SDK for Go integration, not deletion of the binding's behavior |
+| Unsupported additional input or non-HTTP output binding | Agreed Azure SDK for Go integration, not deletion of the binding's behavior |
+
+The preview Durable middleware's `durabletask.ClientInput()` registers a supported
+`durableClient` input binding. Verify the selected middleware/extension compatibility,
+Go version, and preview acceptance separately; do not introduce Durable implicitly
+or assume that this exception enables general additional input bindings.
 
 `sdk.WithConnection` takes the setting name, not a credential. Preserve entity names,
 `%SETTING%` resolution, consumer groups, subscriptions, sessions, schedules, and retry
@@ -62,7 +67,12 @@ Remove `host.json`'s `customHandler` block after the new entry point exists.
 Keep applicable extension bundles, connection setting names, HTTP options, retries,
 service settings, and logging. Translate obsolete extension schemas only with
 version-specific evidence and record the change. Remove each old `function.json`
-only after all its bindings/retries are mapped or recorded as blockers.
+only after all its binding and retry behavior has implemented, verified native
+mappings or approved, verified replacements. Recording a blocker is not sufficient:
+retain the original metadata and pause conversion while any behavior is blocked.
+When metadata is retired, keep a copy in the rollback source/snapshot outside the
+active native app and package. Do not mix legacy metadata indexing with native
+registrations or cut over while any behavior is blocked.
 
 Under `Values`, preserve unrelated values and set:
 

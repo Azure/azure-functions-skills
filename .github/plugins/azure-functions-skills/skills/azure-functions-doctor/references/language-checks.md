@@ -90,7 +90,7 @@ extensions require separate preview checks.
 | `GO-007` | Context propagation | - | `context.Context` ignored, or long work not cancellable |
 | `GO-008` | Startup cost | - | Blocking work in `init()` or before `worker.Start` |
 | `GO-009` | Toolchain version | Go/toolchain below the selected worker or extension module's minimum (core: 1.24) | Required version cannot be established |
-| `GO-010` | Unsupported feature | Additional input binding, non-HTTP output binding, or Durable entity used in a native Go project | Trigger/extension support or required preview acceptance is unverified |
+| `GO-010` | Unsupported feature | Unsupported additional input binding (exclude the Durable middleware's `durableClient` binding), non-HTTP output binding, or Durable entity used in a native Go project | Trigger/extension support or required preview acceptance is unverified |
 
 Notes:
 
@@ -98,6 +98,6 @@ Notes:
 - `GO-004`: native Go uses `FUNCTIONS_WORKER_RUNTIME=native` locally; `go` and `golang` are wrong for that model. A source custom handler with runtime `custom` and a `host.json` `customHandler` block is not a finding. Cloud runtime configuration must match the target-plan schema; Flex uses `functionAppConfig.runtime`.
 - `GO-005`: native Go indexes from code. Do not flag a source custom handler's required `function.json` or remove it without approved migration.
 - `GO-006`: extension triggers such as Blob live in `triggers/` and must be activated with a blank import, for example `_ "github.com/azure/azure-functions-golang-worker/triggers/blob"`. Missing it is the usual cause of a trigger that never registers.
-- `GO-010`: HTTP responses use `http.ResponseWriter`; do not flag them as unsupported output bindings. Additional input/non-HTTP output bindings need Azure SDK for Go integration. Durable orchestrations/activities are preview through `middleware/durabletask` with Go 1.25+ and Durable Task extension 3.15.0+; entities are unsupported. Check the selected release rather than flagging all Durable use.
+- `GO-010`: HTTP responses use `http.ResponseWriter`; do not flag them as unsupported output bindings. The preview Durable middleware's `durabletask.ClientInput()` registers a supported `durableClient` input binding; do not flag it as unsupported merely because it is an additional input. Other unsupported input/non-HTTP output bindings need Azure SDK for Go integration. Durable orchestrations/activities are preview through `middleware/durabletask` with Go 1.25+ and Durable Task extension 3.15.0+; entities are unsupported. Verify middleware/extension compatibility and preview acceptance separately. Check the selected release rather than flagging all Durable use.
 - Entry-point checks that assume an interpreted script file do not apply. Go deploys a compiled binary, so there is no `scriptFile` or `entryPoint` to resolve.
 - Deployment findings should account for Linux Flex Consumption (GA) or confirmed Linux Premium/Dedicated preview availability. Windows and Linux Consumption are not native Go targets.
