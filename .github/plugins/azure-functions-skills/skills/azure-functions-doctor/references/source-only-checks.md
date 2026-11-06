@@ -49,9 +49,9 @@ Do these checks first in every analysis. They need only the project files. `RT-0
 - Prefer Fail only for startup blockers, unsupported configurations, parse errors, and confirmed secrets.
 - Treat native Python dependency detection as compatibility information, not
   evidence of a vulnerable or malicious package.
-- `AS-001` valid `FUNCTIONS_WORKER_RUNTIME` values include `native`, which is what Go apps use. Do not report `native` as invalid. `go` and `golang` are misconfigurations in a Go project, and the fix is `native`.
-- `DP-003` does not apply to Go. Go deploys a compiled binary and indexes functions from code, so there is no configured entry point file to resolve and no `function.json` to read. A `function.json` in a Go project is itself the finding.
-- `DP-002` binding inventory in a Go project only ever contains triggers. The Go worker has no input or output bindings.
+- `AS-001` valid `FUNCTIONS_WORKER_RUNTIME` values include `native`. Confirm Go from source/modules, not this setting alone. Native Go uses `native`, not `go` or `golang`; a Go custom handler legitimately uses `custom` until migrated.
+- `DP-003` does not apply to native Go. It deploys a compiled binary and indexes from code. A leftover `function.json` in a confirmed native Go project is a finding; a source custom handler still needs its metadata.
+- `DP-002` native Go registers triggers in code and supports HTTP responses through `http.ResponseWriter`. The preview Durable middleware's `durabletask.ClientInput()` registers a supported `durableClient` input binding; check its compatibility/preview requirements rather than rejecting all additional inputs. Other unsupported input/non-HTTP output bindings require SDK replacements; do not apply these limits as defects in an unmigrated custom handler.
 - The extension bundle range is commonly written with a wildcard, `[4.*, 5.0.0)`. That is the documented form and must not be reported as outdated.
 - For `RT-004`, recommend the bundle `Microsoft.Azure.Functions.ExtensionBundle` with the range `[4.*, 5.0.0)`. A range that starts at major version 4 or higher is current.
 
@@ -69,7 +69,7 @@ Use this table only when Azure CLI runtime metadata is not available. In the fin
 | Node.js | 22, 24 |
 | Python | 3.10, 3.11, 3.12, 3.13 |
 | .NET | 8.0, 9.0, 10.0 |
-| Go | 1.24 or later (preview) |
+| Go | Core worker: Go 1.24+; selected extensions can require 1.25+. Linux Flex is GA; Premium/Dedicated availability is preview and must be confirmed. |
 
 ### Deprecated settings for `AS-003`
 

@@ -1,7 +1,7 @@
 ---
 name: azure-functions-update
 title: Update Azure Functions
-description: 'Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Current scenario: C# in-process to .NET isolated worker; more scenarios are planned. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review.'
+description: 'Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario: C# in-process to .NET isolated worker, or Go custom handlers to the native Go worker. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review.'
 category: task
 license: MIT
 metadata:
@@ -31,6 +31,7 @@ does not authorize changing them together or installing external tools.
 | Observed scenario | Reference |
 | --- | --- |
 | C# in-process Functions to isolated worker | [dotnet-isolated](references/dotnet-isolated.md) |
+| Go custom-handler executable, `host.json` custom-handler configuration, and `function.json` bindings | [custom-handlers-to-go](references/custom-handlers-to-go.md) |
 | No implemented scenario matches | Assess within permission, report the missing route, and stop conversion |
 
 Do not use this workflow for new apps, cross-cloud migration, deployment-only work,
@@ -42,7 +43,7 @@ deployment, and SKU decisions. Do not start a second migration plan during a han
 This skill is the umbrella workflow for Azure Functions migration scenarios.
 The scenario table above is the registry. Each row points to one scenario reference.
 
-- Current coverage: the C# in-process to .NET isolated worker scenario only.
+- Current coverage: C# in-process to .NET isolated worker, and Go custom handlers to the native Go worker.
 - Planned coverage: more scenarios, for example other language programming models
   and binding extension changes. A planned scenario is not available until its row exists.
 - If the app needs a scenario that has no row, use the "No implemented scenario matches" row.
