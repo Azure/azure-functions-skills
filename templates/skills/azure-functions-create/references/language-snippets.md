@@ -70,7 +70,7 @@ public HttpResponseMessage run(
 }
 ```
 
-## Go (preview)
+## Go
 
 Go uses worker-driven indexing — there is no `function.json`. Register the function in code and start the worker. The module path is lowercase (`github.com/azure/...`) even though the repository is `Azure/...`.
 
@@ -105,9 +105,9 @@ func main() {
 }
 ```
 
-Set `"FUNCTIONS_WORKER_RUNTIME": "native"` in `local.settings.json` — not `go` or `golang`.
+Set `"FUNCTIONS_WORKER_RUNTIME": "native"` and `"FUNCTIONS_CLI_NATIVE_LANGUAGE": "go"` in `local.settings.json` under `Values` — not `go` or `golang` as the worker runtime.
 
 ## Notes
 
 - HTTP triggers default to `authLevel: 'function'`. Use `'anonymous'` only for explicitly public endpoints.
-- For non-HTTP triggers (Timer, Blob, Queue, Service Bus, Cosmos DB, Event Hub, etc.), always prefer the `functions list or get template` Azure MCP tool — binding configuration is error-prone to write by hand. Go is the exception: it has no MCP templates, so use the trigger table in Path C of the skill.
+- For non-HTTP triggers (Timer, Blob, Queue, Service Bus, Cosmos DB, Event Hub, etc.), prefer the Azure MCP template list/get tools. If the requested Go trigger has no retrievable template, use the verified registration APIs in [go-project.md](go-project.md); do not invent a template or binding.
