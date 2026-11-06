@@ -76,18 +76,25 @@ Before handing off, collect and pass the following Azure Functions-specific guid
 
 ## Go-specific deployment context
 
-Go is in public preview, and Core Tools 4.12 or later owns the Go build and packaging. Lead with the supported commands rather than a hand-rolled package.
+Go is GA on Linux Flex Consumption. Linux Elastic Premium and Dedicated support
+is a preview rollout; confirm availability for the actual plan, SKU, and region
+and obtain acceptance before production preview deployment. Core Tools owns the
+Go build and packaging: 4.12 is the Flex minimum; use 4.16.0 or later for
+Elastic Premium/Dedicated. The
+[4.16.0 release notes](https://github.com/Azure/azure-functions-core-tools/releases/tag/4.16.0)
+confirm that support; do not treat 4.12 as sufficient for those plans.
 
-Two preview constraints are hard limits, so check them before planning anything else.
+Check target compatibility before planning deployment.
 
-- Go function apps are supported **only on the Flex Consumption plan**.
-- Go function apps run on **Linux only** in Azure. Do not select or attempt a Windows-hosted plan.
+- Go function apps run on **Linux only** in Azure. Windows and Linux Consumption are not native Go targets.
+- Do not force an existing Premium/Dedicated app to Flex without an approved hosting-plan change.
+- A Go MCP template can include AZD/Bicep for a new Flex target; this does not prove resources exist or that the template matches an existing app's plan.
 
-Supported deployment paths:
+Build/package context for Azure Skills or an explicitly approved fallback:
 
 | Command | What it does |
 | --- | --- |
-| `func azure functionapp publish <APP_NAME>` | Builds, packages, and deploys to an existing function app. Simplest path. |
+| `func azure functionapp publish <APP_NAME>` | Builds, packages, and deploys to an existing compatible function app; direct execution requires fallback approval. |
 | `func pack` | Builds for Linux x64 and produces a deployable zip with the binary at the package root as `app`. Deploy it with `az functionapp deployment source config-zip`. |
 
 A package produced by `func pack` is ready to run, so do not request a remote build when deploying it.
@@ -98,9 +105,10 @@ Other Go context to pass to Azure Skills:
 | --- | --- |
 | Cross-compilation | Only needed with `func pack --no-build`. In that case build first with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/app .`. Otherwise Core Tools targets the right platform for you. |
 | Executable permission | Core Tools sets this correctly. It only becomes a problem with a hand-rolled archive, because some tools such as Windows `Compress-Archive` do not preserve Unix permissions, which leaves the platform unable to start the binary. Prefer `func pack`. |
-| Worker runtime setting | `FUNCTIONS_WORKER_RUNTIME` must be `native`. |
+| Native runtime configuration | Verify the target-plan schema. Flex uses `functionAppConfig.runtime`; where the plan uses `FUNCTIONS_WORKER_RUNTIME`, its Go value is `native`. Do not copy local CLI settings into Azure app settings. |
 | Azure CLI version | 2.87.0 or later is required to create Azure resources or deploy packages for Go. |
-| Preview status | Confirm the user accepts preview status before a production deployment. |
+| Premium/Dedicated package settings | For a confirmed preview target, set `WEBSITE_RUN_FROM_PACKAGE=1`, wait for configuration to apply, and use Always On for Dedicated. Do not add `WEBSITE_RUN_FROM_PACKAGE` on Flex. |
+| Preview status | Confirm availability and acceptance for a Premium/Dedicated preview deployment or a separately selected preview extension; do not label Flex core-worker support as preview. |
 
 If a Go deployment succeeds but the app never becomes healthy, check the plan and OS first, then whether the package was built by Core Tools or assembled by hand.
 

@@ -1,26 +1,47 @@
-# Creating a Go Azure Functions project (preview)
+# Creating a Go Azure Functions project
 
 Load this file only when the user asks for Go. It is not needed for any other language.
 
-Go support on Azure Functions is in **public preview**. Say so before scaffolding, and do not recommend it for production without the user acknowledging the preview status.
+Go support is generally available on Linux Flex Consumption. Linux Elastic Premium
+and Dedicated support is a preview rollout; confirm availability for the target
+plan, SKU, and region, and obtain acceptance before a production preview deployment.
 
 Primary reference: [Go developer reference for Azure Functions](https://learn.microsoft.com/azure/azure-functions/functions-reference-go).
 
-## Why Go has its own path
+## Template discovery
 
-Neither the Azure MCP template set nor the templates manifest contains Go templates. Do not call `functions_template_get` with a Go language value, do not invent a Go template ID, and do not silently scaffold a different language instead. Use Core Tools, as described below.
+Prefer the MCP path in the parent skill: call `functions_language_list`, then
+`functions_project_get` with `language: go`, and list/get the returned Go templates
+with `functions_template_get`. The catalog includes Go HTTP and timer templates
+with AZD/Bicep infrastructure. Discover current IDs rather than inventing them.
+
+Project metadata alone is not a buildable app. Retrieve the selected template's
+files and follow its setup instructions; validate native settings, dependencies,
+and actual local behavior before reporting creation complete. Template infrastructure
+does not mean Azure resources exist or authorize provisioning/deployment.
+
+Use the manifest fallback when MCP retrieval is unavailable or fails, then the
+Core Tools scaffold below if no suitable template can be retrieved. Never substitute
+another language. Check hosting status against the current Go developer reference;
+a catalog's preview label can lag the service. The native worker's version is not
+the Go compiler version.
 
 ## Step 1 — Verify prerequisites
 
 | Tool | Minimum | Check |
 | --- | --- | --- |
-| Go | 1.24 | `go version` |
-| Azure Functions Core Tools | 4.12 | `func --version` |
+| Go | 1.24 for the core worker; check extension modules for higher requirements | `go version` |
+| Azure Functions Core Tools | Flex: 4.12+; Elastic Premium/Dedicated: use 4.16.0+ | `func --version` |
 | Azure CLI | 2.87.0, only when creating Azure resources or deploying | `az version` |
 
 Core Tools before 4.12 does not ship the `native` worker and rejects Go projects with a misleading "unsupported worker runtime" error. If a prerequisite is missing or too old, stop and suggest **azure-functions-setup**.
 
-## Step 2 — Scaffold with Core Tools (preferred)
+For Elastic Premium/Dedicated, use 4.16.0 or later: its
+[release notes](https://github.com/Azure/azure-functions-core-tools/releases/tag/4.16.0)
+confirm preview support. This is a verified baseline, not the earliest known
+supporting release; do not declare those targets ready with 4.12.
+
+## Step 2 — Scaffold with Core Tools (template fallback)
 
 ```bash
 func init <project-name> --worker-runtime go
@@ -29,7 +50,8 @@ cd <project-name>
 
 Omit the project name to scaffold into the current directory instead of a subdirectory.
 
-This is the supported path and it is what the official documentation describes. It generates a complete, buildable project.
+This supported fallback generates a local project, not Azure resources. Run it
+only in an approved empty directory, never over an existing custom-handler app.
 
 | File | Notes |
 | --- | --- |
@@ -80,7 +102,7 @@ go build ./...
 Two more things to get right:
 
 - **Module path casing.** The GitHub repository is `Azure/azure-functions-golang-worker`, but the Go module path is lowercase `github.com/azure/azure-functions-golang-worker`. Go module paths are case sensitive, so the uppercase form does not resolve.
-- **Published versions.** Every published version is a preview tag such as `v0.6.0-preview`. A bare `go get` resolves to the newest one, which is fine. Run `go list -m -versions github.com/azure/azure-functions-golang-worker` to see what exists. Do not depend on `main`, and never invent a tag.
+- **Published versions.** `v1.0.0` is the first GA core-worker release. Select a published compatible tag and record the resolved version. Extension modules can have separate versions and Go requirements. Do not depend on `main`, and never invent a tag.
 
 You must also hand-write `host.json` and `local.settings.json` to match the shapes shown in step 2.
 
@@ -122,7 +144,7 @@ func hello(w http.ResponseWriter, r *http.Request) {
 Rules that differ from every other language:
 
 - **Never author `function.json`.** Worker-driven indexing means the registration options in code are the only source of truth. A `function.json` file does not belong in a Go project.
-- **There are no input or output bindings.** Go supports triggers only. If the user wants to write to a queue, blob, or Cosmos DB container, call the Azure SDK for Go directly from the handler.
+- **Additional input bindings and non-HTTP output bindings are not supported.** HTTP responses use `http.ResponseWriter`. Other service I/O uses the Azure SDK for Go.
 - `FUNCTIONS_WORKER_RUNTIME` is `native`. It is never `go` or `golang`.
 - The extension bundle is still required, because Go is a non-.NET runtime.
 - Do not commit `local.settings.json`.
@@ -159,9 +181,18 @@ Retries are configured per function with `sdk.WithRetry`.
 
 `WithConnection` applies to the Cosmos DB, Azure SQL, Storage Queue, Event Hubs, Service Bus, and Blob triggers. It does not apply to Event Grid or Timer, so do not add it there. Cosmos DB has a further family of lease options beyond `WithLeaseContainer`, including `WithLeaseDatabase`, `WithLeaseConnection`, and the lease interval settings.
 
-If the user asks for a trigger that is not in these tables, say it is unavailable in the Go worker preview rather than improvising. Check the worker samples at https://github.com/Azure/azure-functions-golang-worker/tree/main/samples before concluding.
+Event Hubs and Service Bus support batch handlers through `app.EventHubBatch`,
+`app.ServiceBusQueueBatch`, and `app.ServiceBusTopicBatch`, taking slices of the
+corresponding message type. Match handler shape and cardinality.
 
-**Durable Functions is not supported for Go.** If the user asks for orchestrations, entities, or the `durableClient` binding, explain the gap and offer a supported language or a non-Durable pattern such as queue or Event Hubs chaining.
+For other triggers, check the selected worker release and samples at
+https://github.com/Azure/azure-functions-golang-worker/tree/main/samples before
+concluding support. Do not invent registration APIs.
+
+Durable orchestrations and activities are in preview through `middleware/durabletask`,
+requiring Go 1.25+ and Durable Task extension 3.15.0+. Entities are not supported.
+Consult that module's documentation when requested; do not generate legacy Durable
+`function.json` bindings or add Durable implicitly.
 
 ## Step 5 — Verify
 
@@ -171,7 +202,9 @@ func start
 
 `func start` runs `go build -o bin/app .` itself before starting the host, so a compile error surfaces as a host start failure. Do not prefix it with a separate build step.
 
-On a healthy start the host prints the preview notice, `Building Go worker binary ...`, `Worker process started and initialized.`, and the indexed function list. An empty function list means a registration call is missing, or an extension trigger's package was not blank-imported.
+On a healthy start, verify worker initialization and the expected indexed function
+list. Exact log text can vary by version. An empty list can indicate missing
+registration or a missing extension-trigger blank import.
 
 Then perform real end-to-end verification, not just a successful start:
 
@@ -182,8 +215,14 @@ A `webjobs.storage` unhealthy warning is expected when `AzureWebJobsStorage` is 
 
 ## Adding a function to an existing Go project
 
-`func new` is not supported for Go. Add a function by editing `main.go` directly, registering it with another `app.*` call, and adding the blank import if it is an extension trigger. Do not run `func init` or `go mod init` again, and do not create `function.json`.
+Use an MCP template with `output: Add` when a suitable template is available, merging
+only the needed function pattern, dependencies, and settings. Otherwise use the
+verified worker APIs above. Register the function with another `app.*` call and add
+the blank import for an extension trigger. `func new` is not supported for Go.
+Do not run `func init` or `go mod init` again, replace existing infrastructure,
+or create `function.json`.
 
 ## Deployment
 
-Hand off to **azure-functions-deploy**. Two preview constraints matter enough to state during scaffolding: Go function apps are supported only on the **Flex Consumption** plan, and they run on **Linux only** in Azure.
+Hand off to **azure-functions-deploy**. Go runs on Linux: Flex Consumption is GA;
+Elastic Premium and Dedicated require confirmed preview availability for the target.

@@ -18,9 +18,9 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 ### Step 0 — Check for Go
 
-If the user asks for **Go** (or Golang), use **Path C** below. Neither the Azure MCP template set nor the templates manifest contains Go templates, so the other paths cannot produce a working Go project.
+If the user asks for **Go** (or Golang), load [references/go-project.md](references/go-project.md) for native-worker prerequisites, configuration, and registration rules, then continue with Step 1. Go templates are available through MCP and the manifest; discover the current catalog rather than assuming a fixed template set.
 
-For every other language, continue with Step 1.
+Use Path C only when no suitable Go template can be retrieved through Path A or Path B.
 
 ### Step 1 — Detect Azure MCP tools
 
@@ -30,7 +30,7 @@ Check whether the following Azure MCP tools are available in your current tool l
 - `functions_project_get` — scaffold project-level files
 - `functions_template_get` — list templates (language only) or get a specific template (language + template)
 
-These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and return officially maintained templates across C#, Python, TypeScript, JavaScript, Java and PowerShell.
+These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and return officially maintained templates across C#, Python, TypeScript, JavaScript, Java, PowerShell, and Go.
 
 Also check for the best practices tool:
 
@@ -59,7 +59,7 @@ Apply the returned guidelines (programming models, extension bundles version, au
 
 Ask the user (or detect from context):
 
-- **Language**: `csharp` | `python` | `typescript` | `javascript` | `java` | `powershell`
+- **Language**: `csharp` | `python` | `typescript` | `javascript` | `java` | `powershell` | `go`
 - **Trigger / template**: let the MCP list decide (step A.3)
 - **Project name**: directory name
 - **Runtime version** (optional): e.g. Node.js `22`, Python `3.11`, Java `21`
@@ -68,9 +68,14 @@ Ask the user (or detect from context):
 
 Call `functions_language_list`. Returns supported languages with runtime versions, programming models, and prerequisites. Use this to confirm the user's language choice is supported and to suggest a default runtime version.
 
+Call `functions_project_get` for the selected language before browsing its templates. It can return setup instructions and project structure without file contents; do not treat metadata alone as a complete scaffold.
+
 #### A.3 Browse available templates
 
 Call `functions_template_get` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
+
+If no returned Go template matches the requested trigger, try Path B, then Path C.
+Do not substitute an unrelated trigger or silently change the hosting target.
 
 Do **not** invent or guess template identifiers such as `HttpTrigger`. Azure MCP template IDs are versioned, language-specific strings returned by the template list. For example, the TypeScript HTTP trigger template is currently returned as `http-trigger-typescript-azd`.
 
@@ -85,16 +90,18 @@ When the user asks for a common trigger name, map it to one of the template IDs 
 
 If a template-get call fails with "template not found", immediately recover by calling `functions_template_get` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
 
+Catalog discovery does not prove that a template can be downloaded or deployed. For retrieval/network failures, report the failed operation and try Path B; use Path C for Go if no suitable template can be retrieved. Never mark creation complete from a template list alone.
+
 #### A.4 Initialize the project
 
-Call `functions_project_get`:
+Use the `functions_project_get` result from A.2:
 
 ```
 Tool: functions_project_get
 language: <chosen language, e.g. typescript>
 ```
 
-Returns project-level files (`host.json`, `local.settings.json`, `package.json` / `requirements.txt` / `pom.xml` / `.csproj`, `tsconfig.json`, etc.). Write these into the target directory.
+Write any returned project-level files into an approved new target directory. If the result contains only instructions/structure, use those with the files returned in A.5 instead. Do not overwrite or reinitialize an existing project.
 
 #### A.5 Add the function
 
@@ -140,7 +147,7 @@ After the host reports the function endpoints/listeners:
 
 ### Path B — Composition algorithm fallback
 
-Use this path **only when the Azure MCP tools are not available**. When falling back, show this notice to the user verbatim (translate to the user's language if needed):
+Use this path when Azure MCP tools are unavailable or cannot retrieve a suitable template. When the tools are unavailable, show this notice to the user verbatim (translate to the user's language if needed):
 
 > ℹ️ Azure MCP tools were not found; using the manifest-based fallback path. Enabling the Azure MCP Server unlocks dynamic template discovery and composition. Run `azure-functions-setup` to configure it.
 
@@ -154,10 +161,11 @@ Follow this manifest-based fallback algorithm:
    If fetch fails → fall back to:
      https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json
    If both fail → fall back to known-good Azure-Samples/functions-quickstart-* repos
-   If all fail → report error and ask user to retry later
+   If all fail → for Go use Path C; otherwise report error and ask user to retry later
 
 2. FILTER TEMPLATES
    Filter by: language, resource, iac
+   If no suitable Go trigger template matches → use Path C
 
 3. CHECK SINGLE-TEMPLATE MATCH
    If one template covers ALL requirements → use it alone
@@ -182,7 +190,7 @@ Follow this manifest-based fallback algorithm:
 
 8. WRITE all files
 
-9. DEPLOY: azd up --no-prompt
+9. HANDOFF: azure-functions-deploy only when deployment is separately requested
 ```
 
 #### B.2 Quick code reference
@@ -203,13 +211,13 @@ func start
 
 ---
 
-### Path C — Go (preview)
+### Path C — Go Core Tools fallback
 
-Go is not represented in the Azure MCP template set or in the templates manifest, so there is nothing to discover. Go also has its own scaffolding command, its own worker runtime value, and preview constraints that apply to no other language.
+Use this path when MCP and manifest retrieval cannot provide a suitable Go template. Go has its own scaffolding command and worker-runtime configuration.
 
-Load [references/go-project.md](references/go-project.md) and follow it. Do not improvise a Go project from Path A or Path B.
+Follow the Core Tools fallback in [references/go-project.md](references/go-project.md). Never scaffold another language as a substitute.
 
-Tell the user up front that **Go support on Azure Functions is in public preview** and may change before GA.
+Go is GA on Linux Flex Consumption. Confirm preview availability and acceptance for a Linux Elastic Premium or Dedicated target before production deployment.
 
 ---
 
@@ -217,9 +225,9 @@ Tell the user up front that **Go support on Azure Functions is in public preview
 
 If `host.json` already exists, do **not** re-initialize. Instead:
 
-- **MCP path**: call `functions_template_get` with the same language as the existing project and specify the desired template name. Write the returned file.
+- **MCP path**: call `functions_template_get` with the same language as the existing project, the desired returned template ID, and `output: Add`. Merge only the needed function code, dependencies, and settings; do not replace the existing project or deploy its template infrastructure.
 - **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
-- **Go path**: `func new` is not supported for Go. Edit `main.go`, add another `app.*` registration and, for an extension trigger, the blank import. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
+- **Go registration**: merge the relevant MCP template pattern when available, or use the verified worker APIs. Add another `app.*` registration and, for an extension trigger, the blank import. `func new` is not supported for Go. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
 
 ## After Creation
 
