@@ -24,6 +24,24 @@
 | Plugin payload verify | `npm run verify:plugin-payload` |
 | Full gate | `npm run check` |
 
+## Local npm Authentication Failures
+
+If `npm ci` fails with `E401` against the Azure Artifacts feed configured in the
+repository's `.npmrc`, run the installed credential provider from the repository
+root, then retry:
+
+```powershell
+artifacts-npm-credprovider
+npm ci
+```
+
+The user must have access to the configured feed. If the provider requires
+interactive sign-in, ask the user to complete it. If the command is unavailable
+or authentication still fails, ask the user to set up the provider or confirm
+their feed access. Do not print credentials, change registries, or remove
+`.npmrc` as an authentication workaround. CI deliberately removes the repository
+`.npmrc` to use public npm; that is not the local authentication procedure.
+
 ## Code Style
 
 - TypeScript strict mode — avoid `any` types; use proper interfaces and generics.
