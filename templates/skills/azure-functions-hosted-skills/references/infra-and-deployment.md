@@ -73,11 +73,13 @@ For a **new approved scheduler**, copy only the supplemental `durable-task-sched
 the retrieved template's `infra/app/`. It creates a new scheduler and Task Hub, grants the app's
 existing User-assigned Managed Identity `Durable Task Data Contributor` at **Task Hub scope**,
 and optionally grants an approved developer user the same access for local Azure runs/dashboard.
-The asset uses a public TLS/identity-authenticated endpoint with no IP restrictions. Review that
-network choice; adapt Bicep/networking for approved private access rather than weakening existing
-restrictions. Consumption is the asset default; Dedicated uses one capacity unit. Confirm SKU/cost
-before deploying either. Do not deploy this asset over an existing scheduler to change its SKU or
-network policy.
+The asset uses a public TLS/identity-authenticated endpoint with `publicNetworkAccess: 'Enabled'`
+and `ipAllowlist: ['0.0.0.0/0']`, allowing any IPv4 source. RBAC is still required; an empty allowlist
+denies all traffic even when RBAC is correct. Review that network choice; adapt Bicep/networking
+for approved restricted IP ranges or private access rather than weakening existing restrictions.
+Consumption is the asset default; Dedicated uses one capacity unit. Confirm SKU/cost before
+deploying either. Do not deploy this asset over an existing scheduler to change its SKU or network
+policy.
 
 Merge this optional module into the existing subscription-scope `main.bicep`, adapting names to
 the retrieved template:
@@ -179,6 +181,7 @@ for repeated Activity delivery. Store secrets through the existing approved secr
 References: [DTS host configuration](https://learn.microsoft.com/azure/durable-task/scheduler/quickstart-durable-task-scheduler),
 [identity/RBAC](https://learn.microsoft.com/azure/durable-task/scheduler/durable-task-scheduler-identity),
 [scheduler resource](https://learn.microsoft.com/azure/templates/microsoft.durabletask/2026-02-01/schedulers),
+[public-network Bicep guidance](https://github.com/microsoft/skills/blob/main/.github/plugins/azure-skills/skills/azure-prepare/references/services/durable-task-scheduler/bicep.md),
 and [dashboard](https://learn.microsoft.com/azure/durable-task/scheduler/durable-task-scheduler-dashboard).
 
 ## Local User Access

@@ -116,4 +116,14 @@ describe('Hosted Skills Dynamic Workflows guidance', () => {
     expect(bicep).toContain('scope: taskHub');
     expect(bicep).toContain('0ad04412-c4d5-4796-b79c-f76d14c8d402');
   });
+
+  it('explicitly allows public IPv4 traffic in the approved new-scheduler asset', () => {
+    const bicep = readFileSync(join(SKILL_DIR, 'assets', 'infra', 'app', 'durable-task-scheduler.bicep'), 'utf-8');
+    expect(bicep).toContain("publicNetworkAccess: 'Enabled'");
+    expect(bicep).toMatch(/ipAllowlist:\s*\[\s*'0\.0\.0\.0\/0'\s*\]/);
+    const guidance = readReference('infra-and-deployment.md');
+    expect(guidance).toContain("ipAllowlist: ['0.0.0.0/0']");
+    expect(guidance).toMatch(/empty allowlist\s+denies all traffic/);
+    expect(guidance).toContain('Do not deploy this asset over an existing scheduler');
+  });
 });

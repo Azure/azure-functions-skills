@@ -34,7 +34,7 @@ resource scheduler 'Microsoft.DurableTask/schedulers@2026-02-01' = {
   tags: tags
   properties: {
     publicNetworkAccess: 'Enabled'
-    ipAllowlist: []
+    ipAllowlist: ['0.0.0.0/0']
     sku: union({
       name: schedulerSku
     }, schedulerSku == 'Dedicated' ? { capacity: 1 } : {})

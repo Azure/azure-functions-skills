@@ -160,6 +160,12 @@ the selected runtime supports `workflow_tool`, and host/app settings resolve to 
 Verify local Emulator versus Azure credentials without printing secrets. Do not accept a printed
 URL as runtime readiness.
 
+For Azure DTS, verify the Function App and any approved dashboard/local client have both scoped
+RBAC and the approved network path. An empty `ipAllowlist` denies all traffic even with correct
+roles; `['0.0.0.0/0']` permits any IPv4 source only for the reviewed public configuration. Check
+restricted ranges/private access against the actual clients; do not open an existing scheduler
+just to pass a test.
+
 After approval, run one bounded scenario through the real owner trigger or existing chat surface.
 Capture Workflow ID, owner, source event/session, environment and revision. A `202 Accepted`,
 queue enqueue, Workflow ID, or successful starter Function is not a completed workflow.
