@@ -90,6 +90,23 @@ agent run.
 | 403 from session pool | Identity lacks role | Assign `Azure ContainerApps Session Executor` to app identity and local user. |
 | Browser/code work unavailable | Agent instructions do not mention using Python/Playwright | Tell the agent when to use `execute_python`. |
 
+## Dynamic Workflows
+
+Load [dynamic-workflows.md](./dynamic-workflows.md) and correlate the actual Workflow ID/node
+before changing configuration or restarting work.
+
+| Symptom | Check and remediation |
+| --- | --- |
+| Workflow tools/Activities missing | Confirm the published runtime/Python version, owner `workflows.enabled`, discovered `@workflow_tool` handlers, and startup import/indexing errors. Normal `@tool` alone is not a workflow marker. |
+| DTS connection fails or returns 403 | Match host provider, connection-setting name, actual endpoint/Hub, identity client ID and Task Hub-scoped `Durable Task Data Contributor`. Verify network access and bundle 4.32.0+. Never silently switch backend or use unauthenticated Azure access. |
+| Plan rejected | Check `workflows.exclude`, specialist grants, upstream references and fixed v1 node caps. Do not invent frontmatter cap settings. |
+| Collection node fails | `for_each` must resolve to a bounded JSON array; predicates require present scalar fields. Downstream aggregates contain `{index, status, result}`, including skipped `null` entries. |
+| Trigger succeeded but no report arrived | Inspect terminal orchestration and final publisher; a successful starter is not completion. Reconcile partial external delivery before retry. |
+| Duplicate writes after retry/restart | Inspect task idempotency and source-event deduplication. Timeout/cancel does not guarantee external work stopped. |
+
+Do not change Hub/backend, remove owner agents or delete histories to make an active failure
+disappear. Obtain approval for drain/migration, retention changes, or targeted recovery.
+
 ## MCP and Connectors
 
 For generic remote MCP servers, load [connector-mcp.md](./connector-mcp.md) and check:

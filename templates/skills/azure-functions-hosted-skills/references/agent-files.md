@@ -19,6 +19,7 @@ The file stem is important. `main.agent.md` uses route segment `main` and functi
 | `mcp` | Optional | `false` disables MCP. `exclude` removes selected servers. |
 | `skills` | Optional | `false` disables Agent Skills. `exclude` removes selected skills. |
 | `tools` | Optional | `false` disables custom Python tools. `exclude` removes selected tools. |
+| `workflows` | Optional | Opt-in Dynamic Workflows: `enabled`, workflow-tool `exclude`, and explicit `subagents` grants. Backend/hub settings belong in `host.json`. |
 | `system_tools` | Optional | Disable inherited system tools such as dynamic sessions per agent. |
 | `input_schema` | Optional | JSON Schema for HTTP request validation. |
 | `response_schema` | Optional | JSON Schema for structured HTTP responses. |
@@ -106,6 +107,18 @@ response_example: |
 
 Use the request body and available tools to return JSON matching the response example.
 ```
+
+## Dynamic Workflow Owners
+
+After the user adopts Dynamic Workflows, add `workflows: { enabled: true }` only to the selected
+owner agents. Preserve their triggers and endpoint choices; workflow enablement does not require
+`main.agent.md` or a debug chat UI. Load [dynamic-workflows.md](./dynamic-workflows.md) for Activity
+authoring, Sub Agent grants, data-driven plans and completion behavior.
+
+`tools: false` and `skills: false` do not disable the runtime's workflow-management tools or its
+workflow system skill. Workflow-tool access uses the independent `workflows.exclude` filter.
+Do not put `backend`, `hub_name`, `max_nodes`, or `max_parallelism` under `workflows`; those are not
+supported agent settings. Keep backend/hub configuration in the Functions host and app settings.
 
 ## Variable Substitution
 

@@ -45,6 +45,21 @@ async def lookup_customer(params: LookupCustomerParams) -> str:
 Plain functions are supported, but the decorator makes the tool name and description explicit.
 Add package dependencies to `requirements.txt`.
 
+## Durable Activity Tools
+
+Normal `@tool` functions are not automatically Dynamic Workflow Activity targets. After the user
+adopts workflows, mark approved Activity-safe handlers with `@workflow_tool`. Both decorators can
+be used when a handler should also be directly callable; preserve its supported input contract.
+Load [dynamic-workflows.md](./dynamic-workflows.md) before authoring these handlers.
+
+Durable delivery can repeat. Require JSON-serializable results, bounded inputs, explicit service
+timeouts, actionable errors and idempotency for external writes. Do not add workflow markers
+indiscriminately to email/post/create tools or generic browsing/code execution tools.
+Remote MCP and system tool names are not automatically valid workflow-node targets. Use an
+authorized specialist with the selected MCP configuration or a focused approved service handler.
+Keep `requirements.txt`, service resources/RBAC in Bicep, `infra/main.parameters.json`, and local
+settings synchronized when adding dependencies or integrations.
+
 ## Converting Stdio MCP Servers to Python Tools
 
 The Azure Functions agents runtime supports remote HTTP MCP servers in `mcp.json`, not local

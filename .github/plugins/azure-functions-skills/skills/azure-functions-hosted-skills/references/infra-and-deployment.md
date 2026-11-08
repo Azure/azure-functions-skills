@@ -4,6 +4,21 @@ Use the Bicep retrieved with the official `ai-hosted-skills-python` template as 
 It provisions Foundry, Flex Consumption, identity-based storage settings, Application Insights,
 dynamic sessions, and optional Connector Namespace MCP resources.
 
+## Contents
+
+- [Infrastructure files](#infrastructure-files)
+- [Dynamic workflow backends](#dynamic-workflow-backends)
+- [Local user access](#local-user-access)
+- [Default model parameters](#default-model-parameters)
+- [Optional email connector](#optional-email-connector)
+- [Connector trigger config deployment](#connector-trigger-config-deployment)
+- [Deploy](#deploy)
+- [Deployment observation](#report-a-successful-deployment-internal-telemetry)
+- [Local development workflow](#local-development-workflow)
+- [Reasoning-capable upgrade](#reasoning-capable-upgrade)
+- [Observability](#observability)
+- [Deployed function keys](#deployed-function-keys)
+
 ## Infrastructure Files
 
 | File | Source | Purpose |
@@ -17,10 +32,154 @@ dynamic sessions, and optional Connector Namespace MCP resources.
 | `app/session-pool-rbac.bicep` | Retrieved template | Session Executor role for the app identity and deployer user. |
 | `app/connector-gateway.bicep` | Retrieved template | Connector Namespace resources and connection MCP server config. |
 | `app/trigger-config.bicep` | [Supplemental skill asset](../assets/infra/app/trigger-config.bicep) | Optional Connector Namespace trigger config that calls the function app connector webhook. |
+| `app/durable-task-scheduler.bicep` | [Supplemental DTS asset](../assets/infra/app/durable-task-scheduler.bicep) | Optional new scheduler, isolated Task Hub, scoped RBAC, and Managed Identity connection settings. |
 
 The official template does not currently include `trigger-config.bicep`. Copy the supplemental
 asset into `infra/app/` only for connector-triggered agents. It is deployed separately because its
 callback URL requires the `connector_extension` system key created after the Functions host starts.
+
+## Dynamic Workflow Backends
+
+Use [dynamic-workflows.md](./dynamic-workflows.md) to confirm adoption and then DTS independently.
+Keep backend selection in `host.json` and matching app settings, never in agent frontmatter.
+Changing the backend or Task Hub does not migrate persisted workflows. Drain active instances
+before an approved backend/hub change; never silently switch to Storage after a DTS failure.
+
+### Azure Storage
+
+When DTS is declined, retain the standard Durable storage provider and existing
+`AzureWebJobsStorage` settings. No DTS resource or connection setting is needed. The standard
+extension bundle includes Durable Functions. Existing identity-based scaffolds already supply
+Blob/Queue/Table service URIs and data roles; verify actual permissions instead of replacing them
+with shared-key connection strings. Give each app/environment an isolated hub and use the same
+hub consistently across its workers.
+
+### Durable Task Scheduler
+
+DTS is recommended for its purpose-built, lower-latency execution backend and activity/history
+dashboard. It is optional, separately billed, and does not eliminate Functions host/deployment
+Storage, Application Insights, model costs or service integration permissions.
+
+Before provisioning, confirm the subscription, supported region, new versus existing Scheduler/
+Task Hub, pricing SKU/budget, and network requirements. Prefer the Function App's region. Discover
+current availability with the read-only command:
+
+```bash
+az provider show --namespace Microsoft.DurableTask \
+  --query "resourceTypes[?resourceType=='schedulers'].locations | [0]" --out table
+```
+
+For a **new approved scheduler**, copy only the supplemental `durable-task-scheduler.bicep` into
+the retrieved template's `infra/app/`. It creates a new scheduler and Task Hub, grants the app's
+existing User-assigned Managed Identity `Durable Task Data Contributor` at **Task Hub scope**,
+and optionally grants an approved developer user the same access for local Azure runs/dashboard.
+The asset uses a public TLS/identity-authenticated endpoint with no IP restrictions. Review that
+network choice; adapt Bicep/networking for approved private access rather than weakening existing
+restrictions. Consumption is the asset default; Dedicated uses one capacity unit. Confirm SKU/cost
+before deploying either. Do not deploy this asset over an existing scheduler to change its SKU or
+network policy.
+
+Merge this optional module into the existing subscription-scope `main.bicep`, adapting names to
+the retrieved template:
+
+```bicep
+@allowed(['storage', 'dts'])
+param durableBackend string = 'storage'
+param durableTaskSchedulerSku string = 'Consumption'
+
+module durableTaskScheduler './app/durable-task-scheduler.bicep' = if (durableBackend == 'dts') {
+  name: 'durableTaskScheduler'
+  scope: rg
+  params: {
+    schedulerName: 'dts-${resourceToken}'
+    location: location
+    tags: tags
+    schedulerSku: durableTaskSchedulerSku
+    taskHubName: 'workflows'
+    managedIdentityPrincipalId: apiUserAssignedIdentity.outputs.principalId
+    managedIdentityClientId: apiUserAssignedIdentity.outputs.clientId
+    deployerPrincipalId: deployerPrincipalId
+  }
+}
+
+var durableAppSettings = durableBackend == 'dts' ? durableTaskScheduler!.outputs.appSettings : {}
+
+output DURABLE_TASK_SCHEDULER_ENDPOINT string = durableBackend == 'dts' ? durableTaskScheduler!.outputs.schedulerEndpoint : ''
+output TASKHUB_NAME string = durableBackend == 'dts' ? durableTaskScheduler!.outputs.hubName : ''
+output DURABLE_TASK_SCHEDULER_DASHBOARD_URL string = durableBackend == 'dts' ? durableTaskScheduler!.outputs.dashboardUrl : ''
+```
+
+Add `durableAppSettings` to the existing `api` module's app-settings `union`, preserving Foundry,
+identity, reasoning, connector and session settings. Add parameter mappings to
+`infra/main.parameters.json`:
+
+```json
+"durableBackend": { "value": "${DURABLE_BACKEND=storage}" },
+"durableTaskSchedulerSku": { "value": "${DURABLE_TASK_SCHEDULER_SKU=Consumption}" }
+```
+
+Set the selected azd values only after the backend/SKU choices are made. Also merge this DTS host
+configuration; setting `DURABLE_BACKEND=dts` alone does not change the host:
+
+```json
+{
+  "version": "2.0",
+  "functionTimeout": "00:30:00",
+  "extensions": {
+    "http": {"routePrefix": ""},
+    "durableTask": {
+      "hubName": "%TASKHUB_NAME%",
+      "storageProvider": {
+        "type": "azureManaged",
+        "connectionStringName": "DURABLE_TASK_SCHEDULER_CONNECTION_STRING"
+      }
+    }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.32.0, 5.0.0)"
+  }
+}
+```
+
+DTS requires bundle 4.32.0 or newer. Preserve a newer compatible bundle and the preview bundle
+required for connector triggers; do not downgrade or replace connector configuration with this
+standard-bundle example. Preserve timeout, HTTP routing, logging and other extensions when merging.
+Keep a finite host timeout sufficient for each Activity and agent turn, not the entire timer wait.
+
+The asset emits a cloud connection string with
+`Endpoint=<actual endpoint>;Authentication=ManagedIdentity;ClientID=<app identity client ID>`.
+It contains identity selection, not an access key. Never use `Authentication=None` for Azure.
+For **existing** DTS, read the actual endpoint/Hub and declare approved `existing` resources plus
+scoped role assignments in the application's Bicep; do not create a duplicate scheduler. Reuse the
+same cloud setting shape and do not share a Hub with incompatible apps/environment deployments.
+
+### Local DTS and Service Integrations
+
+For local Emulator use, preserve `AzureWebJobsStorage=UseDevelopmentStorage=true` and use
+`DURABLE_TASK_SCHEDULER_CONNECTION_STRING=Endpoint=http://localhost:8080;TaskHub=workflows;Authentication=None`
+with `TASKHUB_NAME=workflows`. Use the actual verified loopback port and an existing/configured hub,
+not a guessed endpoint. Local `host.json` must agree with that backend. Keep these values only in
+ignored local settings, never Bicep or cloud parameters.
+
+Reuse a compatible existing Emulator/Azurite when available. Verify image identity, hub and ports;
+otherwise obtain approval to start pinned official services. Do not stop borrowed services or
+promise Emulator persistence across restarts. The default local dashboard port is 8082; use the
+actual mapping. To run locally against **Azure DTS**, use documented developer authentication for
+the installed extension and authorized signed-in user; do not copy the deployed app's Managed
+Identity credential into a developer machine or fall back to unauthenticated Azure access.
+
+If a workflow adds Blob/Queue/database/notification/API operations, update the retrieved Bicep
+resources or existing-resource references, scoped app RBAC, approved local-user access, networking
+and app settings alongside Python dependencies and `infra/main.parameters.json`. Keep local
+settings in sync. Approve new service/authentication/side-effect choices separately; do not let the
+runtime agent provision resources or expand permissions. Use a stable destination and deduplication
+for repeated Activity delivery. Store secrets through the existing approved secret design.
+
+References: [DTS host configuration](https://learn.microsoft.com/azure/durable-task/scheduler/quickstart-durable-task-scheduler),
+[identity/RBAC](https://learn.microsoft.com/azure/durable-task/scheduler/durable-task-scheduler-identity),
+[scheduler resource](https://learn.microsoft.com/azure/templates/microsoft.durabletask/2026-02-01/schedulers),
+and [dashboard](https://learn.microsoft.com/azure/durable-task/scheduler/durable-task-scheduler-dashboard).
 
 ## Local User Access
 
