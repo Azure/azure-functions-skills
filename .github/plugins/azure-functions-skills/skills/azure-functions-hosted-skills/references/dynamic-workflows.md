@@ -1,6 +1,6 @@
 # Dynamic Workflows
 
-Dynamic Workflows are an experimental Azure Functions agents runtime feature. The application
+Dynamic Workflows are a Preview feature of the Azure Functions agents runtime. The application
 provides safe executable capabilities; the agent authors a DAG at runtime, and Durable Functions
 executes it. Do not build a second orchestrator, invent a YAML workflow DSL, or confuse this feature
 with a coding agent's own workflow/automation tools.

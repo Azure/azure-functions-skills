@@ -174,7 +174,7 @@ tested. If the user has already provided enough detail, make reasonable choices 
 For parallel analysis, several dependent tool calls, bounded dataset processing, durable waits,
 or work that must survive worker restarts, load
 [dynamic-workflows.md](./references/dynamic-workflows.md) before choosing the execution model.
-Explain briefly that Dynamic Workflows are experimental: an agent builds a plan at runtime and
+Explain briefly that Dynamic Workflows are in Preview: an agent builds a plan at runtime and
 Durable Functions executes its activities with persisted state and observable progress.
 Ask whether to use Dynamic Workflows before enabling them; do not add them to simple one-turn work.
 
