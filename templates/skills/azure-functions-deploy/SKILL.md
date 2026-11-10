@@ -1,7 +1,7 @@
 ---
 name: azure-functions-deploy
 title: Deploy Azure Functions
-description: Proxy Azure Functions deployment requests to the Azure Skills prepare, validate, and deploy workflow while preserving Azure Functions-specific guidance
+description: Proxy standard Azure Functions deployment requests to the Azure Skills prepare, validate, and deploy workflow while preserving Azure Functions-specific guidance. Do not use for Azure Functions Hosted Skills, including follow-up deployment requests during Hosted Skills creation; use azure-functions-hosted-skills instead.
 category: task
 ---
 
@@ -12,6 +12,8 @@ category: task
 Deploy your Azure Functions app to Azure by proxying to the Azure Skills deployment workflow.
 
 This skill is the Azure Functions-facing entry point. It should not run deployment commands directly. It prepares Azure Functions-specific context, then delegates execution to `azure-prepare`, `azure-validate`, and `azure-deploy` from the Azure Skills plugin.
+
+Before checking prerequisites or delegating, check the conversation and project context. If the app is an Azure Functions Hosted Skills app (for example, the conversation is creating a Hosted Skill, or the app uses `*.agent.md` and `agents.config.yaml`), invoke `azure-functions-hosted-skills` instead and stop this workflow. Hosted Skills deployment needs its own model, connector, and runtime guidance, even when the user only says to deploy.
 
 ## Prerequisites
 
