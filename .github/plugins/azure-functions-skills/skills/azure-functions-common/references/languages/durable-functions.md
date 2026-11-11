@@ -19,7 +19,13 @@ Use this file when investigating Durable Functions issues that cross language bo
 
 ## Language support gaps
 
-- **Go is not supported.** There is no shipped Durable Functions SDK for the Go worker, so `orchestrationTrigger`, `activityTrigger`, `entityTrigger`, and the `durableClient` binding are unavailable in Go apps. Do not propose a Durable design for a Go project. Recommend a supported language for the Durable portion, or a non-Durable pattern such as queue or Event Hubs chaining. If a Go app already declares Durable bindings, treat it as an unsupported configuration rather than a runtime bug.
+- **Go orchestrations and activities are in preview** through the Go worker's
+  [`middleware/durabletask`](https://github.com/Azure/azure-functions-golang-worker/tree/main/middleware/durabletask)
+  module, requiring Go 1.25+ and Durable Task extension 3.15.0+. Verify the selected
+  module and provider before proposing a design. Durable entities are not supported.
+  Apps using the Go worker register in code; legacy Durable `function.json` bindings are not
+  the Go worker programming model. Do not introduce a preview Durable dependency
+  implicitly during custom-handler migration.
 
 ## Public documentation
 
