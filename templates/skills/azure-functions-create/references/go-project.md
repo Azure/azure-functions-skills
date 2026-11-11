@@ -1,6 +1,6 @@
 # Creating a Go Azure Functions project
 
-This file covers the native Go worker, not Go custom handlers. For an existing app,
+This file covers Go function apps using the Go worker, not Go custom handlers. For an existing app,
 confirm the model from configuration and Go source/modules before using these
 templates or registration APIs. Adding a function to a custom handler must preserve
 its handler, runtime `custom`, `host.json.customHandler`, and `function.json` metadata;
@@ -20,14 +20,14 @@ with `functions_template_get`. The catalog includes Go HTTP and timer templates
 with AZD/Bicep infrastructure. Discover current IDs rather than inventing them.
 
 Project metadata alone is not a buildable app. Retrieve the selected template's
-files and follow its setup instructions; validate native settings, dependencies,
+files and follow its setup instructions; validate Go worker settings, dependencies,
 and actual local behavior before reporting creation complete. Template infrastructure
 does not mean Azure resources exist or authorize provisioning/deployment.
 
 Use the manifest fallback when MCP retrieval is unavailable or fails, then the
 Core Tools scaffold below if no suitable template can be retrieved. Never substitute
 another language. Check hosting status against the current Go developer reference;
-a catalog's preview label can lag the service. The native worker's version is not
+a catalog's preview label can lag the service. The Go worker's version is not
 the Go compiler version.
 
 ## Step 1 — Verify prerequisites
@@ -145,9 +145,9 @@ func hello(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-Native Go rules:
+Go programming model rules:
 
-- **Never author `function.json` for native Go.** Worker-driven indexing means the registration options in code are the only source of truth. Go custom handlers still require their metadata.
+- **Never author `function.json` for apps using the Go worker.** Worker-driven indexing means the registration options in code are the only source of truth. Go custom handlers still require their metadata.
 - **General additional input bindings and non-HTTP output bindings are not supported.** The preview Durable middleware's `durabletask.ClientInput()` is a supported exception that registers a `durableClient` input binding. Verify its version/extension requirements below. HTTP responses use `http.ResponseWriter`. Other service I/O uses the Azure SDK for Go.
 - `FUNCTIONS_WORKER_RUNTIME` is `native`. It is never `go` or `golang`.
 - The extension bundle is still required, because Go is a non-.NET runtime.
@@ -220,9 +220,9 @@ Then perform real end-to-end verification, not just a successful start:
 
 A `webjobs.storage` unhealthy warning is expected when `AzureWebJobsStorage` is empty or points at the storage emulator while Azurite is not running. It does not block HTTP triggers, but non-HTTP triggers need a real storage endpoint.
 
-## Adding a function to an existing native Go project
+## Adding a function to an existing Go function project
 
-Confirm native Go from configuration and Go source/modules first. If the app is
+Confirm use of the Go worker from configuration and Go source/modules first. If the app is
 a Go custom handler, extend its existing handler and `function.json` instead;
 do not introduce `app.*` registrations or change its runtime as part of adding a function.
 

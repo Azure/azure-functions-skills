@@ -31,7 +31,7 @@ assessment gap.
 
 ## Classify each function
 
-Save one row per function/binding with its current behavior, proposed native
+Save one row per function/binding with its current behavior, proposed Go worker
 registration and handler shape, preserved settings, validation, and status:
 
 - **Direct mapping**: supported trigger and compatible payload/HTTP contract.
@@ -51,7 +51,7 @@ function/listener discovery, HTTP contracts, message success/failure, outputs,
 telemetry, packaging, and rollback as applicable.
 
 Record whether an Azure target already exists or must be provisioned; do not assume
-native Go app creation has succeeded. Use `azure-functions-create` only for an
+Go function app creation has succeeded. Use `azure-functions-create` only for an
 approved empty local comparison/target project, not to reinitialize the source.
 
 Separate local conversion from Go/tool upgrades, Azure configuration/provisioning,

@@ -1,7 +1,7 @@
 ---
 name: azure-functions-update
 title: Update Azure Functions
-description: 'Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Current scenarios: C# in-process to .NET isolated worker, Go custom handlers to the native Go worker, Python programming model v1 to v2, Python Blob SDK type bindings, Python HTTP streaming, extension bundles v1-v3 to v4, and the Durable Functions extension v1 or v2 to a current version. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review.'
+description: 'Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Current scenarios: C# in-process to .NET isolated worker, Go custom handlers to the Go worker, Python programming model v1 to v2, Python Blob SDK type bindings, Python HTTP streaming, extension bundles v1-v3 to v4, and the Durable Functions extension v1 or v2 to a current version. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review.'
 category: task
 license: MIT
 metadata:
@@ -49,7 +49,7 @@ This skill is the umbrella workflow for Azure Functions migration scenarios.
 The scenario table above is the registry. Each row points to one scenario reference.
 
 - Current coverage: C# in-process to .NET isolated worker, Go custom handlers to the
-  native Go worker, Python programming model v1 to v2, Python Blob SDK type bindings,
+  Go worker, Python programming model v1 to v2, Python Blob SDK type bindings,
   Python HTTP streaming, extension bundles v1-v3 to v4, and the Durable Functions extension.
 - The bundle scenario also loads [Binding extensions](references/extensions.md) for the
   extensions that the app uses. When the app uses Durable Functions, it reads the

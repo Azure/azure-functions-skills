@@ -93,12 +93,12 @@ preview deployment. Check extension modules separately for version and preview s
 
 Go has two version floors that no other language has.
 
-- **Core Tools 4.12 or later for Flex.** Earlier versions do not support the native Go worker. Use 4.16.0+ for Elastic Premium/Dedicated, whose support is confirmed in the [4.16.0 release notes](https://github.com/Azure/azure-functions-core-tools/releases/tag/4.16.0). Do not declare those targets ready with 4.12 or infer that 4.16.0 was the earliest supporting release.
+- **Core Tools 4.12 or later for Flex.** Earlier versions do not support the Go worker. Use 4.16.0+ for Elastic Premium/Dedicated, whose support is confirmed in the [4.16.0 release notes](https://github.com/Azure/azure-functions-core-tools/releases/tag/4.16.0). Do not declare those targets ready with 4.12 or infer that 4.16.0 was the earliest supporting release.
 - **Azure CLI 2.87.0 or later**, needed when creating Azure resources or deploying packages. The general 2.60 floor used elsewhere in this checklist is not sufficient for Go, so a Go environment can otherwise be reported as ready when it is not. Check with `az version`.
 
 If the installed Core Tools or Azure CLI is present but below the Go floor, report it as a failing check and give the upgrade command for the user's platform.
 
-Native Go projects use `FUNCTIONS_WORKER_RUNTIME=native` and
+Projects using the Go worker use `FUNCTIONS_WORKER_RUNTIME=native` and
 `FUNCTIONS_CLI_NATIVE_LANGUAGE=go` under `Values` in `local.settings.json`, not
 `go` or `golang` as the worker runtime. Do not change a Go custom handler's
 `custom` setting unless its programming-model migration is approved.
