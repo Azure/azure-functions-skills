@@ -23,8 +23,8 @@ Use this file when investigating Durable Functions issues that cross language bo
   [`middleware/durabletask`](https://github.com/Azure/azure-functions-golang-worker/tree/main/middleware/durabletask)
   module, requiring Go 1.25+ and Durable Task extension 3.15.0+. Verify the selected
   module and provider before proposing a design. Durable entities are not supported.
-  Native Go registers in code; legacy Durable `function.json` bindings are not
-  the native programming model. Do not introduce a preview Durable dependency
+  Apps using the Go worker register in code; legacy Durable `function.json` bindings are not
+  the Go worker programming model. Do not introduce a preview Durable dependency
   implicitly during custom-handler migration.
 
 ## Public documentation

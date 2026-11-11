@@ -21,7 +21,7 @@ preserve shared initialization, clients, business handlers, and middleware.
 Inspect the selected release's registration and options APIs for each used trigger.
 Keep exact function names unless renaming is separately approved.
 
-| Custom-handler surface | Native starting point |
+| Custom-handler surface | Go worker equivalent |
 | --- | --- |
 | `httpTrigger` and HTTP response output | `app.HTTP` with `func(http.ResponseWriter, *http.Request)` |
 | `timerTrigger` | `app.Timer` with `bindings.TimerInfo` and `sdk.WithSchedule` |
@@ -67,11 +67,11 @@ Remove `host.json`'s `customHandler` block after the new entry point exists.
 Keep applicable extension bundles, connection setting names, HTTP options, retries,
 service settings, and logging. Translate obsolete extension schemas only with
 version-specific evidence and record the change. Remove each old `function.json`
-only after all its binding and retry behavior has implemented, verified native
+only after all its binding and retry behavior has implemented, verified Go worker
 mappings or approved, verified replacements. Recording a blocker is not sufficient:
 retain the original metadata and pause conversion while any behavior is blocked.
 When metadata is retired, keep a copy in the rollback source/snapshot outside the
-active native app and package. Do not mix legacy metadata indexing with native
+active migrated app and package. Do not mix legacy metadata indexing with Go worker
 registrations or cut over while any behavior is blocked.
 
 Under `Values`, preserve unrelated values and set:
@@ -84,7 +84,7 @@ Keep this file ignored and outside the package. Preserve `AzureWebJobsStorage` a
 connection setting names; never commit secrets. Remove a custom-handler port setting
 only if nothing else needs it.
 
-Propose native Go runtime configuration for the Azure target/IaC separately.
+Propose Go runtime configuration for the Azure target/IaC separately.
 
 Verify and record the exact target-plan schema and values in the plan/report:
 Flex uses `functionAppConfig.runtime`, not a blind copy of local app settings.
@@ -98,6 +98,6 @@ preserving required levels/correlation. OpenTelemetry needs host configuration a
 worker middleware; it is not automatic. Do not replace an existing telemetry pipeline
 without agreement. See the [observability guide](https://azure.github.io/azure-functions-golang-worker/guides/observability/).
 
-Update CI/package entry points for the native build, excluding retired executables
+Update CI/package entry points for the Go worker build, excluding retired executables
 and custom-handler metadata without deleting shared files or business data.
 Continue with [validation.md](validation.md) for common steps 5-7.

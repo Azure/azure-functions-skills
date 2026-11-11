@@ -152,7 +152,7 @@ For contributor guidance on the product boundary between Azure Skills and Azure 
 | [`azure-functions-help`](templates/skills/azure-functions-help/SKILL.md) | Discover and route to the best Azure Functions skill |
 | [`azure-functions-setup`](templates/skills/azure-functions-setup/SKILL.md) | Verify local prerequisites (Azure CLI, Core Tools, runtimes, Azure Skills) |
 | [`azure-functions-create`](templates/skills/azure-functions-create/SKILL.md) | Create new Functions projects or add functions via Azure MCP templates |
-| [`azure-functions-update`](templates/skills/azure-functions-update/SKILL.md) | Explicitly selected migration workflow: C# in-process to isolated, or Go custom handlers to the native Go worker |
+| [`azure-functions-update`](templates/skills/azure-functions-update/SKILL.md) | Explicitly selected migration workflow: C# in-process to isolated, or Go custom handlers to the Go worker |
 | [`azure-functions-hosted-skills`](templates/skills/azure-functions-hosted-skills/SKILL.md) | Build cloud-hosted, event-driven intelligent capabilities with Markdown, Functions triggers, code, tools, HTTP, and MCP |
 | [`azure-functions-hosted-skills-migrate`](templates/skills/azure-functions-hosted-skills-migrate/SKILL.md) | Explicit use by name only: migrate existing skills, chat workflows, agents, code, or instructions; compare Connector/MCP/Python tools, deploy, and test |
 | [`azure-functions-connector-create`](templates/skills/azure-functions-connector-create/SKILL.md) | Create and authorize least-privilege Connector Namespace connections for Hosted Skills |
@@ -179,7 +179,7 @@ Use azure-functions-update to assess my Go custom handler and save a migration p
 
 The [Go migration scenario](templates/skills/azure-functions-update/references/custom-handlers-to-go.md)
 inventories triggers, bindings, HTTP behavior, configuration, and hosting constraints.
-It proposes native registrations, identifies bindings that need Azure SDK replacements,
+It proposes Go worker registrations, identifies bindings that need Azure SDK replacements,
 and records validation and rollback requirements before code changes. Deployment,
 hosting-plan changes, and toolchain upgrades remain separately approved work.
 

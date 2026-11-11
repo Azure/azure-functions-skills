@@ -19,9 +19,9 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 ### Step 0 — Check for Go
 
-If the user asks for **Go** (or Golang), first check whether the target is a new project or an existing app. For an existing app, inspect `host.json`, local runtime settings, Go source, and modules to distinguish native Go from a Go custom handler; neither `native` nor `custom` alone identifies the language. A `customHandler` block and its Go executable/source indicate the custom-handler model. Preserve that model when adding a function: extend its handler and `function.json` metadata, skip the native template paths below, and do not change runtime settings. Route to **azure-functions-update** only when migration is explicitly requested. If the model is unclear or configuration conflicts with source, resolve it before editing.
+If the user asks for **Go** (or Golang), first check whether the target is a new project or an existing app. For an existing app, inspect `host.json`, local runtime settings, Go source, and modules to distinguish apps using the Go worker from Go custom handlers; neither `native` nor `custom` alone identifies the language. A `customHandler` block and its Go executable/source indicate the custom-handler model. Preserve that model when adding a function: extend its handler and `function.json` metadata, skip the Go worker template paths below, and do not change runtime settings. Route to **azure-functions-update** only when migration is explicitly requested. If the model is unclear or configuration conflicts with source, resolve it before editing.
 
-For a new native Go project or a confirmed existing native Go app, load [references/go-project.md](references/go-project.md) for native-worker prerequisites, configuration, and registration rules, then continue with Step 1. Go templates are available through MCP and the manifest; discover the current catalog rather than assuming a fixed template set.
+For a new Go function project or an existing app confirmed to use the Go worker, load [references/go-project.md](references/go-project.md) for Go worker prerequisites, configuration, and registration rules, then continue with Step 1. Go templates are available through MCP and the manifest; discover the current catalog rather than assuming a fixed template set.
 
 Use Path C only when no suitable Go template can be retrieved through Path A or Path B.
 
@@ -228,10 +228,10 @@ Go is GA on Linux Flex Consumption. Confirm preview availability and acceptance 
 
 If `host.json` already exists, do **not** re-initialize. Instead:
 
-- **Go model gate**: apply Step 0 before selecting templates. For a Go custom handler, preserve the dispatch/HTTP-forwarding model, `host.json.customHandler`, runtime `custom`, and per-function `function.json`; add the requested handler and metadata without merging native Go templates.
+- **Go model gate**: apply Step 0 before selecting templates. For a Go custom handler, preserve the dispatch/HTTP-forwarding model, `host.json.customHandler`, runtime `custom`, and per-function `function.json`; add the requested handler and metadata without merging Go worker templates.
 - **MCP path**: call `functions_template_get` with the same language as the existing project, the desired returned template ID, and `output: Add`. Merge only the needed function code, dependencies, and settings; do not replace the existing project or deploy its template infrastructure.
 - **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
-- **Native Go registration only**: merge the relevant MCP template pattern when available, or use the verified worker APIs. Add another `app.*` registration and, for an extension trigger, the blank import. `func new` is not supported for native Go. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
+- **Go worker registration only**: merge the relevant MCP template pattern when available, or use the verified worker APIs. Add another `app.*` registration and, for an extension trigger, the blank import. `func new` is not supported for apps using the Go worker. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
 
 ## After Creation
 

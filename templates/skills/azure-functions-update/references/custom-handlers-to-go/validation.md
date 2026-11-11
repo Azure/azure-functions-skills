@@ -41,7 +41,7 @@ Rollback includes code, settings, and event-source ownership, not just the old Z
 For necessary Go version changes, use common step 8 with an available, explicitly
 approved language/toolchain route. Do not invoke the .NET upgrade agent for Go or
 invent an unavailable Go upgrade skill. If the route is unavailable, record the
-blocker. After it returns, recheck modules, native registrations, settings, build,
+blocker. After it returns, recheck modules, Go worker registrations, settings, build,
 host, and E2E evidence under common step 9.
 
 ## Definition of done
@@ -53,12 +53,12 @@ future conversion requirements; report the plan as delivered, not the app as mig
 | ID | Required evidence |
 | --- | --- |
 | CG-01 | Approved inventory, baseline/accepted substitute, scope, compatible versions, and restore point are recorded. |
-| CG-02 | Every original function/trigger/binding has a native mapping; unresolved blockers prevent migration completion. |
-| CG-03 | Native startup/registrations replace the custom-handler listener; retired metadata/executables are excluded only after their behavior is accounted for. |
+| CG-02 | Every original function/trigger/binding has a Go worker mapping; unresolved blockers prevent migration completion. |
+| CG-03 | Go worker startup/registrations replace the custom-handler listener; retired metadata/executables are excluded only after their behavior is accounted for. |
 | CG-04 | HTTP routes, methods, auth, responses, and middleware match baseline fixtures, or HTTP is absent with a stated reason. |
 | CG-05 | Used message/timer triggers preserve payloads, batch shape, retries, settlement/checkpoints, and service settings; actual failure behavior is verified. |
 | CG-06 | Each unsupported input/output binding has an approved, verified replacement preserving identity/side effects, or no such bindings exist. |
-| CG-07 | The exact local native/Go settings in conversion.md are present, required host/connection/logging settings are retained, and secrets are excluded. The native Azure runtime proposal, with verified plan-specific schema/values, is recorded in the plan/report; Azure changes remain proposals unless approved and verified. |
+| CG-07 | The exact local Go worker settings in conversion.md are present, required host/connection/logging settings are retained, and secrets are excluded. The Azure Go runtime proposal, with verified plan-specific schema/values, is recorded in the plan/report; Azure changes remain proposals unless approved and verified. |
 | CG-08 | The migrated app builds, applicable existing tests pass, and local indexing/listeners are verified for every expected function. |
 | CG-09 | Agreed trigger E2E cases prove business results and required telemetry; missing services or permissions remain blocked. |
 | CG-10 | The package is inspected; deployment/cutover/rollback status, platform/toolchain handoffs, unverified cloud behavior, and run-owned cleanup are recorded accurately. |

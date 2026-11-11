@@ -10,16 +10,16 @@ Use this checklist after collecting Function App inventory. Apply only sections 
 - JavaScript/TypeScript apps use the v4 programming model when practical.
 - Python apps use the v2 programming model when practical.
 - Python Function Apps run on Linux.
-- Native Go apps pin a published compatible worker release rather than tracking `main`; selected preview hosting/extension capabilities are acknowledged in production readiness decisions.
+- Apps using the Go worker pin a published compatible worker release rather than tracking `main`; selected preview hosting/extension capabilities are acknowledged in production readiness decisions.
 - Go apps propagate panics from user-started goroutines as errors, because an unrecovered goroutine panic terminates the worker and fails every concurrent invocation on it.
-- Native Go apps use Linux Flex Consumption (GA), or a Linux Premium/Dedicated target with confirmed preview availability and acceptance.
+- Apps using the Go worker use Linux Flex Consumption (GA), or a Linux Premium/Dedicated target with confirmed preview availability and acceptance.
 - Durable Functions workloads consider Durable Task Scheduler when appropriate.
 - Go Durable orchestrations/activities are preview through `middleware/durabletask`, requiring Go 1.25+ and Durable Task extension 3.15.0+. Entities are unsupported; do not introduce Durable implicitly during migration.
 
 ## Host and app configuration
 
 - `FUNCTIONS_EXTENSION_VERSION` is configured for Functions v4.
-- `FUNCTIONS_WORKER_RUNTIME` matches the deployed model. Native Go uses `native`, not `go` or `golang`; a Go custom handler still uses `custom` until an approved migration.
+- `FUNCTIONS_WORKER_RUNTIME` matches the deployed model. Apps using the Go worker use `native`, not `go` or `golang`; a Go custom handler still uses `custom` until an approved migration.
 - Non-.NET apps use extension bundle `[4.*, 5.0.0)` unless there is a justified exception. Go is a non-.NET runtime, so this applies to Go as well.
 - Required app settings are present; unresolved `%SETTING_NAME%` placeholders are treated as configuration issues.
 - `local.settings.json` is used only for local development and is not committed with secrets.

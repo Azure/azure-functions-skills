@@ -1,4 +1,4 @@
-# Go custom handlers to the native Go worker
+# Migrate Go custom handlers to the Go worker
 
 Use with the eleven steps in [SKILL.md](../SKILL.md). This scenario provides a
 starting point, not a one-command conversion or deployment. Assessment, plan, and
@@ -21,7 +21,7 @@ The common workflow's selection, permission, evidence, and recovery rules still 
 ## Creation and provisioning are separate
 
 Neither assessment nor local conversion assumes an Azure Go Function App exists.
-Keep the existing source project; do not reinitialize it to obtain a native scaffold.
+Keep the existing source project; do not reinitialize it to obtain a Go worker scaffold.
 If an approved empty comparison/target project is needed, hand local scaffolding
 to `azure-functions-create`, which discovers Go MCP templates with manifest and
 Core Tools fallbacks. Template infrastructure is not evidence of deployed resources.
@@ -49,7 +49,7 @@ The core worker v1.0.0 is generally available on Linux Flex Consumption. Linux
 Elastic Premium and Dedicated support is a preview rollout: confirm availability
 for the actual plan, SKU, and region. Do not force a move to Flex or promise all
 preview targets are available. Windows-hosted Azure apps and Linux Consumption
-are not native Go targets; Windows local development is supported.
+are not supported Go worker hosting targets; Windows local development is supported.
 
 Reviewed minimums: Go 1.24 for the core worker, Core Tools 4.12 for Flex, and Azure
 CLI 2.87.0 when approved Azure operations need it. Use Core Tools 4.16.0 or later
