@@ -1,6 +1,6 @@
 ---
 name: azure-functions-hosted-skills
-description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, or Azure Functions hosted agent. Use this skill, not azure-functions-deploy, for follow-up deployment requests when the conversation or project is about Hosted Skills, even if the user only says to deploy without repeating Hosted Skills. To migrate an existing workflow from skills, chat context, agents, code, or instructions, recommend azure-functions-hosted-skills-migrate; it requires an explicit use request by name and must not run automatically."
+description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, Azure Functions hosted agent, or Dynamic Workflows on the Azure Functions agents runtime with Durable Functions or Durable Task Scheduler (DTS). Use this skill, not azure-functions-deploy, for follow-up deployment requests when the conversation or project is about Hosted Skills, even if the user only says to deploy without repeating Hosted Skills. To migrate an existing workflow from skills, chat context, agents, code, or instructions, recommend azure-functions-hosted-skills-migrate; it requires an explicit use request by name and must not run automatically."
 argument-hint: 'Describe the Hosted Skill, triggers, instructions, tools, model needs, and deployment target'
 ---
 
@@ -94,6 +94,7 @@ Load only the files needed for the task:
 | Connector side-effect smoke tests for Teams, Outlook, and MCP tools | [connector-smoke-tests.md](./references/connector-smoke-tests.md) |
 | Connector-triggered agents and trigger config deployment | [connector-triggers.md](./references/connector-triggers.md) |
 | Custom Python tools and Agent Skills | [tools-and-skills.md](./references/tools-and-skills.md) |
+| Dynamic Workflows: suitability, opt-in, Durable activities, data-driven plans, Sub Agents, and backend choice | [dynamic-workflows.md](./references/dynamic-workflows.md) |
 | Writing robust agent instructions | [agent-authoring.md](./references/agent-authoring.md) |
 | Bicep, azd, deployment, local development | [infra-and-deployment.md](./references/infra-and-deployment.md) |
 | Azure resource naming abbreviations used by the Bicep assets | [abbreviations.json](./references/abbreviations.json) |
@@ -167,6 +168,28 @@ verify background agents with the admin invoke endpoint and Application Insights
 After the discovery, summarize the plan before editing. Include the agent files, trigger or
 built-in endpoints, model choice, tools/MCP/connectors, infrastructure changes, and how it will be
 tested. If the user has already provided enough detail, make reasonable choices and proceed.
+
+### Consider Dynamic Workflows
+
+For parallel analysis, several dependent tool calls, bounded dataset processing, durable waits,
+or work that must survive worker restarts, load
+[dynamic-workflows.md](./references/dynamic-workflows.md) before choosing the execution model.
+Explain briefly how Dynamic Workflows work: an agent builds a plan at runtime and
+Durable Functions executes its activities with persisted state and observable progress.
+Ask whether to use Dynamic Workflows before enabling them; do not add them to simple one-turn work.
+
+After adoption, ask a separate question about Durable Task Scheduler (DTS). Recommend DTS for
+lower orchestration latency and its execution-history/activity dashboard, explaining additional
+Azure resources and cost without promising a speed multiplier. Azure Storage remains supported
+when DTS is declined. An explicit choice already made by the user need not be asked again.
+These choices do not approve provisioning, side-effect tests, or deployment.
+
+Enable only the selected agents, author bounded `@workflow_tool` handlers, and keep backend
+configuration in `host.json` and matching app settings, not agent frontmatter. Dynamic Workflows
+do not require ACA Dynamic Sessions; retain sessions only for approved web/code workloads.
+Preserve migration support exclusions and the user's approved service/tool choices.
+Include the terminal result destination, idempotency strategy, backend and service-related Bicep
+changes, and completion checks in the plan. A started Workflow ID is not business completion.
 
 ## Scaffold a New App
 
@@ -415,6 +438,10 @@ For connector actions with visible side effects, such as Teams posts or Outlook 
 the downstream side effect through `azure-functions-connector-validate`. If the user reports it is
 missing, do not keep triggering the agent. Preserve the recorded tool result and arguments for the
 validation workflow instead of changing model settings or rerunning the full Hosted Skill.
+
+For Dynamic Workflows, also use [testing.md](./references/testing.md#dynamic-workflows) to verify
+the terminal orchestration state and final destination. The trigger Function can finish while
+the workflow continues; neither `202 Accepted` nor a successful starter proves completion.
 
 Be hands-on after scaffolding. Do not stop at a command list when the next command is safe and the
 user already approved the direction. Run `azd up`, run `azd env get-values`, test deployed Hosted

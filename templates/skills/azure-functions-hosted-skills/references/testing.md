@@ -148,6 +148,44 @@ the downstream system. If the side effect is missing after one run, stop rerunni
 and use [connector-smoke-tests.md](./connector-smoke-tests.md) to validate the connector path with
 the recorded tool arguments.
 
+## Dynamic Workflows
+
+Load [dynamic-workflows.md](./dynamic-workflows.md) and check the approved backend before tests.
+Use deterministic handler/configuration checks before any model-backed run. Confirm paid test
+target, budget, repetition count and owned-resource cleanup separately; do not run LLM-backed
+evaluations in PR-triggered CI or on unreviewed contributor code.
+
+Check startup indexes the owner trigger/endpoints and Durable orchestration/Activity functions,
+the selected runtime supports `workflow_tool`, and host/app settings resolve to the intended Hub.
+Verify local Emulator versus Azure credentials without printing secrets. Do not accept a printed
+URL as runtime readiness.
+
+For Azure DTS, verify the Function App and any approved dashboard/local client have both scoped
+RBAC and the approved network path. An empty `ipAllowlist` denies all traffic even with correct
+roles; `['0.0.0.0/0']` permits any IPv4 source only for the reviewed public configuration. Check
+restricted ranges/private access against the actual clients; do not open an existing scheduler
+just to pass a test.
+
+After approval, run one bounded scenario through the real owner trigger or existing chat surface.
+Capture Workflow ID, owner, source event/session, environment and revision. A `202 Accepted`,
+queue enqueue, Workflow ID, or successful starter Function is not a completed workflow.
+The runtime agent must end its initial turn rather than poll for completion; the test/operator
+may inspect status through the existing chat status surface or Durable/DTS tooling.
+
+For chat, reuse the real session and verify per-task progress and terminal result delivery.
+For non-HTTP triggers, inspect the Durable/DTS terminal state and verify the final publisher's
+actual Blob/queue/database/notification result. Do not add a debug chat agent just for this check.
+Correlate Workflow ID/node with Function logs and Application Insights; retain failures and partial
+external results. DTS timeline/history is complementary to, not a replacement for, App Insights.
+
+Cover fixed fan-out/fan-in and `for_each` input ordering, skipped and empty collections, explicit
+upstream output transfer, authorized/unauthorized specialists, and errors for missing references,
+non-array iteration and node-cap overflow. Keep collection sizes within the 50-node budget.
+Test timeout, retry/idempotency, cancellation and restart recovery only against separately approved
+isolated targets; never repeat live emails/posts to prove retry or kill shared processes.
+If the publisher outcome is unknown, reconcile the stable destination/event key before retrying.
+Report business completion only after terminal state and the required destination are verified.
+
 ## Queue and Blob Smoke Tests
 
 For local Storage Queue triggers, add a queue message with Azure Storage tooling or SDKs after

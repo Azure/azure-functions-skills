@@ -71,6 +71,7 @@ describe('simplified distribution', () => {
     expect(existsSync(join(root, 'hooks', 'copilot-hooks.json'))).toBe(true);
     expect(existsSync(join(root, 'hooks', 'hooks.json'))).toBe(true);
     expectLocalTelemetry(root, 'hooks', 'skills');
+    expectWorkflowAssets(root, 'skills');
     expect(existsSync(join(root, 'agents'))).toBe(false);
     expect(existsSync(join(root, 'prompts'))).toBe(false);
 
@@ -99,6 +100,7 @@ describe('simplified distribution', () => {
       expect(existsSync(join(targetRoot, hookPath))).toBe(true);
       const hookRoot = target === 'ghcp' ? '.github' : target === 'claude' ? '.claude' : '.codex';
       expectLocalTelemetry(targetRoot, join(hookRoot, 'hooks'), skillsPath);
+      expectWorkflowAssets(targetRoot, skillsPath);
       expect(existsSync(join(targetRoot, 'AGENTS.md'))).toBe(false);
       expect(existsSync(join(targetRoot, 'CLAUDE.md'))).toBe(false);
       expect(existsSync(join(targetRoot, '.github', 'agents'))).toBe(false);
@@ -107,6 +109,17 @@ describe('simplified distribution', () => {
   );
 
 });
+
+function expectWorkflowAssets(root: string, skillsPath: string): void {
+  const skill = join('azure-functions-hosted-skills');
+  for (const path of [
+    join(skill, 'references', 'dynamic-workflows.md'),
+    join(skill, 'assets', 'infra', 'app', 'durable-task-scheduler.bicep'),
+  ]) {
+    expect(readFileSync(join(root, skillsPath, path), 'utf-8'))
+      .toBe(readFileSync(join(TEMPLATES_DIR, 'skills', path), 'utf-8'));
+  }
+}
 
 function expectLocalTelemetry(root: string, hooksPath: string, skillsPath: string): void {
   const runtime = readFileSync(join(root, hooksPath, 'runtime', 'telemetry.mjs'), 'utf-8');

@@ -26,6 +26,9 @@ from azure_functions_agents import create_function_app
 app = create_function_app()
 ```
 
+Do not replace this bootstrap with a hand-authored Durable orchestrator for Dynamic Workflows.
+After an agent opts in, the runtime creates the Durable App and registers the workflow functions.
+
 ## requirements.txt
 
 Use `azurefunctions-agents-runtime[monitor]` whenever the app includes
@@ -104,6 +107,23 @@ least as long as the longest `timeout` in `agents.config.yaml` or an individual 
 making it a little longer is fine. For synchronous HTTP agents, remember that Azure's front-end
 HTTP response limit is about 230 seconds even when `functionTimeout` is longer. Use a timer,
 queue, connector trigger, or other deferred workflow for longer work.
+
+## Dynamic Workflow Files
+
+For adopted Dynamic Workflows, keep Python 3.13+ and a published compatible runtime; its Durable SDK
+is transitive. Configure `workflows.enabled` per owner `.agent.md` and `@workflow_tool` handlers
+under `tools/`. Do not generate static workflow JSON/YAML files as a replacement for the runtime's
+agent-authored plans.
+
+Azure Storage is the default Durable backend. For approved DTS, merge the host settings in
+[infra-and-deployment.md](./infra-and-deployment.md#dynamic-workflow-backends) without replacing
+HTTP, connector, timeout or logging settings. Keep `TASKHUB_NAME` and
+`DURABLE_TASK_SCHEDULER_CONNECTION_STRING` synchronized with the chosen backend and environment.
+Changing an azd parameter alone does not rewrite `host.json`. Do not include local emulator
+connection strings in cloud app settings, or deployed Managed Identity settings in local runs.
+
+Add cloud resources and service permissions for Activity tools in the retrieved Bicep, not just
+local settings. Workflow enablement itself does not require a dynamic session pool.
 
 ## agents.config.yaml
 
