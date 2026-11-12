@@ -11,7 +11,7 @@
 import { isAbsolute, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
-import { loadSkills, loadMcpServers, loadHooks, loadTelemetryRuntime } from './loader.js';
+import { loadSkills, loadMcpServers, loadHooks, loadTelemetryRuntime, loadFunctionsTools } from './loader.js';
 import { buildPluginMarketplaces, buildPluginPayload, buildTarget } from './build-target.js';
 import type { BuildData, BuildTargetName } from '../types.js';
 
@@ -59,13 +59,16 @@ const runtime = existsSync(join(ROOT, 'src', 'telemetry', 'runtime.ts'))
   ? (await import('./telemetry-runtime.js')).buildTelemetryRuntime(join(TEMPLATES_DIR, 'skills'))
   : loadTelemetryRuntime(join(ROOT, 'dist', 'plugin', 'azure-functions-skills', 'hooks', 'runtime'));
 const hooks = loadHooks(join(TEMPLATES_DIR, 'hooks'), runtime);
+const tools = existsSync(join(ROOT, 'src', 'tools', 'cli.ts'))
+  ? (await import('./tools-runtime.js')).buildFunctionsTools()
+  : loadFunctionsTools(join(ROOT, 'dist', 'plugin', 'azure-functions-skills'));
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')) as { version: string };
 
 console.log(`  ${skills.length} skills loaded`);
 console.log(`  ${mcpServers.length} MCP servers loaded`);
 
 // Build each target
-const data: BuildData = { skills, mcpServers, hooks, packageVersion: pkg.version };
+const data: BuildData = { skills, mcpServers, hooks, tools, packageVersion: pkg.version };
 if (!pluginOnly) {
   for (const target of selectedTargets) {
     const targetDir = join(distDir, 'workspace', target);
