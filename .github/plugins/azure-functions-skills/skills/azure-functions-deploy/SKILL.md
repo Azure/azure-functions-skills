@@ -1,6 +1,6 @@
 ---
 name: azure-functions-deploy
-description: "Proxy standard Azure Functions deployment requests to the Azure Skills prepare, validate, and deploy workflow while preserving Azure Functions-specific guidance. Do not use for Azure Functions Hosted Skills, including follow-up deployment requests during Hosted Skills creation; use azure-functions-hosted-skills instead."
+description: "Deploy an Azure Functions app to Azure with the Azure Developer CLI, using a script that plans, applies, and verifies the deployment. Do not use for Azure Functions Hosted Skills, including follow-up deployment requests during Hosted Skills creation; use azure-functions-hosted-skills instead."
 ---
 
 
@@ -8,179 +8,153 @@ description: "Proxy standard Azure Functions deployment requests to the Azure Sk
 
 # azure-functions-deploy — Deploy Azure Functions
 
-Deploy your Azure Functions app to Azure by proxying to the Azure Skills deployment workflow.
+Deploy an Azure Functions app to the Flex Consumption plan with the Azure Developer CLI (`azd`).
 
-This skill is the Azure Functions-facing entry point. It should not run deployment commands directly. It prepares Azure Functions-specific context, then delegates execution to `azure-prepare`, `azure-validate`, and `azure-deploy` from the Azure Skills plugin.
+A script does the fixed work: it reads the project, writes a plan, runs the approved plan, and checks the result. Your job is to get the missing inputs from the user, show the plan, get approval, and handle a failure.
 
-Before checking prerequisites or delegating, check the conversation and project context. If the app is an Azure Functions Hosted Skills app (for example, the conversation is creating a Hosted Skill, or the app uses `*.agent.md` and `agents.config.yaml`), invoke `azure-functions-hosted-skills` instead and stop this workflow. Hosted Skills deployment needs its own model, connector, and runtime guidance, even when the user only says to deploy.
+If the app is an Azure Functions Hosted Skills app (the conversation is creating a Hosted Skill, or the app uses `*.agent.md` or `agents.config.yaml`), invoke `azure-functions-hosted-skills` instead and stop.
 
-## Prerequisites
+## What this skill supports
 
-- Azure CLI installed and logged in (`az login`)
-- Azure Developer CLI installed and logged in (`azd auth login`) for AZD-based deployments
-- An Azure subscription (`az account show`)
-- A Functions project with `host.json` in the current directory
-- Azure Skills plugin installed with `azure-prepare`, `azure-validate`, and `azure-deploy` available
+| Project | Path |
+| --- | --- |
+| Has `azure.yaml` and `infra/main.bicep` (projects from `azure-functions-create` templates have both) | Script workflow below |
+| Anything else: no `azure.yaml`, Terraform, Go without infrastructure files, an existing app without azd | [references/manual-deploy.md](references/manual-deploy.md) |
 
-If any prerequisite is missing, suggest running **azure-functions-setup** first.
+The script deploys only what the project's own `infra/` describes. It does not choose a hosting plan, write infrastructure, or delete resources.
 
-## Required delegation model
+## The tool
 
-Use Azure Skills as the deployment engine:
-
-1. If `.azure/deployment-plan.md` is missing, invoke `azure-prepare` first — **unless the shortcut path below applies**.
-2. If `.azure/deployment-plan.md` exists but is not `Validated`, invoke `azure-validate` before any deployment attempt.
-3. If `.azure/deployment-plan.md` exists and status is `Validated`, invoke `azure-deploy` directly.
-4. Never mark the plan as `Validated` from this skill. Only `azure-validate` may do that.
-5. Do not run `azd up`, `azd deploy`, `terraform apply`, `az deployment`, or `func azure functionapp publish` directly from this skill unless Azure Skills cannot handle the scenario and the user explicitly approves a fallback.
-
-### Shortcut path for MCP-template projects
-
-When a project was scaffolded from an Azure MCP template (e.g., via `azure-functions-create` Path A), it already contains complete infrastructure. Detect this by checking **all** of these conditions:
-
-1. `azure.yaml` exists in the project root
-2. `infra/main.bicep` or `infra/*.tf` exists
-3. `host.json` exists
-4. `azure.yaml` contains a `metadata.template` field (indicates MCP template origin)
-
-If all conditions are met, **skip `azure-prepare`** and proceed directly:
-
-1. Generate a lightweight `.azure/plan.md` noting the pre-existing infrastructure
-2. Invoke `azure-validate` (provisions preview, environment setup)
-3. Invoke `azure-deploy` (runs `azd up`)
-
-This avoids the redundant 5–10 minute analysis and planning phase for projects that already have production-ready infrastructure.
-
-The normal workflow is:
+Run the tool with Node. `<skill-dir>` is the folder that contains this `SKILL.md`.
 
 ```text
-azure-functions-deploy → azure-prepare → azure-validate → azure-deploy
+node "<skill-dir>/../azure-functions-common/scripts/functions-tools.mjs" deploy <command> --dir "<project-root>"
 ```
 
-When a validated plan already exists:
+`<project-root>` is the folder that contains `azure.yaml`. Each run prints one JSON object. Read `ok`, `summary`, `data`, `findings`, `gaps`, and `next`.
+
+| Exit code | Meaning | What to do |
+| --- | --- | --- |
+| 0 | The command ran | Follow the JSON. `ok: false` means it found a problem. |
+| 2 | Invalid arguments | Fix the arguments and run once more. |
+| 3 | Blocked before running anything | Apply `findings[].fix` or ask for `data.inputsNeeded`, then run again. |
+| 4 | A step failed | See [When a step fails](#when-a-step-fails). |
+| 1 | Unexpected failure | Use [references/manual-deploy.md](references/manual-deploy.md). Do not run the same command again. |
+
+Trust the output. Do not repeat its checks with your own `az` or `azd` commands.
+
+If `node` is missing or the tool file does not exist, use [references/manual-deploy.md](references/manual-deploy.md). Do not install Node or download the tool.
+
+## Workflow
+
+### 1. Plan
 
 ```text
-azure-functions-deploy → azure-deploy
+node "<tool>" deploy plan --dir "<project-root>"
 ```
 
-## Azure Functions context to inject
+This step reads files and sign-in state. It changes nothing in Azure and nothing in the azd environment.
 
-Before handing off, collect and pass the following Azure Functions-specific guidance to Azure Skills:
+- If `data.inputsNeeded` is present, ask the user for each item. Offer `suggested` and `allowed` values when they are listed. Then run `deploy plan` again with the listed options (`--env`, `--subscription`, `--location`, `--set NAME=VALUE`).
+- If a finding has a `fix`, show it to the user. Run `azd auth login` only when the user asks you to.
+- If `next.action` is `manual-steps`, switch to [references/manual-deploy.md](references/manual-deploy.md).
+- To update the code of an app that is already provisioned, add `--code-only`.
 
-- Use Azure Functions deployment best-practices MCP guidance (`get_azure_bestpractices` with `resource: azurefunctions` and `action: deployment`) when available.
-- Prefer Flex Consumption / FC1 for new serverless Function Apps.
-- Include `functionAppConfig` with deployment storage for FC1 Function Apps.
-- Use Linux for Python Function Apps.
-- Configure Function authentication or stronger mechanisms; avoid anonymous access unless intentional.
-- Enable Application Insights for monitoring, exception tracking, and dependency monitoring.
-- Consider private networking and one Function App per independently scaling workload when appropriate.
-- Use Azure Functions endpoint verification after deploy; do not use `curl -I` for HTTP trigger verification because HEAD can return false negatives.
+Do not choose a subscription, location, or environment name for the user. Use the values from the plan or ask.
 
-## Go-specific deployment context
+### 2. Get approval
 
-Go is in public preview, and Core Tools 4.12 or later owns the Go build and packaging. Lead with the supported commands rather than a hand-rolled package.
+Show the user these fields from the plan output, then ask whether to deploy:
 
-Two preview constraints are hard limits, so check them before planning anything else.
+- `data.subscription` and `data.location`
+- `data.environment`, and whether it is new (`data.environmentExists`)
+- `data.values`, including each value whose `source` is `default`
+- `data.steps`, with what each one changes (`local-environment`, `azure-resources`, or `application-code`)
 
-- Go function apps are supported **only on the Flex Consumption plan**.
-- Go function apps run on **Linux only** in Azure. Do not select or attempt a Windows-hosted plan.
+Tell the user that the `azure-resources` step creates billable resources.
 
-Supported deployment paths:
+If the user wants to see the resource changes first, run the preview. It creates the local azd environment but provisions nothing.
 
-| Command | What it does |
-| --- | --- |
-| `func azure functionapp publish <APP_NAME>` | Builds, packages, and deploys to an existing function app. Simplest path. |
-| `func pack` | Builds for Linux x64 and produces a deployable zip with the binary at the package root as `app`. Deploy it with `az functionapp deployment source config-zip`. |
+```text
+node "<tool>" deploy apply --dir "<project-root>" --approve <planId> --preview
+```
 
-A package produced by `func pack` is ready to run, so do not request a remote build when deploying it.
+Pass `--approve` only with the `planId` the user approved. If you run `deploy plan` again, the id changes and you must ask again.
 
-Other Go context to pass to Azure Skills:
+### 3. Apply
 
-| Concern | Guidance |
-| --- | --- |
-| Cross-compilation | Only needed with `func pack --no-build`. In that case build first with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/app .`. Otherwise Core Tools targets the right platform for you. |
-| Executable permission | Core Tools sets this correctly. It only becomes a problem with a hand-rolled archive, because some tools such as Windows `Compress-Archive` do not preserve Unix permissions, which leaves the platform unable to start the binary. Prefer `func pack`. |
-| Worker runtime setting | `FUNCTIONS_WORKER_RUNTIME` must be `native`. |
-| Azure CLI version | 2.87.0 or later is required to create Azure resources or deploy packages for Go. |
-| Preview status | Confirm the user accepts preview status before a production deployment. |
+```text
+node "<tool>" deploy apply --dir "<project-root>" --approve <planId>
+```
 
-If a Go deployment succeeds but the app never becomes healthy, check the plan and OS first, then whether the package was built by Core Tools or assembled by hand.
+Provisioning and deployment can take up to 30 minutes each. Run the command with a long timeout or in the background, and wait for it to exit. Do not stop it because it prints nothing; the script captures the `azd` output in `data.logFile`.
 
-Reference: https://learn.microsoft.com/azure/azure-functions/functions-reference-go
+The script refuses to run when the plan id does not match, when the plan file was edited, or when `azure.yaml` or `infra/` changed after planning. In each case, plan again and ask again.
 
-## Azure Skills plugin installation guidance
+When Azure Storage refuses the package right after a new provision, the script checks the cause before it does anything else. It counts as a storage refusal only when the output names a storage error code (`AuthorizationPermissionMismatch`, `AuthorizationFailure`) or pairs a 403 with a `*.blob.core.*` URL; any other 403 is a normal step failure. It reads the function app's deployment storage, the managed identity's Storage Blob Data role on that account, and the account's network rules. Only when an unconditional role is assigned, the network allows the request, and the next attempt still falls less than 15 minutes after provision does it wait (60 seconds, then 90 seconds) and run the deploy step again. `data.retries` records each wait and its evidence. In every other case it stops with `DEPLOY-STORAGE-FORBIDDEN`, and `data.storageAccess.cause` says why: `role-missing`, `network-restricted`, or `unknown` (including a role assignment with a condition). If a retry fails for another reason, that new failure is reported instead.
 
-If Azure Skills is unavailable, stop and ask the user to install it for their host:
+### 4. Verify
 
-| Host | Install guidance |
-| --- | --- |
-| GitHub Copilot CLI | `/plugin marketplace add microsoft/azure-skills`, then `/plugin install azure@azure-skills` |
-| Claude Code | `/plugin install azure@claude-plugins-official` |
-| Codex CLI | `codex plugin marketplace add microsoft/azure-skills`, then install `azure` from `/plugins` |
-| VS Code | Install the Azure MCP extension and companion Azure Skills integration, then reload VS Code |
-| GitHub Copilot fallback | `npx skills add https://github.com/microsoft/azure-skills/tree/main/.github/plugins/azure-skills/skills -a github-copilot -g -y` |
+```text
+node "<tool>" deploy verify --dir "<project-root>" --env <environment>
+```
 
-## Fallback policy
+The script lists the deployed functions and sends one GET request to each anonymous HTTP trigger. It never uses HEAD. When Azure does not report the app state, the script reads it from the resource; if it is still unknown, it records a gap and relies on the function list and HTTP results.
 
-Prefer Azure Skills for all deployment execution. Use a Functions-specific fallback only when:
+- `ok: true`: report the function app name, `data.portalUrl`, the functions, and the HTTP results.
+- `gaps`: tell the user which functions were not requested and why (for example, a function that needs a key).
+- Functions with `authLevel: function`: ask the user whether to request them with a key. Only if the user agrees, run the command again with `--use-keys`. The script reads each function's default key with the Azure CLI and sends it in the `x-functions-key` header. It never prints or stores the key. Admin-level functions are never requested.
+- `ok: false`: report the findings and suggest `azure-functions-diagnostics`.
+- `ok: false`: report the findings and suggest `azure-functions-diagnostics`.
 
-- Azure Skills cannot be installed or invoked in the current host,
-- the user explicitly asks for a quick publish to an existing Function App, or
-- a scenario is not covered by Azure Skills and must be handled by Azure Functions Core Tools.
+`deploy verify` needs the Azure CLI (`az`) to be installed and signed in. If it is blocked, tell the user the deployment finished but was not verified.
 
-Before using a fallback, explain what will be skipped compared with `azure-prepare` → `azure-validate` → `azure-deploy`, and ask for confirmation.
+## When a step fails
 
-## Post-deploy verification
+Exit code 4 means `azd` ran and failed. The script stops at that step and remembers the finished ones.
 
-Let `azure-deploy` own post-deploy verification. Add Azure Functions-specific reminders when relevant:
+1. Read `findings[0]` and `data.outputTail`. Read `data.logFile` when the tail is not enough.
+2. Explain the cause to the user. Apply `findings[0].fix` when there is one and the user agrees.
+3. Run the same `deploy apply` command again. It continues from the failed step.
 
-- List deployed functions and verify the app is running.
-- Test HTTP trigger endpoints with GET, not HEAD.
-- Suggest `azure-functions-health-status` for runtime health, metrics, and Application Insights checks.
-- Suggest `azure-functions-best-practices` for production readiness after successful deployment.
+Do not retry without a change. The script has already retried a storage refusal when the evidence showed role propagation; for `DEPLOY-STORAGE-FORBIDDEN`, follow `findings[0].fix`. Do not run `azd down`, delete a resource group, or change `infra/` to get past a failure unless the user asks.
 
-## Monitoring `azd up` progress
+If the same step fails twice, or the cause is in the Azure Functions runtime rather than in provisioning, stop and use [references/manual-deploy.md](references/manual-deploy.md) or `azure-functions-diagnostics`.
 
-The `azd up` command uses animated progress bars that may not render correctly in agent terminal capture. If the output appears stuck on a spinner (e.g., repeated "Initialize bicep provider"), the deployment is likely still progressing normally in the background.
-
-To monitor deployment progress independently:
+If a step timed out, the operation may still be running in Azure. Check it before resuming:
 
 ```bash
-# Check resource group creation
-az group show --name rg-<env-name> -o json
-
-# Check deployment status
-az deployment group list --resource-group rg-<env-name> \
-  --query "[].{name:name, state:properties.provisioningState}" -o table
-
-# Check Function App status
-az functionapp list --resource-group rg-<env-name> \
-  --query "[].{name:name, state:state}" -o table
+az deployment sub list --query "[?contains(name, '<environment>')].{name:name, state:properties.provisioningState}" -o table
 ```
 
-Do not kill and restart the `azd up` process based solely on lack of terminal output. Instead, use the commands above to verify whether the deployment is progressing.
+## Azure Functions facts to keep in mind
 
-## After Deployment
-
-> ✅ Your app is deployed through Azure Skills. Consider running `azure-functions-best-practices` for a production readiness review.
+- New serverless apps use the Flex Consumption plan. Package deployment is its only code deployment method.
+- Python apps run on Linux. The official templates set `remoteBuild: true` in `azure.yaml`, so do not build Python dependencies locally for deployment.
+- Flex Consumption has no deployment slots. Use rolling updates for zero-downtime deployments.
+- When the app has private endpoints and no public network access, the machine that deploys needs network access to the deployment endpoint.
+- Go apps are in public preview. They run only on Flex Consumption and Linux, need `FUNCTIONS_WORKER_RUNTIME=native`, Core Tools 4.12 or later, and Azure CLI 2.87.0 or later. See [references/manual-deploy.md](references/manual-deploy.md#go-apps).
 
 ## Report a successful deployment (internal telemetry)
 
-After `azure-deploy` reports success for a complete `azd up` or a standalone
-`azd provision`, run the local deployment-observation collector exactly once.
-This skill owns the step for its delegated deployment. Do not also run the
-hosted-skills collector for the same command.
+Run the local deployment-observation collector exactly once after `deploy apply`
+succeeds and its output contains `data.telemetry`. That field is present only
+when the run provisioned and deployed, which matches a complete `azd up`.
+This skill owns the step. Do not also run the hosted-skills collector for the
+same deployment.
 
-Do not collect after a failed, cancelled, preview, or validation-only command.
-Do not collect after `azd deploy`, Terraform, direct Azure CLI, or Core Tools
-publish. These paths do not produce the supported azd provisioning deployment.
+Do not collect after a failed, cancelled, or preview run, after a `--code-only`
+run, or after the manual steps unless they ran a complete `azd up` or a
+standalone `azd provision`.
 
-Use `deploy` for `azd up`, or `provision` for standalone `azd provision`.
+Use `data.telemetry.operation` for `<operation>` and
+`data.telemetry.environmentName` for `<azd-env-name>`. For the manual steps,
+use `deploy` for `azd up` and `provision` for standalone `azd provision`.
 Use the current host name for `<agent>` (`copilot-cli`, `claude-code`, `codex`,
-or `Visual Studio Code`). Set `environmentName` to the actual azd environment
-name. If that name is not available, skip collection. Do not guess it.
-If you recorded a UTC start time before deployment, include it as `startedAt`.
-Otherwise, omit `startedAt`. The name and start time are not telemetry fields.
+or `Visual Studio Code`). If the environment name is not available, skip
+collection. Do not guess it. If you recorded a UTC start time before
+deployment, include it as `startedAt`. Otherwise, omit `startedAt`. The name
+and start time are not telemetry fields.
 
 Find `hooks/runtime/telemetry.mjs` in the installed plugin root. For workspace
 assets, use `.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`,
@@ -205,7 +179,7 @@ Normal deployment verification and deployed-app monitoring are unchanged.
 
 ## Next steps
 
-- On missing Azure Skills, suggest `azure-functions-setup` to install or configure the Azure Skills plugin.
-- On missing or unvalidated plan, invoke `azure-prepare` and `azure-validate` before `azure-deploy`.
-- On successful deployment, suggest `azure-functions-best-practices` for production readiness.
-- On deployment failure, suggest `azure-functions-diagnostics` after `azure-deploy` error recovery is exhausted.
+- On a missing tool (`azd`, `az`, `node`), suggest `azure-functions-setup`.
+- On a successful deployment, suggest `azure-functions-best-practices` for a production readiness review.
+- For runtime health, metrics, and Application Insights checks, suggest `azure-functions-health-status`.
+- On a failure that the steps above do not resolve, suggest `azure-functions-diagnostics`.

@@ -1,6 +1,7 @@
 import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { BuildData, BuildTargetName, McpServer, Skill } from '../types.js';
+import { TOOLS_FILE, TOOLS_SKILL_ID, type FunctionsTools } from './loader.js';
 
 type TargetBuilder = (data: BuildData, distDir: string) => void;
 
@@ -31,7 +32,7 @@ export function buildPluginPayload(data: BuildData, pluginDir: string): void {
   mkdirSync(join(pluginDir, '.codex-plugin'), { recursive: true });
   writeJson(join(pluginDir, '.codex-plugin', 'plugin.json'), manifest);
 
-  writeSkills(data.skills, join(pluginDir, 'skills'));
+  writeSkills(data, join(pluginDir, 'skills'));
   writeJson(join(pluginDir, '.mcp.json'), generatePluginMcpJson(data.mcpServers));
   writePluginTelemetryAssets(data, pluginDir);
 }
@@ -61,7 +62,7 @@ export function buildPluginMarketplaces(repoRoot: string, options: PluginMarketp
 
 function buildGhcp(data: BuildData, distDir: string): void {
   const base = join(distDir, 'ghcp');
-  writeSkills(data.skills, join(base, '.github', 'skills'));
+  writeSkills(data, join(base, '.github', 'skills'));
   writeJson(join(base, '.mcp.json'), generateCopilotMcpJson(data.mcpServers));
   writeWorkspaceTelemetryAssets(data, join(base, '.github', 'hooks'));
   writeJson(
@@ -72,7 +73,7 @@ function buildGhcp(data: BuildData, distDir: string): void {
 
 function buildClaude(data: BuildData, distDir: string): void {
   const base = join(distDir, 'claude');
-  writeSkills(data.skills, join(base, '.claude', 'skills'));
+  writeSkills(data, join(base, '.claude', 'skills'));
   const hooks = workspaceClaudeHooks();
   writeJson(join(base, '.claude', 'settings.json'), {
     ...generateClaudeSettings(data.mcpServers),
@@ -84,20 +85,27 @@ function buildClaude(data: BuildData, distDir: string): void {
 
 function buildCodex(data: BuildData, distDir: string): void {
   const base = join(distDir, 'codex');
-  writeSkills(data.skills, join(base, '.agents', 'skills'));
+  writeSkills(data, join(base, '.agents', 'skills'));
   mkdirSync(join(base, '.codex'), { recursive: true });
   writeFileSync(join(base, '.codex', 'config.toml'), generateCodexConfigToml(data.mcpServers));
   writeJson(join(base, '.codex', 'hooks.json'), workspaceCodexHooks());
   writeWorkspaceTelemetryAssets(data, join(base, '.codex', 'hooks'));
 }
 
-function writeSkills(skills: Skill[], root: string): void {
-  for (const skill of skills) {
+function writeSkills(data: BuildData, root: string): void {
+  for (const skill of data.skills) {
     const skillDir = join(root, skill.id);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), generateSkillMd(skill));
     copySkillAssets(skill, skillDir);
   }
+  if (data.tools) writeFunctionsTools(data.tools, root);
+}
+
+function writeFunctionsTools(tools: FunctionsTools, skillsRoot: string): void {
+  const path = join(skillsRoot, TOOLS_SKILL_ID, TOOLS_FILE);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, tools.code);
 }
 
 function copySkillAssets(skill: Skill, skillDir: string): void {

@@ -129,6 +129,21 @@ export function loadTelemetryRuntime(runtimeDir: string): TelemetryRuntime {
   };
 }
 
+export interface FunctionsTools {
+  readonly code: string;
+}
+
+/** The skill that carries the tool, so plugin and skill-only installs both receive it. */
+export const TOOLS_SKILL_ID = 'azure-functions-common';
+export const TOOLS_FILE = join('scripts', 'functions-tools.mjs');
+
+/** Published packages ship the built tool, not its source or the bundler. */
+export function loadFunctionsTools(pluginDir: string): FunctionsTools {
+  const path = join(pluginDir, 'skills', TOOLS_SKILL_ID, TOOLS_FILE);
+  if (!existsSync(path)) throw new Error(`The package tools payload is missing from ${path}. Use a complete package.`);
+  return { code: readFileSync(path, 'utf-8') };
+}
+
 // ─── Minimal YAML helpers (no dependencies) ───
 
 function parseYamlValue(yaml: string, key: string): string {

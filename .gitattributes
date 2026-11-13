@@ -1,2 +1,3 @@
 *.sh text eol=lf
 .github/plugins/azure-functions-skills/hooks/runtime/** text eol=lf
+.github/plugins/azure-functions-skills/skills/azure-functions-common/scripts/functions-tools.mjs text eol=lf
