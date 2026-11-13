@@ -1,6 +1,6 @@
 ---
 name: azure-functions-diagnostics
-description: "Use when diagnosing or resolving standard Azure Functions issues: deployment failures, runtime errors, trigger/binding failures, language worker issues, telemetry/log analysis, known issue research, source investigation, and remediation. Acts as a facade that routes to focused Azure Functions skills and small language/extension references. Do not use for Azure Functions Hosted Skills (conversations creating, running, or deploying a Hosted Skill, or projects with any *.agent.md file, agents.config.yaml, or the azurefunctions-agents-runtime package), even when the user only reports an error; use azure-functions-hosted-skills and its troubleshooting reference instead."
+description: "Use when diagnosing or resolving standard Azure Functions issues: deployment failures, runtime errors, trigger/binding failures, language worker issues, telemetry/log analysis, known issue research, source investigation, and remediation. Acts as a facade that routes to focused Azure Functions skills and small language/extension references. Do not use for Azure Functions Hosted Skills (conversations creating, running, or deploying a Hosted Skill, or the selected Functions app has agents.config.yaml, depends on azurefunctions-agents-runtime, or imports create_function_app() from that runtime). App-local *.agent.md files count only when they belong to that runtime app; ignore repository-level .github/agents/*.agent.md coding-agent configuration. Even when the user only reports an error, use azure-functions-hosted-skills and its troubleshooting reference instead."
 ---
 
 
@@ -15,8 +15,9 @@ Write final answers in the user's language.
 Before collecting inputs or inventory, check the conversation and project context. If the issue is about an Azure Functions Hosted Skills app, invoke `azure-functions-hosted-skills` instead and stop this workflow. Treat it as a Hosted Skills app when any of these apply:
 
 - The conversation is creating, extending, running, testing, or deploying a Hosted Skill.
-- The project contains `*.agent.md` agent definitions or `agents.config.yaml`.
-- `requirements.txt` depends on `azurefunctions-agents-runtime`, or `function_app.py` calls `create_function_app()` from that runtime.
+- The selected Functions app contains `agents.config.yaml` (commonly `src/agents.config.yaml`).
+- Its `requirements.txt` depends on `azurefunctions-agents-runtime`, or its `function_app.py` imports `create_function_app()` from that runtime.
+- App-local `*.agent.md` files count only when they belong to that runtime app. Do not treat repository-level `.github/agents/*.agent.md` coding-agent configuration as a Hosted Skills marker.
 
 Hosted Skills failures (agent loading, model provider, MCP and connectors, dynamic sessions, Dynamic Workflows, and Hosted Skills deployment) are covered by that skill's troubleshooting reference. Do not run this skill in parallel for the same issue.
 

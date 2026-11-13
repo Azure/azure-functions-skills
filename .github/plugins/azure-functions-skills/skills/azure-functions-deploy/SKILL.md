@@ -1,6 +1,6 @@
 ---
 name: azure-functions-deploy
-description: "Not for Azure Functions Hosted Skills. Proxy standard Azure Functions deployment requests to the Azure Skills prepare, validate, and deploy workflow while preserving Azure Functions-specific guidance. Do not use when the conversation is creating, running, or deploying a Hosted Skill, or the project has *.agent.md files or agents.config.yaml, including follow-up requests that only say deploy, azd up, or redeploy; use azure-functions-hosted-skills instead."
+description: "Not for Azure Functions Hosted Skills. Proxy standard Azure Functions deployment requests to the Azure Skills prepare, validate, and deploy workflow while preserving Azure Functions-specific guidance. Do not use when the conversation is creating, running, or deploying a Hosted Skill, or the selected Functions app has agents.config.yaml, depends on azurefunctions-agents-runtime, or imports create_function_app() from that runtime. App-local *.agent.md files count only when they belong to that runtime app; ignore repository-level .github/agents/*.agent.md coding-agent configuration. This also applies to follow-up requests that only say deploy, azd up, or redeploy; use azure-functions-hosted-skills instead."
 ---
 
 
@@ -17,8 +17,9 @@ This skill is the Azure Functions-facing entry point. It should not run deployme
 Before checking prerequisites or delegating, check the conversation and project context. If the app is an Azure Functions Hosted Skills app, invoke `azure-functions-hosted-skills` instead and stop this workflow. Treat it as a Hosted Skills app when any of these apply:
 
 - The conversation is creating, extending, running, testing, or deploying a Hosted Skill.
-- The project contains `*.agent.md` agent definitions or `agents.config.yaml`.
-- `requirements.txt` depends on `azurefunctions-agents-runtime`, or `function_app.py` calls `create_function_app()` from that runtime.
+- The selected Functions app contains `agents.config.yaml` (commonly `src/agents.config.yaml`).
+- Its `requirements.txt` depends on `azurefunctions-agents-runtime`, or its `function_app.py` imports `create_function_app()` from that runtime.
+- App-local `*.agent.md` files count only when they belong to that runtime app. Do not treat repository-level `.github/agents/*.agent.md` coding-agent configuration as a Hosted Skills marker.
 
 Hosted Skills deployment needs its own model, connector, and runtime guidance, even when the user only says to deploy, run `azd up`, or redeploy after a fix. Do not invoke `azure-prepare`, `azure-validate`, or `azure-deploy` from this skill for a Hosted Skills app, and do not suggest `azure-functions-diagnostics` for its deployment failures.
 
