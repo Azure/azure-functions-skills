@@ -17,6 +17,31 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 ## Workflow
 
+### The template tool
+
+A bundled script lists templates and writes their files in one call, so you do not copy file contents by hand. `<skill-dir>` is the folder that contains this `SKILL.md`.
+
+```text
+node "<skill-dir>/../azure-functions-common/scripts/functions-tools.mjs" template <command> [options]
+```
+
+| Command | What it does |
+| --- | --- |
+| `template find --language <name> [--resource <name>] [--iac <name>]` | Lists template IDs from the Azure Functions template manifest. |
+| `template write --template <id> --dir <target>` | Downloads the template from its GitHub repository and writes it into `<target>`. |
+| `template write --from <file> --dir <target>` | Writes the files from a saved Azure MCP template result. |
+
+Each run prints one JSON object. Read `ok`, `summary`, `data`, `findings`, and `next`. The tool never overwrites an existing file; it lists such files in `data.skipped`. Add `--dry-run` to see the file list without writing.
+
+| Exit code | What to do |
+| --- | --- |
+| 0 | Follow the JSON. `ok: false` means it found a problem. |
+| 2 | Fix the arguments and run once more. |
+| 3 | Apply `findings[].fix`. For `TEMPLATE-UNSAFE-PATH`, stop and tell the user. |
+| 1 | Write the files by hand as described in each path. Do not run the same command again. |
+
+If `node` is missing or the tool file does not exist, write the files by hand as described in each path. Do not install Node or download the tool.
+
 ### Step 0 — Check for Go
 
 If the user asks for **Go** (or Golang), use **Path C** below. Neither the Azure MCP template set nor the templates manifest contains Go templates, so the other paths cannot produce a working Go project.
@@ -86,20 +111,19 @@ When the user asks for a common trigger name, map it to one of the template IDs 
 
 If a template-get call fails with "template not found", immediately recover by calling `functions_template_get` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
 
-#### A.4 Initialize the project
+#### A.4 Write the project
 
-Call `functions_project_get`:
+For a new project, write the chosen template with the tool. Use the template ID from step A.3 unchanged.
 
+```text
+node "<tool>" template write --template <template-id> --dir "<project-dir>" [--runtime-version <version>]
 ```
-Tool: functions_project_get
-language: <chosen language, e.g. typescript>
-```
 
-Returns project-level files (`host.json`, `local.settings.json`, `package.json` / `requirements.txt` / `pom.xml` / `.csproj`, `tsconfig.json`, etc.). Write these into the target directory.
+The `*-azd` templates are complete projects. They include `host.json`, the dependency manifest, the function source, `azure.yaml`, and `infra/`, so `azure-functions-deploy` can deploy the result without more setup.
 
-#### A.5 Add the function
+Report `data.written` to the user as a count and the main files, not as a full list. Then install dependencies (`npm install`, or the equivalent for the language) to create the lock file for this machine.
 
-Call `functions_template_get` with both `language` and `template`:
+**Fallback when the tool cannot run or reports `TEMPLATE-FETCH-FAILED` twice**: call `functions_project_get` with the language, then `functions_template_get` with the language and the template ID.
 
 ```
 Tool: functions_template_get
@@ -109,9 +133,17 @@ runtime-version: <optional, e.g. 22>
 output: <optional, "New" (default) or "Add" for existing projects>
 ```
 
-Returns the full function source code plus any required app settings and additional package dependencies. Write the returned file(s) into the project and merge any extra settings into `local.settings.json` and any extra packages into the dependency manifest.
+If the host saved the result to a file, pass that file to the tool instead of copying its contents:
 
-> ⚠️ **Large template output**: Some templates (especially `*-azd` variants that include infrastructure files) can produce very large output (100KB+). If the tool output is truncated or saved to a temporary file, read the file, parse the JSON `files` array, and write each file individually. After writing files, run `npm install` (or the equivalent package manager command) to generate lock files rather than relying on lock files from the template output.
+```text
+node "<tool>" template write --from "<saved-result.json>" --dir "<project-dir>"
+```
+
+Otherwise write each returned file into the project, and merge any extra settings into `local.settings.json` and any extra packages into the dependency manifest.
+
+#### A.5 Apply merge instructions
+
+When `data.mergeInstructions` or `data.skipped` is present, the tool left existing files alone. Read the instructions and the skipped files, then merge the needed settings and dependencies by hand. Do not delete or replace the user's files.
 
 #### A.6 Verify
 
@@ -147,44 +179,27 @@ Use this path **only when the Azure MCP tools are not available**. When falling 
 
 #### B.1 Fallback algorithm
 
-Follow this manifest-based fallback algorithm:
+1. **Find templates.** The tool reads the manifest from the Azure Functions CDN and falls back to the copy on GitHub.
 
-```
-1. FETCH MANIFEST
-   GET https://cdn.functions.azure.com/public/templates-manifest/manifest.json
-   If fetch fails → fall back to:
-     https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json
-   If both fail → fall back to known-good Azure-Samples/functions-quickstart-* repos
-   If all fail → report error and ask user to retry later
+   ```text
+   node "<tool>" template find --language <language> [--resource <resource>] [--iac bicep]
+   ```
 
-2. FILTER TEMPLATES
-   Filter by: language, resource, iac
+   Present `data.templates` and let the user choose. If one template covers all requirements, use it alone.
 
-3. CHECK SINGLE-TEMPLATE MATCH
-   If one template covers ALL requirements → use it alone
+2. **Write the trigger template.** It is the base project and includes the infrastructure files.
 
-4. SELECT TEMPLATES
-   - Trigger template (REQUIRED) — base project with IaC
-   - Binding templates (OPTIONAL) — extract patterns only
+   ```text
+   node "<tool>" template write --template <template-id> --dir "<project-dir>"
+   ```
 
-5. DOWNLOAD TEMPLATES
-   For each template:
-   - If folderPath == "." → ZIP download + unzip
-   - If folderPath != "." → fetch tree + raw github url file downloads
-   - Fallback: git clone --depth 1
+3. **Compose (your work).** When the user also needs bindings from another template, write that template into a separate temporary folder with `template write`, read the binding pattern from it, and add the pattern to the base project. Merge its infrastructure resources, role assignments, and settings. Add the user's business logic.
 
-6. COMPOSE
-   - Use trigger template as BASE
-   - EXTRACT binding patterns from binding templates
-   - MERGE IaC resources, RBAC roles and settings
-   - ADD user's custom business logic
+4. **Trim (your work).** Remove demo code the user does not need. Keep `AzureWebJobsStorage`.
 
-7. TRIM unused demo code (keep AzureWebJobsStorage)
+5. **Deploy.** Do not deploy from this skill. Suggest `azure-functions-deploy`.
 
-8. WRITE all files
-
-9. DEPLOY: azd up --no-prompt
-```
+If the tool cannot run, do steps 1 and 2 by hand: fetch `https://cdn.functions.azure.com/public/templates-manifest/manifest.json`, filter by language, resource, and IaC, and download the files under the template's `repositoryUrl`, `folderPath`, and `gitRef`. If the manifest is also unavailable, use B.2.
 
 #### B.2 Quick code reference
 
@@ -218,8 +233,9 @@ Tell the user up front that **Go support on Azure Functions is in public preview
 
 If `host.json` already exists, do **not** re-initialize. Instead:
 
-- **MCP path**: call `functions_template_get` with the same language as the existing project and specify the desired template name. Write the returned file.
-- **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
+- **MCP path**: call `functions_template_get` with the same language as the existing project, the desired template ID, and `output: "Add"`. If the host saved the result to a file, run `template write --from <file> --dir <project-dir>`; otherwise write the returned function files by hand. Then follow A.5.
+- **Fallback path**: run `template write --template <template-id> --dir <temporary-folder>` to get the template source in a separate folder, then copy the function files into the existing project and merge the settings and dependencies by hand.
+- Do not run `template write --template` directly on an existing project with a full-project template. The tool refuses it (`TEMPLATE-NEEDS-NEW-FOLDER`), because such a template would bring a second project layout.
 - **Go path**: `func new` is not supported for Go. Edit `main.go`, add another `app.*` registration and, for an extension trigger, the blank import. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
 
 ## After Creation
