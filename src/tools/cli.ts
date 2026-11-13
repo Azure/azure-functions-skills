@@ -9,12 +9,16 @@ import { parseArgs, UsageError } from './shared/args.js';
 import { createRunner, type Runner } from './shared/exec.js';
 import { EXIT, fail, type ToolResult } from './shared/output.js';
 import { redact } from './shared/redact.js';
+import { DEFAULT_MANIFEST_URLS, findTemplates } from './template/find.js';
+import { writeTemplate } from './template/write.js';
 
 export interface CliDependencies {
   readonly run: Runner;
   readonly now: () => Date;
   readonly fetchStatus: (url: string) => Promise<number>;
   readonly sleep: (milliseconds: number) => Promise<void>;
+  /** Overrides the template manifest locations. Tests use this; the command line cannot. */
+  readonly manifestUrls?: readonly string[];
 }
 
 const HTTP_TIMEOUT_MS = 30_000;
@@ -28,6 +32,12 @@ const USAGE = `Usage: functions-tools.mjs <group> <command> [options]
                  Runs the approved plan with azd. Resumes after a failed step.
   deploy verify  --dir <path> [--env <name>] [--app <name>] [--subscription <id>]
                  Lists the deployed functions and requests anonymous HTTP triggers.
+
+  template find  --language <name> [--resource <name>] [--iac <name>]
+                 Lists templates from the Azure Functions template manifest.
+  template write --dir <path> (--template <id> | --from <mcp-result.json>)
+                 [--language <name>] [--runtime-version <version>] [--mode new|add] [--dry-run]
+                 Writes template files. Never overwrites an existing file.
 
 Output is one JSON object on stdout.
 Exit codes: 0 ran, 1 unexpected failure, 2 invalid arguments, 3 blocked before running, 4 a step failed.`;
@@ -65,6 +75,30 @@ export async function runCli(argv: readonly string[], dependencies: CliDependenc
         app: args.strings.app,
         subscription: args.strings.subscription,
       }, dependencies);
+    }
+    if (command === 'template find') {
+      const args = parseArgs(rest, { strings: ['language', 'resource', 'iac'] });
+      return await findTemplates({
+        language: required(args.strings, 'language'),
+        resource: args.strings.resource,
+        iac: args.strings.iac,
+      }, { manifestUrls: dependencies.manifestUrls ?? DEFAULT_MANIFEST_URLS });
+    }
+    if (command === 'template write') {
+      const args = parseArgs(rest, {
+        strings: ['dir', 'template', 'from', 'language', 'runtime-version', 'mode'], booleans: ['dry-run'],
+      });
+      const mode = args.strings.mode;
+      if (mode !== undefined && mode !== 'new' && mode !== 'add') throw new UsageError('--mode must be new or add');
+      return await writeTemplate({
+        dir: required(args.strings, 'dir'),
+        template: args.strings.template,
+        from: args.strings.from,
+        language: args.strings.language,
+        runtimeVersion: args.strings['runtime-version'],
+        mode,
+        dryRun: args.booleans['dry-run'] ?? false,
+      }, { manifestUrls: dependencies.manifestUrls ?? DEFAULT_MANIFEST_URLS });
     }
     throw new UsageError(command ? `Unknown command: ${command}` : 'No command was given');
   } catch (error) {

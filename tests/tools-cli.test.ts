@@ -73,7 +73,9 @@ describe('functions-tools bundle', () => {
     const file = join(dir, 'functions-tools.mjs');
     const { code } = buildFunctionsTools();
     writeFileSync(file, code);
-    expect(code).not.toMatch(/from\s*["'](?!node:)/);
+    // Every import must be a Node built-in.
+    expect(code).not.toMatch(/^\s*import\b[^\n]*\bfrom\s*["'](?!node:)/m);
+    expect(code).not.toMatch(/\brequire\(\s*["'](?!node:)/);
 
     const help = spawnSync(process.execPath, [file, '--help'], { cwd: dir, encoding: 'utf-8' });
     expect(help.status).toBe(0);

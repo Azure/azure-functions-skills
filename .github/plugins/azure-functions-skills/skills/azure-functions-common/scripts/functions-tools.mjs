@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 // lib/tools/cli.js
-import { realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { realpathSync as realpathSync2 } from "node:fs";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // lib/tools/deploy/apply.js
 import { appendFileSync } from "node:fs";
@@ -965,7 +965,7 @@ function buildInvocation(file, args, platform) {
   return { file: "cmd.exe", args: ["/d", "/s", "/c", `"${[`"${file}"`, ...quoted].join(" ")}"`], verbatim: true };
 }
 function createRunner(environment = process.env, platform = process.platform) {
-  return (command, args, options = {}) => new Promise((resolve6) => {
+  return (command, args, options = {}) => new Promise((resolve8) => {
     const file = resolveExecutable(command, {
       platform,
       path: environment.PATH || environment.Path || "",
@@ -973,12 +973,12 @@ function createRunner(environment = process.env, platform = process.platform) {
       exists: existsSync4
     });
     if (!file)
-      return resolve6({ code: null, stdout: "", stderr: "", notFound: true, timedOut: false });
+      return resolve8({ code: null, stdout: "", stderr: "", notFound: true, timedOut: false });
     let invocation;
     try {
       invocation = buildInvocation(file, args, platform);
     } catch (error) {
-      return resolve6({ code: null, stdout: "", stderr: error.message, notFound: false, timedOut: false });
+      return resolve8({ code: null, stdout: "", stderr: error.message, notFound: false, timedOut: false });
     }
     const child = spawn(invocation.file, invocation.args, {
       cwd: options.cwd,
@@ -1002,13 +1002,578 @@ function createRunner(environment = process.env, platform = process.platform) {
     });
     child.on("error", (error) => {
       clearTimeout(timer);
-      resolve6({ code: null, stdout, stderr: stderr || error.message, notFound: false, timedOut });
+      resolve8({ code: null, stdout, stderr: stderr || error.message, notFound: false, timedOut });
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolve6({ code: timedOut ? null : code, stdout, stderr, notFound: false, timedOut });
+      resolve8({ code: timedOut ? null : code, stdout, stderr, notFound: false, timedOut });
     });
   });
+}
+
+// lib/templates/index.js
+import { execFileSync } from "node:child_process";
+import { existsSync as existsSync5, lstatSync, mkdirSync as mkdirSync2, readFileSync as readFileSync3, readdirSync as readdirSync2, realpathSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { dirname as dirname2, isAbsolute, join as join4, relative, resolve as resolve6 } from "node:path";
+import { fileURLToPath } from "node:url";
+var DEFAULT_TEMPLATE_MANIFEST_URL = "https://cdn.functions.azure.com/public/templates-manifest/manifest.json";
+var TemplateError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "TemplateError";
+  }
+};
+var ADD_MODE_PROJECT_PATHS = /* @__PURE__ */ new Set([
+  ".gitignore",
+  "azure.yaml",
+  "host.json",
+  "local.settings.json",
+  "package-lock.json",
+  "package.json",
+  "pom.xml",
+  "requirements.txt",
+  "tsconfig.json"
+]);
+var ADD_MODE_PROJECT_PREFIXES = [
+  ".devcontainer/",
+  ".github/",
+  ".vscode/",
+  "infra/"
+];
+var githubCliTokenWarningShown = false;
+async function listFunctionTemplates(options = {}) {
+  const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
+  const manifest = await loadTemplateManifest(manifestUrl);
+  const templates = manifest.templates.filter((template) => matchesFilter(template.language, options.language)).filter((template) => matchesFilter(template.resource, options.resource)).filter((template) => matchesFilter(template.iac, options.iac)).slice().sort(compareTemplates);
+  return { manifestUrl, templates };
+}
+async function applyFunctionTemplate(targetDir, options) {
+  const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
+  const manifest = await loadTemplateManifest(manifestUrl);
+  const template = findTemplate(manifest, options.template, options.language);
+  const mode = resolveApplyMode(targetDir, options.mode ?? "auto");
+  const downloadedFiles = await downloadTemplateFiles(template, manifestUrl);
+  const runtimeVersion = options.runtimeVersion ?? manifest.runtimeVersions?.[template.language]?.default;
+  const templateFiles = downloadedFiles.map((file) => ({
+    relativePath: normalizeTemplatePath(file.relativePath),
+    content: applyRuntimePlaceholders(file.content, runtimeVersion)
+  }));
+  if (mode === "add")
+    assertAddModeSafe(template, templateFiles);
+  const plannedFiles = templateFiles.map((file) => file.relativePath).sort();
+  const filesWritten = [];
+  const skippedFiles = [];
+  const candidates = templateFiles.filter((file) => {
+    if (!shouldSkipFile(file.relativePath, mode, options.force === true))
+      return true;
+    skippedFiles.push(file.relativePath);
+    return false;
+  });
+  const destinations = new Map(candidates.map((file) => [file, resolveInsideTarget(targetDir, file.relativePath)]));
+  for (const file of candidates) {
+    const destination = destinations.get(file);
+    if (existsSync5(destination) && options.force !== true) {
+      skippedFiles.push(file.relativePath);
+      continue;
+    }
+    if (!options.dryRun) {
+      mkdirSync2(dirname2(destination), { recursive: true });
+      writeFileSync2(destination, file.content);
+    }
+    filesWritten.push(file.relativePath);
+  }
+  return {
+    template,
+    mode,
+    dryRun: options.dryRun === true,
+    filesWritten: filesWritten.sort(),
+    skippedFiles: skippedFiles.sort(),
+    plannedFiles
+  };
+}
+function resolveInsideTarget(targetDir, relativePath) {
+  const destination = join4(targetDir, normalizeTemplatePath(relativePath));
+  if (!existsSync5(targetDir))
+    return destination;
+  const root = realpathSync(targetDir);
+  let ancestor = dirname2(destination);
+  while (!existsSync5(ancestor))
+    ancestor = dirname2(ancestor);
+  const inside = relative(root, realpathSync(ancestor));
+  const isLink = existsSync5(destination) && lstatSync(destination).isSymbolicLink();
+  if (inside.startsWith("..") || isAbsolute(inside) || isLink) {
+    throw new TemplateError("unsafe-path", `Template file would be written outside the target folder: ${relativePath}`);
+  }
+  return destination;
+}
+async function loadTemplateManifest(manifestUrl) {
+  const parsed = new URL(manifestUrl);
+  const raw = parsed.protocol === "file:" ? readFileSync3(fileURLToPath(parsed), "utf-8") : await fetchText(manifestUrl);
+  const parsedJson = JSON.parse(raw);
+  if (!isTemplateManifest(parsedJson)) {
+    throw new TemplateError("invalid-manifest", `Template manifest at ${manifestUrl} does not match the expected schema.`);
+  }
+  return parsedJson;
+}
+async function downloadTemplateFiles(template, manifestUrl) {
+  const repositoryUrl = new URL(template.repositoryUrl);
+  if (repositoryUrl.protocol === "file:") {
+    if (new URL(manifestUrl).protocol !== "file:") {
+      throw new TemplateError("unsupported-source", "Local file template repositories are only supported with local file manifests.");
+    }
+    return readLocalTemplateFiles(fileURLToPath(repositoryUrl), template.folderPath);
+  }
+  const repo = parseGitHubRepo(repositoryUrl);
+  if (!repo) {
+    throw new TemplateError("unsupported-source", `Unsupported template repository URL: ${template.repositoryUrl}`);
+  }
+  return downloadGitHubTemplateFiles(repo, template.folderPath, normalizeGitHubRef(template.gitRef ?? "main"));
+}
+function readLocalTemplateFiles(sourceDir, folderPath) {
+  assertSafeFolderPath(folderPath);
+  const sourceRoot = resolve6(sourceDir);
+  const rootDir = folderPath === "." ? sourceRoot : resolve6(sourceRoot, folderPath);
+  assertPathInside(sourceRoot, rootDir, "Template folder");
+  if (!existsSync5(rootDir)) {
+    throw new Error(`Template folder does not exist: ${rootDir}`);
+  }
+  const files = [];
+  collectLocalFiles(rootDir, rootDir, files);
+  return files;
+}
+function collectLocalFiles(rootDir, currentDir, files) {
+  const entries = readdirSync2(currentDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = join4(currentDir, entry.name);
+    if (entry.isDirectory()) {
+      collectLocalFiles(rootDir, entryPath, files);
+    } else if (entry.isFile()) {
+      files.push({
+        relativePath: relative(rootDir, entryPath),
+        content: readFileSync3(entryPath)
+      });
+    }
+  }
+}
+async function downloadGitHubTemplateFiles(repo, folderPath, ref) {
+  assertSafeFolderPath(folderPath);
+  const rootPath = folderPath === "." ? "" : folderPath.replace(/^\/+|\/+$/g, "");
+  const entries = await listGitHubContents(repo, rootPath, ref);
+  const files = [];
+  for (const entry of entries) {
+    if (!entry.download_url) {
+      throw new Error(`GitHub file entry is missing download URL: ${entry.path}`);
+    }
+    const content = await fetchBuffer(entry.download_url);
+    files.push({
+      relativePath: rootPath ? entry.path.slice(rootPath.length + 1) : entry.path,
+      content
+    });
+  }
+  return files;
+}
+async function listGitHubContents(repo, path, ref) {
+  const encodedPath = path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+  const url = new URL(`https://api.github.com/repos/${repo.owner}/${repo.repo}/contents/${encodedPath}`);
+  url.searchParams.set("ref", ref);
+  const entries = await fetchGitHubJson(url.toString());
+  if (!Array.isArray(entries)) {
+    throw new Error(`GitHub contents path is not a directory: ${path || "."}`);
+  }
+  const files = [];
+  for (const entry of entries) {
+    if (!isGitHubContentEntry(entry))
+      continue;
+    if (entry.type === "file") {
+      files.push(entry);
+    } else {
+      files.push(...await listGitHubContents(repo, entry.path, ref));
+    }
+  }
+  return files;
+}
+function parseGitHubRepo(url) {
+  if (url.hostname.toLowerCase() !== "github.com")
+    return null;
+  const [owner, repoName] = url.pathname.replace(/^\/+/, "").split("/");
+  if (!owner || !repoName)
+    return null;
+  return { owner, repo: repoName.replace(/\.git$/i, "") };
+}
+function normalizeGitHubRef(ref) {
+  return ref.replace(/^refs\/heads\//, "").replace(/^refs\/tags\//, "");
+}
+function assertSafeFolderPath(folderPath) {
+  if (isAbsolute(folderPath) || folderPath.split(/[\\/]/).includes("..")) {
+    throw new TemplateError("unsafe-path", `Unsafe template folder path: ${folderPath}`);
+  }
+}
+function assertPathInside(root, candidate, label) {
+  const relativePath = relative(root, candidate);
+  if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
+    throw new TemplateError("unsafe-path", `${label} must stay inside the template repository.`);
+  }
+}
+function assertAddModeSafe(template, files) {
+  const nestedProjectFile = files.find((file) => {
+    const normalized = normalizeTemplatePath(file.relativePath);
+    return normalized.includes("/") && ADD_MODE_PROJECT_PATHS.has(normalized.split("/").at(-1) ?? "");
+  });
+  if (nestedProjectFile) {
+    throw new TemplateError("needs-new-mode", `Template '${template.id}' appears to contain a nested full project (${nestedProjectFile.relativePath}). Apply it with --mode new, or choose an add-specific template.`);
+  }
+}
+function findTemplate(manifest, templateId, language) {
+  const templates = manifest.templates.filter((candidate) => equalsIgnoreCase(candidate.id, templateId));
+  if (templates.length === 0) {
+    throw new TemplateError("not-found", `Template '${templateId}' was not found in the manifest.`);
+  }
+  if (language) {
+    const template = templates.find((candidate) => equalsIgnoreCase(candidate.language, language));
+    if (!template) {
+      throw new TemplateError("not-found", `Template '${templateId}' was found, but not for language '${language}'.`);
+    }
+    return template;
+  }
+  if (templates.length > 1) {
+    const languages = templates.map((template) => template.language).sort().join(", ");
+    throw new TemplateError("not-found", `Template '${templateId}' matches multiple languages (${languages}); pass --language to disambiguate.`);
+  }
+  return templates[0];
+}
+function resolveApplyMode(targetDir, mode) {
+  if (mode === "new" || mode === "add")
+    return mode;
+  return existsSync5(join4(targetDir, "host.json")) ? "add" : "new";
+}
+function shouldSkipFile(relativePath, mode, force) {
+  if (mode === "new")
+    return false;
+  if (force)
+    return false;
+  const normalized = normalizeTemplatePath(relativePath);
+  if (ADD_MODE_PROJECT_PATHS.has(normalized))
+    return true;
+  return ADD_MODE_PROJECT_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+function normalizeTemplatePath(path) {
+  const normalized = path.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized || normalized.split("/").includes("..") || /^[A-Za-z]:/.test(normalized)) {
+    throw new TemplateError("unsafe-path", `Unsafe template file path: ${path}`);
+  }
+  return normalized;
+}
+function applyRuntimePlaceholders(content, runtimeVersion) {
+  if (!runtimeVersion || !isTextContent(content))
+    return content;
+  const replaced = content.toString("utf-8").replaceAll("{{nodeVersion}}", runtimeVersion).replaceAll("{{javaVersion}}", runtimeVersion).replaceAll("{{pythonVersion}}", runtimeVersion).replaceAll("{{runtimeVersion}}", runtimeVersion);
+  return Buffer.from(replaced, "utf-8");
+}
+function isTextContent(content) {
+  return !content.includes(0);
+}
+function matchesFilter(actual, expected) {
+  return !expected || equalsIgnoreCase(actual, expected);
+}
+function equalsIgnoreCase(actual, expected) {
+  return Boolean(actual && expected && actual.toLowerCase() === expected.toLowerCase());
+}
+function compareTemplates(left, right) {
+  const priority = (left.priority ?? Number.MAX_SAFE_INTEGER) - (right.priority ?? Number.MAX_SAFE_INTEGER);
+  if (priority !== 0)
+    return priority;
+  return left.id.localeCompare(right.id);
+}
+async function fetchText(url) {
+  const { text } = await fetchTextResponse(url);
+  return text;
+}
+async function fetchBuffer(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new TemplateError("fetch-failed", `Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+async function fetchGitHubJson(url) {
+  const result = await fetchTextResponse(url, githubHeaders());
+  if (result.response.ok) {
+    return JSON.parse(result.text);
+  }
+  const token = resolveGitHubToken();
+  if (!token || !isGitHubAuthRetryable(result.response)) {
+    throw new TemplateError("fetch-failed", buildFetchErrorMessage(url, result, { includeGitHubTokenHint: true }));
+  }
+  const retryResult = await fetchTextResponse(url, githubHeaders(token));
+  if (!retryResult.response.ok) {
+    throw new TemplateError("fetch-failed", buildFetchErrorMessage(url, retryResult));
+  }
+  return JSON.parse(retryResult.text);
+}
+async function fetchTextResponse(url, headers) {
+  const response = await fetch(url, headers ? { headers } : void 0);
+  const text = await response.text();
+  if (!response.ok && !headers) {
+    throw new TemplateError("fetch-failed", buildFetchErrorMessage(url, { text, response }));
+  }
+  return { text, response };
+}
+function githubHeaders(token) {
+  return {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "azure-functions-skills",
+    ...token ? { Authorization: `Bearer ${token}` } : {}
+  };
+}
+function resolveGitHubToken(env = process.env) {
+  return env.GH_TOKEN || env.GITHUB_TOKEN || resolveGitHubCliToken();
+}
+function resolveGitHubCliToken() {
+  if (!githubCliTokenWarningShown) {
+    process.stderr.write("GitHub API rate limit or private repository access requires authentication. Trying `gh auth token`...\n");
+    githubCliTokenWarningShown = true;
+  }
+  try {
+    const token = execFileSync("gh", ["auth", "token"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    return token || void 0;
+  } catch (_err) {
+    return void 0;
+  }
+}
+function isGitHubAuthRetryable(response) {
+  return response.status === 401 || response.status === 404 || response.status === 403 && response.headers.get("x-ratelimit-remaining") === "0";
+}
+function buildFetchErrorMessage(url, result, options = {}) {
+  const suffix = options.includeGitHubTokenHint && isGitHubAuthRetryable(result.response) ? " Set GH_TOKEN or GITHUB_TOKEN, or run gh auth login, to retry GitHub API requests authenticated." : "";
+  return `Failed to fetch ${url}: ${result.response.status} ${result.response.statusText}.${suffix}`;
+}
+function isTemplateManifest(value) {
+  return isRecord(value) && Array.isArray(value.templates) && value.templates.every(isFunctionTemplate);
+}
+function isFunctionTemplate(value) {
+  return isRecord(value) && typeof value.id === "string" && typeof value.displayName === "string" && typeof value.shortDescription === "string" && typeof value.language === "string" && typeof value.repositoryUrl === "string" && typeof value.folderPath === "string";
+}
+function isGitHubContentEntry(value) {
+  return isRecord(value) && (value.type === "file" || value.type === "dir") && typeof value.path === "string" && (typeof value.download_url === "string" || value.download_url === null);
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null;
+}
+
+// lib/tools/template/find.js
+var DEFAULT_MANIFEST_URLS = [
+  "https://cdn.functions.azure.com/public/templates-manifest/manifest.json",
+  "https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json"
+];
+var COMMAND4 = "template find";
+async function findTemplates(options, dependencies) {
+  const loaded = await loadFirstManifest(dependencies.manifestUrls, options);
+  if (!loaded)
+    return manifestUnavailable(COMMAND4);
+  const templates = loaded.result.templates.map((template) => ({
+    id: template.id,
+    displayName: template.displayName,
+    description: template.shortDescription,
+    language: template.language,
+    ...template.resource ? { resource: template.resource } : {},
+    ...template.iac ? { iac: template.iac } : {}
+  }));
+  const data = { templates, manifestSource: loaded.source };
+  if (templates.length === 0) {
+    const result = succeed(COMMAND4, "No template matches the filters", data, {
+      gaps: loaded.gaps,
+      findings: [{
+        id: "TEMPLATE-NONE-MATCH",
+        severity: "warn",
+        title: `No template matches language ${options.language}`,
+        fix: "Remove --resource or --iac, or check the language name. Go has no manifest templates."
+      }]
+    });
+    return { ...result, body: { ...result.body, ok: false } };
+  }
+  return succeed(COMMAND4, `Found ${templates.length} template(s)`, data, {
+    gaps: loaded.gaps,
+    next: { action: "choose-template", reason: "Let the user choose, then run template write with the chosen id." }
+  });
+}
+async function loadFirstManifest(manifestUrls, filter = {}) {
+  const gaps = [];
+  for (const [index, manifestUrl] of manifestUrls.entries()) {
+    try {
+      const result = await listFunctionTemplates({ manifestUrl, ...filter });
+      return { result, source: index === 0 ? "primary" : "fallback", gaps };
+    } catch (error) {
+      gaps.push({
+        check: index === 0 ? "manifest-primary" : `manifest-fallback-${index}`,
+        reason: redact(error instanceof Error ? error.message : String(error))
+      });
+    }
+  }
+  return null;
+}
+function manifestUnavailable(command) {
+  return fail(command, EXIT.blocked, "The template manifest could not be read", {
+    findings: [{
+      id: "TEMPLATE-MANIFEST-UNAVAILABLE",
+      severity: "error",
+      title: "No template manifest location answered",
+      fix: "Check the network connection and try once more, or use the Azure MCP template tools."
+    }]
+  });
+}
+
+// lib/tools/template/write.js
+import { existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { dirname as dirname3, resolve as resolve7 } from "node:path";
+var COMMAND5 = "template write";
+var MCP_FILE_LISTS = ["projectfiles", "functionfiles", "files"];
+var MAX_SEARCH_DEPTH = 4;
+var FINDINGS = {
+  "not-found": { id: "TEMPLATE-NOT-FOUND", fix: "Run template find and use an id from its output." },
+  "unsafe-path": { id: "TEMPLATE-UNSAFE-PATH", fix: "Do not write this template. Report it to the user." },
+  "needs-new-mode": { id: "TEMPLATE-NEEDS-NEW-FOLDER", fix: "Write this template into an empty folder." },
+  "fetch-failed": { id: "TEMPLATE-FETCH-FAILED", fix: "Check the network connection and try once more." },
+  "invalid-manifest": { id: "TEMPLATE-FETCH-FAILED", fix: "Try once more, or use the Azure MCP template tools." },
+  "unsupported-source": { id: "TEMPLATE-UNSUPPORTED-SOURCE", fix: "Choose a template hosted on GitHub." }
+};
+async function writeTemplate(options, dependencies) {
+  if (options.template === void 0 === (options.from === void 0)) {
+    throw new UsageError("Give exactly one of --template or --from");
+  }
+  const dir = resolve7(options.dir);
+  try {
+    return options.from !== void 0 ? writeFromMcpFile(dir, resolve7(options.from), options.dryRun) : await writeFromManifest(dir, options.template, options, dependencies);
+  } catch (error) {
+    if (!(error instanceof TemplateError))
+      throw error;
+    const known = FINDINGS[error.code];
+    return blocked4(redact(error.message), { id: known.id, severity: "error", title: redact(error.message), fix: known.fix });
+  }
+}
+async function writeFromManifest(dir, template, options, dependencies) {
+  const loaded = await loadFirstManifest(dependencies.manifestUrls);
+  if (!loaded)
+    return manifestUnavailable(COMMAND5);
+  const applied = await applyFunctionTemplate(dir, {
+    manifestUrl: loaded.result.manifestUrl,
+    template,
+    language: options.language,
+    runtimeVersion: options.runtimeVersion,
+    mode: options.mode ?? "auto",
+    dryRun: options.dryRun
+  });
+  return done({
+    source: "manifest",
+    template: applied.template.id,
+    mode: applied.mode,
+    dryRun: applied.dryRun,
+    written: applied.filesWritten,
+    skipped: applied.skippedFiles
+  }, loaded.gaps);
+}
+function writeFromMcpFile(dir, from, dryRun) {
+  const result = findMcpResult(readJson2(from));
+  const files = result ? collectFiles(result) : [];
+  if (!result || files.length === 0) {
+    return blocked4("The file holds no template files", {
+      id: "TEMPLATE-INPUT-INVALID",
+      severity: "error",
+      title: "--from must be the JSON result of functions_template_get or functions_project_get",
+      detail: "Expected a files, functionFiles, or projectFiles list of { fileName, content } entries.",
+      fix: "Save the complete tool result to a file and pass that file."
+    });
+  }
+  const planned = files.map((file) => {
+    if (/^[\\/]/.test(file.fileName)) {
+      throw new TemplateError("unsafe-path", `Unsafe template file path: ${file.fileName}`);
+    }
+    return { file, destination: resolveInsideTarget(dir, file.fileName) };
+  });
+  const written = [];
+  const skipped = [];
+  for (const { file, destination } of planned) {
+    const name = file.fileName.replace(/\\/g, "/");
+    if (existsSync6(destination)) {
+      skipped.push(name);
+      continue;
+    }
+    if (!dryRun) {
+      mkdirSync3(dirname3(destination), { recursive: true });
+      writeFileSync3(destination, file.content);
+    }
+    written.push(name);
+  }
+  const mergeInstructions = pick(result, "mergeinstructions");
+  return done({
+    source: "mcp-file",
+    template: asText(pick(result, "templatename")),
+    dryRun,
+    written: written.sort(),
+    skipped: skipped.sort(),
+    ...typeof mergeInstructions === "string" && mergeInstructions ? { mergeInstructions } : {}
+  }, []);
+}
+function done(data, gaps) {
+  const written = data.written?.length ?? 0;
+  const skipped = data.skipped?.length ?? 0;
+  const next = skipped > 0 ? { action: "merge-skipped", reason: "Merge the needed settings and dependencies from the skipped files by hand." } : { action: "install-and-verify", reason: "Install dependencies, then build and run the project locally." };
+  const verb = data.dryRun ? "Would write" : "Wrote";
+  return succeed(COMMAND5, `${verb} ${written} file(s), skipped ${skipped}`, data, { gaps, next });
+}
+function blocked4(summary, finding) {
+  return fail(COMMAND5, EXIT.blocked, summary, { findings: [finding] });
+}
+function readJson2(path) {
+  try {
+    return JSON.parse(readFileSync4(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+function findMcpResult(value, depth = 0) {
+  if (!isRecord2(value) || depth > MAX_SEARCH_DEPTH)
+    return null;
+  if (MCP_FILE_LISTS.some((name) => Array.isArray(pick(value, name))))
+    return value;
+  for (const child of Object.values(value)) {
+    const found = findMcpResult(child, depth + 1);
+    if (found)
+      return found;
+  }
+  return null;
+}
+function collectFiles(result) {
+  const files = /* @__PURE__ */ new Map();
+  for (const listName of MCP_FILE_LISTS) {
+    const list = pick(result, listName);
+    if (!Array.isArray(list))
+      continue;
+    for (const entry of list) {
+      if (!isRecord2(entry))
+        continue;
+      const fileName = pick(entry, "filename");
+      const content = pick(entry, "content");
+      if (typeof fileName === "string" && typeof content === "string" && !files.has(fileName)) {
+        files.set(fileName, { fileName, content });
+      }
+    }
+  }
+  return [...files.values()];
+}
+function pick(record, lowerCaseName) {
+  const key = Object.keys(record).find((candidate) => candidate.toLowerCase() === lowerCaseName);
+  return key === void 0 ? void 0 : record[key];
+}
+function asText(value) {
+  return typeof value === "string" && value ? value : void 0;
+}
+function isRecord2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 // lib/tools/cli.js
@@ -1022,6 +1587,12 @@ var USAGE = `Usage: functions-tools.mjs <group> <command> [options]
                  Runs the approved plan with azd. Resumes after a failed step.
   deploy verify  --dir <path> [--env <name>] [--app <name>] [--subscription <id>]
                  Lists the deployed functions and requests anonymous HTTP triggers.
+
+  template find  --language <name> [--resource <name>] [--iac <name>]
+                 Lists templates from the Azure Functions template manifest.
+  template write --dir <path> (--template <id> | --from <mcp-result.json>)
+                 [--language <name>] [--runtime-version <version>] [--mode new|add] [--dry-run]
+                 Writes template files. Never overwrites an existing file.
 
 Output is one JSON object on stdout.
 Exit codes: 0 ran, 1 unexpected failure, 2 invalid arguments, 3 blocked before running, 4 a step failed.`;
@@ -1061,6 +1632,32 @@ async function runCli(argv, dependencies) {
         subscription: args.strings.subscription
       }, dependencies);
     }
+    if (command === "template find") {
+      const args = parseArgs(rest, { strings: ["language", "resource", "iac"] });
+      return await findTemplates({
+        language: required(args.strings, "language"),
+        resource: args.strings.resource,
+        iac: args.strings.iac
+      }, { manifestUrls: dependencies.manifestUrls ?? DEFAULT_MANIFEST_URLS });
+    }
+    if (command === "template write") {
+      const args = parseArgs(rest, {
+        strings: ["dir", "template", "from", "language", "runtime-version", "mode"],
+        booleans: ["dry-run"]
+      });
+      const mode = args.strings.mode;
+      if (mode !== void 0 && mode !== "new" && mode !== "add")
+        throw new UsageError("--mode must be new or add");
+      return await writeTemplate({
+        dir: required(args.strings, "dir"),
+        template: args.strings.template,
+        from: args.strings.from,
+        language: args.strings.language,
+        runtimeVersion: args.strings["runtime-version"],
+        mode,
+        dryRun: args.booleans["dry-run"] ?? false
+      }, { manifestUrls: dependencies.manifestUrls ?? DEFAULT_MANIFEST_URLS });
+    }
     throw new UsageError(command ? `Unknown command: ${command}` : "No command was given");
   } catch (error) {
     if (error instanceof UsageError) {
@@ -1099,8 +1696,8 @@ async function main() {
     run: createRunner(),
     now: () => /* @__PURE__ */ new Date(),
     fetchStatus,
-    sleep: (milliseconds) => new Promise((resolve6) => {
-      setTimeout(resolve6, milliseconds);
+    sleep: (milliseconds) => new Promise((resolve8) => {
+      setTimeout(resolve8, milliseconds);
     })
   });
   process.stdout.write(`${JSON.stringify(result.body, null, 2)}
@@ -1109,7 +1706,7 @@ async function main() {
 }
 function isEntryPoint() {
   try {
-    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+    return Boolean(process.argv[1]) && realpathSync2(process.argv[1]) === realpathSync2(fileURLToPath2(import.meta.url));
   } catch {
     return false;
   }
