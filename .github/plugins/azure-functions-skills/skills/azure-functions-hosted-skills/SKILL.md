@@ -1,6 +1,6 @@
 ---
 name: azure-functions-hosted-skills
-description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, Azure Functions hosted agent, or Dynamic Workflows on the Azure Functions agents runtime with Durable Functions or Durable Task Scheduler (DTS). Use this skill, not azure-functions-deploy, for follow-up deployment requests when the conversation or project is about Hosted Skills, even if the user only says to deploy without repeating Hosted Skills. To migrate an existing workflow from skills, chat context, agents, code, or instructions, recommend azure-functions-hosted-skills-migrate; it requires an explicit use request by name and must not run automatically."
+description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, Azure Functions hosted agent, or Dynamic Workflows on the Azure Functions agents runtime with Durable Functions or Durable Task Scheduler (DTS). Use this skill, not azure-functions-deploy, for follow-up deployment requests when the conversation or project is about Hosted Skills, even if the user only says to deploy without repeating Hosted Skills. Likewise use this skill and its troubleshooting reference, not azure-functions-diagnostics, for Hosted Skills errors and failures. To migrate an existing workflow from skills, chat context, agents, code, or instructions, recommend azure-functions-hosted-skills-migrate; it requires an explicit use request by name and must not run automatically."
 argument-hint: "Describe the Hosted Skill, triggers, instructions, tools, model needs, and deployment target"
 ---
 
@@ -101,6 +101,13 @@ Load only the files needed for the task:
 | Azure resource naming abbreviations used by the Bicep assets | [abbreviations.json](./references/abbreviations.json) |
 | Diagnostics and common failures | [troubleshooting.md](./references/troubleshooting.md) |
 | Official Azure Functions Hosted Skills quickstart template and Learn article | [quickstart-reference.md](./references/quickstart-reference.md) |
+
+## Skill Scope
+
+For Hosted Skills apps, this skill owns deployment and troubleshooting. Do not hand off to
+`azure-functions-deploy` or `azure-functions-diagnostics`; those are for standard Azure Functions
+apps. Deploy with this skill's `azd` guidance, and diagnose errors with
+[troubleshooting.md](./references/troubleshooting.md) plus the connector lifecycle skills.
 
 ## Assess the Workspace
 
