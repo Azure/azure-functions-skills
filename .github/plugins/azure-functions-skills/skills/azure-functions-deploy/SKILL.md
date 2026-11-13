@@ -91,16 +91,20 @@ Provisioning and deployment can take up to 30 minutes each. Run the command with
 
 The script refuses to run when the plan id does not match, when the plan file was edited, or when `azure.yaml` or `infra/` changed after planning. In each case, plan again and ask again.
 
+When Azure Storage refuses the package right after a new provision, the script checks the cause before it does anything else. It counts as a storage refusal only when the output names a storage error code (`AuthorizationPermissionMismatch`, `AuthorizationFailure`) or pairs a 403 with a `*.blob.core.*` URL; any other 403 is a normal step failure. It reads the function app's deployment storage, the managed identity's Storage Blob Data role on that account, and the account's network rules. Only when an unconditional role is assigned, the network allows the request, and the next attempt still falls less than 15 minutes after provision does it wait (60 seconds, then 90 seconds) and run the deploy step again. `data.retries` records each wait and its evidence. In every other case it stops with `DEPLOY-STORAGE-FORBIDDEN`, and `data.storageAccess.cause` says why: `role-missing`, `network-restricted`, or `unknown` (including a role assignment with a condition). If a retry fails for another reason, that new failure is reported instead.
+
 ### 4. Verify
 
 ```text
 node "<tool>" deploy verify --dir "<project-root>" --env <environment>
 ```
 
-The script lists the deployed functions and sends one GET request to each anonymous HTTP trigger. It never uses HEAD and never reads function keys.
+The script lists the deployed functions and sends one GET request to each anonymous HTTP trigger. It never uses HEAD. When Azure does not report the app state, the script reads it from the resource; if it is still unknown, it records a gap and relies on the function list and HTTP results.
 
-- `ok: true`: report the function app name, the functions, and the HTTP results.
+- `ok: true`: report the function app name, `data.portalUrl`, the functions, and the HTTP results.
 - `gaps`: tell the user which functions were not requested and why (for example, a function that needs a key).
+- Functions with `authLevel: function`: ask the user whether to request them with a key. Only if the user agrees, run the command again with `--use-keys`. The script reads each function's default key with the Azure CLI and sends it in the `x-functions-key` header. It never prints or stores the key. Admin-level functions are never requested.
+- `ok: false`: report the findings and suggest `azure-functions-diagnostics`.
 - `ok: false`: report the findings and suggest `azure-functions-diagnostics`.
 
 `deploy verify` needs the Azure CLI (`az`) to be installed and signed in. If it is blocked, tell the user the deployment finished but was not verified.
@@ -113,7 +117,7 @@ Exit code 4 means `azd` ran and failed. The script stops at that step and rememb
 2. Explain the cause to the user. Apply `findings[0].fix` when there is one and the user agrees.
 3. Run the same `deploy apply` command again. It continues from the failed step.
 
-Do not retry without a change. Do not run `azd down`, delete a resource group, or change `infra/` to get past a failure unless the user asks.
+Do not retry without a change. The script has already retried a storage refusal when the evidence showed role propagation; for `DEPLOY-STORAGE-FORBIDDEN`, follow `findings[0].fix`. Do not run `azd down`, delete a resource group, or change `infra/` to get past a failure unless the user asks.
 
 If the same step fails twice, or the cause is in the Azure Functions runtime rather than in provisioning, stop and use [references/manual-deploy.md](references/manual-deploy.md) or `azure-functions-diagnostics`.
 

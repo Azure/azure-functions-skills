@@ -16,19 +16,26 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 ## Workflow
 
-### The template tool
+Start from the official template that is closest to the goal, write it at once, and change only what differs. Writing a template takes seconds; writing a project from scratch takes minutes and misses the infrastructure.
 
-A bundled script lists templates and writes their files in one call, so you do not copy file contents by hand. `<skill-dir>` is the folder that contains this `SKILL.md`.
+### The tool
+
+A bundled script picks, writes, and checks templates, so you do not copy file contents by hand. `<skill-dir>` is the folder that contains this `SKILL.md`.
 
 ```text
-node "<skill-dir>/../azure-functions-common/scripts/functions-tools.mjs" template <command> [options]
+node "<skill-dir>/../azure-functions-common/scripts/functions-tools.mjs" <command> [options]
 ```
 
 | Command | What it does |
 | --- | --- |
-| `template find --language <name> [--resource <name>] [--iac <name>]` | Lists template IDs from the Azure Functions template manifest. |
-| `template write --template <id> --dir <target>` | Downloads the template from its GitHub repository and writes it into `<target>`. |
+| `template write --language <name> --resource <name> --dir <target>` | Picks the manifest's recommended template for the language and trigger, downloads it, and writes it. `data.selection.alternatives` lists the next-closest templates. |
+| `template write --template <id> --dir <target>` | Writes one named template. |
+| `template write ... --dir <project> --stage` | Writes the template into `<project>/.azure-functions-skills/templates/<id>` instead, so you can copy one function into an existing project. |
 | `template write --from <file> --dir <target>` | Writes the files from a saved Azure MCP template result. |
+| `template find --language <name> [--resource <name>] [--iac <name>]` | Lists templates. Use it only when the user wants to browse. |
+| `local verify --dir <project> [--start-azurite]` | Installs dependencies, starts the host, waits until it is running, and calls one HTTP function. |
+
+Resources in the manifest: `http`, `timer`, `blob`, `eventhub`, `servicebus`, `cosmos`, `sql`, `durable`, `MCP`, `connector`. Languages: `python`, `typescript`, `javascript`, `csharp`, `java`, `powershell`.
 
 Each run prints one JSON object. Read `ok`, `summary`, `data`, `findings`, and `next`. The tool never overwrites an existing file; it lists such files in `data.skipped`. Add `--dry-run` to see the file list without writing.
 
@@ -37,192 +44,84 @@ Each run prints one JSON object. Read `ok`, `summary`, `data`, `findings`, and `
 | 0 | Follow the JSON. `ok: false` means it found a problem. |
 | 2 | Fix the arguments and run once more. |
 | 3 | Apply `findings[].fix`. For `TEMPLATE-UNSAFE-PATH`, stop and tell the user. |
-| 1 | Write the files by hand as described in each path. Do not run the same command again. |
+| 4 | A step failed. Read `findings` and the step output, fix the cause, then run once more. |
+| 1 | Write the files by hand as described in Path B. Do not run the same command again. |
 
-If `node` is missing or the tool file does not exist, write the files by hand as described in each path. Do not install Node or download the tool.
+If `node` is missing or the tool file does not exist, use Path B. Do not install Node or download the tool.
 
-### Step 0 — Check for Go
+### Step 0 — Go
 
-If the user asks for **Go** (or Golang), use **Path C** below. Neither the Azure MCP template set nor the templates manifest contains Go templates, so the other paths cannot produce a working Go project.
+If the user asks for **Go** (or Golang), use **Path C**. The templates manifest and the Azure MCP template set have no Go templates.
 
-For every other language, continue with Step 1.
+### Step 1 — Ask only what is missing
 
-### Step 1 — Detect Azure MCP tools
+You need two facts: the **language** and the **trigger** (the resource that starts the function). Take them from the request or the workspace. When one is missing, ask one short question for it and offer the likely choices. Do not ask about anything else before writing the template: the folder name, the runtime version, and the business logic can follow.
 
-Check whether the following Azure MCP tools are available in your current tool list:
+Map the request to a resource: a web API, webhook, or endpoint is `http`; a schedule is `timer`; a file upload is `blob`; a message queue is `servicebus` (use the Azure Storage queue pattern only when the user names Storage queues); a stream is `eventhub`; a database change is `cosmos` or `sql`; a long-running workflow is `durable`; a tool for an AI agent is `MCP`.
 
-- `functions_language_list` — list supported languages and runtime versions
-- `functions_project_get` — scaffold project-level files
-- `functions_template_get` — list templates (language only) or get a specific template (language + template)
+### Step 2 — Write the closest template now
 
-These are provided by the [Azure MCP Server](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-functions) (`@azure/mcp`) and return officially maintained templates across C#, Python, TypeScript, JavaScript, Java and PowerShell.
-
-Also check for the best practices tool:
-
-- `get_azure_bestpractices` / `get_azure_bestpractices_get` with `resource: azurefunctions`
-
-- **If available** → proceed with **Path A (MCP primary)**.
-- **If not available** → proceed with **Path B (composition algorithm fallback)**.
-
----
-
-### Path A — MCP primary (recommended)
-
-Use the Azure MCP Server as the **authoritative source of truth** for Azure Functions templates. Do **not** write function code from scratch when these tools are available.
-
-#### A.1 Gather requirements & best practices
-
-If `get_azure_bestpractices` is available, call it first:
-
-```
-Tool: get_azure_bestpractices
-resource: azurefunctions
-action: code-generation
-```
-
-Apply the returned guidelines (programming models, extension bundles version, authentication levels, project structure, etc.) to every file you generate in the steps below.
-
-Ask the user (or detect from context):
-
-- **Language**: `csharp` | `python` | `typescript` | `javascript` | `java` | `powershell`
-- **Trigger / template**: let the MCP list decide (step A.3)
-- **Project name**: directory name
-- **Runtime version** (optional): e.g. Node.js `22`, Python `3.11`, Java `21`
-
-#### A.2 Discover supported languages
-
-Call `functions_language_list`. Returns supported languages with runtime versions, programming models, and prerequisites. Use this to confirm the user's language choice is supported and to suggest a default runtime version.
-
-#### A.3 Browse available templates
-
-Call `functions_template_get` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
-
-Do **not** invent or guess template identifiers such as `HttpTrigger`. Azure MCP template IDs are versioned, language-specific strings returned by the template list. For example, the TypeScript HTTP trigger template is currently returned as `http-trigger-typescript-azd`.
-
-When the user asks for a common trigger name, map it to one of the template IDs returned by the MCP list before calling the template-get operation. Examples:
-
-| User intent | Language | Prefer a returned template ID like |
-| --- | --- | --- |
-| HTTP trigger | `typescript` | `http-trigger-typescript-azd` |
-| Timer trigger | `typescript` | `timer-trigger-typescript-azd` |
-| Blob trigger | `typescript` | `blob-eventgrid-trigger-typescript-azd` |
-| Queue / Service Bus trigger | `typescript` | `servicebus-trigger-typescript-azd` |
-
-If a template-get call fails with "template not found", immediately recover by calling `functions_template_get` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
-
-#### A.4 Write the project
-
-For a new project, write the chosen template with the tool. Use the template ID from step A.3 unchanged.
+For a new project, write the recommended template into the target folder:
 
 ```text
-node "<tool>" template write --template <template-id> --dir "<project-dir>" [--runtime-version <version>]
+node "<tool>" template write --language <language> --resource <resource> --dir "<project-dir>"
 ```
 
-The `*-azd` templates are complete projects. They include `host.json`, the dependency manifest, the function source, `azure.yaml`, and `infra/`, so `azure-functions-deploy` can deploy the result without more setup.
+- The template is a complete project: `host.json`, the dependency manifest, function source, `azure.yaml`, and `infra/`. `azure-functions-deploy` can deploy it unchanged.
+- Report the template id and the number of files written, not the whole file list.
+- When the user needs a binding that another template shows (for example an HTTP API that writes to Cosmos DB), write the template for the **trigger** as the base. Then write the other template with `--stage` and copy only the binding code, its settings, and its infrastructure resources and role assignments into the base.
+- On `TEMPLATE-NONE-MATCH`, read `findings[].detail` for the resources that exist for the language and pick the closest one.
+- On `TEMPLATE-FETCH-FAILED`, run the same command once more, then use the Azure MCP fallback below.
 
-Report `data.written` to the user as a count and the main files, not as a full list. Then install dependencies (`npm install`, or the equivalent for the language) to create the lock file for this machine.
+### Step 3 — Change only what differs
 
-**Fallback when the tool cannot run or reports `TEMPLATE-FETCH-FAILED` twice**: call `functions_project_get` with the language, then `functions_template_get` with the language and the template ID.
+Edit the template toward the request: rename the function, change the route, schedule, or binding names, and add the user's business logic. Keep the template's project layout, `AzureWebJobsStorage`, the extension bundle, and the infrastructure. Remove demo code only when the user does not need it.
 
-```
-Tool: functions_template_get
-language: <chosen language, e.g. typescript>
-template: <chosen returned template ID, e.g. http-trigger-typescript-azd>
-runtime-version: <optional, e.g. 22>
-output: <optional, "New" (default) or "Add" for existing projects>
-```
+If the `get_azure_bestpractices` tool (`resource: azurefunctions`, `action: code-generation`) is available, apply its guidance to the code you write in this step.
 
-If the host saved the result to a file, pass that file to the tool instead of copying its contents:
+### Step 4 — Verify locally
 
 ```text
-node "<tool>" template write --from "<saved-result.json>" --dir "<project-dir>"
+node "<tool>" local verify --dir "<project-dir>"
 ```
 
-Otherwise write each returned file into the project, and merge any extra settings into `local.settings.json` and any extra packages into the dependency manifest.
+The command creates `local.settings.json` when it is missing, installs the dependencies (a Python virtual environment or `npm install` and `npm run build`), starts `func start`, waits for the host to report `Running`, lists the functions, and calls one HTTP function. It stops the host before it returns. A second run skips installation when the dependency file has not changed.
 
-#### A.5 Apply merge instructions
+- `ok: true` means the functions were indexed and the HTTP call did not return a server error. Report the function names and the HTTP status.
+- `AZURITE-NOT-RUNNING`: the project has a timer, blob, queue, Event Hubs, or Durable trigger that needs Azurite. Ask the user once whether you may start Azurite. If yes, run the command again with `--start-azurite`; the tool starts Azurite and stops it at the end (add `--keep-azurite` to leave it running). If no, report that the non-HTTP triggers were not run locally.
+- `INSTALL-FAILED`, `HOST-EXITED`, or `NO-FUNCTIONS-INDEXED`: read `data.outputTail`, fix the code or the dependency file, and run once more.
+- To call a specific function, add `--invoke <name>`. To send a real message to a non-HTTP trigger, see `azure-functions-common/references/local-emulators.md`.
+- For Cosmos DB, SQL, and other services without a local emulator, keep the result as host start and indexing, and offer a test against a development resource in Azure.
 
-When `data.mergeInstructions` or `data.skipped` is present, the tool left existing files alone. Read the instructions and the skipped files, then merge the needed settings and dependencies by hand. Do not delete or replace the user's files.
+### Azure MCP fallback
 
-#### A.6 Verify
+Use the Azure MCP Server only when the tool cannot run or keeps reporting `TEMPLATE-FETCH-FAILED`, or when the user asks to browse the MCP template set.
 
-For TypeScript and other compiled-language projects, build first:
-
-```bash
-npm run build   # TypeScript / JavaScript
-# dotnet build  # C#
-# mvn package   # Java
-```
-
-Then perform an end-to-end local verification, not just a host start:
-
-```bash
-func start
-```
-
-After the host reports the function endpoints/listeners:
-
-- **HTTP triggers**: send an actual request to the local endpoint and verify the status code and response body, for example `curl http://localhost:7071/api/<FunctionName>?name=World`.
-- **Timer triggers**: verify the listener starts and, when practical, temporarily use a short development-only schedule or manual invocation approach; restore the user's intended schedule before finishing.
-- **Storage, Cosmos DB, SQL, Redis, Dapr, or other service-backed triggers/bindings**: load `azure-functions-common/references/local-emulators.md`, identify the required local emulator or development service, and run a realistic message/blob/document/event through the trigger when the user wants E2E verification.
-- **Before installing or starting any emulator/local service**: ask the user for confirmation. If the user says the emulator is not needed, unavailable, or should be skipped, do not install it; record that emulator-backed E2E was skipped and provide manual/Azure test steps instead.
-- **When no practical local emulator exists**: explain the limitation, suggest a temporary Azure dev resource or deployment-based test, and keep the local verification to build + host/listener startup.
+1. Call `functions_template_get` with only `language` to list template IDs. Do not invent IDs such as `HttpTrigger`; MCP IDs are versioned strings such as `http-trigger-typescript-azd`.
+2. Call `functions_template_get` with the language and the chosen ID. If the host saved the result to a file, run `template write --from "<saved-result.json>" --dir "<project-dir>"`. Otherwise write each returned file into the project.
+3. When `data.mergeInstructions` or `data.skipped` is present, merge the needed settings and dependencies by hand. Do not delete or replace the user's files.
+4. Continue with Step 3 and Step 4.
 
 ---
 
-### Path B — Composition algorithm fallback
+### Path B — Without the tool
 
-Use this path **only when the Azure MCP tools are not available**. When falling back, show this notice to the user verbatim (translate to the user's language if needed):
+Use this path only when `node` or the tool is unavailable. Show this notice to the user (translate it to the user's language):
 
-> ℹ️ Azure MCP tools were not found; using the manifest-based fallback path. Enabling the Azure MCP Server unlocks dynamic template discovery and composition. Run `azure-functions-setup` to configure it.
+> ℹ️ The bundled template tool is unavailable; writing the template by hand.
 
-#### B.1 Fallback algorithm
+1. Fetch `https://cdn.functions.azure.com/public/templates-manifest/manifest.json`. Filter by language and resource and choose the entry with the highest priority.
+2. Download the files under the entry's `repositoryUrl`, `folderPath`, and `gitRef`, and write them into the project folder.
+3. Continue with Step 3. Verify with `func start` and one real HTTP request; for non-HTTP triggers, use `azure-functions-common/references/local-emulators.md` and ask before starting an emulator.
 
-1. **Find templates.** The tool reads the manifest from the Azure Functions CDN and falls back to the copy on GitHub.
-
-   ```text
-   node "<tool>" template find --language <language> [--resource <resource>] [--iac bicep]
-   ```
-
-   Present `data.templates` and let the user choose. If one template covers all requirements, use it alone.
-
-2. **Write the trigger template.** It is the base project and includes the infrastructure files.
-
-   ```text
-   node "<tool>" template write --template <template-id> --dir "<project-dir>"
-   ```
-
-3. **Compose (your work).** When the user also needs bindings from another template, write that template into a separate temporary folder with `template write`, read the binding pattern from it, and add the pattern to the base project. Merge its infrastructure resources, role assignments, and settings. Add the user's business logic.
-
-4. **Trim (your work).** Remove demo code the user does not need. Keep `AzureWebJobsStorage`.
-
-5. **Deploy.** Do not deploy from this skill. Suggest `azure-functions-deploy`.
-
-If the tool cannot run, do steps 1 and 2 by hand: fetch `https://cdn.functions.azure.com/public/templates-manifest/manifest.json`, filter by language, resource, and IaC, and download the files under the template's `repositoryUrl`, `folderPath`, and `gitRef`. If the manifest is also unavailable, use B.2.
-
-#### B.2 Quick code reference
-
-For minimal HTTP trigger snippets per language (last-resort fallback when the manifest is also unavailable), see [references/language-snippets.md](references/language-snippets.md).
-
-#### B.3 Verify
-
-Build compiled projects first, then perform the same local E2E verification standard used in Path A:
-
-```bash
-func start
-```
-
-- For HTTP triggers, send a real request to the local endpoint and validate the response.
-- For non-HTTP triggers, consult `azure-functions-common/references/local-emulators.md` and use an emulator/local service when practical.
-- Ask before installing or starting emulators. If the user declines, skip emulator-backed E2E and document the skipped verification plus manual/Azure test steps.
+If the manifest is also unavailable, use the minimal snippets in [references/language-snippets.md](references/language-snippets.md).
 
 ---
-
 ### Path C — Go (preview)
 
 Go is not represented in the Azure MCP template set or in the templates manifest, so there is nothing to discover. Go also has its own scaffolding command, its own worker runtime value, and preview constraints that apply to no other language.
 
-Load [references/go-project.md](references/go-project.md) and follow it. Do not improvise a Go project from Path A or Path B.
+Load [references/go-project.md](references/go-project.md) and follow it. Do not improvise a Go project from the templates or from Path B.
 
 Tell the user up front that **Go support on Azure Functions is in public preview** and may change before GA.
 
@@ -230,12 +129,20 @@ Tell the user up front that **Go support on Azure Functions is in public preview
 
 ### Adding functions to existing projects
 
-If `host.json` already exists, do **not** re-initialize. Instead:
+If `host.json` already exists, do **not** re-initialize the project. Start from the template for the new trigger:
 
-- **MCP path**: call `functions_template_get` with the same language as the existing project, the desired template ID, and `output: "Add"`. If the host saved the result to a file, run `template write --from <file> --dir <project-dir>`; otherwise write the returned function files by hand. Then follow A.5.
-- **Fallback path**: run `template write --template <template-id> --dir <temporary-folder>` to get the template source in a separate folder, then copy the function files into the existing project and merge the settings and dependencies by hand.
-- Do not run `template write --template` directly on an existing project with a full-project template. The tool refuses it (`TEMPLATE-NEEDS-NEW-FOLDER`), because such a template would bring a second project layout.
-- **Go path**: `func new` is not supported for Go. Edit `main.go`, add another `app.*` registration and, for an extension trigger, the blank import. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
+1. Stage the template inside the project. Use the project's language.
+
+   ```text
+   node "<tool>" template write --language <language> --resource <resource> --dir "<project-dir>" --stage
+   ```
+
+2. Copy the function source from `data.stagedDir` into the project and follow the project's layout (for Python v2, a new blueprint or the main file; for Node v4, a new file under `src/functions`). Merge new packages into the dependency manifest, new settings into `local.settings.json`, and new resources and role assignments into `infra/`. Do not replace the user's files.
+3. Delete the staged folder, then run `local verify`.
+
+Do not run `template write` without `--stage` on an existing project. The tool refuses a full-project template there (`TEMPLATE-NEEDS-NEW-FOLDER`), because it would add a second project layout. When the tool is unavailable, call `functions_template_get` with `output: "Add"` and apply its merge instructions.
+
+**Go**: `func new` is not supported for Go. Edit `main.go`, add another `app.*` registration and, for an extension trigger, the blank import. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
 
 ## After Creation
 

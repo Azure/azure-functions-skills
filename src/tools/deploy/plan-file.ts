@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { ensureToolDir, toolDir } from '../shared/work-dir.js';
 
 export type StepId = 'env-new' | `env-set:${string}` | 'provision' | 'deploy';
 
@@ -32,9 +33,10 @@ export interface DeployPlan extends PlanContent {
 export interface DeployState {
   readonly planId: string;
   readonly completed: readonly StepId[];
+  /** When the provision step finished. Used to judge whether a storage refusal can be role propagation. */
+  readonly provisionedAt?: string;
 }
 
-const WORK_DIR = '.azure-functions-skills';
 
 /** The only `azd` argument lists a plan may contain. `deploy apply` rejects anything else. */
 export function stepArgs(
@@ -61,7 +63,7 @@ export function isValidStep(step: PlanStep, plan: Pick<PlanContent, 'environment
 }
 
 export function workDir(dir: string): string {
-  return join(resolve(dir), WORK_DIR, 'deploy');
+  return join(toolDir(dir), 'deploy');
 }
 
 export function planFilePath(dir: string): string {
@@ -113,10 +115,7 @@ function writeWorkFile(dir: string, path: string, value: unknown): void {
 
 /** Creates the work folder and keeps it out of source control. */
 export function ensureWorkDir(dir: string): void {
-  const root = join(resolve(dir), WORK_DIR);
-  mkdirSync(workDir(dir), { recursive: true });
-  const ignore = join(root, '.gitignore');
-  if (!existsSync(ignore)) writeFileSync(ignore, '*\n');
+  ensureToolDir(dir, 'deploy');
 }
 
 function readJson<T>(path: string): T | null {

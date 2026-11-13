@@ -179,6 +179,78 @@ describe('template write from the manifest', () => {
   });
 });
 
+describe('template find recommendation', () => {
+  it('names the closest template first so the agent can write it without another lookup', async () => {
+    const { manifestUrl } = fixture();
+    const found = await findTemplates({ language: 'typescript', resource: 'timer' }, { manifestUrls: [manifestUrl] });
+    expect(found.body.data.recommended).toBe('timer-trigger-typescript-azd');
+    expect(found.body.next?.command).toContain('--template timer-trigger-typescript-azd');
+  });
+});
+
+describe('template write with automatic selection', () => {
+  it('chooses the template that matches the language and resource', async () => {
+    const { manifestUrl } = fixture();
+    const dir = join(tempDir(), 'auto');
+    const written = await writeTemplate({ dir, language: 'typescript', resource: 'timer', dryRun: false },
+      { manifestUrls: [manifestUrl] });
+
+    expect(written.exitCode).toBe(EXIT.ok);
+    expect(written.body.data).toMatchObject({
+      template: 'timer-trigger-typescript-azd', language: 'TypeScript', runtimeVersion: '22',
+      selection: { by: 'language+resource', alternatives: [] },
+    });
+    expect(existsSync(join(dir, 'host.json'))).toBe(true);
+  });
+
+  it('chooses the highest priority template when only the language is known', async () => {
+    const { manifestUrl } = fixture();
+    const written = await writeTemplate({ dir: join(tempDir(), 'auto'), language: 'typescript', dryRun: true },
+      { manifestUrls: [manifestUrl] });
+    expect(written.body.data.template).toBe('http-trigger-typescript-azd');
+    expect(written.body.data.selection).toEqual({ by: 'language', alternatives: ['timer-trigger-typescript-azd'] });
+  });
+
+  it('is blocked when nothing matches and lists what exists for the language', async () => {
+    const { manifestUrl } = fixture();
+    const dir = join(tempDir(), 'none');
+    const written = await writeTemplate({ dir, language: 'typescript', resource: 'cosmos', dryRun: false },
+      { manifestUrls: [manifestUrl] });
+    expect(written.exitCode).toBe(EXIT.blocked);
+    expect(written.body.findings[0]).toMatchObject({ id: 'TEMPLATE-NONE-MATCH' });
+    expect(written.body.findings[0].detail).toContain('http, timer');
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('points to the local check after writing a new project', async () => {
+    const { manifestUrl } = fixture();
+    const dir = join(tempDir(), 'next');
+    const written = await writeTemplate({ dir, template: 'http-trigger-typescript-azd', dryRun: false },
+      { manifestUrls: [manifestUrl] });
+    expect(written.body.next).toMatchObject({ action: 'local-verify' });
+    expect(written.body.next?.command).toContain('local verify --dir');
+  });
+});
+
+describe('template write --stage', () => {
+  it('writes the whole template into a git-ignored staging folder of an existing project', async () => {
+    const { manifestUrl } = fixture();
+    const dir = tempDir();
+    writeFileSync(join(dir, 'host.json'), '{"version":"2.0","custom":true}\n');
+
+    const written = await writeTemplate({ dir, template: 'timer-trigger-typescript-azd', stage: true, dryRun: false },
+      { manifestUrls: [manifestUrl] });
+
+    const staged = join(dir, '.azure-functions-skills', 'templates', 'timer-trigger-typescript-azd');
+    expect(written.exitCode).toBe(EXIT.ok);
+    expect(written.body.data).toMatchObject({ mode: 'new', stagedDir: staged });
+    expect(existsSync(join(staged, 'src', 'functions', 'httpTrigger.ts'))).toBe(true);
+    expect(readFileSync(join(dir, '.azure-functions-skills', '.gitignore'), 'utf-8')).toBe('*\n');
+    expect(readFileSync(join(dir, 'host.json'), 'utf-8')).toContain('custom');
+    expect(written.body.next).toMatchObject({ action: 'merge-staged' });
+  });
+});
+
 describe('template write from Azure MCP output', () => {
   function mcpFile(content: unknown): string {
     const path = join(tempDir(), 'template.json');
@@ -254,6 +326,8 @@ describe('template commands on the command line', () => {
     [['template', 'write', '--dir', '.', '--template', 'a', '--from', 'b']],
     [['template', 'find', '--language', 'python', '--manifest-url', 'https://example.invalid/m.json']],
     [['template', 'write', '--dir', '.', '--template', 'a', '--force']],
+    [['template', 'write', '--dir', '.', '--template', 'a', '--resource', 'http']],
+    [['template', 'write', '--dir', '.', '--from', 'a', '--stage']],
   ])('reports %j as a usage error', async argv => {
     expect((await runCli(argv, dependencies)).exitCode).toBe(EXIT.usage);
   });

@@ -77,6 +77,16 @@ describe('command invocation', () => {
     expect(resolveExecutable('missing', { platform: 'win32', path: 'C:\\bin', pathExt: '.EXE;.CMD', exists })).toBeNull();
   });
 
+  it('resolves an absolute path without searching PATH', () => {
+    const exists = (path: string) => path === 'C:\\app\\.venv\\Scripts\\python.exe' || path === '/app/.venv/bin/python';
+    expect(resolveExecutable('C:\\app\\.venv\\Scripts\\python', { platform: 'win32', path: 'C:\\bin', pathExt: '.EXE', exists }))
+      .toBe('C:\\app\\.venv\\Scripts\\python.exe');
+    expect(resolveExecutable('C:\\app\\.venv\\Scripts\\python.exe', { platform: 'win32', path: '', pathExt: '.EXE', exists }))
+      .toBe('C:\\app\\.venv\\Scripts\\python.exe');
+    expect(resolveExecutable('/app/.venv/bin/python', { platform: 'linux', path: '/usr/bin', exists })).toBe('/app/.venv/bin/python');
+    expect(resolveExecutable('/missing/python', { platform: 'linux', path: '/usr/bin', exists })).toBeNull();
+  });
+
   it('prefers a native executable over a command script in the same folder', () => {
     const exists = (path: string) => path.startsWith('C:\\bin\\func.');
     expect(resolveExecutable('func', { platform: 'win32', path: 'C:\\bin', pathExt: '.CMD;.EXE', exists }))

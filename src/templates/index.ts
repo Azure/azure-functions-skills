@@ -25,6 +25,8 @@ export class TemplateError extends Error {
 
 export interface TemplateListOptions {
   readonly manifestUrl?: string;
+  /** An already loaded manifest. `manifestUrl` must still name where it came from. */
+  readonly manifest?: TemplateManifest;
   readonly language?: string;
   readonly resource?: string;
   readonly iac?: string;
@@ -32,6 +34,8 @@ export interface TemplateListOptions {
 
 export interface TemplateApplyOptions {
   readonly manifestUrl?: string;
+  /** An already loaded manifest, so it is not downloaded twice. `manifestUrl` must still name where it came from. */
+  readonly manifest?: TemplateManifest;
   readonly language?: string;
   readonly template: string;
   readonly runtimeVersion?: string;
@@ -127,11 +131,15 @@ const ADD_MODE_PROJECT_PREFIXES = [
   'infra/',
 ];
 
+const DOWNLOAD_CONCURRENCY = 8;
+
 let githubCliTokenWarningShown = false;
+/** `null` until `gh auth token` has been asked once in this process. Parallel requests share the answer. */
+let githubCliToken: string | undefined | null = null;
 
 export async function listFunctionTemplates(options: TemplateListOptions = {}): Promise<TemplateListResult> {
   const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
-  const manifest = await loadTemplateManifest(manifestUrl);
+  const manifest = options.manifest ?? await loadTemplateManifest(manifestUrl);
   const templates = manifest.templates
     .filter(template => matchesFilter(template.language, options.language))
     .filter(template => matchesFilter(template.resource, options.resource))
@@ -144,7 +152,7 @@ export async function listFunctionTemplates(options: TemplateListOptions = {}): 
 
 export async function applyFunctionTemplate(targetDir: string, options: TemplateApplyOptions): Promise<TemplateApplyResult> {
   const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
-  const manifest = await loadTemplateManifest(manifestUrl);
+  const manifest = options.manifest ?? await loadTemplateManifest(manifestUrl);
   const template = findTemplate(manifest, options.template, options.language);
   const mode = resolveApplyMode(targetDir, options.mode ?? 'auto');
   const downloadedFiles = await downloadTemplateFiles(template, manifestUrl);
@@ -208,7 +216,7 @@ export function resolveInsideTarget(targetDir: string, relativePath: string): st
   return destination;
 }
 
-async function loadTemplateManifest(manifestUrl: string): Promise<TemplateManifest> {
+export async function loadTemplateManifest(manifestUrl: string): Promise<TemplateManifest> {
   const parsed = new URL(manifestUrl);
   const raw = parsed.protocol === 'file:'
     ? readFileSync(fileURLToPath(parsed), 'utf-8')
@@ -269,20 +277,29 @@ async function downloadGitHubTemplateFiles(repo: GitHubRepo, folderPath: string,
   assertSafeFolderPath(folderPath);
   const rootPath = folderPath === '.' ? '' : folderPath.replace(/^\/+|\/+$/g, '');
   const entries = await listGitHubContents(repo, rootPath, ref);
-  const files: TemplateFile[] = [];
-
-  for (const entry of entries) {
+  return mapLimit(entries, DOWNLOAD_CONCURRENCY, async entry => {
     if (!entry.download_url) {
       throw new Error(`GitHub file entry is missing download URL: ${entry.path}`);
     }
-    const content = await fetchBuffer(entry.download_url);
-    files.push({
+    return {
       relativePath: rootPath ? entry.path.slice(rootPath.length + 1) : entry.path,
-      content,
-    });
-  }
+      content: await fetchBuffer(entry.download_url),
+    };
+  });
+}
 
-  return files;
+/** Runs `worker` over `items` with at most `limit` calls in flight and keeps the input order. */
+async function mapLimit<T, R>(items: readonly T[], limit: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array<R>(items.length);
+  let next = 0;
+  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await worker(items[index]);
+    }
+  });
+  await Promise.all(lanes);
+  return results;
 }
 
 async function listGitHubContents(repo: GitHubRepo, path: string, ref: string): Promise<readonly GitHubContentEntry[]> {
@@ -294,16 +311,11 @@ async function listGitHubContents(repo: GitHubRepo, path: string, ref: string): 
     throw new Error(`GitHub contents path is not a directory: ${path || '.'}`);
   }
 
-  const files: GitHubContentEntry[] = [];
-  for (const entry of entries) {
-    if (!isGitHubContentEntry(entry)) continue;
-    if (entry.type === 'file') {
-      files.push(entry);
-    } else {
-      files.push(...await listGitHubContents(repo, entry.path, ref));
-    }
-  }
-  return files;
+  const valid = entries.filter(isGitHubContentEntry);
+  const nested = await Promise.all(valid.map(entry => (entry.type === 'file'
+    ? Promise.resolve([entry])
+    : listGitHubContents(repo, entry.path, ref))));
+  return nested.flat();
 }
 
 function parseGitHubRepo(url: URL): GitHubRepo | null {
@@ -469,6 +481,7 @@ function resolveGitHubToken(env: NodeJS.ProcessEnv = process.env): string | unde
 }
 
 function resolveGitHubCliToken(): string | undefined {
+  if (githubCliToken !== null) return githubCliToken;
   if (!githubCliTokenWarningShown) {
     process.stderr.write(
       'GitHub API rate limit or private repository access requires authentication. Trying `gh auth token`...\n',
@@ -481,10 +494,11 @@ function resolveGitHubCliToken(): string | undefined {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
-    return token || undefined;
+    githubCliToken = token || undefined;
   } catch (_err) {
-    return undefined;
+    githubCliToken = undefined;
   }
+  return githubCliToken;
 }
 
 function isGitHubAuthRetryable(response: Response): boolean {

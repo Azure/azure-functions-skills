@@ -58,9 +58,27 @@ function redact(text) {
 
 // lib/tools/deploy/plan-file.js
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-var WORK_DIR = ".azure-functions-skills";
+import { mkdirSync as mkdirSync2, readFileSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { dirname, join as join2 } from "node:path";
+
+// lib/tools/shared/work-dir.js
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+var TOOL_DIR = ".azure-functions-skills";
+function toolDir(dir) {
+  return join(resolve(dir), TOOL_DIR);
+}
+function ensureToolDir(dir, ...parts) {
+  const root = toolDir(dir);
+  const target = join(root, ...parts);
+  mkdirSync(target, { recursive: true });
+  const ignore = join(root, ".gitignore");
+  if (!existsSync(ignore))
+    writeFileSync(ignore, "*\n");
+  return target;
+}
+
+// lib/tools/deploy/plan-file.js
 function stepArgs(id, plan, value = "") {
   if (id === "env-new") {
     return ["env", "new", plan.environment, "--subscription", plan.subscriptionId, "--location", plan.location, "--no-prompt"];
@@ -70,26 +88,26 @@ function stepArgs(id, plan, value = "") {
   return ["env", "set", id.slice("env-set:".length), value, "-e", plan.environment, "--no-prompt"];
 }
 var ENV_SET_VALUE_INDEX = 3;
-function isValidStep(step, plan) {
-  if (!Array.isArray(step.args) || step.args.some((argument) => typeof argument !== "string"))
+function isValidStep(step2, plan) {
+  if (!Array.isArray(step2.args) || step2.args.some((argument) => typeof argument !== "string"))
     return false;
-  const known = step.id === "env-new" || step.id === "provision" || step.id === "deploy" || /^env-set:[A-Z_][A-Z0-9_]*$/.test(step.id);
+  const known = step2.id === "env-new" || step2.id === "provision" || step2.id === "deploy" || /^env-set:[A-Z_][A-Z0-9_]*$/.test(step2.id);
   if (!known)
     return false;
-  const expected = stepArgs(step.id, plan, step.id.startsWith("env-set:") ? step.args[ENV_SET_VALUE_INDEX] : "");
-  return expected.length === step.args.length && expected.every((argument, index) => argument === step.args[index]);
+  const expected = stepArgs(step2.id, plan, step2.id.startsWith("env-set:") ? step2.args[ENV_SET_VALUE_INDEX] : "");
+  return expected.length === step2.args.length && expected.every((argument, index) => argument === step2.args[index]);
 }
 function workDir(dir) {
-  return join(resolve(dir), WORK_DIR, "deploy");
+  return join2(toolDir(dir), "deploy");
 }
 function planFilePath(dir) {
-  return join(workDir(dir), "plan.json");
+  return join2(workDir(dir), "plan.json");
 }
 function stateFilePath(dir) {
-  return join(workDir(dir), "state.json");
+  return join2(workDir(dir), "state.json");
 }
 function logFilePath(dir) {
-  return join(workDir(dir), "apply.log");
+  return join2(workDir(dir), "apply.log");
 }
 function planId(content) {
   return createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 16);
@@ -115,16 +133,12 @@ function writeState(dir, state) {
 }
 function writeWorkFile(dir, path, value) {
   ensureWorkDir(dir);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}
+  mkdirSync2(dirname(path), { recursive: true });
+  writeFileSync2(path, `${JSON.stringify(value, null, 2)}
 `);
 }
 function ensureWorkDir(dir) {
-  const root = join(resolve(dir), WORK_DIR);
-  mkdirSync(workDir(dir), { recursive: true });
-  const ignore = join(root, ".gitignore");
-  if (!existsSync(ignore))
-    writeFileSync(ignore, "*\n");
+  ensureToolDir(dir, "deploy");
 }
 function readJson(path) {
   try {
@@ -137,7 +151,7 @@ function readJson(path) {
 // lib/tools/deploy/project.js
 import { createHash as createHash2 } from "node:crypto";
 import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync2, statSync } from "node:fs";
-import { join as join2, resolve as resolve2 } from "node:path";
+import { join as join3, resolve as resolve2 } from "node:path";
 
 // lib/tools/shared/dotenv.js
 function parseDotenv(text) {
@@ -155,20 +169,20 @@ function parseDotenv(text) {
 // lib/tools/deploy/project.js
 function inspectProject(dir) {
   const root = resolve2(dir);
-  const azureYaml = readAzureYaml(join2(root, "azure.yaml"));
-  const functionProjects = (azureYaml?.services ?? []).filter((service) => service.host === "function").map((service) => join2(root, service.project));
+  const azureYaml = readAzureYaml(join3(root, "azure.yaml"));
+  const functionProjects = (azureYaml?.services ?? []).filter((service) => service.host === "function").map((service) => join3(root, service.project));
   return {
     dir: root,
-    hasHostJson: [root, ...functionProjects].some((folder) => isFile(join2(folder, "host.json"))),
-    isHostedSkills: isFile(join2(root, "agents.config.yaml")) || hasAgentFile(root),
+    hasHostJson: [root, ...functionProjects].some((folder) => isFile(join3(folder, "host.json"))),
+    isHostedSkills: isFile(join3(root, "agents.config.yaml")) || hasAgentFile(root),
     azureYaml,
-    infra: readInfra(join2(root, "infra")),
-    environments: readEnvironments(join2(root, ".azure")),
+    infra: readInfra(join3(root, "infra")),
+    environments: readEnvironments(join3(root, ".azure")),
     fingerprint: fingerprint(root)
   };
 }
 function readEnvironmentValues(dir, environment) {
-  const path = join2(resolve2(dir), ".azure", environment, ".env");
+  const path = join3(resolve2(dir), ".azure", environment, ".env");
   return isFile(path) ? parseDotenv(readFileSync2(path, "utf-8")) : null;
 }
 function isFile(path) {
@@ -178,7 +192,7 @@ function isDirectory(path) {
   return existsSync2(path) && statSync(path).isDirectory();
 }
 function hasAgentFile(root) {
-  return [root, join2(root, "src")].some((folder) => isDirectory(folder) && readdirSync(folder).some((name) => name.endsWith(".agent.md")));
+  return [root, join3(root, "src")].some((folder) => isDirectory(folder) && readdirSync(folder).some((name) => name.endsWith(".agent.md")));
 }
 function readAzureYaml(path) {
   if (!isFile(path))
@@ -215,7 +229,7 @@ function readAzureYaml(path) {
   return { name, template, services };
 }
 function readInfra(infraDir) {
-  const bicepPath = join2(infraDir, "main.bicep");
+  const bicepPath = join3(infraDir, "main.bicep");
   if (!isFile(bicepPath)) {
     const hasTerraform = isDirectory(infraDir) && readdirSync(infraDir).some((name) => name.endsWith(".tf"));
     return { kind: hasTerraform ? "terraform" : null, allowedLocations: null, inputs: [] };
@@ -224,7 +238,7 @@ function readInfra(infraDir) {
   return {
     kind: "bicep",
     allowedLocations: bicep.get("location")?.allowed ?? null,
-    inputs: readInputs(join2(infraDir, "main.parameters.json"), bicep)
+    inputs: readInputs(join3(infraDir, "main.parameters.json"), bicep)
   };
 }
 var OTHER_DECLARATION = /^(?:var|resource|module|output|type|func)\s+[A-Za-z_]|^targetScope\s*=/;
@@ -282,10 +296,10 @@ function readInputs(path, bicep) {
 function readEnvironments(azureDir) {
   if (!isDirectory(azureDir))
     return { defaultName: null, names: [] };
-  const names = readdirSync(azureDir, { withFileTypes: true }).filter((entry) => entry.isDirectory() && isFile(join2(azureDir, entry.name, ".env"))).map((entry) => entry.name).sort();
+  const names = readdirSync(azureDir, { withFileTypes: true }).filter((entry) => entry.isDirectory() && isFile(join3(azureDir, entry.name, ".env"))).map((entry) => entry.name).sort();
   let defaultName = null;
   try {
-    const config = JSON.parse(readFileSync2(join2(azureDir, "config.json"), "utf-8"));
+    const config = JSON.parse(readFileSync2(join3(azureDir, "config.json"), "utf-8"));
     if (typeof config.defaultEnvironment === "string" && names.includes(config.defaultEnvironment)) {
       defaultName = config.defaultEnvironment;
     }
@@ -295,7 +309,7 @@ function readEnvironments(azureDir) {
 }
 function fingerprint(root) {
   const hash = createHash2("sha256");
-  const files = [join2(root, "azure.yaml"), ...listFiles(join2(root, "infra"))].filter(isFile).sort();
+  const files = [join3(root, "azure.yaml"), ...listFiles(join3(root, "infra"))].filter(isFile).sort();
   for (const file of files) {
     hash.update(file.slice(root.length).replaceAll("\\", "/"));
     hash.update("\0");
@@ -308,14 +322,117 @@ function listFiles(dir) {
   if (!isDirectory(dir))
     return [];
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join2(dir, entry.name);
+    const path = join3(dir, entry.name);
     return entry.isDirectory() ? listFiles(path) : [path];
   });
+}
+
+// lib/tools/deploy/storage-access.js
+var PROPAGATION_WINDOW_MINUTES = 15;
+var BLOB_DATA_ROLES = ["Storage Blob Data Owner", "Storage Blob Data Contributor"];
+var STORAGE_DENIAL_CODE = /\bAuthorizationPermissionMismatch\b|\bAuthorizationFailure\b/;
+var GENERIC_DENIAL = /\b403\b|\bForbidden\b|not authorized to perform this operation/i;
+var STORAGE_ENDPOINT = /\.blob\.core\.(?:windows\.net|chinacloudapi\.cn|usgovcloudapi\.net)\b/i;
+function isStorageForbidden(output) {
+  return STORAGE_DENIAL_CODE.test(output) || GENERIC_DENIAL.test(output) && STORAGE_ENDPOINT.test(output);
+}
+function provisionAgeMs(provisionedAt, now) {
+  if (!provisionedAt)
+    return null;
+  const age = now.getTime() - Date.parse(provisionedAt);
+  return Number.isFinite(age) && age >= 0 ? age : null;
+}
+function withinPropagationWindow(provisionedAt, now) {
+  const age = provisionAgeMs(provisionedAt, now);
+  return age !== null && age < PROPAGATION_WINDOW_MINUTES * 6e4;
+}
+async function diagnoseStorageAccess(target, run) {
+  const age = provisionAgeMs(target.provisionedAt, target.now);
+  const minutesSinceProvision = age === null ? null : Math.floor(age / 6e4);
+  const unknown = (detail, evidence2 = {}) => ({
+    cause: "unknown",
+    detail,
+    evidence: { ...evidence2, minutesSinceProvision },
+    fix: "Read the log file, check the identity role and storage network rules, then resume."
+  });
+  const scope = ["--subscription", target.subscription, "--output", "json"];
+  const az = async (args) => run("az", [...args, ...scope], { cwd: target.dir });
+  const resourceGroup = parse(await az(["resource", "list", "--name", target.app, "--resource-type", "Microsoft.Web/sites"]))?.[0]?.resourceGroup;
+  if (!resourceGroup)
+    return unknown(`Function app ${target.app} could not be read.`);
+  const site = parse(await az(["functionapp", "show", "--name", target.app, "--resource-group", resourceGroup]));
+  const storage = site?.functionAppConfig?.deployment?.storage ?? site?.properties?.functionAppConfig?.deployment?.storage;
+  const account = storage?.value ? accountName(storage.value) : null;
+  if (!account)
+    return unknown("The deployment storage of the function app could not be read.");
+  const authentication = storage?.authentication?.type?.toLowerCase();
+  const identity = authentication === "userassignedidentity" ? "user-assigned" : authentication === "systemassignedidentity" ? "system-assigned" : "other";
+  if (identity === "other") {
+    return unknown("The deployment storage does not use a managed identity, so a role delay cannot explain the refusal.", { account, identity });
+  }
+  const principalId = identity === "user-assigned" ? parse(await az(["identity", "show", "--ids", storage?.authentication?.userAssignedIdentityResourceId ?? ""]))?.principalId : site?.identity?.principalId;
+  const accountInfo = parse(await az(["storage", "account", "show", "--name", account]));
+  if (!principalId || !accountInfo?.id)
+    return unknown("The identity or the storage account could not be read.", { account, identity });
+  const publicNetworkAccess = accountInfo.publicNetworkAccess ?? "Enabled";
+  const defaultAction = accountInfo.networkRuleSet?.defaultAction ?? "Allow";
+  const assignments = parse(await az(["role", "assignment", "list", "--assignee", principalId, "--scope", accountInfo.id, "--include-inherited"]));
+  const matching = (assignments ?? []).filter((assignment) => !!assignment.roleDefinitionName && BLOB_DATA_ROLES.includes(assignment.roleDefinitionName));
+  const unconditional = matching.find((assignment) => !assignment.condition?.trim());
+  const role = (unconditional ?? matching[0])?.roleDefinitionName ?? null;
+  const evidence = { account, identity, role, publicNetworkAccess, defaultAction, minutesSinceProvision };
+  if (!assignments)
+    return unknown("The role assignments could not be read.", evidence);
+  if (!role) {
+    return {
+      cause: "role-missing",
+      evidence,
+      detail: `The ${identity} identity has no Storage Blob Data role on ${account}.`,
+      fix: `Assign Storage Blob Data Owner on ${account} to the identity in the infrastructure, run provision again, then resume.`
+    };
+  }
+  if (!unconditional) {
+    return unknown(`The ${role} assignment on ${account} has a condition that may deny this request.`, evidence);
+  }
+  if (publicNetworkAccess.toLowerCase() !== "enabled" || defaultAction.toLowerCase() !== "allow") {
+    return {
+      cause: "network-restricted",
+      evidence,
+      detail: `${account} does not accept requests from this machine (public access ${publicNetworkAccess}, default action ${defaultAction}).`,
+      fix: "Deploy from a network the storage account allows, or change its network rules with the user's approval, then resume."
+    };
+  }
+  if (!withinPropagationWindow(target.provisionedAt, target.now)) {
+    return unknown("The role and network rules look correct, but the resources were not just provisioned, so a role delay is unlikely.", evidence);
+  }
+  return {
+    cause: "propagation",
+    evidence,
+    detail: `The role and network rules are correct and provision finished ${minutesSinceProvision} minute(s) ago. The role assignment is probably still propagating.`
+  };
+}
+function accountName(blobUrl) {
+  try {
+    const host = new URL(blobUrl).hostname;
+    return host.split(".")[0] || null;
+  } catch {
+    return null;
+  }
+}
+function parse(outcome) {
+  if (outcome.code !== 0)
+    return null;
+  try {
+    return JSON.parse(outcome.stdout);
+  } catch {
+    return null;
+  }
 }
 
 // lib/tools/deploy/apply.js
 var COMMAND = "deploy apply";
 var TAIL_LINES = 40;
+var PROPAGATION_RETRY_WAITS_MS = [6e4, 9e4];
 async function applyDeploy(options, dependencies) {
   const dir = resolve3(options.dir);
   const plan = readPlan(planFilePath(dir));
@@ -335,7 +452,7 @@ async function applyDeploy(options, dependencies) {
       fix: "Show the current plan to the user. Pass its plan id only after they approve it."
     });
   }
-  if (plan.steps.some((step) => !isValidStep(step, plan))) {
+  if (plan.steps.some((step2) => !isValidStep(step2, plan))) {
     return blocked("The plan contains a step that is not part of a deployment", {
       id: "DEPLOY-PLAN-INVALID",
       severity: "error",
@@ -353,23 +470,62 @@ async function applyDeploy(options, dependencies) {
   }
   ensureWorkDir(dir);
   const logFile = logFilePath(dir);
-  const completed = [...readState(dir, plan).completed];
-  for (const step of plan.steps) {
-    if (completed.includes(step.id))
+  const now = dependencies.now ?? (() => /* @__PURE__ */ new Date());
+  const sleep = dependencies.sleep ?? ((ms) => new Promise((done2) => setTimeout(done2, ms)));
+  const state = readState(dir, plan);
+  const completed = [...state.completed];
+  let provisionedAt = state.provisionedAt;
+  const retries = [];
+  for (const step2 of plan.steps) {
+    if (completed.includes(step2.id))
       continue;
-    const isPreview = options.preview && step.changes !== "local-environment";
-    const args = isPreview ? [...step.args, "--preview"] : [...step.args];
-    if (isPreview && step.id !== "provision")
+    const isPreview = options.preview && step2.changes !== "local-environment";
+    const args = isPreview ? [...step2.args, "--preview"] : [...step2.args];
+    if (isPreview && step2.id !== "provision")
       break;
-    const outcome = await dependencies.run("azd", args, { cwd: dir, timeoutMs: step.timeoutSeconds * 1e3 });
-    const output = redact([outcome.stdout, outcome.stderr].filter(Boolean).join("\n"));
-    appendFileSync(logFile, `--- ${step.id} (exit ${outcome.code ?? "none"})
-${output}
+    const execute = async () => {
+      const outcome2 = await dependencies.run("azd", args, { cwd: dir, timeoutMs: step2.timeoutSeconds * 1e3 });
+      const output2 = redact([outcome2.stdout, outcome2.stderr].filter(Boolean).join("\n"));
+      appendFileSync(logFile, `--- ${step2.id} (exit ${outcome2.code ?? "none"})
+${output2}
 `);
+      return { outcome: outcome2, output: output2 };
+    };
+    let { outcome, output } = await execute();
+    let storageAccess;
+    while (outcome.code !== 0 && step2.id === "deploy" && isStorageForbidden(output)) {
+      storageAccess ??= await diagnose(dir, plan, provisionedAt, now(), dependencies.run);
+      const wait = PROPAGATION_RETRY_WAITS_MS[retries.length];
+      if (storageAccess.cause !== "propagation" || wait === void 0)
+        break;
+      if (!withinPropagationWindow(provisionedAt, new Date(now().getTime() + wait))) {
+        storageAccess = {
+          ...storageAccess,
+          cause: "unknown",
+          detail: `${storageAccess.detail} Another wait would pass the ${PROPAGATION_WINDOW_MINUTES}-minute propagation window, so it was not retried.`
+        };
+        break;
+      }
+      retries.push({ step: step2.id, cause: "propagation", waitedSeconds: wait / 1e3, evidence: storageAccess.evidence });
+      appendFileSync(logFile, `--- ${step2.id}: storage refused the package; waiting ${wait / 1e3}s for role propagation
+`);
+      await sleep(wait);
+      ({ outcome, output } = await execute());
+    }
+    const storageRefused = storageAccess !== void 0 && isStorageForbidden(output);
     if (outcome.code !== 0) {
-      return fail(COMMAND, EXIT.stepFailed, `Step ${step.id} failed`, {
-        data: { planId: plan.planId, environment: plan.environment, completed, failedStep: step.id, outputTail: tail(output), logFile },
-        findings: [failure(step, outcome, output)],
+      return fail(COMMAND, EXIT.stepFailed, `Step ${step2.id} failed`, {
+        data: {
+          planId: plan.planId,
+          environment: plan.environment,
+          completed,
+          failedStep: step2.id,
+          outputTail: tail(output),
+          logFile,
+          ...retries.length > 0 ? { retries } : {},
+          ...storageAccess ? { storageAccess } : {}
+        },
+        findings: [storageRefused && storageAccess ? storageFailure(storageAccess, retries.length) : failure(step2, outcome, output)],
         next: {
           action: "fix-then-resume",
           reason: "Fix the cause, then run the same command. Finished steps are not repeated. Do not retry unchanged.",
@@ -386,8 +542,10 @@ ${output}
         logFile
       }, { next: { action: "approve", reason: "Run without --preview after the user approves.", command: resumeCommand(dir, plan) } });
     }
-    completed.push(step.id);
-    writeState(dir, { planId: plan.planId, completed });
+    completed.push(step2.id);
+    if (step2.id === "provision")
+      provisionedAt = now().toISOString();
+    writeState(dir, { planId: plan.planId, completed, ...provisionedAt ? { provisionedAt } : {} });
   }
   if (options.preview) {
     return succeed(COMMAND, "This plan has no infrastructure change to preview.", {
@@ -404,6 +562,7 @@ ${output}
     completed,
     functionApp,
     logFile,
+    ...retries.length > 0 ? { retries } : {},
     ...plan.mode === "provision-and-deploy" ? { telemetry: { operation: "deploy", environmentName: plan.environment } } : {}
   }, {
     next: {
@@ -422,21 +581,43 @@ function functionAppName(values) {
 function blocked(summary, finding) {
   return fail(COMMAND, EXIT.blocked, summary, { findings: [finding] });
 }
+async function diagnose(dir, plan, provisionedAt, now, run) {
+  const app = functionAppName(readEnvironmentValues(dir, plan.environment) ?? {});
+  if (!app) {
+    return {
+      cause: "unknown",
+      evidence: {},
+      detail: "The azd environment does not name the function app, so its storage could not be checked.",
+      fix: "Check the identity role and storage network rules in the Azure portal, then resume."
+    };
+  }
+  return diagnoseStorageAccess({ app, subscription: plan.subscriptionId, dir, provisionedAt, now }, run);
+}
+function storageFailure(diagnosis, retried) {
+  const after = retried > 0 ? ` after ${retried} automatic retr${retried === 1 ? "y" : "ies"}` : "";
+  return {
+    id: "DEPLOY-STORAGE-FORBIDDEN",
+    severity: "error",
+    title: `The deployment storage refused the package${after} (${diagnosis.cause})`,
+    detail: diagnosis.detail,
+    ...diagnosis.fix ? { fix: diagnosis.fix } : retried > 0 ? { fix: "Wait a few minutes and resume once. If it still fails, check the role assignment in the Azure portal." } : {}
+  };
+}
 function resumeCommand(dir, plan) {
   return `deploy apply --dir "${dir}" --approve ${plan.planId}`;
 }
-function failure(step, outcome, output) {
+function failure(step2, outcome, output) {
   const base = { id: "DEPLOY-STEP-FAILED", severity: "error" };
   if (outcome.notFound)
     return { ...base, title: "The azd command was not found", fix: "Install the Azure Developer CLI." };
   if (outcome.timedOut) {
     return {
       ...base,
-      title: `azd ${step.args[0]} timed out after ${step.timeoutSeconds} seconds`,
+      title: `azd ${step2.args[0]} timed out after ${step2.timeoutSeconds} seconds`,
       detail: "The operation may still be running in Azure. Check its state before resuming."
     };
   }
-  const title = `azd ${step.args[0]} exited with code ${outcome.code}`;
+  const title = `azd ${step2.args[0]} exited with code ${outcome.code}`;
   if (/not logged in|azd auth login|AADSTS|reauthentication required/i.test(output)) {
     return { ...base, title, detail: "Authentication failed.", fix: "azd auth login" };
   }
@@ -625,7 +806,7 @@ async function planDeploy(options, dependencies) {
     template: project.azureYaml?.template ?? "",
     services: (project.azureYaml?.services ?? []).filter((service) => service.host === "function").map((service) => service.name),
     values: values.map((value) => SECRET_NAME.test(value.name) ? { ...value, value: "***" } : value),
-    steps: plan.steps.map((step) => ({ id: step.id, command: display(step), changes: step.changes }))
+    steps: plan.steps.map((step2) => ({ id: step2.id, command: display(step2), changes: step2.changes }))
   }, { findings, gaps, next });
 }
 function checkProject(project) {
@@ -667,26 +848,26 @@ function checkProject(project) {
 function blocked2(summary, findings, extras = {}) {
   return fail(COMMAND2, EXIT.blocked, summary, { findings, ...extras });
 }
-function resolveSetting(request, findings, inputsNeeded) {
-  if (request.existing) {
-    if (request.requested && request.requested !== request.existing) {
+function resolveSetting(request2, findings, inputsNeeded) {
+  if (request2.existing) {
+    if (request2.requested && request2.requested !== request2.existing) {
       findings.push({
-        id: request.findingId,
+        id: request2.findingId,
         severity: "error",
-        title: `The environment already uses another ${request.name}`,
-        detail: `Environment: ${request.existing}. Requested: ${request.requested}.`,
-        fix: `Omit ${request.option}, or choose a new environment name with --env.`
+        title: `The environment already uses another ${request2.name}`,
+        detail: `Environment: ${request2.existing}. Requested: ${request2.requested}.`,
+        fix: `Omit ${request2.option}, or choose a new environment name with --env.`
       });
     }
-    return request.existing;
+    return request2.existing;
   }
-  const value = request.requested ?? request.fallbacks.find((candidate) => candidate);
+  const value = request2.requested ?? request2.fallbacks.find((candidate) => candidate);
   if (!value) {
     inputsNeeded.push({
-      name: request.name,
-      option: request.option,
-      reason: request.reason,
-      ...request.allowed ? { allowed: request.allowed } : {}
+      name: request2.name,
+      option: request2.option,
+      reason: request2.reason,
+      ...request2.allowed ? { allowed: request2.allowed } : {}
     });
   }
   return value;
@@ -752,8 +933,8 @@ function buildSteps(environment, subscriptionId, location, environmentExists, va
   });
   return steps;
 }
-function display(step) {
-  const args = step.id.startsWith("env-set:") && SECRET_NAME.test(step.args[2]) ? step.args.map((argument, index) => index === 3 ? "***" : argument) : step.args;
+function display(step2) {
+  const args = step2.id.startsWith("env-set:") && SECRET_NAME.test(step2.args[2]) ? step2.args.map((argument, index) => index === 3 ? "***" : argument) : step2.args;
   return ["azd", ...args].join(" ");
 }
 function parseValues(pairs) {
@@ -821,7 +1002,8 @@ async function verifyDeploy(options, dependencies) {
       fix: "Install the Azure CLI, or check the app in the Azure portal."
     });
   }
-  const resourceGroup = parse(located)?.[0]?.resourceGroup;
+  const resource = parse2(located)?.[0];
+  const resourceGroup = resource?.resourceGroup;
   if (!resourceGroup) {
     return blocked3(`Function app ${app} was not found`, {
       id: "VERIFY-APP-NOT-FOUND",
@@ -831,17 +1013,16 @@ async function verifyDeploy(options, dependencies) {
     });
   }
   const target = ["--name", app, "--resource-group", resourceGroup, ...scope];
-  const site = parse(await dependencies.run("az", ["functionapp", "show", ...target], { cwd: dir }));
+  const site = parse2(await dependencies.run("az", ["functionapp", "show", ...target], { cwd: dir }));
+  const state = site?.state ?? await resourceState(app, resourceGroup, scope, dir, dependencies);
   const entries = await listFunctions(target, dir, dependencies);
   const findings = [];
   const gaps = [];
   const functions = entries.map(describe);
-  if (site?.state !== "Running") {
-    findings.push({
-      id: "VERIFY-APP-NOT-RUNNING",
-      severity: "error",
-      title: `The function app state is ${site?.state ?? "unknown"}`
-    });
+  if (!state) {
+    gaps.push({ check: "state", reason: "Azure did not report the app state. The function list and HTTP checks stand in for it." });
+  } else if (state !== "Running") {
+    findings.push({ id: "VERIFY-APP-NOT-RUNNING", severity: "error", title: `The function app state is ${state}` });
   }
   if (functions.length === 0) {
     findings.push({
@@ -856,14 +1037,21 @@ async function verifyDeploy(options, dependencies) {
     const info = describe(entry);
     if (info.trigger !== "httpTrigger")
       continue;
-    const reason = skipReason(entry, info, http.length);
+    const reason = skipReason(entry, info, http.length, options.useKeys ?? false);
     if (reason) {
       gaps.push({ check: `http:${info.name}`, reason });
       continue;
     }
-    const status = await dependencies.fetchStatus(entry.invokeUrlTemplate).catch(() => 0);
-    const reachable = status >= 200 && status < 500 && status !== 404;
-    http.push({ function: info.name, status, reachable });
+    const usedKey = info.authLevel?.toLowerCase() === "function";
+    const key = usedKey ? await functionKey(info.name, target, dir, dependencies) : null;
+    if (usedKey && !key) {
+      gaps.push({ check: `http:${info.name}`, reason: "The function key could not be read with the Azure CLI." });
+      continue;
+    }
+    const headers = key ? { "x-functions-key": key } : void 0;
+    const status = await dependencies.fetchStatus(entry.invokeUrlTemplate, headers).catch(() => 0);
+    const reachable = status >= 200 && status < 500 && status !== 404 && !(usedKey && (status === 401 || status === 403));
+    http.push({ function: info.name, status, reachable, usedKey });
     if (!reachable) {
       findings.push({
         id: "VERIFY-HTTP-FAILED",
@@ -875,8 +1063,9 @@ async function verifyDeploy(options, dependencies) {
   const data = {
     functionApp: app,
     resourceGroup,
-    state: site?.state ?? "unknown",
+    state: state ?? "unknown",
     hostName: site?.defaultHostName,
+    ...resource?.id ? { portalUrl: `https://portal.azure.com/#resource${resource.id}/overview` } : {},
     functions,
     http
   };
@@ -886,7 +1075,7 @@ async function verifyDeploy(options, dependencies) {
 }
 async function listFunctions(target, dir, dependencies) {
   for (let attempt = 1; attempt <= LIST_ATTEMPTS; attempt++) {
-    const listed = parse(await dependencies.run("az", ["functionapp", "function", "list", ...target], { cwd: dir }));
+    const listed = parse2(await dependencies.run("az", ["functionapp", "function", "list", ...target], { cwd: dir }));
     if (Array.isArray(listed) && listed.length > 0)
       return listed;
     if (attempt < LIST_ATTEMPTS)
@@ -902,10 +1091,32 @@ function describe(entry) {
     ...trigger?.authLevel ? { authLevel: trigger.authLevel } : {}
   };
 }
-function skipReason(entry, info, checked) {
+async function resourceState(app, resourceGroup, scope, dir, dependencies) {
+  const resource = parse2(await dependencies.run("az", [
+    "resource",
+    "show",
+    "--name",
+    app,
+    "--resource-group",
+    resourceGroup,
+    "--resource-type",
+    "Microsoft.Web/sites",
+    ...scope
+  ], { cwd: dir }));
+  return resource?.properties?.state ?? null;
+}
+async function functionKey(name, target, dir, dependencies) {
+  const keys = parse2(await dependencies.run("az", ["functionapp", "function", "keys", "list", "--function-name", name, ...target], { cwd: dir }));
+  const key = keys?.default ?? Object.values(keys ?? {}).find((value) => typeof value === "string");
+  return typeof key === "string" && key ? key : null;
+}
+function skipReason(entry, info, checked, useKeys) {
   const methods = entry.config?.bindings?.find((binding) => binding.type === "httpTrigger")?.methods;
-  if (info.authLevel?.toLowerCase() !== "anonymous")
-    return "Needs a function key. The script does not read keys.";
+  const level = info.authLevel?.toLowerCase();
+  if (level === "function" && !useKeys)
+    return "Needs a function key. Run deploy verify with --use-keys to read it with the Azure CLI.";
+  if (level !== "anonymous" && level !== "function")
+    return "Needs an admin or system key. Request it manually.";
   if (methods && methods.length > 0 && !methods.some((method) => method.toLowerCase() === "get"))
     return "Does not accept GET.";
   if (!entry.invokeUrlTemplate || entry.invokeUrlTemplate.includes("{"))
@@ -914,7 +1125,7 @@ function skipReason(entry, info, checked) {
     return `Only the first ${MAX_HTTP_CHECKS} HTTP triggers are requested.`;
   return null;
 }
-function parse(outcome) {
+function parse2(outcome) {
   if (outcome.code !== 0)
     return null;
   try {
@@ -927,18 +1138,28 @@ function blocked3(summary, finding) {
   return fail(COMMAND3, EXIT.blocked, summary, { findings: [finding] });
 }
 
+// lib/tools/local/processes.js
+import { spawn as spawn2, spawnSync } from "node:child_process";
+import { existsSync as existsSync5 } from "node:fs";
+import { request } from "node:http";
+import { createConnection, createServer } from "node:net";
+
 // lib/tools/shared/exec.js
 import { spawn } from "node:child_process";
 import { existsSync as existsSync4 } from "node:fs";
-import { delimiter, join as join3, win32 } from "node:path";
+import { delimiter, join as join4, posix, win32 } from "node:path";
 var DEFAULT_TIMEOUT_MS = 6e4;
 var NATIVE_FIRST = [".exe", ".com"];
 var UNSAFE_FOR_CMD = /["%^&|<>!\r\n]/;
 function resolveExecutable(command, environment) {
   const isWindows = environment.platform === "win32";
   const separator = isWindows ? ";" : delimiter;
-  const joinPath = isWindows ? win32.join : join3;
+  const joinPath = isWindows ? win32.join : join4;
   const extensions = isWindows ? orderExtensions((environment.pathExt || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)) : [""];
+  if (isWindows ? win32.isAbsolute(command) : posix.isAbsolute(command)) {
+    const candidates = isWindows && /\.[A-Za-z0-9]+$/.test(command) ? [command] : extensions.map((extension) => `${command}${extension}`);
+    return candidates.find((candidate) => environment.exists(candidate)) ?? null;
+  }
   for (const directory of environment.path.split(separator).filter(Boolean)) {
     for (const extension of extensions) {
       const candidate = joinPath(directory, `${command}${extension}`);
@@ -965,7 +1186,7 @@ function buildInvocation(file, args, platform) {
   return { file: "cmd.exe", args: ["/d", "/s", "/c", `"${[`"${file}"`, ...quoted].join(" ")}"`], verbatim: true };
 }
 function createRunner(environment = process.env, platform = process.platform) {
-  return (command, args, options = {}) => new Promise((resolve8) => {
+  return (command, args, options = {}) => new Promise((resolve10) => {
     const file = resolveExecutable(command, {
       platform,
       path: environment.PATH || environment.Path || "",
@@ -973,12 +1194,12 @@ function createRunner(environment = process.env, platform = process.platform) {
       exists: existsSync4
     });
     if (!file)
-      return resolve8({ code: null, stdout: "", stderr: "", notFound: true, timedOut: false });
+      return resolve10({ code: null, stdout: "", stderr: "", notFound: true, timedOut: false });
     let invocation;
     try {
       invocation = buildInvocation(file, args, platform);
     } catch (error) {
-      return resolve8({ code: null, stdout: "", stderr: error.message, notFound: false, timedOut: false });
+      return resolve10({ code: null, stdout: "", stderr: error.message, notFound: false, timedOut: false });
     }
     const child = spawn(invocation.file, invocation.args, {
       cwd: options.cwd,
@@ -1002,19 +1223,942 @@ function createRunner(environment = process.env, platform = process.platform) {
     });
     child.on("error", (error) => {
       clearTimeout(timer);
-      resolve8({ code: null, stdout, stderr: stderr || error.message, notFound: false, timedOut });
+      resolve10({ code: null, stdout, stderr: stderr || error.message, notFound: false, timedOut });
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolve8({ code: timedOut ? null : code, stdout, stderr, notFound: false, timedOut });
+      resolve10({ code: timedOut ? null : code, stdout, stderr, notFound: false, timedOut });
     });
   });
 }
 
+// lib/tools/local/processes.js
+var OUTPUT_LIMIT = 64 * 1024;
+var STOP_GRACE_MS = 5e3;
+function createStarter(environment = process.env, platform = process.platform) {
+  return (command, args, options) => {
+    const env = options.env ?? environment;
+    const file = resolveExecutable(command, {
+      platform,
+      path: env.PATH ?? env.Path ?? "",
+      pathExt: env.PATHEXT,
+      exists: existsSync5
+    });
+    if (!file)
+      return null;
+    const invocation = buildInvocation(file, args, platform);
+    const child = spawn2(invocation.file, invocation.args, {
+      cwd: options.cwd,
+      env: { ...env },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+      windowsVerbatimArguments: invocation.verbatim,
+      // A separate process group lets POSIX stop the host together with its worker.
+      detached: platform !== "win32"
+    });
+    let output = "";
+    let exit;
+    const append = (chunk) => {
+      output = (output + chunk.toString("utf-8")).slice(-OUTPUT_LIMIT);
+    };
+    child.stdout.on("data", append);
+    child.stderr.on("data", append);
+    const exited = new Promise((resolve10) => {
+      child.on("exit", (code) => {
+        exit = code;
+        resolve10();
+      });
+      child.on("error", (error) => {
+        output += `
+${error.message}`;
+        exit = null;
+        resolve10();
+      });
+    });
+    const closePipes = () => {
+      child.stdout.destroy();
+      child.stderr.destroy();
+    };
+    const process_ = {
+      pid: child.pid,
+      output: () => output,
+      exitCode: () => exit,
+      release: () => {
+        closePipes();
+        child.unref();
+      },
+      stop: async () => {
+        const pid = child.pid;
+        if (pid === void 0)
+          return;
+        if (platform === "win32") {
+          if (exit === void 0)
+            spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+        } else {
+          if (signalGroup(pid, "SIGTERM")) {
+            await Promise.race([exited, delay(STOP_GRACE_MS)]);
+            if (groupAlive(pid)) {
+              const deadline = Date.now() + STOP_GRACE_MS;
+              while (groupAlive(pid) && Date.now() < deadline)
+                await delay(100);
+              if (groupAlive(pid))
+                signalGroup(pid, "SIGKILL");
+            }
+          }
+        }
+        await Promise.race([exited, delay(STOP_GRACE_MS)]);
+        closePipes();
+      }
+    };
+    return process_;
+  };
+}
+function delay(milliseconds) {
+  return new Promise((resolve10) => {
+    setTimeout(resolve10, milliseconds).unref();
+  });
+}
+function signalGroup(pid, signal) {
+  try {
+    process.kill(-pid, signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function groupAlive(pid) {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+var loopbackRequest = (url, options = {}) => new Promise((resolvePromise) => {
+  const target = new URL(url);
+  if (target.protocol !== "http:") {
+    resolvePromise(null);
+    return;
+  }
+  const timeoutMs = options.timeoutMs ?? 1e4;
+  let settled = false;
+  const resolve10 = (value) => {
+    if (settled)
+      return;
+    settled = true;
+    clearTimeout(deadline);
+    resolvePromise(value);
+  };
+  const body2 = options.body;
+  const outgoing = request({
+    host: target.hostname,
+    port: target.port || 80,
+    path: `${target.pathname}${target.search}`,
+    method: options.method ?? "GET",
+    agent: false,
+    headers: body2 === void 0 ? {} : { "content-type": "application/json", "content-length": Buffer.byteLength(body2) },
+    timeout: timeoutMs
+  }, (response) => {
+    let text = "";
+    response.setEncoding("utf-8");
+    response.on("data", (chunk) => {
+      if (text.length < OUTPUT_LIMIT)
+        text += chunk;
+    });
+    response.on("end", () => {
+      const headers = {};
+      for (const [name, value] of Object.entries(response.headers)) {
+        if (value !== void 0)
+          headers[name.toLowerCase()] = Array.isArray(value) ? value.join(", ") : value;
+      }
+      resolve10({ status: response.statusCode ?? 0, headers, body: text });
+    });
+    response.on("error", () => resolve10(null));
+    response.on("close", () => resolve10(null));
+  });
+  const deadline = setTimeout(() => {
+    outgoing.destroy();
+    resolve10(null);
+  }, timeoutMs);
+  deadline.unref();
+  outgoing.on("timeout", () => outgoing.destroy());
+  outgoing.on("error", () => resolve10(null));
+  if (body2 !== void 0)
+    outgoing.write(body2);
+  outgoing.end();
+});
+function portInUse(port) {
+  return new Promise((resolve10) => {
+    const socket = createConnection({ host: "127.0.0.1", port });
+    const finish = (inUse) => {
+      socket.destroy();
+      resolve10(inUse);
+    };
+    socket.setTimeout(1e3, () => finish(false));
+    socket.once("connect", () => finish(true));
+    socket.once("error", () => finish(false));
+  });
+}
+function freePort() {
+  return new Promise((resolve10, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      server.close(() => port ? resolve10(port) : reject(new Error("No free port was found")));
+    });
+  });
+}
+function localDependencies(base, environment = process.env, platform = process.platform) {
+  return {
+    ...base,
+    start: createStarter(environment, platform),
+    http: loopbackRequest,
+    portInUse,
+    freePort,
+    platform,
+    env: environment
+  };
+}
+
+// lib/tools/local/verify.js
+import { createHash as createHash3 } from "node:crypto";
+import { existsSync as existsSync7, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join6, resolve as resolve7 } from "node:path";
+
+// lib/tools/local/project.js
+import { existsSync as existsSync6, readdirSync as readdirSync2, readFileSync as readFileSync3, statSync as statSync3 } from "node:fs";
+import { extname, join as join5, resolve as resolve6 } from "node:path";
+var STORAGE_TRIGGERS = /* @__PURE__ */ new Set(["timer", "blob", "queue", "eventhub", "durable"]);
+var TRIGGER_PATTERNS = [
+  ["http", /@app\.route\(|\.http_trigger\(|\bapp\.(?:http|get|post|put|patch|delete)\(|\[HttpTrigger|@HttpTrigger|"httpTrigger"/],
+  ["timer", /timer_trigger\(|\bapp\.schedule\(|\bapp\.timer\(|\[TimerTrigger|@TimerTrigger|"timerTrigger"/],
+  ["blob", /blob_trigger\(|\bapp\.storageBlob\(|\[BlobTrigger|@BlobTrigger|"blobTrigger"/],
+  ["queue", /queue_trigger\(|\bapp\.storageQueue\(|\[QueueTrigger|@QueueTrigger|"queueTrigger"/],
+  ["eventhub", /event_hub_message_trigger\(|\bapp\.eventHub\(|\[EventHubTrigger|@EventHubTrigger|"eventHubTrigger"/],
+  ["servicebus", /service_bus_(?:queue|topic)_trigger\(|\bapp\.serviceBus(?:Queue|Topic)\(|\[ServiceBusTrigger|@ServiceBus(?:Queue|Topic)Trigger|"serviceBusTrigger"/],
+  ["cosmos", /cosmos_db_trigger\(|\bapp\.cosmosDB\(|\[CosmosDBTrigger|@CosmosDBTrigger|"cosmosDBTrigger"/],
+  ["eventgrid", /event_grid_trigger\(|\bapp\.eventGrid\(|\[EventGridTrigger|@EventGridTrigger|"eventGridTrigger"/],
+  ["durable", /orchestration_trigger\(|df\.app\.orchestration\(|\[OrchestrationTrigger|"orchestrationTrigger"|DFApp\(/],
+  ["sql", /sql_trigger\(|\bapp\.sql\(|\[SqlTrigger|@SqlTrigger|"sqlTrigger"/],
+  ["mcp", /mcp_tool_trigger\(|\bapp\.mcpTool\(|\[McpToolTrigger|@McpToolTrigger|"mcpToolTrigger"/]
+];
+var SOURCE_EXTENSIONS = /* @__PURE__ */ new Set([".py", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cs", ".fs", ".java", ".ps1"]);
+var SKIPPED_FOLDERS = /* @__PURE__ */ new Set([
+  "node_modules",
+  "venv",
+  "bin",
+  "obj",
+  "dist",
+  "target",
+  "infra",
+  "tests",
+  "test",
+  "__pycache__"
+]);
+var MAX_DEPTH = 5;
+var MAX_FILES = 1e3;
+function findFunctionDir(dir) {
+  const root = resolve6(dir);
+  if (isFile2(join5(root, "host.json")))
+    return root;
+  for (const service of inspectProject(root).azureYaml?.services ?? []) {
+    const candidate = resolve6(root, service.project);
+    if (service.host === "function" && isFile2(join5(candidate, "host.json")))
+      return candidate;
+  }
+  const children = readdirSync2(root, { withFileTypes: true }).filter((entry) => entry.isDirectory() && !isSkipped(entry.name)).map((entry) => join5(root, entry.name)).filter((folder) => isFile2(join5(folder, "host.json")));
+  return children.length === 1 ? children[0] : null;
+}
+function readLocalSettings(functionDir) {
+  const path = join5(functionDir, "local.settings.json");
+  if (!isFile2(path))
+    return { path, exists: false, values: {} };
+  try {
+    const parsed = JSON.parse(readFileSync3(path, "utf-8"));
+    const values = Object.fromEntries(Object.entries(parsed.Values ?? {}).filter((entry) => typeof entry[1] === "string"));
+    return { path, exists: true, values };
+  } catch {
+    return { path, exists: true, values: {} };
+  }
+}
+function detectWorker(functionDir, settings) {
+  const runtime = settings.values.FUNCTIONS_WORKER_RUNTIME?.toLowerCase();
+  if (runtime?.startsWith("dotnet"))
+    return "dotnet";
+  if (runtime === "python" || runtime === "node" || runtime === "java" || runtime === "powershell" || runtime === "custom") {
+    return runtime;
+  }
+  const names = readdirSync2(functionDir);
+  if (names.some((name) => name === "function_app.py" || name === "requirements.txt"))
+    return "python";
+  if (names.some((name) => /\.(?:cs|fs)proj$/i.test(name)))
+    return "dotnet";
+  if (names.some((name) => name === "pom.xml" || name.startsWith("build.gradle")))
+    return "java";
+  if (names.includes("package.json"))
+    return "node";
+  if (names.some((name) => name === "profile.ps1" || name === "requirements.psd1"))
+    return "powershell";
+  return null;
+}
+function workerRuntimeSetting(worker) {
+  return worker === "dotnet" ? "dotnet-isolated" : worker;
+}
+function scanTriggers(functionDir) {
+  const found = /* @__PURE__ */ new Set();
+  let budget = MAX_FILES;
+  const visit = (folder, depth) => {
+    if (depth > MAX_DEPTH)
+      return;
+    for (const entry of readdirSync2(folder, { withFileTypes: true })) {
+      if (budget <= 0)
+        return;
+      const path = join5(folder, entry.name);
+      if (entry.isDirectory()) {
+        if (!isSkipped(entry.name))
+          visit(path, depth + 1);
+        continue;
+      }
+      if (!SOURCE_EXTENSIONS.has(extname(entry.name).toLowerCase()) && entry.name !== "function.json")
+        continue;
+      budget--;
+      const text = readFileSync3(path, "utf-8");
+      for (const [kind, pattern] of TRIGGER_PATTERNS)
+        if (pattern.test(text))
+          found.add(kind);
+    }
+  };
+  visit(functionDir, 0);
+  return TRIGGER_PATTERNS.map(([kind]) => kind).filter((kind) => found.has(kind));
+}
+function storageConnection(values) {
+  const value = values.AzureWebJobsStorage;
+  if (value && /UseDevelopmentStorage=true|devstoreaccount1|127\.0\.0\.1:1000[0-2]/i.test(value))
+    return "development";
+  if (value || Object.keys(values).some((key) => key.startsWith("AzureWebJobsStorage__")))
+    return "other";
+  return "missing";
+}
+function isSkipped(name) {
+  return name.startsWith(".") || SKIPPED_FOLDERS.has(name);
+}
+function isFile2(path) {
+  return existsSync6(path) && statSync3(path).isFile();
+}
+
+// lib/tools/local/verify.js
+var COMMAND4 = "local verify";
+var DEFAULT_PORT = 7071;
+var DEFAULT_TIMEOUT_SECONDS = 120;
+var AZURITE_TIMEOUT_MS = 6e4;
+var POLL_MS = 1e3;
+var INDEX_RETRIES = 3;
+var INSTALL_TIMEOUT_MS = 9e5;
+var BODY_PREVIEW = 500;
+var OUTPUT_TAIL_LINES = 40;
+var AZURITE_PORTS = { blob: 1e4, queue: 10001, table: 10002 };
+var AZURITE_IMAGE = "mcr.microsoft.com/azure-storage/azurite";
+var Stop = class extends Error {
+  exitCode;
+  summary;
+  constructor(exitCode, summary) {
+    super(summary);
+    this.exitCode = exitCode;
+    this.summary = summary;
+  }
+};
+async function verifyLocal(options, deps) {
+  const root = resolve7(options.dir);
+  const functionDir = existsSync7(root) ? findFunctionDir(root) : null;
+  if (!functionDir) {
+    return fail(COMMAND4, EXIT.blocked, "No Azure Functions project was found", {
+      findings: [{
+        id: "NO-FUNCTIONS-PROJECT",
+        severity: "error",
+        title: `No host.json in ${root} or its function service folder`,
+        fix: "Pass --dir with the folder that contains host.json, or create the project with template write."
+      }]
+    });
+  }
+  const settings = readLocalSettings(functionDir);
+  const worker = detectWorker(functionDir, settings);
+  const triggers = scanTriggers(functionDir);
+  const context = {
+    options,
+    deps,
+    root,
+    functionDir,
+    data: {
+      functionDir,
+      worker,
+      triggers,
+      settings: { path: settings.path, created: false },
+      storage: { connection: "missing", need: "none", azurite: "not-needed" },
+      install: { skipped: false, steps: [] },
+      host: null,
+      functions: [],
+      invocation: null,
+      cleanup: { host: "not-started", azurite: "not-started" }
+    },
+    findings: [],
+    gaps: [],
+    azurite: null,
+    host: null,
+    index: []
+  };
+  try {
+    if (!worker || worker === "java" || worker === "custom")
+      throw unsupportedWorker(context, worker);
+    const values = ensureSettings(context, worker, settings);
+    await prepareStorage(context, values);
+    await checkCoreTools(context);
+    const env = await installDependencies(context, worker);
+    const port = await choosePort(context);
+    await startHost(context, port, env);
+    await readFunctionIndex(context, port);
+    await invokeHttp(context, port);
+  } catch (error) {
+    await cleanUp(context);
+    if (error instanceof Stop) {
+      return fail(COMMAND4, error.exitCode, error.summary, { data: context.data, findings: context.findings, gaps: context.gaps });
+    }
+    throw error;
+  }
+  await cleanUp(context);
+  const invoked = context.data.invocation;
+  const summary = invoked ? `The host ran ${context.data.functions.length} function(s); ${invoked.method} ${invoked.function} returned ${invoked.status}` : `The host ran ${context.data.functions.length} function(s)`;
+  return succeed(COMMAND4, summary, context.data, {
+    findings: context.findings,
+    gaps: context.gaps,
+    next: { action: "deploy", reason: "The app starts and indexes its functions locally.", command: `deploy plan --dir "${root}"` }
+  });
+}
+function unsupportedWorker(context, worker) {
+  context.findings.push(worker === "java" ? {
+    id: "LOCAL-WORKER-UNSUPPORTED",
+    severity: "error",
+    title: "Java apps are not run by this command",
+    fix: "Run `mvn clean package`, then `mvn azure-functions:run` (or `func start` in the staging folder under target/azure-functions)."
+  } : {
+    id: "LOCAL-WORKER-UNSUPPORTED",
+    severity: "error",
+    title: worker ? `The ${worker} worker is not run by this command` : "The worker runtime could not be detected",
+    fix: "Set FUNCTIONS_WORKER_RUNTIME in local.settings.json, or run `func start` manually."
+  });
+  return new Stop(EXIT.blocked, "This app cannot be verified by local verify");
+}
+function ensureSettings(context, worker, settings) {
+  if (settings.exists) {
+    if (!settings.values.FUNCTIONS_WORKER_RUNTIME) {
+      context.findings.push({
+        id: "SETTINGS-NO-WORKER",
+        severity: "warn",
+        title: "local.settings.json has no FUNCTIONS_WORKER_RUNTIME",
+        fix: `Add "FUNCTIONS_WORKER_RUNTIME": "${workerRuntimeSetting(worker)}" under Values.`
+      });
+    }
+    return settings.values;
+  }
+  const values = { FUNCTIONS_WORKER_RUNTIME: workerRuntimeSetting(worker), AzureWebJobsStorage: "UseDevelopmentStorage=true" };
+  writeFileSync3(settings.path, `${JSON.stringify({ IsEncrypted: false, Values: values }, null, 2)}
+`);
+  context.data.settings.created = true;
+  return values;
+}
+async function prepareStorage(context, values) {
+  const { data, options } = context;
+  const connection = storageConnection(values);
+  const need = data.triggers.some((kind) => STORAGE_TRIGGERS.has(kind)) ? "required" : "optional";
+  data.storage.connection = connection;
+  data.storage.need = need;
+  if (connection === "missing") {
+    if (need === "required") {
+      context.findings.push({
+        id: "STORAGE-NOT-CONFIGURED",
+        severity: "error",
+        title: `AzureWebJobsStorage is empty, but ${data.triggers.filter((kind) => STORAGE_TRIGGERS.has(kind)).join(", ")} triggers need storage`,
+        fix: 'Set "AzureWebJobsStorage": "UseDevelopmentStorage=true" in local.settings.json and use Azurite.'
+      });
+      throw new Stop(EXIT.blocked, "Local storage is not configured");
+    }
+    return;
+  }
+  if (connection === "other")
+    return;
+  const required2 = azuriteServices(data.triggers);
+  const probe = await probeAzurite(context.deps, required2);
+  data.storage.azurite = probe.state;
+  if (probe.state === "conflict") {
+    context.findings.push({
+      id: "AZURITE-PORT-CONFLICT",
+      severity: need === "required" ? "error" : "warn",
+      title: "Another program answers on an Azurite port (10000-10002)",
+      detail: `Ports: ${probe.foreign.map((service) => AZURITE_PORTS[service]).join(", ")}`,
+      fix: "Stop that program, or point AzureWebJobsStorage at a running Azurite instance."
+    });
+    if (need === "required")
+      throw new Stop(EXIT.blocked, "Azurite ports are used by another program");
+    return;
+  }
+  if (probe.state === "incomplete") {
+    context.findings.push({
+      id: "AZURITE-INCOMPLETE",
+      severity: need === "required" ? "error" : "warn",
+      title: `Azurite is running without the ${probe.missing.join(", ")} service`,
+      detail: `This app needs ${required2.join(", ")}. Missing ports: ${probe.missing.map((service) => AZURITE_PORTS[service]).join(", ")}`,
+      fix: "Restart Azurite with all services (the `azurite` command, not `azurite-blob` alone), then run this command again."
+    });
+    if (need === "required")
+      throw new Stop(EXIT.blocked, "Azurite is missing a required service");
+    return;
+  }
+  if (probe.state === "running")
+    return;
+  if (options.startAzurite) {
+    await startAzurite(context, required2);
+    data.storage.azurite = "started";
+    return;
+  }
+  if (need === "required") {
+    context.findings.push({
+      id: "AZURITE-NOT-RUNNING",
+      severity: "error",
+      title: "The app uses development storage, and Azurite is not running",
+      fix: "Run this command again with --start-azurite, or start Azurite yourself."
+    });
+    throw new Stop(EXIT.blocked, "Azurite is not running");
+  }
+  context.findings.push({
+    id: "AZURITE-NOT-RUNNING",
+    severity: "info",
+    title: "Azurite is not running. HTTP functions run without it; add --start-azurite to start it."
+  });
+}
+function azuriteServices(triggers) {
+  const services = /* @__PURE__ */ new Set(["blob"]);
+  if (triggers.some((kind) => kind === "queue" || kind === "blob" || kind === "durable"))
+    services.add("queue");
+  if (triggers.includes("durable"))
+    services.add("table");
+  return [...services];
+}
+async function probeAzurite(deps, required2) {
+  const services = Object.keys(AZURITE_PORTS);
+  const responses = await Promise.all(services.map((service) => deps.http(`http://127.0.0.1:${AZURITE_PORTS[service]}/`, { timeoutMs: 2e3 })));
+  const answer = new Map(services.map((service, index) => [service, responses[index]]));
+  const foreign = services.filter((service) => {
+    const response = answer.get(service);
+    return response !== null && response !== void 0 && !/azurite/i.test(response.headers.server ?? "");
+  });
+  const missing = required2.filter((service) => !answer.get(service));
+  if (foreign.length > 0)
+    return { state: "conflict", missing, foreign };
+  if (missing.length === 0)
+    return { state: "running", missing, foreign };
+  if (responses.every((response) => !response))
+    return { state: "not-running", missing, foreign };
+  return { state: "incomplete", missing, foreign };
+}
+async function startAzurite(context, required2) {
+  const { deps, root } = context;
+  const location = join6(toolDir(root), "azurite");
+  ensureToolDir(root, "azurite");
+  const process2 = deps.start("azurite", ["--silent", "--skipApiVersionCheck", "--location", location], { cwd: root });
+  if (process2) {
+    context.azurite = {
+      stop: () => process2.stop(),
+      release: () => process2.release(),
+      description: `azurite (pid ${process2.pid ?? "unknown"})`
+    };
+  } else {
+    const ports = Object.values(AZURITE_PORTS).flatMap((port) => ["-p", `127.0.0.1:${port}:${port}`]);
+    const run = await deps.run("docker", ["run", "-d", "--rm", ...ports, AZURITE_IMAGE], { timeoutMs: INSTALL_TIMEOUT_MS });
+    const containerId = run.stdout.trim().split(/\s+/).pop() ?? "";
+    if (run.notFound || run.code !== 0 || !containerId) {
+      context.findings.push({
+        id: "AZURITE-UNAVAILABLE",
+        severity: "error",
+        title: "Azurite could not be started",
+        detail: run.notFound ? "Neither the azurite command nor docker is on PATH." : redact(tail2(run.stderr || run.stdout)),
+        fix: "Install Azurite with `npm install -g azurite`, or start Docker Desktop, then run this command again."
+      });
+      throw new Stop(EXIT.blocked, "Azurite could not be started");
+    }
+    context.azurite = {
+      stop: async () => {
+        await deps.run("docker", ["stop", containerId], { timeoutMs: 6e4 });
+      },
+      release: () => void 0,
+      description: `docker container ${containerId.slice(0, 12)}`
+    };
+  }
+  const deadline = deps.now().getTime() + AZURITE_TIMEOUT_MS;
+  while (deps.now().getTime() < deadline) {
+    if (process2 && process2.exitCode() !== void 0)
+      break;
+    if ((await probeAzurite(deps, required2)).state === "running")
+      return;
+    await deps.sleep(500);
+  }
+  context.findings.push({
+    id: "AZURITE-NOT-READY",
+    severity: "error",
+    title: `Azurite did not start answering for ${required2.join(", ")}`,
+    detail: process2 ? redact(tail2(process2.output())) : void 0,
+    fix: "Start Azurite manually and check its output."
+  });
+  throw new Stop(EXIT.stepFailed, "Azurite did not become ready");
+}
+async function checkCoreTools(context) {
+  const version = await context.deps.run("func", ["--version"], { timeoutMs: 3e4 });
+  if (version.notFound)
+    throw funcNotFound(context);
+}
+function funcNotFound(context) {
+  context.findings.push({
+    id: "FUNC-NOT-FOUND",
+    severity: "error",
+    title: "Azure Functions Core Tools (func) is not on PATH",
+    fix: "Install Core Tools v4: https://learn.microsoft.com/azure/azure-functions/functions-run-local#install-the-azure-functions-core-tools"
+  });
+  return new Stop(EXIT.blocked, "Azure Functions Core Tools is missing");
+}
+async function installDependencies(context, worker) {
+  if (worker === "python")
+    return installPython(context);
+  if (worker === "node")
+    await installNode(context);
+  else
+    context.data.install.skipped = true;
+  return void 0;
+}
+async function installPython(context) {
+  const { deps, functionDir, data, options } = context;
+  const scripts = deps.platform === "win32" ? "Scripts" : "bin";
+  const venv = join6(functionDir, ".venv");
+  const binDir = join6(venv, scripts);
+  const python = join6(binDir, deps.platform === "win32" ? "python.exe" : "python");
+  const requirements = join6(functionDir, "requirements.txt");
+  const hash = existsSync7(requirements) ? hashFiles([requirements]) : null;
+  const venvExists = existsSync7(python);
+  if (options.noInstall || venvExists && (hash === null || readMarker(context, "python") === hash)) {
+    data.install.skipped = true;
+  } else {
+    const uv = await deps.run("uv", ["--version"], { timeoutMs: 3e4 });
+    const useUv = !uv.notFound && uv.code === 0;
+    if (!venvExists) {
+      if (useUv)
+        await step(context, "uv", ["venv", ".venv"]);
+      else
+        await step(context, await basePython(context), ["-m", "venv", ".venv"]);
+    }
+    if (hash !== null) {
+      if (useUv)
+        await step(context, "uv", ["pip", "install", "-r", "requirements.txt", "--python", python]);
+      else
+        await step(context, python, ["-m", "pip", "install", "-r", "requirements.txt"]);
+      writeMarker(context, "python", hash);
+    }
+  }
+  if (!existsSync7(binDir) && data.install.skipped && !venvExists)
+    return void 0;
+  return withPath(deps, binDir, { VIRTUAL_ENV: venv, languageWorkers__python__defaultExecutablePath: python });
+}
+async function basePython(context) {
+  const candidates = context.deps.platform === "win32" ? ["python", "py"] : ["python3", "python"];
+  for (const candidate of candidates) {
+    const version = await context.deps.run(candidate, ["--version"], { timeoutMs: 3e4 });
+    if (!version.notFound && version.code === 0)
+      return candidate;
+  }
+  context.findings.push({
+    id: "PYTHON-NOT-FOUND",
+    severity: "error",
+    title: "Python is not on PATH",
+    fix: "Install a Python version that Azure Functions supports (3.10 to 3.13), or install uv."
+  });
+  throw new Stop(EXIT.blocked, "Python is missing");
+}
+async function installNode(context) {
+  const { functionDir, data, options } = context;
+  const packageJsonPath = join6(functionDir, "package.json");
+  if (!existsSync7(packageJsonPath)) {
+    data.install.skipped = true;
+    return;
+  }
+  const hash = hashFiles([packageJsonPath, join6(functionDir, "package-lock.json")]);
+  const installed = existsSync7(join6(functionDir, "node_modules")) && readMarker(context, "node") === hash;
+  if (options.noInstall) {
+    data.install.skipped = true;
+    return;
+  }
+  if (installed)
+    data.install.skipped = true;
+  else {
+    await step(context, "npm", ["install"]);
+    writeMarker(context, "node", hash);
+  }
+  const packageJson = JSON.parse(readFileSync4(packageJsonPath, "utf-8"));
+  if (typeof packageJson.scripts?.build === "string")
+    await step(context, "npm", ["run", "build"]);
+}
+async function step(context, command, args) {
+  const line = [command, ...args].join(" ");
+  context.data.install.steps.push(line);
+  const outcome = await context.deps.run(command, args, { cwd: context.functionDir, timeoutMs: INSTALL_TIMEOUT_MS });
+  if (outcome.code === 0)
+    return;
+  context.findings.push({
+    id: "INSTALL-FAILED",
+    severity: "error",
+    title: `\`${line}\` failed`,
+    detail: outcome.notFound ? `${command} is not on PATH.` : redact(tail2(outcome.stderr || outcome.stdout)),
+    fix: "Fix the dependency problem, then run local verify again."
+  });
+  throw new Stop(EXIT.stepFailed, "Installing dependencies failed");
+}
+async function choosePort(context) {
+  const { deps, options } = context;
+  if (options.port !== void 0) {
+    if (!await deps.portInUse(options.port))
+      return options.port;
+    context.findings.push({
+      id: "PORT-IN-USE",
+      severity: "error",
+      title: `Port ${options.port} is already in use`,
+      fix: "Stop the program that uses the port, or omit --port to use a free port."
+    });
+    throw new Stop(EXIT.blocked, `Port ${options.port} is in use`);
+  }
+  return await deps.portInUse(DEFAULT_PORT) ? deps.freePort() : DEFAULT_PORT;
+}
+async function startHost(context, port, env) {
+  const { deps, functionDir, options, data } = context;
+  const host = deps.start("func", ["start", "--port", String(port)], { cwd: functionDir, ...env ? { env } : {} });
+  if (!host)
+    throw funcNotFound(context);
+  context.host = host;
+  data.host = { port, state: "Starting", readyMs: null };
+  const started = deps.now().getTime();
+  const deadline = started + (options.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) * 1e3;
+  while (deps.now().getTime() < deadline) {
+    if (host.exitCode() !== void 0) {
+      data.host.state = "Exited";
+      context.findings.push({
+        id: "HOST-EXITED",
+        severity: "error",
+        title: `func start exited with code ${host.exitCode() ?? "unknown"} before it was ready`,
+        detail: redact(tail2(host.output())),
+        fix: "Read the host output in detail. Fix the error, then run local verify again."
+      });
+      throw new Stop(EXIT.stepFailed, "The Functions host stopped during startup");
+    }
+    const status = await deps.http(`http://127.0.0.1:${port}/admin/host/status`, { timeoutMs: 5e3 });
+    const state = status?.status === 200 ? hostState(status.body) : null;
+    if (state)
+      data.host.state = state;
+    if (state === "Running") {
+      data.host.readyMs = deps.now().getTime() - started;
+      return;
+    }
+    await deps.sleep(POLL_MS);
+  }
+  context.findings.push({
+    id: "HOST-NOT-READY",
+    severity: "error",
+    title: `The host did not report Running within ${options.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS} seconds (last state: ${data.host.state})`,
+    detail: redact(tail2(host.output())),
+    fix: "Read the host output. If a proxy is configured, add localhost and 127.0.0.1 to NO_PROXY."
+  });
+  throw new Stop(EXIT.stepFailed, "The Functions host did not become ready");
+}
+function hostState(body2) {
+  try {
+    const parsed = JSON.parse(body2);
+    return typeof parsed.state === "string" ? parsed.state : null;
+  } catch {
+    return null;
+  }
+}
+async function readFunctionIndex(context, port) {
+  const { deps } = context;
+  let functions = [];
+  for (let attempt = 0; attempt < INDEX_RETRIES && functions.length === 0; attempt++) {
+    if (attempt > 0)
+      await deps.sleep(POLL_MS);
+    const response = await deps.http(`http://127.0.0.1:${port}/admin/functions`, { timeoutMs: 1e4 });
+    functions = response?.status === 200 ? parseFunctions(response.body) : [];
+  }
+  context.index = functions;
+  context.data.functions = functions.map((fn) => ({ name: String(fn.name), trigger: triggerType(fn) }));
+  if (functions.length > 0)
+    return;
+  context.findings.push({
+    id: "NO-FUNCTIONS-INDEXED",
+    severity: "error",
+    title: "The host is running but found no functions",
+    detail: redact(tail2(context.host?.output() ?? "")),
+    fix: "Check that the function code is registered (decorators, app.* calls, or attributes) and that the build output is current."
+  });
+  throw new Stop(EXIT.stepFailed, "No functions were indexed");
+}
+function parseFunctions(body2) {
+  try {
+    const parsed = JSON.parse(body2);
+    return Array.isArray(parsed) ? parsed.filter((fn) => typeof fn?.name === "string") : [];
+  } catch {
+    return [];
+  }
+}
+function triggerType(fn) {
+  const binding = fn.config?.bindings?.find((item) => typeof item.type === "string" && /trigger$/i.test(item.type));
+  return typeof binding?.type === "string" ? binding.type : "unknown";
+}
+async function invokeHttp(context, port) {
+  const { deps, options, data } = context;
+  const functions = context.index.filter((fn) => /^httptrigger$/i.test(triggerType(fn)));
+  const methodsOf = (fn) => {
+    const methods = fn.config?.bindings?.find((item) => /^httptrigger$/i.test(String(item.type)))?.methods;
+    return Array.isArray(methods) ? methods.map((method2) => String(method2).toLowerCase()) : [];
+  };
+  const callable = (fn) => typeof fn.invoke_url_template === "string" && !fn.invoke_url_template.includes("{");
+  const methodOf = (fn) => {
+    const methods = methodsOf(fn);
+    if (methods.length === 0 || methods.includes("get"))
+      return "GET";
+    return methods.includes("post") ? "POST" : null;
+  };
+  let target;
+  if (options.invoke) {
+    target = functions.find((fn) => fn.name === options.invoke);
+    if (!target) {
+      context.findings.push({
+        id: "INVOKE-NOT-FOUND",
+        severity: "warn",
+        title: `No HTTP function named ${options.invoke} was indexed`,
+        detail: `HTTP functions: ${functions.map((fn) => String(fn.name)).join(", ") || "none"}`
+      });
+      return;
+    }
+    if (!callable(target)) {
+      context.gaps.push({ check: `invoke ${options.invoke}`, reason: "The route has parameters. Request it manually with real values." });
+      return;
+    }
+  } else {
+    const candidates = functions.filter(callable);
+    target = candidates.find((fn) => methodOf(fn) === "GET") ?? candidates.find((fn) => methodOf(fn) === "POST");
+    if (!target) {
+      if (candidates.length > 0) {
+        context.gaps.push({ check: "invoke", reason: "No HTTP function accepts GET or POST. Request one manually." });
+      } else if (functions.length > 0) {
+        context.gaps.push({ check: "invoke", reason: "Every HTTP function has route parameters. Request one manually." });
+      }
+      return;
+    }
+  }
+  const method = methodOf(target);
+  if (!method) {
+    context.gaps.push({
+      check: `invoke ${String(target.name)}`,
+      reason: `The function accepts only ${methodsOf(target).join(", ").toUpperCase()}. Request it manually.`
+    });
+    return;
+  }
+  const url = String(target.invoke_url_template).replace(/^https?:\/\/[^/]+/i, `http://127.0.0.1:${port}`);
+  const response = await deps.http(url, { method, timeoutMs: 3e4, ...method === "POST" ? { body: "{}" } : {} });
+  data.invocation = {
+    function: String(target.name),
+    method,
+    url,
+    status: response?.status ?? null,
+    body: redact((response?.body ?? "").slice(0, BODY_PREVIEW))
+  };
+  if (!response || response.status >= 500) {
+    context.findings.push({
+      id: "INVOKE-FAILED",
+      severity: "error",
+      title: response ? `${method} ${target.name} returned ${response.status}` : `${method} ${target.name} got no response`,
+      detail: redact(tail2(context.host?.output() ?? "")),
+      fix: "Read the host output for the exception, fix the function, and run local verify again."
+    });
+    throw new Stop(EXIT.stepFailed, "The HTTP function failed");
+  }
+  if (response.status >= 400) {
+    context.findings.push({
+      id: "INVOKE-CLIENT-ERROR",
+      severity: "warn",
+      title: `${method} ${target.name} returned ${response.status}`,
+      detail: "The function may need a query string or a request body."
+    });
+  }
+}
+async function cleanUp(context) {
+  const { data } = context;
+  if (context.host) {
+    await context.host.stop();
+    data.cleanup.host = "stopped";
+    context.host = null;
+  }
+  if (context.azurite) {
+    if (context.options.keepAzurite) {
+      context.azurite.release();
+      data.cleanup.azurite = "kept";
+      context.findings.push({ id: "AZURITE-KEPT", severity: "info", title: `Azurite is still running: ${context.azurite.description}` });
+    } else {
+      await context.azurite.stop();
+      data.cleanup.azurite = "stopped";
+    }
+    context.azurite = null;
+  }
+}
+function withPath(deps, directory, extra) {
+  const env = { ...deps.env };
+  const key = Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+  const separator = deps.platform === "win32" ? ";" : ":";
+  env[key] = env[key] ? `${directory}${separator}${env[key]}` : directory;
+  return { ...env, ...extra };
+}
+function hashFiles(paths) {
+  const hash = createHash3("sha256");
+  for (const path of paths) {
+    hash.update(path);
+    hash.update("\0");
+    if (existsSync7(path))
+      hash.update(readFileSync4(path));
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+}
+function markerPath(root) {
+  return join6(toolDir(root), "local-install.json");
+}
+function readMarkers(root) {
+  try {
+    return JSON.parse(readFileSync4(markerPath(root), "utf-8"));
+  } catch {
+    return {};
+  }
+}
+function readMarker(context, worker) {
+  return readMarkers(context.root)[context.functionDir]?.[worker];
+}
+function writeMarker(context, worker, hash) {
+  ensureToolDir(context.root);
+  const markers = readMarkers(context.root);
+  markers[context.functionDir] = { ...markers[context.functionDir], [worker]: hash };
+  writeFileSync3(markerPath(context.root), `${JSON.stringify(markers, null, 2)}
+`);
+}
+function tail2(text) {
+  return text.split(/\r?\n/).filter((line) => line.trim()).slice(-OUTPUT_TAIL_LINES).join("\n");
+}
+
 // lib/templates/index.js
 import { execFileSync } from "node:child_process";
-import { existsSync as existsSync5, lstatSync, mkdirSync as mkdirSync2, readFileSync as readFileSync3, readdirSync as readdirSync2, realpathSync, writeFileSync as writeFileSync2 } from "node:fs";
-import { dirname as dirname2, isAbsolute, join as join4, relative, resolve as resolve6 } from "node:path";
+import { existsSync as existsSync8, lstatSync, mkdirSync as mkdirSync3, readFileSync as readFileSync5, readdirSync as readdirSync3, realpathSync, writeFileSync as writeFileSync4 } from "node:fs";
+import { dirname as dirname2, isAbsolute, join as join7, relative, resolve as resolve8 } from "node:path";
 import { fileURLToPath } from "node:url";
 var DEFAULT_TEMPLATE_MANIFEST_URL = "https://cdn.functions.azure.com/public/templates-manifest/manifest.json";
 var TemplateError = class extends Error {
@@ -1042,16 +2186,18 @@ var ADD_MODE_PROJECT_PREFIXES = [
   ".vscode/",
   "infra/"
 ];
+var DOWNLOAD_CONCURRENCY = 8;
 var githubCliTokenWarningShown = false;
+var githubCliToken = null;
 async function listFunctionTemplates(options = {}) {
   const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
-  const manifest = await loadTemplateManifest(manifestUrl);
+  const manifest = options.manifest ?? await loadTemplateManifest(manifestUrl);
   const templates = manifest.templates.filter((template) => matchesFilter(template.language, options.language)).filter((template) => matchesFilter(template.resource, options.resource)).filter((template) => matchesFilter(template.iac, options.iac)).slice().sort(compareTemplates);
   return { manifestUrl, templates };
 }
 async function applyFunctionTemplate(targetDir, options) {
   const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
-  const manifest = await loadTemplateManifest(manifestUrl);
+  const manifest = options.manifest ?? await loadTemplateManifest(manifestUrl);
   const template = findTemplate(manifest, options.template, options.language);
   const mode = resolveApplyMode(targetDir, options.mode ?? "auto");
   const downloadedFiles = await downloadTemplateFiles(template, manifestUrl);
@@ -1074,13 +2220,13 @@ async function applyFunctionTemplate(targetDir, options) {
   const destinations = new Map(candidates.map((file) => [file, resolveInsideTarget(targetDir, file.relativePath)]));
   for (const file of candidates) {
     const destination = destinations.get(file);
-    if (existsSync5(destination) && options.force !== true) {
+    if (existsSync8(destination) && options.force !== true) {
       skippedFiles.push(file.relativePath);
       continue;
     }
     if (!options.dryRun) {
-      mkdirSync2(dirname2(destination), { recursive: true });
-      writeFileSync2(destination, file.content);
+      mkdirSync3(dirname2(destination), { recursive: true });
+      writeFileSync4(destination, file.content);
     }
     filesWritten.push(file.relativePath);
   }
@@ -1094,15 +2240,15 @@ async function applyFunctionTemplate(targetDir, options) {
   };
 }
 function resolveInsideTarget(targetDir, relativePath) {
-  const destination = join4(targetDir, normalizeTemplatePath(relativePath));
-  if (!existsSync5(targetDir))
+  const destination = join7(targetDir, normalizeTemplatePath(relativePath));
+  if (!existsSync8(targetDir))
     return destination;
   const root = realpathSync(targetDir);
   let ancestor = dirname2(destination);
-  while (!existsSync5(ancestor))
+  while (!existsSync8(ancestor))
     ancestor = dirname2(ancestor);
   const inside = relative(root, realpathSync(ancestor));
-  const isLink = existsSync5(destination) && lstatSync(destination).isSymbolicLink();
+  const isLink = existsSync8(destination) && lstatSync(destination).isSymbolicLink();
   if (inside.startsWith("..") || isAbsolute(inside) || isLink) {
     throw new TemplateError("unsafe-path", `Template file would be written outside the target folder: ${relativePath}`);
   }
@@ -1110,7 +2256,7 @@ function resolveInsideTarget(targetDir, relativePath) {
 }
 async function loadTemplateManifest(manifestUrl) {
   const parsed = new URL(manifestUrl);
-  const raw = parsed.protocol === "file:" ? readFileSync3(fileURLToPath(parsed), "utf-8") : await fetchText(manifestUrl);
+  const raw = parsed.protocol === "file:" ? readFileSync5(fileURLToPath(parsed), "utf-8") : await fetchText(manifestUrl);
   const parsedJson = JSON.parse(raw);
   if (!isTemplateManifest(parsedJson)) {
     throw new TemplateError("invalid-manifest", `Template manifest at ${manifestUrl} does not match the expected schema.`);
@@ -1133,10 +2279,10 @@ async function downloadTemplateFiles(template, manifestUrl) {
 }
 function readLocalTemplateFiles(sourceDir, folderPath) {
   assertSafeFolderPath(folderPath);
-  const sourceRoot = resolve6(sourceDir);
-  const rootDir = folderPath === "." ? sourceRoot : resolve6(sourceRoot, folderPath);
+  const sourceRoot = resolve8(sourceDir);
+  const rootDir = folderPath === "." ? sourceRoot : resolve8(sourceRoot, folderPath);
   assertPathInside(sourceRoot, rootDir, "Template folder");
-  if (!existsSync5(rootDir)) {
+  if (!existsSync8(rootDir)) {
     throw new Error(`Template folder does not exist: ${rootDir}`);
   }
   const files = [];
@@ -1144,15 +2290,15 @@ function readLocalTemplateFiles(sourceDir, folderPath) {
   return files;
 }
 function collectLocalFiles(rootDir, currentDir, files) {
-  const entries = readdirSync2(currentDir, { withFileTypes: true });
+  const entries = readdirSync3(currentDir, { withFileTypes: true });
   for (const entry of entries) {
-    const entryPath = join4(currentDir, entry.name);
+    const entryPath = join7(currentDir, entry.name);
     if (entry.isDirectory()) {
       collectLocalFiles(rootDir, entryPath, files);
     } else if (entry.isFile()) {
       files.push({
         relativePath: relative(rootDir, entryPath),
-        content: readFileSync3(entryPath)
+        content: readFileSync5(entryPath)
       });
     }
   }
@@ -1161,18 +2307,27 @@ async function downloadGitHubTemplateFiles(repo, folderPath, ref) {
   assertSafeFolderPath(folderPath);
   const rootPath = folderPath === "." ? "" : folderPath.replace(/^\/+|\/+$/g, "");
   const entries = await listGitHubContents(repo, rootPath, ref);
-  const files = [];
-  for (const entry of entries) {
+  return mapLimit(entries, DOWNLOAD_CONCURRENCY, async (entry) => {
     if (!entry.download_url) {
       throw new Error(`GitHub file entry is missing download URL: ${entry.path}`);
     }
-    const content = await fetchBuffer(entry.download_url);
-    files.push({
+    return {
       relativePath: rootPath ? entry.path.slice(rootPath.length + 1) : entry.path,
-      content
-    });
-  }
-  return files;
+      content: await fetchBuffer(entry.download_url)
+    };
+  });
+}
+async function mapLimit(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await worker(items[index]);
+    }
+  });
+  await Promise.all(lanes);
+  return results;
 }
 async function listGitHubContents(repo, path, ref) {
   const encodedPath = path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
@@ -1182,17 +2337,9 @@ async function listGitHubContents(repo, path, ref) {
   if (!Array.isArray(entries)) {
     throw new Error(`GitHub contents path is not a directory: ${path || "."}`);
   }
-  const files = [];
-  for (const entry of entries) {
-    if (!isGitHubContentEntry(entry))
-      continue;
-    if (entry.type === "file") {
-      files.push(entry);
-    } else {
-      files.push(...await listGitHubContents(repo, entry.path, ref));
-    }
-  }
-  return files;
+  const valid = entries.filter(isGitHubContentEntry);
+  const nested = await Promise.all(valid.map((entry) => entry.type === "file" ? Promise.resolve([entry]) : listGitHubContents(repo, entry.path, ref)));
+  return nested.flat();
 }
 function parseGitHubRepo(url) {
   if (url.hostname.toLowerCase() !== "github.com")
@@ -1246,7 +2393,7 @@ function findTemplate(manifest, templateId, language) {
 function resolveApplyMode(targetDir, mode) {
   if (mode === "new" || mode === "add")
     return mode;
-  return existsSync5(join4(targetDir, "host.json")) ? "add" : "new";
+  return existsSync8(join7(targetDir, "host.json")) ? "add" : "new";
 }
 function shouldSkipFile(relativePath, mode, force) {
   if (mode === "new")
@@ -1331,6 +2478,8 @@ function resolveGitHubToken(env = process.env) {
   return env.GH_TOKEN || env.GITHUB_TOKEN || resolveGitHubCliToken();
 }
 function resolveGitHubCliToken() {
+  if (githubCliToken !== null)
+    return githubCliToken;
   if (!githubCliTokenWarningShown) {
     process.stderr.write("GitHub API rate limit or private repository access requires authentication. Trying `gh auth token`...\n");
     githubCliTokenWarningShown = true;
@@ -1340,10 +2489,11 @@ function resolveGitHubCliToken() {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
-    return token || void 0;
+    githubCliToken = token || void 0;
   } catch (_err) {
-    return void 0;
+    githubCliToken = void 0;
   }
+  return githubCliToken;
 }
 function isGitHubAuthRetryable(response) {
   return response.status === 401 || response.status === 404 || response.status === 403 && response.headers.get("x-ratelimit-remaining") === "0";
@@ -1370,11 +2520,11 @@ var DEFAULT_MANIFEST_URLS = [
   "https://cdn.functions.azure.com/public/templates-manifest/manifest.json",
   "https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json"
 ];
-var COMMAND4 = "template find";
+var COMMAND5 = "template find";
 async function findTemplates(options, dependencies) {
   const loaded = await loadFirstManifest(dependencies.manifestUrls, options);
   if (!loaded)
-    return manifestUnavailable(COMMAND4);
+    return manifestUnavailable(COMMAND5);
   const templates = loaded.result.templates.map((template) => ({
     id: template.id,
     displayName: template.displayName,
@@ -1385,7 +2535,7 @@ async function findTemplates(options, dependencies) {
   }));
   const data = { templates, manifestSource: loaded.source };
   if (templates.length === 0) {
-    const result = succeed(COMMAND4, "No template matches the filters", data, {
+    const result = succeed(COMMAND5, "No template matches the filters", data, {
       gaps: loaded.gaps,
       findings: [{
         id: "TEMPLATE-NONE-MATCH",
@@ -1396,17 +2546,22 @@ async function findTemplates(options, dependencies) {
     });
     return { ...result, body: { ...result.body, ok: false } };
   }
-  return succeed(COMMAND4, `Found ${templates.length} template(s)`, data, {
+  return succeed(COMMAND5, `Found ${templates.length} template(s)`, { ...data, recommended: templates[0].id }, {
     gaps: loaded.gaps,
-    next: { action: "choose-template", reason: "Let the user choose, then run template write with the chosen id." }
+    next: {
+      action: "write-template",
+      reason: "Write the recommended template unless the user asked for another one in the list.",
+      command: `template write --template ${templates[0].id} --language ${templates[0].language} --dir <project-dir>`
+    }
   });
 }
 async function loadFirstManifest(manifestUrls, filter = {}) {
   const gaps = [];
   for (const [index, manifestUrl] of manifestUrls.entries()) {
     try {
-      const result = await listFunctionTemplates({ manifestUrl, ...filter });
-      return { result, source: index === 0 ? "primary" : "fallback", gaps };
+      const manifest = await loadTemplateManifest(manifestUrl);
+      const result = await listFunctionTemplates({ manifestUrl, manifest, ...filter });
+      return { result, manifest, source: index === 0 ? "primary" : "fallback", gaps };
     } catch (error) {
       gaps.push({
         check: index === 0 ? "manifest-primary" : `manifest-fallback-${index}`,
@@ -1428,9 +2583,10 @@ function manifestUnavailable(command) {
 }
 
 // lib/tools/template/write.js
-import { existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
-import { dirname as dirname3, resolve as resolve7 } from "node:path";
-var COMMAND5 = "template write";
+import { existsSync as existsSync9, mkdirSync as mkdirSync4, readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "node:fs";
+import { dirname as dirname3, join as join8, resolve as resolve9 } from "node:path";
+var COMMAND6 = "template write";
+var MAX_ALTERNATIVES = 3;
 var MCP_FILE_LISTS = ["projectfiles", "functionfiles", "files"];
 var MAX_SEARCH_DEPTH = 4;
 var FINDINGS = {
@@ -1442,12 +2598,22 @@ var FINDINGS = {
   "unsupported-source": { id: "TEMPLATE-UNSUPPORTED-SOURCE", fix: "Choose a template hosted on GitHub." }
 };
 async function writeTemplate(options, dependencies) {
-  if (options.template === void 0 === (options.from === void 0)) {
-    throw new UsageError("Give exactly one of --template or --from");
+  const sources = [options.template, options.from].filter((value) => value !== void 0).length;
+  if (sources > 1)
+    throw new UsageError("Give only one of --template or --from");
+  if (sources === 0 && options.language === void 0) {
+    throw new UsageError("Give --template, --from, or --language to choose the closest template");
   }
-  const dir = resolve7(options.dir);
+  if (options.template !== void 0 && (options.resource !== void 0 || options.iac !== void 0)) {
+    throw new UsageError("--resource and --iac choose a template, so do not combine them with --template");
+  }
+  if (options.from !== void 0 && options.stage)
+    throw new UsageError("--stage works only with manifest templates");
+  if (options.stage && options.mode !== void 0)
+    throw new UsageError("--stage always writes a whole template; omit --mode");
+  const dir = resolve9(options.dir);
   try {
-    return options.from !== void 0 ? writeFromMcpFile(dir, resolve7(options.from), options.dryRun) : await writeFromManifest(dir, options.template, options, dependencies);
+    return options.from !== void 0 ? writeFromMcpFile(dir, resolve9(options.from), options.dryRun) : await writeFromManifest(dir, options, dependencies);
   } catch (error) {
     if (!(error instanceof TemplateError))
       throw error;
@@ -1455,26 +2621,69 @@ async function writeTemplate(options, dependencies) {
     return blocked4(redact(error.message), { id: known.id, severity: "error", title: redact(error.message), fix: known.fix });
   }
 }
-async function writeFromManifest(dir, template, options, dependencies) {
+async function writeFromManifest(dir, options, dependencies) {
   const loaded = await loadFirstManifest(dependencies.manifestUrls);
   if (!loaded)
-    return manifestUnavailable(COMMAND5);
-  const applied = await applyFunctionTemplate(dir, {
+    return manifestUnavailable(COMMAND6);
+  let template = options.template;
+  let language = options.language;
+  let selection;
+  if (template === void 0) {
+    const chosen = selectTemplate(loaded, options);
+    if ("blocked" in chosen)
+      return chosen.blocked;
+    template = chosen.template.id;
+    language = chosen.template.language;
+    selection = chosen.selection;
+  }
+  const stagedDir = options.stage ? join8(toolDir(dir), "templates", template) : void 0;
+  if (stagedDir && !options.dryRun)
+    ensureToolDir(dir, "templates");
+  const applied = await applyFunctionTemplate(stagedDir ?? dir, {
     manifestUrl: loaded.result.manifestUrl,
+    manifest: loaded.manifest,
     template,
-    language: options.language,
+    language,
     runtimeVersion: options.runtimeVersion,
-    mode: options.mode ?? "auto",
+    mode: stagedDir ? "new" : options.mode ?? "auto",
     dryRun: options.dryRun
   });
-  return done({
+  return done(dir, {
     source: "manifest",
     template: applied.template.id,
+    language: applied.template.language,
+    runtimeVersion: options.runtimeVersion ?? loaded.manifest.runtimeVersions?.[applied.template.language]?.default,
+    ...selection ? { selection } : {},
     mode: applied.mode,
     dryRun: applied.dryRun,
+    ...stagedDir ? { stagedDir } : {},
     written: applied.filesWritten,
     skipped: applied.skippedFiles
   }, loaded.gaps);
+}
+function selectTemplate(loaded, options) {
+  const language = options.language.toLowerCase();
+  const sameLanguage = loaded.result.templates.filter((candidate) => candidate.language.toLowerCase() === language);
+  const matches = sameLanguage.filter((candidate) => !options.resource || candidate.resource?.toLowerCase() === options.resource.toLowerCase()).filter((candidate) => !options.iac || candidate.iac?.toLowerCase() === options.iac.toLowerCase());
+  if (matches.length === 0) {
+    const resources = [...new Set(sameLanguage.map((candidate) => candidate.resource).filter(Boolean))].join(", ");
+    return {
+      blocked: fail(COMMAND6, EXIT.blocked, "No template matches the request", {
+        findings: [{
+          id: "TEMPLATE-NONE-MATCH",
+          severity: "error",
+          title: `No ${options.language} template matches${options.resource ? ` resource ${options.resource}` : ""}${options.iac ? ` with ${options.iac}` : ""}`,
+          detail: resources ? `Resources with ${options.language} templates: ${resources}.` : `No ${options.language} templates exist.`,
+          fix: "Choose one of the listed resources, or run template find to see every template."
+        }]
+      })
+    };
+  }
+  const by = ["language", options.resource ? "resource" : "", options.iac ? "iac" : ""].filter(Boolean).join("+");
+  return {
+    template: matches[0],
+    selection: { by, alternatives: matches.slice(1, 1 + MAX_ALTERNATIVES).map((candidate) => candidate.id) }
+  };
 }
 function writeFromMcpFile(dir, from, dryRun) {
   const result = findMcpResult(readJson2(from));
@@ -1498,18 +2707,18 @@ function writeFromMcpFile(dir, from, dryRun) {
   const skipped = [];
   for (const { file, destination } of planned) {
     const name = file.fileName.replace(/\\/g, "/");
-    if (existsSync6(destination)) {
+    if (existsSync9(destination)) {
       skipped.push(name);
       continue;
     }
     if (!dryRun) {
-      mkdirSync3(dirname3(destination), { recursive: true });
-      writeFileSync3(destination, file.content);
+      mkdirSync4(dirname3(destination), { recursive: true });
+      writeFileSync5(destination, file.content);
     }
     written.push(name);
   }
   const mergeInstructions = pick(result, "mergeinstructions");
-  return done({
+  return done(dir, {
     source: "mcp-file",
     template: asText(pick(result, "templatename")),
     dryRun,
@@ -1518,19 +2727,26 @@ function writeFromMcpFile(dir, from, dryRun) {
     ...typeof mergeInstructions === "string" && mergeInstructions ? { mergeInstructions } : {}
   }, []);
 }
-function done(data, gaps) {
+function done(dir, data, gaps) {
   const written = data.written?.length ?? 0;
   const skipped = data.skipped?.length ?? 0;
-  const next = skipped > 0 ? { action: "merge-skipped", reason: "Merge the needed settings and dependencies from the skipped files by hand." } : { action: "install-and-verify", reason: "Install dependencies, then build and run the project locally." };
+  const next = data.stagedDir ? {
+    action: "merge-staged",
+    reason: "Copy the function source from data.stagedDir into the project and merge its dependencies, settings, and infra resources. Delete the staged folder afterwards."
+  } : skipped > 0 ? { action: "merge-skipped", reason: "Merge the needed settings and dependencies from the skipped files by hand." } : {
+    action: "local-verify",
+    reason: "Install dependencies, start the host, and call an HTTP function once.",
+    command: `local verify --dir "${dir}"`
+  };
   const verb = data.dryRun ? "Would write" : "Wrote";
-  return succeed(COMMAND5, `${verb} ${written} file(s), skipped ${skipped}`, data, { gaps, next });
+  return succeed(COMMAND6, `${verb} ${written} file(s), skipped ${skipped}`, data, { gaps, next });
 }
 function blocked4(summary, finding) {
-  return fail(COMMAND5, EXIT.blocked, summary, { findings: [finding] });
+  return fail(COMMAND6, EXIT.blocked, summary, { findings: [finding] });
 }
 function readJson2(path) {
   try {
-    return JSON.parse(readFileSync4(path, "utf-8"));
+    return JSON.parse(readFileSync6(path, "utf-8"));
   } catch {
     return null;
   }
@@ -1585,14 +2801,21 @@ var USAGE = `Usage: functions-tools.mjs <group> <command> [options]
                  Reads the project and writes a deployment plan. Changes nothing in Azure.
   deploy apply   --dir <path> --approve <plan-id> [--preview]
                  Runs the approved plan with azd. Resumes after a failed step.
-  deploy verify  --dir <path> [--env <name>] [--app <name>] [--subscription <id>]
-                 Lists the deployed functions and requests anonymous HTTP triggers.
+  deploy verify  --dir <path> [--env <name>] [--app <name>] [--subscription <id>] [--use-keys]
+                 Lists the deployed functions and requests anonymous HTTP triggers. --use-keys also
+                 requests FUNCTION-level triggers with a key read by the Azure CLI; keys are never printed.
+
+  local verify   --dir <path> [--port <n>] [--timeout <seconds>] [--invoke <function>]
+                 [--start-azurite] [--keep-azurite] [--no-install]
+                 Creates local.settings.json when missing, installs dependencies, starts the host,
+                 waits for Running, lists the functions, calls one HTTP function, then stops the host.
 
   template find  --language <name> [--resource <name>] [--iac <name>]
-                 Lists templates from the Azure Functions template manifest.
-  template write --dir <path> (--template <id> | --from <mcp-result.json>)
-                 [--language <name>] [--runtime-version <version>] [--mode new|add] [--dry-run]
-                 Writes template files. Never overwrites an existing file.
+                 Lists templates from the Azure Functions template manifest, closest first.
+  template write --dir <path> (--template <id> | --language <name> [--resource <name>] [--iac <name>]
+                 | --from <mcp-result.json>) [--runtime-version <version>] [--mode new|add] [--stage] [--dry-run]
+                 Writes template files. Never overwrites an existing file. Without --template it
+                 chooses the closest template. --stage writes into .azure-functions-skills/templates/<id>.
 
 Output is one JSON object on stdout.
 Exit codes: 0 ran, 1 unexpected failure, 2 invalid arguments, 3 blocked before running, 4 a step failed.`;
@@ -1624,13 +2847,30 @@ async function runCli(argv, dependencies) {
       }, dependencies);
     }
     if (command === "deploy verify") {
-      const args = parseArgs(rest, { strings: ["dir", "env", "app", "subscription"] });
+      const args = parseArgs(rest, { strings: ["dir", "env", "app", "subscription"], booleans: ["use-keys"] });
       return await verifyDeploy({
         dir: required(args.strings, "dir"),
         env: args.strings.env,
         app: args.strings.app,
-        subscription: args.strings.subscription
+        subscription: args.strings.subscription,
+        useKeys: args.booleans["use-keys"] ?? false
       }, dependencies);
+    }
+    if (command === "local verify") {
+      const args = parseArgs(rest, {
+        strings: ["dir", "port", "timeout", "invoke"],
+        booleans: ["start-azurite", "keep-azurite", "no-install"]
+      });
+      const base = { run: dependencies.run, sleep: dependencies.sleep, now: dependencies.now };
+      return await verifyLocal({
+        dir: required(args.strings, "dir"),
+        port: positiveInteger(args.strings, "port", 65535),
+        timeoutSeconds: positiveInteger(args.strings, "timeout", 3600),
+        invoke: args.strings.invoke,
+        startAzurite: args.booleans["start-azurite"] ?? false,
+        keepAzurite: args.booleans["keep-azurite"] ?? false,
+        noInstall: args.booleans["no-install"] ?? false
+      }, dependencies.local ? { ...dependencies.local, ...base } : localDependencies(base));
     }
     if (command === "template find") {
       const args = parseArgs(rest, { strings: ["language", "resource", "iac"] });
@@ -1642,8 +2882,8 @@ async function runCli(argv, dependencies) {
     }
     if (command === "template write") {
       const args = parseArgs(rest, {
-        strings: ["dir", "template", "from", "language", "runtime-version", "mode"],
-        booleans: ["dry-run"]
+        strings: ["dir", "template", "from", "language", "resource", "iac", "runtime-version", "mode"],
+        booleans: ["dry-run", "stage"]
       });
       const mode = args.strings.mode;
       if (mode !== void 0 && mode !== "new" && mode !== "add")
@@ -1653,8 +2893,11 @@ async function runCli(argv, dependencies) {
         template: args.strings.template,
         from: args.strings.from,
         language: args.strings.language,
+        resource: args.strings.resource,
+        iac: args.strings.iac,
         runtimeVersion: args.strings["runtime-version"],
         mode,
+        stage: args.booleans.stage ?? false,
         dryRun: args.booleans["dry-run"] ?? false
       }, { manifestUrls: dependencies.manifestUrls ?? DEFAULT_MANIFEST_URLS });
     }
@@ -1681,8 +2924,22 @@ function required(strings, name) {
     throw new UsageError(`Missing required option --${name}`);
   return value;
 }
-async function fetchStatus(url) {
-  const response = await fetch(url, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
+function positiveInteger(strings, name, max) {
+  const value = strings[name];
+  if (value === void 0)
+    return void 0;
+  const parsed = Number(value);
+  if (!/^\d+$/.test(value) || parsed < 1 || parsed > max)
+    throw new UsageError(`--${name} must be a whole number from 1 to ${max}`);
+  return parsed;
+}
+async function fetchStatus(url, headers) {
+  const response = await fetch(url, {
+    method: "GET",
+    redirect: "manual",
+    signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+    ...headers ? { headers } : {}
+  });
   return response.status;
 }
 async function main() {
@@ -1696,8 +2953,8 @@ async function main() {
     run: createRunner(),
     now: () => /* @__PURE__ */ new Date(),
     fetchStatus,
-    sleep: (milliseconds) => new Promise((resolve8) => {
-      setTimeout(resolve8, milliseconds);
+    sleep: (milliseconds) => new Promise((resolve10) => {
+      setTimeout(resolve10, milliseconds);
     })
   });
   process.stdout.write(`${JSON.stringify(result.body, null, 2)}

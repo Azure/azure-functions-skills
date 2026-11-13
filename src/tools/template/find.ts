@@ -1,4 +1,6 @@
-import { listFunctionTemplates, type TemplateListResult } from '../../templates/index.js';
+import {
+  listFunctionTemplates, loadTemplateManifest, type TemplateListResult, type TemplateManifest,
+} from '../../templates/index.js';
 import { EXIT, fail, succeed, type Gap, type ToolResult } from '../shared/output.js';
 import { redact } from '../shared/redact.js';
 
@@ -32,11 +34,15 @@ export interface FoundTemplate {
 
 export interface FindData {
   readonly templates?: readonly FoundTemplate[];
+  /** The first template, which is the closest match by manifest priority. */
+  readonly recommended?: string;
   readonly manifestSource?: 'primary' | 'fallback';
 }
 
 export interface LoadedManifest {
   readonly result: TemplateListResult;
+  /** The whole manifest, so a later step can reuse it without downloading it again. */
+  readonly manifest: TemplateManifest;
   readonly source: 'primary' | 'fallback';
   readonly gaps: readonly Gap[];
 }
@@ -66,9 +72,13 @@ export async function findTemplates(options: FindOptions, dependencies: Template
     });
     return { ...result, body: { ...result.body, ok: false } };
   }
-  return succeed(COMMAND, `Found ${templates.length} template(s)`, data, {
+  return succeed(COMMAND, `Found ${templates.length} template(s)`, { ...data, recommended: templates[0].id }, {
     gaps: loaded.gaps,
-    next: { action: 'choose-template', reason: 'Let the user choose, then run template write with the chosen id.' },
+    next: {
+      action: 'write-template',
+      reason: 'Write the recommended template unless the user asked for another one in the list.',
+      command: `template write --template ${templates[0].id} --language ${templates[0].language} --dir <project-dir>`,
+    },
   });
 }
 
@@ -80,8 +90,9 @@ export async function loadFirstManifest(
   const gaps: Gap[] = [];
   for (const [index, manifestUrl] of manifestUrls.entries()) {
     try {
-      const result = await listFunctionTemplates({ manifestUrl, ...filter });
-      return { result, source: index === 0 ? 'primary' : 'fallback', gaps };
+      const manifest = await loadTemplateManifest(manifestUrl);
+      const result = await listFunctionTemplates({ manifestUrl, manifest, ...filter });
+      return { result, manifest, source: index === 0 ? 'primary' : 'fallback', gaps };
     } catch (error) {
       gaps.push({
         check: index === 0 ? 'manifest-primary' : `manifest-fallback-${index}`,

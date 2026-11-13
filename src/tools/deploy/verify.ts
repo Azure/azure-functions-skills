@@ -9,12 +9,14 @@ export interface VerifyOptions {
   readonly env?: string;
   readonly app?: string;
   readonly subscription?: string;
+  /** Reads function keys with the Azure CLI to request FUNCTION-level HTTP triggers. Keys are never printed. */
+  readonly useKeys?: boolean;
 }
 
 export interface VerifyDependencies {
   readonly run: Runner;
   /** Sends one GET request and returns the HTTP status. */
-  readonly fetchStatus: (url: string) => Promise<number>;
+  readonly fetchStatus: (url: string, headers?: Readonly<Record<string, string>>) => Promise<number>;
   readonly sleep: (milliseconds: number) => Promise<void>;
 }
 
@@ -29,8 +31,16 @@ export interface VerifyData {
   readonly resourceGroup?: string;
   readonly state?: string;
   readonly hostName?: string;
+  readonly portalUrl?: string;
   readonly functions?: readonly VerifiedFunction[];
-  readonly http?: ReadonlyArray<{ readonly function: string; readonly status: number; readonly reachable: boolean }>;
+  readonly http?: readonly HttpCheck[];
+}
+
+export interface HttpCheck {
+  readonly function: string;
+  readonly status: number;
+  readonly reachable: boolean;
+  readonly usedKey: boolean;
 }
 
 interface FunctionEntry {
@@ -68,7 +78,8 @@ export async function verifyDeploy(options: VerifyOptions, dependencies: VerifyD
       fix: 'Install the Azure CLI, or check the app in the Azure portal.',
     });
   }
-  const resourceGroup = parse<Array<{ resourceGroup?: string }>>(located)?.[0]?.resourceGroup;
+  const resource = parse<Array<{ id?: string; resourceGroup?: string }>>(located)?.[0];
+  const resourceGroup = resource?.resourceGroup;
   if (!resourceGroup) {
     return blocked(`Function app ${app} was not found`, {
       id: 'VERIFY-APP-NOT-FOUND', severity: 'error', title: `No function app named ${app} is visible in the subscription`,
@@ -77,18 +88,18 @@ export async function verifyDeploy(options: VerifyOptions, dependencies: VerifyD
   }
 
   const target = ['--name', app, '--resource-group', resourceGroup, ...scope];
-  const site = parse<{ state?: string; defaultHostName?: string }>(
+  const site = parse<{ state?: string | null; defaultHostName?: string }>(
     await dependencies.run('az', ['functionapp', 'show', ...target], { cwd: dir }));
+  const state = site?.state ?? await resourceState(app, resourceGroup, scope, dir, dependencies);
   const entries = await listFunctions(target, dir, dependencies);
 
   const findings: Finding[] = [];
   const gaps: Gap[] = [];
   const functions = entries.map(describe);
-  if (site?.state !== 'Running') {
-    findings.push({
-      id: 'VERIFY-APP-NOT-RUNNING', severity: 'error',
-      title: `The function app state is ${site?.state ?? 'unknown'}`,
-    });
+  if (!state) {
+    gaps.push({ check: 'state', reason: 'Azure did not report the app state. The function list and HTTP checks stand in for it.' });
+  } else if (state !== 'Running') {
+    findings.push({ id: 'VERIFY-APP-NOT-RUNNING', severity: 'error', title: `The function app state is ${state}` });
   }
   if (functions.length === 0) {
     findings.push({
@@ -97,18 +108,25 @@ export async function verifyDeploy(options: VerifyOptions, dependencies: VerifyD
     });
   }
 
-  const http: Array<{ function: string; status: number; reachable: boolean }> = [];
+  const http: HttpCheck[] = [];
   for (const entry of entries) {
     const info = describe(entry);
     if (info.trigger !== 'httpTrigger') continue;
-    const reason = skipReason(entry, info, http.length);
+    const reason = skipReason(entry, info, http.length, options.useKeys ?? false);
     if (reason) {
       gaps.push({ check: `http:${info.name}`, reason });
       continue;
     }
-    const status = await dependencies.fetchStatus(entry.invokeUrlTemplate as string).catch(() => 0);
-    const reachable = status >= 200 && status < 500 && status !== 404;
-    http.push({ function: info.name, status, reachable });
+    const usedKey = info.authLevel?.toLowerCase() === 'function';
+    const key = usedKey ? await functionKey(info.name, target, dir, dependencies) : null;
+    if (usedKey && !key) {
+      gaps.push({ check: `http:${info.name}`, reason: 'The function key could not be read with the Azure CLI.' });
+      continue;
+    }
+    const headers = key ? { 'x-functions-key': key } : undefined;
+    const status = await dependencies.fetchStatus(entry.invokeUrlTemplate as string, headers).catch(() => 0);
+    const reachable = status >= 200 && status < 500 && status !== 404 && !(usedKey && (status === 401 || status === 403));
+    http.push({ function: info.name, status, reachable, usedKey });
     if (!reachable) {
       findings.push({
         id: 'VERIFY-HTTP-FAILED', severity: 'error',
@@ -118,7 +136,9 @@ export async function verifyDeploy(options: VerifyOptions, dependencies: VerifyD
   }
 
   const data: VerifyData = {
-    functionApp: app, resourceGroup, state: site?.state ?? 'unknown', hostName: site?.defaultHostName, functions, http,
+    functionApp: app, resourceGroup, state: state ?? 'unknown', hostName: site?.defaultHostName,
+    ...(resource?.id ? { portalUrl: `https://portal.azure.com/#resource${resource.id}/overview` } : {}),
+    functions, http,
   };
   const failed = findings.some(finding => finding.severity === 'error');
   const summary = failed
@@ -148,9 +168,28 @@ function describe(entry: FunctionEntry): VerifiedFunction {
   };
 }
 
-function skipReason(entry: FunctionEntry, info: VerifiedFunction, checked: number): string | null {
+async function resourceState(
+  app: string, resourceGroup: string, scope: string[], dir: string, dependencies: VerifyDependencies,
+): Promise<string | null> {
+  const resource = parse<{ properties?: { state?: string | null } }>(await dependencies.run('az', [
+    'resource', 'show', '--name', app, '--resource-group', resourceGroup, '--resource-type', 'Microsoft.Web/sites', ...scope,
+  ], { cwd: dir }));
+  return resource?.properties?.state ?? null;
+}
+
+/** Reads the default function key. The value stays in memory and is only sent as a request header. */
+async function functionKey(name: string, target: string[], dir: string, dependencies: VerifyDependencies): Promise<string | null> {
+  const keys = parse<Record<string, unknown>>(await dependencies.run('az',
+    ['functionapp', 'function', 'keys', 'list', '--function-name', name, ...target], { cwd: dir }));
+  const key = keys?.default ?? Object.values(keys ?? {}).find(value => typeof value === 'string');
+  return typeof key === 'string' && key ? key : null;
+}
+
+function skipReason(entry: FunctionEntry, info: VerifiedFunction, checked: number, useKeys: boolean): string | null {
   const methods = entry.config?.bindings?.find(binding => binding.type === 'httpTrigger')?.methods;
-  if (info.authLevel?.toLowerCase() !== 'anonymous') return 'Needs a function key. The script does not read keys.';
+  const level = info.authLevel?.toLowerCase();
+  if (level === 'function' && !useKeys) return 'Needs a function key. Run deploy verify with --use-keys to read it with the Azure CLI.';
+  if (level !== 'anonymous' && level !== 'function') return 'Needs an admin or system key. Request it manually.';
   if (methods && methods.length > 0 && !methods.some(method => method.toLowerCase() === 'get')) return 'Does not accept GET.';
   if (!entry.invokeUrlTemplate || entry.invokeUrlTemplate.includes('{')) return 'The route needs parameters.';
   if (checked >= MAX_HTTP_CHECKS) return `Only the first ${MAX_HTTP_CHECKS} HTTP triggers are requested.`;

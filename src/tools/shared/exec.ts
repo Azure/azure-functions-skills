@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { delimiter, join, win32 } from 'node:path';
+import { delimiter, join, posix, win32 } from 'node:path';
 
 export interface RunResult {
   /** Process exit code. `null` when the process did not start or was stopped. */
@@ -45,6 +45,10 @@ export function resolveExecutable(command: string, environment: ResolveEnvironme
   const extensions = isWindows
     ? orderExtensions((environment.pathExt || '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean))
     : [''];
+  if (isWindows ? win32.isAbsolute(command) : posix.isAbsolute(command)) {
+    const candidates = isWindows && /\.[A-Za-z0-9]+$/.test(command) ? [command] : extensions.map(extension => `${command}${extension}`);
+    return candidates.find(candidate => environment.exists(candidate)) ?? null;
+  }
   for (const directory of environment.path.split(separator).filter(Boolean)) {
     for (const extension of extensions) {
       const candidate = joinPath(directory, `${command}${extension}`);
