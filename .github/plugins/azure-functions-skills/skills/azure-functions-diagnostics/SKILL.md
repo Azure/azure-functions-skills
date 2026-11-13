@@ -1,6 +1,6 @@
 ---
 name: azure-functions-diagnostics
-description: "Use when diagnosing or resolving Azure Functions issues: deployment failures, runtime errors, trigger/binding failures, language worker issues, telemetry/log analysis, known issue research, source investigation, and remediation. Acts as a facade that routes to focused Azure Functions skills and small language/extension references."
+description: "Use when diagnosing or resolving standard Azure Functions issues: deployment failures, runtime errors, trigger/binding failures, language worker issues, telemetry/log analysis, known issue research, source investigation, and remediation. Acts as a facade that routes to focused Azure Functions skills and small language/extension references. Do not use for Azure Functions Hosted Skills (conversations creating, running, or deploying a Hosted Skill, or projects with any *.agent.md file, agents.config.yaml, or the azurefunctions-agents-runtime package), even when the user only reports an error; use azure-functions-hosted-skills and its troubleshooting reference instead."
 ---
 
 
@@ -9,6 +9,16 @@ description: "Use when diagnosing or resolving Azure Functions issues: deploymen
 Use this skill to diagnose and resolve Azure Functions issues by orchestrating focused skills and loading only the references needed for the current app.
 
 Write final answers in the user's language.
+
+## Hosted Skills exclusion
+
+Before collecting inputs or inventory, check the conversation and project context. If the issue is about an Azure Functions Hosted Skills app, invoke `azure-functions-hosted-skills` instead and stop this workflow. Treat it as a Hosted Skills app when any of these apply:
+
+- The conversation is creating, extending, running, testing, or deploying a Hosted Skill.
+- The project contains `*.agent.md` agent definitions or `agents.config.yaml`.
+- `requirements.txt` depends on `azurefunctions-agents-runtime`, or `function_app.py` calls `create_function_app()` from that runtime.
+
+Hosted Skills failures (agent loading, model provider, MCP and connectors, dynamic sessions, Dynamic Workflows, and Hosted Skills deployment) are covered by that skill's troubleshooting reference. Do not run this skill in parallel for the same issue.
 
 ## Core principle
 

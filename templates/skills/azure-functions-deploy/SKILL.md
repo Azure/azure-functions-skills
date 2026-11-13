@@ -1,7 +1,7 @@
 ---
 name: azure-functions-deploy
 title: Deploy Azure Functions
-description: Proxy standard Azure Functions deployment requests to the Azure Skills prepare, validate, and deploy workflow while preserving Azure Functions-specific guidance. Do not use for Azure Functions Hosted Skills, including follow-up deployment requests during Hosted Skills creation; use azure-functions-hosted-skills instead.
+description: Not for Azure Functions Hosted Skills. Proxy standard Azure Functions deployment requests to the Azure Skills prepare, validate, and deploy workflow while preserving Azure Functions-specific guidance. Do not use when the conversation is creating, running, or deploying a Hosted Skill, or the project has *.agent.md files or agents.config.yaml, including follow-up requests that only say deploy, azd up, or redeploy; use azure-functions-hosted-skills instead.
 category: task
 ---
 
@@ -13,7 +13,15 @@ Deploy your Azure Functions app to Azure by proxying to the Azure Skills deploym
 
 This skill is the Azure Functions-facing entry point. It should not run deployment commands directly. It prepares Azure Functions-specific context, then delegates execution to `azure-prepare`, `azure-validate`, and `azure-deploy` from the Azure Skills plugin.
 
-Before checking prerequisites or delegating, check the conversation and project context. If the app is an Azure Functions Hosted Skills app (for example, the conversation is creating a Hosted Skill, or the app uses `*.agent.md` and `agents.config.yaml`), invoke `azure-functions-hosted-skills` instead and stop this workflow. Hosted Skills deployment needs its own model, connector, and runtime guidance, even when the user only says to deploy.
+## Hosted Skills exclusion
+
+Before checking prerequisites or delegating, check the conversation and project context. If the app is an Azure Functions Hosted Skills app, invoke `azure-functions-hosted-skills` instead and stop this workflow. Treat it as a Hosted Skills app when any of these apply:
+
+- The conversation is creating, extending, running, testing, or deploying a Hosted Skill.
+- The project contains `*.agent.md` agent definitions or `agents.config.yaml`.
+- `requirements.txt` depends on `azurefunctions-agents-runtime`, or `function_app.py` calls `create_function_app()` from that runtime.
+
+Hosted Skills deployment needs its own model, connector, and runtime guidance, even when the user only says to deploy, run `azd up`, or redeploy after a fix. Do not invoke `azure-prepare`, `azure-validate`, or `azure-deploy` from this skill for a Hosted Skills app, and do not suggest `azure-functions-diagnostics` for its deployment failures.
 
 ## Prerequisites
 
