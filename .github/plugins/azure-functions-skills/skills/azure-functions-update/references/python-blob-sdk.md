@@ -28,3 +28,6 @@ permission gap.
 | PB-04 | Each use of the argument reads the complete content and keeps decoding, status, content type, and error behavior | Tests with full, empty, multibyte, and larger content |
 | PB-05 | A Blob trigger stays a Blob trigger, and an HTTP function stays HTTP | Trigger type before and after; N/A for the other kind |
 | PB-06 | Registration succeeds; host indexing and storage access are checked only in an authorized environment | Function list, and the reason if the host check is blocked |
+
+When a Python language stage is requested or required, also apply `PY-POST-01` to
+`PY-POST-03` from [Python language stage](python-language.md).

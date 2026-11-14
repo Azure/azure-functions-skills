@@ -8,12 +8,14 @@ changes customer code. It is manual. CI does not run it.
 | Selection — question | A question about migration does not start the skill or change the project. |
 | Selection — generic request | An update request without the skill name does not start the skill. |
 | Selection — named skill | The named skill starts, saves a plan, and keeps `net8.0`. |
+| Selection — Python v1 app | A Python `function.json` app selects the `python-model-v2` scenario in a saved plan and keeps the project unchanged. |
 | Resume | The skill continues from the saved plan in `fixtures/azure-functions-update-plan.md`. |
 | Stages | .NET 10 and hosting plan requests stay separate stages. The project keeps `net8.0`. |
 | Migration | The model-only migration builds at `net8.0`, states `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated`, and reports a status for each definition-of-done ID. One grader checks each ID from `DI-01` to `DI-16` and from `DI-POST-01` to `DI-POST-03`. |
 
 `fixtures/app` is a small C# in-process app with HTTP, queue, and blob functions and
-`FunctionsStartup` DI. `fixtures/AGENTS.md` sets the workspace limits for the agent.
+`FunctionsStartup` DI. `fixtures/python-v1-app` is a one-function Python app that uses
+`function.json` (programming model v1). `fixtures/AGENTS.md` sets the workspace limits for the agent.
 
 The scoring threshold is `1.0`. A stimulus passes only when each of its graders passes.
 

@@ -47,3 +47,7 @@ permission gap.
 | PS-04 | All HTTP functions in the app, including blueprints, use the extension types, with the same routes, methods, authorization, and names | Function inventory before and after |
 | PS-05 | Each endpoint keeps status, body, and Content-Type for success and error responses | Tests for each endpoint |
 | PS-06 | The streaming endpoint sends events in order, as they become available, and ends | Test with a finite event source |
+
+When a Python language stage is requested or required, also apply `PY-POST-01` to
+`PY-POST-03` from [Python language stage](python-language.md). Removing
+`PYTHON_ENABLE_INIT_INDEXING` after a move to Python 3.13 or later needs approval.

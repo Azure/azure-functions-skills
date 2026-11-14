@@ -46,8 +46,12 @@ The scenario table above is the registry. Each row points to one scenario refere
   v1 to v2, Python Blob SDK type bindings, Python HTTP streaming, extension bundles
   v1-v3 to v4, and the Durable Functions extension.
 - The bundle scenario also loads [Binding extensions](references/extensions.md) for the
-  extensions that the app uses, and the durable-v2 scenario when the app uses Durable Functions.
-  `extensions.md` is not a separate scenario.
+  extensions that the app uses. When the app uses Durable Functions, it reads the
+  [durable-v2](references/durable-v2.md) reference and applies its DF IDs inside the same
+  bundle plan and phase; this is not a second scenario or migration plan.
+- The Python scenarios share [Python language stage](references/python-language.md) for the
+  separate Python version handoff and its follow-up.
+- `extensions.md` and `python-language.md` are shared references, not separate scenarios.
 - Planned coverage: more scenarios, for example the Node.js programming model.
   A planned scenario is not available until its row exists.
 - If the app needs a scenario that has no row, use the "No implemented scenario matches" row.
@@ -137,10 +141,11 @@ material decisions that remain open. Do not assume every old defect is intended 
 Confirm target versions after research; "latest" is not a permanent fixed target.
 Record language updating as a separate stage, not part of the model conversion.
 
-When the scenario has a current target framework that is not its most current supported
-one, ask the user whether a language-version update is planned: now through common step 8,
-later through a separate tool or plugin, or not planned. Record the answer and, when
-planned, the required Functions follow-up in the plan's Target row, even when another
+When the app's current language version (for example, the .NET target framework or the
+Python version) is not the most current version that Functions supports, ask the user
+whether a language-version update is planned: now through common step 8, later through
+a separate tool or plugin, or not planned. Record the answer and, when planned, the
+scenario's required Functions follow-up in the plan's Target row, even when another
 tool will do the actual version change outside this skill entirely. This keeps the
 follow-up visible so it does not depend on the user returning to this skill.
 
