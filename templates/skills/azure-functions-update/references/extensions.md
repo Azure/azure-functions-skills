@@ -19,14 +19,16 @@ Select the language, model, and extension version on the page. For another bindi
 
 ## Bundle migration checks
 
-Sources checked on **2026-09-15**. First use the
+Sources checked on **2026-09-15**, rechecked on **2026-11-14**. First use the
 [tagged bundle comparison](bundles-v4.md) to identify the actual extension
 transition. Read only the following sections for bindings used by the app.
 
 ### Cosmos DB extension 3 to 4
 
 Use the [migration guide](https://learn.microsoft.com/en-us/azure/azure-functions/migrate-cosmos-db-version-3-version-4)
-(updated 2026-09-02). For `function.json` metadata:
+(updated 2026-09-02). Cosmos DB extension 3.x was retired on 31 August 2024 and no
+longer receives maintenance or support, so treat this transition as required, not
+optional. For `function.json` metadata:
 
 | Old property | New property |
 | --- | --- |

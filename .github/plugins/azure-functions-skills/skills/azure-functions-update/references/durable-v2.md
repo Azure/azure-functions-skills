@@ -10,9 +10,14 @@ Check the task hub name and stored state before a deployment. The default task h
 
 ## Extension v1 to v2
 
-Sources checked on **2026-09-15**. The
+Sources checked on **2026-09-15**, rechecked on **2026-11-14**. The
 [versions guide](https://learn.microsoft.com/en-us/azure/durable-task/durable-functions/durable-functions-versions)
-was updated on 2026-08-03. Bundle 1 includes DurableTask 1.x in the
+was updated on 2026-08-03. Its version summary lists v3.x as current and recommended,
+v2.x as maintained for security and bug fixes only, and v1.x as reaching end of support
+with Functions runtime 1.x on
+[14 September 2026](https://azure.microsoft.com/updates?id=support-for-the-1x-version-of-azure-functions-ends-14-september-2026).
+At the recheck date, a v1.x app is already out of support; do not present v2 as the
+final target. Bundle 1 includes DurableTask 1.x in the
 [observed releases](bundles-v4.md); current bundle 4 can cross both the
 DurableTask 1-to-2 and 2-to-3 boundaries.
 

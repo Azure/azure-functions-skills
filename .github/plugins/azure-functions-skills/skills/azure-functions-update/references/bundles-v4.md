@@ -66,6 +66,12 @@ including the alpha Storage version, not binary verification. The v4 rows
 use release bodies for resolved versions where manifests use major selectors.
 No binaries were executed to create this table. 4.39.1 was the latest stable
 release found at the check date, not a permanent target recommendation.
+On the **2026-11-14** recheck, releases 4.40.0, 4.41.0, and 4.41.1 were published
+with rollout still in progress; among the table columns, 4.41.1 changes only
+DurableTask (3.15.2). The extension bundles page still lists 4.x as Active and
+1.x to 3.x as Deprecated, with `[4.0.0, 5.0.0)` as the recommended range.
+Use the [latest release](https://github.com/Azure/azure-functions-extension-bundles/releases/latest)
+for the actual resolved target.
 
 Important consequences:
 
