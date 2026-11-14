@@ -1,12 +1,12 @@
 ---
 name: azure-functions-update
 title: Update Azure Functions
-description: 'Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Current scenario: C# in-process to .NET isolated worker; more scenarios are planned. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review.'
+description: 'Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Current scenarios: C# in-process to .NET isolated worker, Python programming model v1 to v2, Python Blob SDK type bindings, Python HTTP streaming, extension bundles v1-v3 to v4, and the Durable Functions extension v1 or v2 to a current version. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review.'
 category: task
 license: MIT
 metadata:
   author: Microsoft
-  version: "2.0.0"
+  version: "2.1.0"
 ---
 
 # Update Azure Functions
@@ -31,6 +31,11 @@ does not authorize changing them together or installing external tools.
 | Observed scenario | Reference |
 | --- | --- |
 | C# in-process Functions to isolated worker | [dotnet-isolated](references/dotnet-isolated.md) |
+| Python functions defined by `function.json` files (programming model v1) | [python-model-v2](references/python-model-v2.md) |
+| Python v2 Blob input or trigger that uses `func.InputStream` | [python-blob-sdk](references/python-blob-sdk.md) |
+| Python v2 HTTP functions that must stream responses | [python-http-streaming](references/python-http-streaming.md) |
+| `host.json` extension bundle range v1, v2, or v3 | [bundles-v4](references/bundles-v4.md) |
+| Durable Functions extension v1 or v2 (`Microsoft.Azure.WebJobs.Extensions.DurableTask` or a bundle that contains it) | [durable-v2](references/durable-v2.md) |
 | No implemented scenario matches | Assess within permission, report the missing route, and stop conversion |
 
 Do not use this workflow for new apps, cross-cloud migration, deployment-only work,
@@ -42,9 +47,14 @@ deployment, and SKU decisions. Do not start a second migration plan during a han
 This skill is the umbrella workflow for Azure Functions migration scenarios.
 The scenario table above is the registry. Each row points to one scenario reference.
 
-- Current coverage: the C# in-process to .NET isolated worker scenario only.
-- Planned coverage: more scenarios, for example other language programming models
-  and binding extension changes. A planned scenario is not available until its row exists.
+- Current coverage: C# in-process to .NET isolated worker, Python programming model
+  v1 to v2, Python Blob SDK type bindings, Python HTTP streaming, extension bundles
+  v1-v3 to v4, and the Durable Functions extension.
+- The bundle scenario also loads [Binding extensions](references/extensions.md) for the
+  extensions that the app uses, and the durable-v2 scenario when the app uses Durable Functions.
+  `extensions.md` is not a separate scenario.
+- Planned coverage: more scenarios, for example the Node.js programming model.
+  A planned scenario is not available until its row exists.
 - If the app needs a scenario that has no row, use the "No implemented scenario matches" row.
 
 Select one row from the observed inventory facts in step 3. The user's words alone are
@@ -131,6 +141,13 @@ Use code/tests and the user's existing answers to establish expectations. Ask on
 material decisions that remain open. Do not assume every old defect is intended behavior.
 Confirm target versions after research; "latest" is not a permanent fixed target.
 Record language updating as a separate stage, not part of the model conversion.
+
+When the scenario has a current target framework that is not its most current supported
+one, ask the user whether a language-version update is planned: now through common step 8,
+later through a separate tool or plugin, or not planned. Record the answer and, when
+planned, the required Functions follow-up in the plan's Target row, even when another
+tool will do the actual version change outside this skill entirely. This keeps the
+follow-up visible so it does not depend on the user returning to this skill.
 
 Local validation is the default. Select actual compatible emulators or Docker brokers
 when needed, such as RabbitMQ, Kafka, or SQL. Record their limits and required approval.
