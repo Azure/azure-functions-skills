@@ -12,7 +12,9 @@ directory from one pasted prompt. Its design is in
 2. The link redirects to the bundle's generated `start.md` under
    [`starter/`](../starter/). `start.md` tells the agent to pick the OS and its
    own agent slug, and to run one command.
-3. `install.ps1` or `install.sh` resolves the branch to one commit SHA, downloads
+3. `install.ps1` or `install.sh` resolves the branch to one commit SHA (from the
+   GitHub API, or, when the anonymous API is rate limited, from the repository's
+   Git ref advertisement on `github.com`), downloads
    that commit's archive from `codeload.github.com`, extracts only `starter/`,
    and runs the bootstrap.
 4. The bootstrap verifies every selected file against its SHA-256 hash, checks
@@ -106,7 +108,7 @@ a `conflict` error also lists `files`.
 | `error.code` | Cause |
 | --- | --- |
 | `resolve-failed` | The commit lookup failed or returned an invalid value. |
-| `rate-limited` | The commit lookup returned HTTP 403 or 429. Retry later, or pin a SHA with `-Ref`. |
+| `rate-limited` | The commit lookup returned HTTP 403 or 429, and the Git ref advertisement fallback also failed. Retry later, or pin a SHA with `-Ref`. |
 | `download-failed` | The archive download or extraction failed. |
 | `engine-mismatch` | The archive needs a newer installer than the cached `install.*`. Retry in a few minutes. |
 | `integrity-failed` | A payload file did not match its hash, or the manifest is invalid. |

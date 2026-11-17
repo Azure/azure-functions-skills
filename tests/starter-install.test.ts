@@ -22,15 +22,44 @@ const PINNED = 'd'.repeat(40);
 const KEY = '00000000-0000-4000-8000-000000000123';
 let temp: string;
 let port: number;
+const OTHER = 'e'.repeat(40);
 let lookup: 'ok' | 'rate-limited' = 'ok';
+let refs: 'ok' | 'fail' = 'ok';
 const archives = new Map<string, Buffer>();
 const events: Array<Record<string, unknown>> = [];
 const lookups: string[] = [];
+const refLookups: string[] = [];
+
+/** One pkt-line of the Git smart HTTP protocol. */
+function pkt(line: string): string {
+  return (Buffer.byteLength(line) + 4).toString(16).padStart(4, '0') + line;
+}
+
+/** A ref advertisement with decoys around the wanted branch. */
+const ADVERTISEMENT = '001e# service=git-upload-pack\n0000'
+  + pkt(`${OTHER} HEAD\0multi_ack symref=HEAD:refs/heads/main agent=git/test\n`)
+  + pkt(`${OTHER} refs/heads/feature/main\n`)
+  + pkt(`${SHA} refs/heads/main\n`)
+  + pkt(`${OTHER} refs/heads/main-old\n`)
+  + pkt(`${OTHER} refs/tags/main\n`)
+  + '0000';
+
 const server = createServer((request, response) => {
   const chunks: Buffer[] = [];
   request.on('data', chunk => chunks.push(Buffer.from(chunk)));
   request.on('end', () => {
     const url = request.url ?? '';
+    if (url === '/contoso/starter-repo.git/info/refs?service=git-upload-pack') {
+      refLookups.push(url);
+      if (refs === 'fail') {
+        response.writeHead(503);
+        response.end();
+        return;
+      }
+      response.writeHead(200, { 'Content-Type': 'application/x-git-upload-pack-advertisement' });
+      response.end(ADVERTISEMENT);
+      return;
+    }
     if (url === '/repos/contoso/starter-repo/commits/main') {
       lookups.push(url);
       if (lookup === 'rate-limited') {
@@ -61,7 +90,7 @@ const server = createServer((request, response) => {
 
 function makeArchive(name: string, commit: string, engine?: string): void {
   const base = `http://127.0.0.1:${port}`;
-  const files = buildFixture({ endpoints: { api: base, codeload: base, telemetry: base, instrumentationKey: KEY, httpsOnly: false } });
+  const files = buildFixture({ endpoints: { api: base, codeload: base, git: base, telemetry: base, instrumentationKey: KEY, httpsOnly: false } });
   if (engine) files.set('engine-version', Buffer.from(`${engine}\n`));
   const stage = join(temp, `stage ${name}`);
   writeFixture(files, join(stage, `starter-repo-${commit}`, 'starter'));
@@ -164,9 +193,31 @@ describe.each(SHELLS)('starter installer (%s)', (shell: Shell) => {
     expect(events).toHaveLength(first);
   }, 240_000);
 
+  it('resolves the branch from the Git ref advertisement when the API is rate limited (ST-019)', async () => {
+    lookup = 'rate-limited';
+    refs = 'ok';
+    const apiBefore = lookups.length;
+    const refsBefore = refLookups.length;
+    const result = await install(shell, destination('fallback'), { noTelemetry: true });
+    lookup = 'ok';
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.json).toMatchObject({ ready: true, sourceCommit: SHA, error: null });
+    expect(lookups.length - apiBefore).toBe(1);
+    expect(refLookups.length - refsBefore).toBe(1);
+  }, 240_000);
+
+  it('does not use the Git ref advertisement when the API answers', async () => {
+    lookup = 'ok';
+    const refsBefore = refLookups.length;
+    expect((await install(shell, destination('api'), { noTelemetry: true })).status).toBe(0);
+    expect(refLookups).toHaveLength(refsBefore);
+  }, 240_000);
+
   it('reports rate limiting and an engine mismatch with their codes (ST-019)', async () => {
     lookup = 'rate-limited';
+    refs = 'fail';
     const limited = await install(shell, destination('rate'));
+    refs = 'ok';
     expect(limited.status).toBe(2);
     expect(limited.json).toMatchObject({ ready: false, error: { code: 'rate-limited' } });
     lookup = 'ok';
