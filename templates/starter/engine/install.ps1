@@ -24,6 +24,7 @@ $branch = '__AFS_BRANCH__'
 $payloadPath = '__AFS_PATH__'
 $apiBase = '__AFS_API_BASE__'
 $codeloadBase = '__AFS_CODELOAD_BASE__'
+$gitBase = '__AFS_GIT_BASE__'
 $telemetryEndpoint = '__AFS_TELEMETRY_ENDPOINT__'
 $instrumentationKey = '__AFS_INSTRUMENTATION_KEY__'
 $skillsVersion = '__AFS_SKILLS_VERSION__'
@@ -52,18 +53,39 @@ try {
 
     $commit = $Ref
     if ($Ref -ceq $branch) {
+        $commit = $null
         try {
             $response = Invoke-WebRequest -UseBasicParsing -Uri "$apiBase/repos/$repository/commits/$branch" -Headers @{ Accept = 'application/vnd.github.sha' } -TimeoutSec 30
+            $content = $response.Content
+            if ($content -is [byte[]]) { $content = [Text.Encoding]::UTF8.GetString($content) }
+            $commit = ([string]$content).Trim()
         } catch {
             $status = Get-StatusCode $_
-            if ($status -eq 403 -or $status -eq 429) {
+            if ($status -ne 403 -and $status -ne 429) {
+                Stop-Installer 'resolve-failed' "Cannot resolve $branch to a commit (HTTP $status). No fallback source was used."
+            }
+        }
+        if ($null -eq $commit) {
+            # The anonymous API allows 60 requests per hour per IP address, which a
+            # shared network can use up. Read the same branch from the Git ref
+            # advertisement of the same repository instead. The archive is still
+            # checked file by file against the manifest hashes.
+            try {
+                $advertisement = Invoke-WebRequest -UseBasicParsing -Uri "$gitBase/$repository.git/info/refs?service=git-upload-pack" -TimeoutSec 30
+            } catch {
                 Stop-Installer 'rate-limited' 'GitHub refused the commit lookup (rate limit). Retry later, or pin a full commit SHA with -Ref.'
             }
-            Stop-Installer 'resolve-failed' "Cannot resolve $branch to a commit (HTTP $status). No fallback source was used."
+            $content = $advertisement.Content
+            if ($content -is [byte[]]) { $content = [Text.Encoding]::UTF8.GetString($content) }
+            $wanted = " refs/heads/$branch"
+            $commit = ''
+            foreach ($line in ([string]$content).Split([char[]]@("`n", "`r", [char]0))) {
+                if ($line.Length -ge 40 + $wanted.Length -and $line.EndsWith($wanted, [StringComparison]::Ordinal)) {
+                    $commit = $line.Substring($line.Length - $wanted.Length - 40, 40)
+                    break
+                }
+            }
         }
-        $content = $response.Content
-        if ($content -is [byte[]]) { $content = [Text.Encoding]::UTF8.GetString($content) }
-        $commit = ([string]$content).Trim()
         if ($commit -cnotmatch '^[0-9a-f]{40}$') { Stop-Installer 'resolve-failed' 'GitHub returned an invalid commit SHA.' }
     }
 
