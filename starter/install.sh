@@ -12,6 +12,7 @@ branch='test/prompt-starter-e2e'
 payload_path='starter'
 api_base='https://api.github.com'
 codeload_base='https://codeload.github.com'
+git_base='https://github.com'
 telemetry_endpoint='https://westus2-2.in.applicationinsights.azure.com'
 instrumentation_key='a5ea7fbd-8657-4d92-8dd1-c059329b11e8'
 skills_version='0.0.7-preview'
@@ -78,11 +79,23 @@ if [ "$ref" = "$branch" ]; then
         -H 'Accept: application/vnd.github.sha' -o "$temporary/commit" -w '%{http_code}' \
         "$api_base/repos/$repository/commits/$branch" 2>/dev/null) || status=000
     case "$status" in
-        200) ;;
-        403|429) fail rate-limited 'GitHub refused the commit lookup (rate limit). Retry later, or pin a full commit SHA with --ref.' ;;
+        200) commit=$(tr -d ' \r\n' < "$temporary/commit") ;;
+        403|429)
+            # The anonymous API allows 60 requests per hour per IP address, which a
+            # shared network can use up. Read the same branch from the Git ref
+            # advertisement of the same repository instead. The archive is still
+            # checked file by file against the manifest hashes.
+            # shellcheck disable=SC2086
+            curl --fail --silent --show-error --location $curl_protocols --connect-timeout 15 --max-time 30 \
+                -o "$temporary/refs" "$git_base/$repository.git/info/refs?service=git-upload-pack" 2>/dev/null ||
+                fail rate-limited 'GitHub refused the commit lookup (rate limit). Retry later, or pin a full commit SHA with --ref.'
+            commit=$(tr '\000\r' '\n\n' < "$temporary/refs" | LC_ALL=C awk -v ref=" refs/heads/$branch" '
+                length($0) >= 40 + length(ref) && substr($0, length($0) - length(ref) + 1) == ref {
+                    print substr($0, length($0) - length(ref) - 39, 40); exit
+                }')
+            ;;
         *) fail resolve-failed "Cannot resolve $branch to a commit (HTTP $status). No fallback source was used." ;;
     esac
-    commit=$(tr -d ' \r\n' < "$temporary/commit")
     [ "${#commit}" -eq 40 ] || fail resolve-failed 'GitHub returned an invalid commit SHA.'
     case "$commit" in *[!0-9a-f]*) fail resolve-failed 'GitHub returned an invalid commit SHA.' ;; esac
 fi

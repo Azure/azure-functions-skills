@@ -3,7 +3,7 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Finalized |
-| Revision | 10 |
+| Revision | 11 |
 | Created | 2026-11-14 |
 | Updated | 2026-11-15 |
 | Author | Claude Code, based on Tsuyoshi Ushio's requirements and decisions |
@@ -94,7 +94,7 @@ Gaps in this repository:
 | ST-016 | A rerun after `main` has moved is safe. | With a bundle installed at commit X, a run at commit Y exits 0, writes no existing file, and reports each file as `current`, `outdated`, or `modified`. |
 | ST-017 | The hook loads its runtime only from the project. | With a hostile runtime in an ancestor directory and none in the project, the hook sends nothing and executes nothing from the ancestor. |
 | ST-018 | Existing plugin-style workspace assets are detected and reported. | With `.github/skills/azure-functions-*` or a `hooks/runtime/telemetry.mjs` present, the report has `coexistence: "workspace"`. |
-| ST-019 | Installer failures are distinguishable. | Each failure in the failure table returns its `error.code`; a test with an HTTP 403 from the SHA lookup returns `rate-limited`. |
+| ST-019 | Installer failures are distinguishable. | Each failure in the failure table returns its `error.code`; a test with an HTTP 403 from the SHA lookup and a failed ref advertisement returns `rate-limited`; with a working ref advertisement the install succeeds with the advertised commit. |
 
 ### Non-goals
 
@@ -303,7 +303,7 @@ missing files, 2 failure.
 | `error.code` | Cause | What `start.md` has the agent say |
 | --- | --- | --- |
 | `resolve-failed` | SHA lookup failed or returned an invalid value | Retry later, or use a pinned SHA |
-| `rate-limited` | SHA lookup returned 403/429 (unauthenticated limit, often shared egress) | Retry later, or use a pinned SHA |
+| `rate-limited` | SHA lookup returned 403/429 (unauthenticated limit, often shared egress) and the Git ref advertisement fallback also failed (D-035) | Retry later, or use a pinned SHA |
 | `download-failed` | Archive download failed | Check GitHub HTTPS access |
 | `engine-mismatch` | Archive needs a newer installer than the cached raw `install.*` | Retry in a few minutes |
 | `integrity-failed` | A payload hash did not match | Stop; report the file |
@@ -313,7 +313,10 @@ missing files, 2 failure.
 The raw `install.*` can be older than the resolved commit because it is cached.
 The archive carries an engine version; the installer stops with
 `engine-mismatch` when the archive requires a newer one. There is no retry and
-no fallback source.
+no fallback source. When the SHA lookup returns 403 or 429, the installer reads
+the same branch from the same repository's Git ref advertisement
+(`https://github.com/<repository>.git/info/refs?service=git-upload-pack`)
+instead (D-035). This resolves the same commit; it is not another payload source.
 
 ### Prerequisite help (ST-004)
 
@@ -540,6 +543,7 @@ The prototype's `skills-update` skill is not ported.
 | D-032 | Hook runtime search in a project without `.git` and without a host project directory | The project root is the host project directory, or the nearest directory that contains `.git` or the agent's hook file (`HOOK_DESTINATIONS`). The runtime is loaded only from that root; with no root before the home directory or the file-system root, nothing is loaded. Before this, a missing local runtime let the walk continue to a shared ancestor such as a Windows drive root, where any user can create folders (PR review). Tightens D-018. Proposal; not approval. | Claude Code (proposal) | 2026-11-17 |
 | D-033 | `lint:security` exception for the one-liners | The whole line must equal a generated installer command (bundle, optional template, agent placeholder or slug). A line that only contains the approved URL, for example in a comment next to another command or with a second command appended, is rejected (PR review). Tightens D-023's lint control. Proposal; not approval. | Claude Code (proposal) | 2026-11-17 |
 | D-034 | Review of D-032 and D-033 | Approve D-032 and D-033 as proposed. | Tsuyoshi Ushio (human) | 2026-11-17 |
+| D-035 | Commit lookup when the anonymous GitHub API is rate limited | On HTTP 403 or 429 from `api.github.com`, read `refs/heads/<branch>` from the same repository's Git ref advertisement on `github.com` and use that commit; only when that also fails, stop with `rate-limited`. The API stays first because it is the documented interface. Found in the end-to-end test: the anonymous limit is 60 requests per hour per IP address, and a shared corporate egress used it up, so the first pasted prompt failed. The archive download and SHA-256 checks are unchanged. Proposal; not approval. | Claude Code (proposal) | 2026-11-17 |
 
 ## 6. Test plan
 
@@ -594,11 +598,11 @@ release process.
 
 | Item | Evidence |
 | --- | --- |
-| Independent architecture review | One pass on revision 3 by a separate Claude Code review agent, 2026-11-14: 6 blockers, 11 major, 11 minor. Addressed in revision 4 (D-016 to D-022, ST-015 to ST-019, open questions 1 to 3). Revision 5 adds only the human decision D-023; revision 6 records D-024 to D-027; revision 7 adds the implementation proposals D-028 to D-030; revision 8 records their approval (D-031); revision 9 adds the review-driven proposals D-032 and D-033; revision 10 records their approval (D-034). Revisions 4 to 10 are not re-reviewed by an agent; the human approver read revision 5. A review by a different model family, as `AGENTS.md` asks, is pending. |
+| Independent architecture review | One pass on revision 3 by a separate Claude Code review agent, 2026-11-14: 6 blockers, 11 major, 11 minor. Addressed in revision 4 (D-016 to D-022, ST-015 to ST-019, open questions 1 to 3). Revision 5 adds only the human decision D-023; revision 6 records D-024 to D-027; revision 7 adds the implementation proposals D-028 to D-030; revision 8 records their approval (D-031); revision 9 adds the review-driven proposals D-032 and D-033; revision 10 records their approval (D-034); revision 11 adds D-035 from the end-to-end test. Revisions 4 to 11 are not re-reviewed by an agent; the human approver read revision 5. A review by a different model family, as `AGENTS.md` asks, is pending. |
 | Human approval | Tsuyoshi Ushio |
 | Approved revision and scope | Revision 5 (SHA-256 of LF-normalized content `8f0557575c06c3a136c1eab66ea4b04a43ade4e2f2208a3a43e4f2efb01ae64e`) plus the decisions D-024 to D-027 recorded in revision 6, D-028 to D-030 approved by D-031 in revision 8, and D-032 and D-033 approved by D-034 in revision 10. Whole document. |
 | Approval reference and date | Chat approval in the authoring session, 2026-11-15: proposals approved and implementation requested. Chat approval of D-028 to D-030, 2026-11-17. Chat approval of D-032 and D-033, 2026-11-17. |
-| Implementation reference | Branch `feat/prompt-starter` (uncommitted at the time of writing): checkpoints 1 to 3 implemented. `starter.config.json`, `templates/starter/`, `src/starter/`, `starter/`, telemetry changes in `src/telemetry/`, extended `scripts/lint-skill-content.mjs`. Checkpoint 4 (`hosted-skills` with the `timer` template, lock file, refresh) and checkpoint 5 (Windows/macOS/Linux CI matrix) are not started; CI runs the new tests on Ubuntu with `sh` and `pwsh`. D-028 to D-030 are approved (D-031). D-032 and D-033 are approved (D-034). |
+| Implementation reference | Branch `feat/prompt-starter` (uncommitted at the time of writing): checkpoints 1 to 3 implemented. `starter.config.json`, `templates/starter/`, `src/starter/`, `starter/`, telemetry changes in `src/telemetry/`, extended `scripts/lint-skill-content.mjs`. Checkpoint 4 (`hosted-skills` with the `timer` template, lock file, refresh) and checkpoint 5 (Windows/macOS/Linux CI matrix) are not started; CI runs the new tests on Ubuntu with `sh` and `pwsh`. D-028 to D-030 are approved (D-031). D-032 and D-033 are approved (D-034). D-035 awaits human review. |
 | Acceptance evidence | Local run on Windows 11 with Git for Windows `sh`, PowerShell 7, and Windows PowerShell 5.1 (`Restricted` execution policy): `tests/starter-build.test.ts` (ST-001, ST-003, ST-006, ST-011, ST-014), `tests/starter-bootstrap.test.ts` (ST-002 to ST-005, ST-007, ST-010, ST-012, ST-013, ST-016, ST-018, ST-019), `tests/starter-tools.test.ts` (ST-004), `tests/starter-hook.test.ts` (ST-007, ST-008, ST-010, ST-015, ST-017), `tests/starter-install.test.ts` (ST-003, ST-009, ST-010, ST-019), `tests/starter-telemetry.test.ts` (D-019). Not yet: macOS and Linux runs, the symlink case on POSIX (skipped on Windows), manual paste-a-prompt runs on each agent, live ingestion of the setup event, and the aka.ms records. |
 
 Not verified by the review, and still open as implementation risks: Windows

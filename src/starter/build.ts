@@ -13,6 +13,8 @@ export const STARTER_ENGINE_VERSION = 1;
 export interface StarterEndpoints {
   readonly api: string;
   readonly codeload: string;
+  /** Git smart HTTP host; its ref advertisement resolves the branch when the API is rate limited. */
+  readonly git: string;
   readonly raw: string;
   readonly telemetry: string;
   readonly instrumentationKey: string;
@@ -23,6 +25,7 @@ export interface StarterEndpoints {
 export const DEFAULT_STARTER_ENDPOINTS: Omit<StarterEndpoints, 'telemetry' | 'instrumentationKey'> = {
   api: 'https://api.github.com',
   codeload: 'https://codeload.github.com',
+  git: 'https://github.com',
   raw: 'https://raw.githubusercontent.com',
   httpsOnly: true,
 };
@@ -211,6 +214,7 @@ function installerSubstitutions(input: StarterBuildInput): Record<string, string
     __AFS_PATH__: path,
     __AFS_API_BASE__: input.endpoints.api,
     __AFS_CODELOAD_BASE__: input.endpoints.codeload,
+    __AFS_GIT_BASE__: input.endpoints.git,
     __AFS_TELEMETRY_ENDPOINT__: input.endpoints.telemetry.replace(/\/+$/, ''),
     __AFS_INSTRUMENTATION_KEY__: input.endpoints.instrumentationKey,
     __AFS_SKILLS_VERSION__: input.packageVersion,
