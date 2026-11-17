@@ -83,6 +83,13 @@ When the user asks for a common trigger name, map it to one of the template IDs 
 | Timer trigger | `typescript` | `timer-trigger-typescript-azd` |
 | Blob trigger | `typescript` | `blob-eventgrid-trigger-typescript-azd` |
 | Queue / Service Bus trigger | `typescript` | `servicebus-trigger-typescript-azd` |
+| Office 365 Outlook connector trigger (new, flagged, or mentioned email; new, upcoming, or updated calendar events; shared mailbox email) | `csharp` / `typescript` / `python` | `office365-connector-trigger-<language>` |
+| SharePoint Online connector trigger (new, updated, or deleted files and list items; form submissions; file classification; recurring digest) | `csharp` / `typescript` / `python` | `sharepoint-connector-trigger-<language>` |
+| Microsoft Teams connector trigger driving an AI hosted skill (IT helpdesk) | `python` | `ai-hosted-skills-teams-helpdesk-connector-python` |
+
+Connector trigger templates receive events from a Connector Namespace (`Microsoft.Web/connectorGateways`). They provision an OAuth connection that the user must authorize in a post-deploy step. The Office 365 TypeScript template contains only a new-email trigger. The other Office 365 and SharePoint templates include several triggers; keep the ones the user needs and remove the rest. For the Teams helpdesk hosted skill, use **azure-functions-hosted-skills**, not this skill.
+
+Only the connectors above have connector trigger templates. For any other connector, such as Teams (without a hosted skill), OneDrive, Azure Blob, Dataverse, Salesforce, Planner, or Azure DevOps, do **not** guess a template ID like `teams-connector-trigger-python`. Check the returned template list. If no template matches, tell the user that no official template exists, and ask whether to start from the closest returned template or use **azure-functions-hosted-skills** for a connector-triggered AI agent.
 
 If a template-get call fails with "template not found", immediately recover by calling `functions_template_get` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
 
