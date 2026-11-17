@@ -3,7 +3,7 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Finalized |
-| Revision | 8 |
+| Revision | 9 |
 | Created | 2026-11-14 |
 | Updated | 2026-11-15 |
 | Author | Claude Code, based on Tsuyoshi Ushio's requirements and decisions |
@@ -349,10 +349,11 @@ because `functions-tools.mjs` and the telemetry hooks need it.
   directories.
 
 **Hook command.** `node -e` with a bash and a PowerShell form. It looks for
-`.azure-functions-skills/runtime/telemetry.mjs` from the current directory
-upward and stops at the project root: the host-provided project directory when
-available, otherwise the nearest directory containing `.git`. It never goes to
-the home directory or above. It imports the file and calls `runHook`. With no
+`.azure-functions-skills/runtime/telemetry.mjs` only in the project root: the
+host-provided project directory, or the nearest directory from the current
+directory upward that contains `.git` or the agent's own hook file. When no
+root is found before the home directory or the file-system root, it loads
+nothing (D-032). It imports the file and calls `runHook`. With no
 Node or no runtime it exits silently. Hook timeout is 8 seconds; the runtime
 keeps its 5 second send and 5.5 second deadline.
 
@@ -536,6 +537,8 @@ The prototype's `skills-update` skill is not ported.
 | D-029 | Install record commit when a later run only finds files current | A record and its commit change only when the run created a file in that record's group, so `installed.runtimeCommit` names the commit whose bytes are installed. Clarifies D-016. Proposal; not approval. | Claude Code (proposal) | 2026-11-15 |
 | D-030 | Failure report shape | On failure the report is `{schemaVersion, ready: false, error: {code, message[, files]}}` without the other fields, because a failure can happen before they are known. Clarifies the report schema. Proposal; not approval. | Claude Code (proposal) | 2026-11-15 |
 | D-031 | Review of D-028 to D-030 | Approve D-028, D-029, and D-030 as proposed. | Tsuyoshi Ushio (human) | 2026-11-17 |
+| D-032 | Hook runtime search in a project without `.git` and without a host project directory | The project root is the host project directory, or the nearest directory that contains `.git` or the agent's hook file (`HOOK_DESTINATIONS`). The runtime is loaded only from that root; with no root before the home directory or the file-system root, nothing is loaded. Before this, a missing local runtime let the walk continue to a shared ancestor such as a Windows drive root, where any user can create folders (PR review). Tightens D-018. Proposal; not approval. | Claude Code (proposal) | 2026-11-17 |
+| D-033 | `lint:security` exception for the one-liners | The whole line must equal a generated installer command (bundle, optional template, agent placeholder or slug). A line that only contains the approved URL, for example in a comment next to another command or with a second command appended, is rejected (PR review). Tightens D-023's lint control. Proposal; not approval. | Claude Code (proposal) | 2026-11-17 |
 
 ## 6. Test plan
 
@@ -590,11 +593,11 @@ release process.
 
 | Item | Evidence |
 | --- | --- |
-| Independent architecture review | One pass on revision 3 by a separate Claude Code review agent, 2026-11-14: 6 blockers, 11 major, 11 minor. Addressed in revision 4 (D-016 to D-022, ST-015 to ST-019, open questions 1 to 3). Revision 5 adds only the human decision D-023; revision 6 records D-024 to D-027; revision 7 adds the implementation proposals D-028 to D-030; revision 8 records their approval (D-031). Revisions 4 to 8 are not re-reviewed by an agent; the human approver read revision 5. A review by a different model family, as `AGENTS.md` asks, is pending. |
+| Independent architecture review | One pass on revision 3 by a separate Claude Code review agent, 2026-11-14: 6 blockers, 11 major, 11 minor. Addressed in revision 4 (D-016 to D-022, ST-015 to ST-019, open questions 1 to 3). Revision 5 adds only the human decision D-023; revision 6 records D-024 to D-027; revision 7 adds the implementation proposals D-028 to D-030; revision 8 records their approval (D-031); revision 9 adds the review-driven proposals D-032 and D-033. Revisions 4 to 9 are not re-reviewed by an agent; the human approver read revision 5. A review by a different model family, as `AGENTS.md` asks, is pending. |
 | Human approval | Tsuyoshi Ushio |
 | Approved revision and scope | Revision 5 (SHA-256 of LF-normalized content `8f0557575c06c3a136c1eab66ea4b04a43ade4e2f2208a3a43e4f2efb01ae64e`) plus the decisions D-024 to D-027 recorded in revision 6, and D-028 to D-030 approved by D-031 in revision 8. Whole document. |
 | Approval reference and date | Chat approval in the authoring session, 2026-11-15: proposals approved and implementation requested. Chat approval of D-028 to D-030, 2026-11-17. |
-| Implementation reference | Branch `feat/prompt-starter` (uncommitted at the time of writing): checkpoints 1 to 3 implemented. `starter.config.json`, `templates/starter/`, `src/starter/`, `starter/`, telemetry changes in `src/telemetry/`, extended `scripts/lint-skill-content.mjs`. Checkpoint 4 (`hosted-skills` with the `timer` template, lock file, refresh) and checkpoint 5 (Windows/macOS/Linux CI matrix) are not started; CI runs the new tests on Ubuntu with `sh` and `pwsh`. D-028 to D-030 are approved (D-031). |
+| Implementation reference | Branch `feat/prompt-starter` (uncommitted at the time of writing): checkpoints 1 to 3 implemented. `starter.config.json`, `templates/starter/`, `src/starter/`, `starter/`, telemetry changes in `src/telemetry/`, extended `scripts/lint-skill-content.mjs`. Checkpoint 4 (`hosted-skills` with the `timer` template, lock file, refresh) and checkpoint 5 (Windows/macOS/Linux CI matrix) are not started; CI runs the new tests on Ubuntu with `sh` and `pwsh`. D-028 to D-030 are approved (D-031). D-032 and D-033 await human review. |
 | Acceptance evidence | Local run on Windows 11 with Git for Windows `sh`, PowerShell 7, and Windows PowerShell 5.1 (`Restricted` execution policy): `tests/starter-build.test.ts` (ST-001, ST-003, ST-006, ST-011, ST-014), `tests/starter-bootstrap.test.ts` (ST-002 to ST-005, ST-007, ST-010, ST-012, ST-013, ST-016, ST-018, ST-019), `tests/starter-tools.test.ts` (ST-004), `tests/starter-hook.test.ts` (ST-007, ST-008, ST-010, ST-015, ST-017), `tests/starter-install.test.ts` (ST-003, ST-009, ST-010, ST-019), `tests/starter-telemetry.test.ts` (D-019). Not yet: macOS and Linux runs, the symlink case on POSIX (skipped on Windows), manual paste-a-prompt runs on each agent, live ingestion of the setup event, and the aka.ms records. |
 
 Not verified by the review, and still open as implementation risks: Windows

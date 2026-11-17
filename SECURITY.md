@@ -46,8 +46,10 @@ D-023), bound to these controls:
   review as the plugin payload. The aka.ms records are a second control point;
   their owner is recorded in FRD-0004 (D-025).
 - `lint:security` scans `templates/starter/` and `starter/`, and allows the
-  download-then-run form only in a generated `start.md` for the configured URL.
-- The telemetry hook loads code only from inside the project.
+  download-then-run form only when a whole line of a generated `start.md` equals
+  the generated installer command for the configured URL.
+- The telemetry hook loads code only from the project root, and loads nothing
+  when it cannot find one.
 
 ## Defense layers built into this repo
 

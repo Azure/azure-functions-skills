@@ -1,5 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { loadSkills } from '../../src/build/loader.js';
 import type { TelemetryRuntime } from '../../src/build/telemetry-runtime.js';
@@ -206,14 +208,42 @@ export function shellExecutable(shell: Shell): string {
   return path;
 }
 
-/** A PATH with the shell's own directory and OS directories, but no developer tools. */
+/** Commands the tool probes look for; a minimal PATH must not contain any of them. */
+const DEVELOPER_TOOLS = new Set(['node', 'nodejs', 'func', 'az', 'azd', 'python', 'python3', 'azurite', 'npm', 'npx']);
+const minimalBins = new Map<Shell, string>();
+
+/**
+ * A PATH with the shell and OS commands, but no developer tools. On Windows the
+ * system directories hold none. On POSIX, CI images install tools such as `az`
+ * into `/usr/bin`, so the PATH is one private directory that links every
+ * command from the shell's directory, `/usr/bin`, and `/bin` except the
+ * developer tools.
+ */
 export function minimalPath(shell: Shell): string {
   if (process.platform === 'win32') {
     const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
     const system = [join(systemRoot, 'System32'), systemRoot, join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0')];
     return [dirname(shellExecutable(shell)), ...system].join(';');
   }
-  return [dirname(shellExecutable(shell)), '/usr/bin', '/bin'].filter((value, index, all) => all.indexOf(value) === index).join(':');
+  const cached = minimalBins.get(shell);
+  if (cached !== undefined) return cached;
+  const bin = mkdtempSync(join(tmpdir(), 'afs-minimal-path-'));
+  process.once('exit', () => rmSync(bin, { recursive: true, force: true }));
+  for (const directory of [dirname(shellExecutable(shell)), '/usr/bin', '/bin']) {
+    if (!existsSync(directory)) continue;
+    for (const name of readdirSync(directory)) {
+      if (DEVELOPER_TOOLS.has(name) || existsSync(join(bin, name))) continue;
+      const source = join(directory, name);
+      try {
+        if (!statSync(source).isFile()) continue;
+        symlinkSync(source, join(bin, name));
+      } catch {
+        // Dangling or unreadable entries are not commands the bootstrap needs.
+      }
+    }
+  }
+  minimalBins.set(shell, bin);
+  return bin;
 }
 
 export const REPORT_KEYS = [

@@ -36,7 +36,6 @@ const ROOTS = [
   { dir: join(REPO_ROOT, 'templates', 'starter'), extensions: ['.md', '.sh', '.ps1'] },
   ...(STARTER_PAYLOAD ? [{ dir: join(REPO_ROOT, ...STARTER_PAYLOAD.split('/')), extensions: ['.md', '.sh', '.ps1'] }] : []),
 ];
-const STARTER_ONE_LINER_PATTERNS = new Set(['scriptblock-remote', 'download-then-run']);
 
 // Each pattern: { name, regex, reason }
 const PATTERNS = [
@@ -105,11 +104,24 @@ const ALLOW_COMMENT = /<!--\s*skill-lint:\s*allow\s+(.+?)\s*-->/i;
 
 const findings = [];
 
+// The exact one-liners that src/starter/build.ts generates (powerShellCommand,
+// posixCommand). The whole line must match, so nothing can be prepended,
+// appended, or hidden in a comment next to the approved URL.
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+const NAME = '[a-z0-9][a-z0-9-]*';
+const AGENT = '(?:<agent>|copilot|claude|codex)';
+const STARTER_ONE_LINERS = STARTER_RAW_BASE ? {
+  'scriptblock-remote': new RegExp(`^& \\(\\[scriptblock\\]::Create\\(\\(Invoke-RestMethod '${escapeRegExp(`${STARTER_RAW_BASE}/install.ps1`)}'\\)\\)\\) -Bundle ${NAME}(?: -Template ${NAME})? -Agent ${AGENT} -Json$`),
+  'download-then-run': new RegExp(`^${escapeRegExp(`(set -eu; installer=$(mktemp); trap 'rm -f "$installer"' EXIT; curl -fsSL --proto '=https' --proto-redir '=https' '${STARTER_RAW_BASE}/install.sh' -o "$installer"; sh "$installer" --bundle `)}${NAME}(?: --template ${NAME})? --agent ${AGENT} --json\\)$`),
+} : {};
+
 function isApprovedStarterOneLiner(rel, line, pattern) {
-  if (!STARTER_ONE_LINER_PATTERNS.has(pattern.name) || !STARTER_PAYLOAD || !STARTER_RAW_BASE) return false;
+  const expected = STARTER_ONE_LINERS[pattern.name];
+  if (!expected || !STARTER_PAYLOAD) return false;
   if (!rel.startsWith(`${STARTER_PAYLOAD}/`) || !rel.endsWith('/start.md')) return false;
-  const installer = pattern.name === 'scriptblock-remote' ? 'install.ps1' : 'install.sh';
-  return line.includes(`'${STARTER_RAW_BASE}/${installer}'`);
+  return expected.test(line);
 }
 
 function walk(dir, extensions) {

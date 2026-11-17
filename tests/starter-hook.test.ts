@@ -149,6 +149,39 @@ describe('starter telemetry hook', () => {
     expect(requests).toHaveLength(first);
   }, 120_000);
 
+  it.each(['claude', 'codex', 'copilot'] as const)(
+    'stops at a non-Git project root marked by the %s hook file when its runtime is missing (ST-017)',
+    async agent => {
+      const parent = join(temp, `hostile non-git ${agent}`);
+      const root = join(parent, 'project');
+      const destination = (await import('../src/starter/hooks.js')).HOOK_DESTINATIONS[agent];
+      mkdirSync(join(root, destination, '..'), { recursive: true });
+      writeFileSync(join(root, destination), '{}');
+      mkdirSync(join(root, 'src'), { recursive: true });
+      const marker = join(temp, `hostile-non-git-${agent}-ran`);
+      mkdirSync(join(parent, '.azure-functions-skills', 'runtime'), { recursive: true });
+      writeFileSync(join(parent, '.azure-functions-skills', 'runtime', 'telemetry.mjs'),
+        `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'ran'); export async function runHook() {}\n`);
+      const command = (await import('../src/starter/hooks.js')).bashHookCommand(agent);
+      const result = await runHook(command, 'bash', join(root, 'src'));
+      expect(result.status).toBe(0);
+      expect(existsSync(marker)).toBe(false);
+    }, 120_000);
+
+  it('loads nothing when no project root marker is found (ST-017)', async () => {
+    const parent = join(temp, 'hostile no-marker');
+    const cwd = join(parent, 'project', 'src');
+    mkdirSync(cwd, { recursive: true });
+    const marker = join(temp, 'hostile-no-marker-ran');
+    mkdirSync(join(parent, '.azure-functions-skills', 'runtime'), { recursive: true });
+    writeFileSync(join(parent, '.azure-functions-skills', 'runtime', 'telemetry.mjs'),
+      `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'ran'); export async function runHook() {}\n`);
+    const command = (await import('../src/starter/hooks.js')).bashHookCommand('copilot');
+    const result = await runHook(command, 'bash', cwd);
+    expect(result.status).toBe(0);
+    expect(existsSync(marker)).toBe(false);
+  }, 120_000);
+
   it('collects a deployment observation with the installed starter runtime (ST-015)', async () => {
     const root = await project('project deploy', 'codex');
     const runtime = join(root, '.azure-functions-skills', 'runtime', 'telemetry.mjs');

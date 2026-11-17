@@ -22,12 +22,14 @@ export const HOOK_DESTINATIONS: Readonly<Record<StarterAgent, string>> = {
 };
 
 /**
- * JavaScript run with `node -e`. It looks for the starter runtime from the
- * current directory upward and stops at the project root: the host-provided
- * project directory, the nearest directory that contains `.git`, or the
- * file-system root. It never checks the home directory or anything above it.
- * The code contains no double quote, dollar sign, or backtick, so it is safe
- * inside double quotes in both POSIX shells and PowerShell.
+ * JavaScript run with `node -e`. It walks from the current directory upward to
+ * the project root: the host-provided project directory, or the nearest
+ * directory that contains `.git` or this agent's hook file. It loads the
+ * starter runtime only from that root. When no root is found before the home
+ * directory or the file-system root, it loads nothing, so a runtime planted in
+ * a shared ancestor such as a drive root never runs. The code contains no
+ * double quote, dollar sign, or backtick, so it is safe inside double quotes in
+ * both POSIX shells and PowerShell.
  */
 export function hookScript(agent: StarterAgent): string {
   const code = [
@@ -37,11 +39,11 @@ export function hookScript(agent: StarterAgent): string {
     'let h=k(p.resolve(o.homedir())),r=process.env.CLAUDE_PROJECT_DIR,d=p.resolve(process.cwd());',
     'for(;;){',
     'if(k(d)===h)break;',
+    `if((r&&k(p.resolve(r))===k(d))||f.existsSync(p.join(d,'.git'))||f.existsSync(p.join(d,'${HOOK_DESTINATIONS[agent]}'))){`,
     `let s=p.join(d,'${STARTER_HOOK_MARKER}');`,
-    'if(f.existsSync(s)){',
-    `import(require('node:url').pathToFileURL(s).href).then(m=>m.runHook('${CLIENT_NAMES[agent]}'))`,
+    `if(f.existsSync(s))import(require('node:url').pathToFileURL(s).href).then(m=>m.runHook('${CLIENT_NAMES[agent]}'))`,
     '.then(()=>process.exit(0),()=>process.exit(0));break}',
-    "if((r&&k(p.resolve(r))===k(d))||f.existsSync(p.join(d,'.git'))||p.dirname(d)===d)break;",
+    'if(p.dirname(d)===d)break;',
     'd=p.dirname(d)}',
     '}catch{}',
   ].join('');

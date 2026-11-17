@@ -132,11 +132,12 @@ files is planned after version 1.
 
 ## Telemetry hook
 
-The hook command is `node -e` with a POSIX and a PowerShell form. It looks for
-`.azure-functions-skills/runtime/telemetry.mjs` from the current directory up to
-the project root (the host's project directory, or the nearest directory with
-`.git`) and never checks the home directory or above it. Without Node.js, or
-without the runtime, it does nothing.
+The hook command is `node -e` with a POSIX and a PowerShell form. It walks from
+the current directory up to the project root: the host's project directory, or
+the nearest directory that contains `.git` or the agent's hook file. It loads
+`.azure-functions-skills/runtime/telemetry.mjs` only from that root. When it
+finds no root before the home directory or the file-system root, it loads
+nothing. Without Node.js, or without the runtime, it does nothing.
 
 | `telemetry.hooks` | Meaning |
 | --- | --- |
@@ -177,5 +178,5 @@ the threat model in [SECURITY.md](../SECURITY.md) (FRD-0004, D-023), bound to
 these controls: authorization comes only from the pasted prompt; HTTPS; one
 immutable commit per run; SHA-256 checks for every payload file; safe-path and
 no-link checks; no fallback source; `lint:security` allows the download-then-run
-form only in generated `start.md` files for the configured URL; and the hook
-loads code only from inside the project.
+form only as the exact generated command line in a generated `start.md`; and
+the hook loads code only from the project root.
