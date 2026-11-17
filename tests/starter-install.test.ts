@@ -29,6 +29,8 @@ const archives = new Map<string, Buffer>();
 const events: Array<Record<string, unknown>> = [];
 const lookups: string[] = [];
 const refLookups: string[] = [];
+/** Every request the fake GitHub and telemetry server saw, for failure messages. */
+const requestLog: Array<{ at: number; method: string; url: string; bytes: number; note?: string }> = [];
 
 /** One pkt-line of the Git smart HTTP protocol. */
 function pkt(line: string): string {
@@ -47,8 +49,11 @@ const ADVERTISEMENT = '001e# service=git-upload-pack\n0000'
 const server = createServer((request, response) => {
   const chunks: Buffer[] = [];
   request.on('data', chunk => chunks.push(Buffer.from(chunk)));
+  const started = Date.now();
+  request.on('aborted', () => requestLog.push({ at: Date.now(), method: request.method ?? '', url: request.url ?? '', bytes: 0, note: `aborted after ${Date.now() - started} ms` }));
   request.on('end', () => {
     const url = request.url ?? '';
+    requestLog.push({ at: Date.now(), method: request.method ?? '', url, bytes: Buffer.concat(chunks).length });
     if (url === '/contoso/starter-repo.git/info/refs?service=git-upload-pack') {
       refLookups.push(url);
       if (refs === 'fail') {
@@ -78,7 +83,11 @@ const server = createServer((request, response) => {
       return;
     }
     if (url === '/v2/track' && request.method === 'POST') {
-      events.push(JSON.parse(Buffer.concat(chunks).toString('utf-8')) as Record<string, unknown>);
+      try {
+        events.push(JSON.parse(Buffer.concat(chunks).toString('utf-8')) as Record<string, unknown>);
+      } catch (error) {
+        requestLog[requestLog.length - 1].note = `unparsable body: ${String(error)}`;
+      }
       response.writeHead(200, { 'Content-Type': 'application/json' });
       response.end('{"itemsReceived":1,"itemsAccepted":1,"errors":[]}');
       return;
@@ -155,10 +164,18 @@ describe.each(SHELLS)('starter installer (%s)', (shell: Shell) => {
     lookup = 'ok';
     const target = destination('fresh');
     const first = events.length;
+    const logStart = requestLog.length;
+    const started = Date.now();
     const result = await install(shell, target);
+    const finished = Date.now();
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(result.json).toMatchObject({ ready: true, sourceCommit: SHA, error: null });
-    expect(events.slice(first)).toHaveLength(1);
+    const diagnostics = JSON.stringify({
+      installMs: finished - started,
+      requests: requestLog.slice(logStart).map(entry => ({ ...entry, at: entry.at - started })),
+      stderr: result.stderr,
+    });
+    expect(events.slice(first), diagnostics).toHaveLength(1);
     const event = events[first];
     expect(Object.keys(event).sort()).toEqual(['data', 'iKey', 'name', 'time']);
     expect(event).toMatchObject({
