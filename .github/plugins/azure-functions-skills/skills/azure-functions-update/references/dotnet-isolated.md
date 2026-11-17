@@ -4,6 +4,17 @@ Use with the eleven steps in [SKILL.md](../SKILL.md). This scenario owns Functio
 model/configuration work. It does not own the separate C#/.NET language or TFM update.
 Do not copy a guide's new TFM into the model-only phase.
 
+## Confirm applicability
+
+Apply this scenario only to an identified C# in-process Functions app. Confirm its
+function source, app project and available worker setting as described in the common
+inventory. Do not identify an app as in-process from `extensions.csproj` or its
+`Microsoft.NET.Sdk.Functions` reference alone. The extension project can support a
+non-.NET app or C# script; its TFM is not evidence of the app's TFM. Review its role
+and compatibility separately, and do not replace its packages or worker settings
+as a .NET app conversion. If evidence is missing or conflicts, block the affected
+conversion and record what must be confirmed. Recheck this before resuming a plan.
+
 ## Official sources and applicability
 
 Research reviewed on 2026-09-18. Record current source dates and actual target applicability

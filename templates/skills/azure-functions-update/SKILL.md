@@ -132,6 +132,30 @@ are historical until their inputs and successful restore are confirmed.
 Use bounded metadata first. For large apps or tables, agree reproducible sampling,
 data/privacy limits, and coverage gaps; size alone is not a support boundary.
 
+For each selected app, distinguish its function implementation from an explicit
+binding-extension project such as `extensions.csproj`. Use evidence from that app's
+function source, language/project manifest, and, when available and permitted, its
+`FUNCTIONS_WORKER_RUNTIME` setting. Do not treat generated build artifacts, a nested
+app, or an unrelated project's settings as evidence for the selected app. Read only
+the permitted setting value; do not expose secrets.
+
+An `extensions.csproj` can build host-side bindings for Java, Python, Node.js, other
+non-.NET apps, or C# script. Its TFM and `Microsoft.NET.Sdk.Functions` reference do
+not by themselves establish the app's language, TFM, in-process model, or an EOL
+date for that extension project. Do not select .NET isolated migration, recommend
+a .NET language update, or change that project on those facts alone. A `dotnet`
+worker setting alone does not establish the project's role either. C# script source
+and its `dotnet` worker are evidence of the in-process model, but the extension
+project's TFM is not the script app's TFM.
+
+When a separate .NET function project exists, use its own source and project
+evidence for the app's model and TFM; review an extension project separately.
+If the role or evidence is unclear or conflicting, record the missing evidence,
+ask for the necessary information, and block affected migration decisions. Do not
+retarget, remove packages, or convert to isolated until applicability and
+compatibility are established. Continue only independent work. See
+[Binding extensions](references/extensions.md) for explicit extension projects.
+
 Load the matching scenario. Research current official model, migration, language, and
 used trigger/binding guidance. Record source/update/access dates, applicable versions,
 conclusions, and uncertainty. Refresh at decisions, target changes, contradictions,
@@ -162,6 +186,10 @@ Existing app metadata or slot validation is optional and needs the user's reques
 Absent cloud data limits cloud claims, not all local analysis.
 
 ## 4. Migrate the Functions model and configuration
+
+Before applying or resuming a saved conversion, recheck the selected app and project
+roles against current evidence from step 3. If they are unclear or changed, stop
+affected changes and revise the plan before proceeding.
 
 Complete and approve the concrete work instructions. Apply the scenario's model/config
 steps and all applicable definition-of-done requirements. Preserve the agreed language/

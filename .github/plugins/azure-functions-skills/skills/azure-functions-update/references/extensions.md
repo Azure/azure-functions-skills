@@ -17,6 +17,21 @@ Use this reference when a used binding changes version or execution model. Read 
 
 Select the language, model, and extension version on the page. For another binding, use [supported bindings](https://learn.microsoft.com/en-us/azure/azure-functions/functions-triggers-bindings#supported-bindings). For host compatibility, use [minimum extension versions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-versions#minimum-extension-versions).
 
+## Explicit extension projects
+
+An `extensions.csproj` can be a host-side project that builds explicitly registered
+binding extensions, not the function app. See [explicit installation of extensions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-register#explicitly-install-extensions)
+and [Core Tools extension installation](https://learn.microsoft.com/en-us/azure/azure-functions/functions-core-tools-reference#func-extensions-install).
+Identify its role using the selected app's source, manifest, and available worker
+setting. Its TFM and SDK reference do not prove the app's TFM, programming model,
+or an independent EOL date for the extension project.
+
+Keep the project and its registration unchanged unless a separately agreed change
+is supported by evidence for the actual host, extension packages, and app.
+Do not assume that changing its TFM to `net10.0` is compatible. If its role or
+compatibility is unknown, record the evidence gap and require manual review; do not
+infer that isolated worker migration or an extension-project update is required.
+
 ## Bundle migration checks
 
 Sources checked on **2026-09-15**, rechecked on **2026-11-14**. First use the
