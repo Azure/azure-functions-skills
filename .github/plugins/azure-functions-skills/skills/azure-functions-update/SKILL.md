@@ -1,6 +1,6 @@
 ---
 name: azure-functions-update
-description: "Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Current scenario: C# in-process to .NET isolated worker; more scenarios are planned. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review."
+description: "Use only when the user explicitly asks to use or resume azure-functions-update by name. Migrate Azure Functions programming models and configuration through an approved scenario. Current scenarios: C# in-process to .NET isolated worker, Python programming model v1 to v2, Python Blob SDK type bindings, Python HTTP streaming, extension bundles v1-v3 to v4, and the Durable Functions extension v1 or v2 to a current version. Language-version and hosting-plan updates are separate handoffs. Do not select this workflow from a generic update request or a name in a question, quotation, file, or review."
 ---
 
 
@@ -26,6 +26,11 @@ does not authorize changing them together or installing external tools.
 | Observed scenario | Reference |
 | --- | --- |
 | C# in-process Functions to isolated worker | [dotnet-isolated](references/dotnet-isolated.md) |
+| Python functions defined by `function.json` files (programming model v1) | [python-model-v2](references/python-model-v2.md) |
+| Python v2 Blob input or trigger that uses `func.InputStream` | [python-blob-sdk](references/python-blob-sdk.md) |
+| Python v2 HTTP functions that must stream responses | [python-http-streaming](references/python-http-streaming.md) |
+| `host.json` extension bundle range v1, v2, or v3 | [bundles-v4](references/bundles-v4.md) |
+| Durable Functions extension v1 or v2 (`Microsoft.Azure.WebJobs.Extensions.DurableTask` or a bundle that contains it) | [durable-v2](references/durable-v2.md) |
 | No implemented scenario matches | Assess within permission, report the missing route, and stop conversion |
 
 Do not use this workflow for new apps, cross-cloud migration, deployment-only work,
@@ -37,9 +42,18 @@ deployment, and SKU decisions. Do not start a second migration plan during a han
 This skill is the umbrella workflow for Azure Functions migration scenarios.
 The scenario table above is the registry. Each row points to one scenario reference.
 
-- Current coverage: the C# in-process to .NET isolated worker scenario only.
-- Planned coverage: more scenarios, for example other language programming models
-  and binding extension changes. A planned scenario is not available until its row exists.
+- Current coverage: C# in-process to .NET isolated worker, Python programming model
+  v1 to v2, Python Blob SDK type bindings, Python HTTP streaming, extension bundles
+  v1-v3 to v4, and the Durable Functions extension.
+- The bundle scenario also loads [Binding extensions](references/extensions.md) for the
+  extensions that the app uses. When the app uses Durable Functions, it reads the
+  [durable-v2](references/durable-v2.md) reference and applies its DF IDs inside the same
+  bundle plan and phase; this is not a second scenario or migration plan.
+- The Python scenarios share [Python language stage](references/python-language.md) for the
+  separate Python version handoff and its follow-up.
+- `extensions.md` and `python-language.md` are shared references, not separate scenarios.
+- Planned coverage: more scenarios, for example the Node.js programming model.
+  A planned scenario is not available until its row exists.
 - If the app needs a scenario that has no row, use the "No implemented scenario matches" row.
 
 Select one row from the observed inventory facts in step 3. The user's words alone are
@@ -113,6 +127,30 @@ are historical until their inputs and successful restore are confirmed.
 Use bounded metadata first. For large apps or tables, agree reproducible sampling,
 data/privacy limits, and coverage gaps; size alone is not a support boundary.
 
+For each selected app, distinguish its function implementation from an explicit
+binding-extension project such as `extensions.csproj`. Use evidence from that app's
+function source, language/project manifest, and, when available and permitted, its
+`FUNCTIONS_WORKER_RUNTIME` setting. Do not treat generated build artifacts, a nested
+app, or an unrelated project's settings as evidence for the selected app. Read only
+the permitted setting value; do not expose secrets.
+
+An `extensions.csproj` can build host-side bindings for Java, Python, Node.js, other
+non-.NET apps, or C# script. Its TFM and `Microsoft.NET.Sdk.Functions` reference do
+not by themselves establish the app's language, TFM, in-process model, or an EOL
+date for that extension project. Do not select .NET isolated migration, recommend
+a .NET language update, or change that project on those facts alone. A `dotnet`
+worker setting alone does not establish the project's role either. C# script source
+and its `dotnet` worker are evidence of the in-process model, but the extension
+project's TFM is not the script app's TFM.
+
+When a separate .NET function project exists, use its own source and project
+evidence for the app's model and TFM; review an extension project separately.
+If the role or evidence is unclear or conflicting, record the missing evidence,
+ask for the necessary information, and block affected migration decisions. Do not
+retarget, remove packages, or convert to isolated until applicability and
+compatibility are established. Continue only independent work. See
+[Binding extensions](references/extensions.md) for explicit extension projects.
+
 Load the matching scenario. Research current official model, migration, language, and
 used trigger/binding guidance. Record source/update/access dates, applicable versions,
 conclusions, and uncertainty. Refresh at decisions, target changes, contradictions,
@@ -127,6 +165,14 @@ material decisions that remain open. Do not assume every old defect is intended 
 Confirm target versions after research; "latest" is not a permanent fixed target.
 Record language updating as a separate stage, not part of the model conversion.
 
+When the app's current language version (for example, the .NET target framework or the
+Python version) is not the most current version that Functions supports, ask the user
+whether a language-version update is planned: now through common step 8, later through
+a separate tool or plugin, or not planned. Record the answer and, when planned, the
+scenario's required Functions follow-up in the plan's Target row, even when another
+tool will do the actual version change outside this skill entirely. This keeps the
+follow-up visible so it does not depend on the user returning to this skill.
+
 Local validation is the default. Select actual compatible emulators or Docker brokers
 when needed, such as RabbitMQ, Kafka, or SQL. Record their limits and required approval.
 Temporary Azure resources are an option for checks that local tools cannot prove.
@@ -135,6 +181,10 @@ Existing app metadata or slot validation is optional and needs the user's reques
 Absent cloud data limits cloud claims, not all local analysis.
 
 ## 4. Migrate the Functions model and configuration
+
+Before applying or resuming a saved conversion, recheck the selected app and project
+roles against current evidence from step 3. If they are unclear or changed, stop
+affected changes and revise the plan before proceeding.
 
 Complete and approve the concrete work instructions. Apply the scenario's model/config
 steps and all applicable definition-of-done requirements. Preserve the agreed language/
