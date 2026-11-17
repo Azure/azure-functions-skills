@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "Azure/azure-functions-skills",
+    "branch": "main",
+    "path": "starter"
+  },
+  "bundles": {
+    "functions": {
+      "title": "Azure Functions Skills",
+      "akaLink": "https://aka.ms/azure-functions-starter",
+      "prompt": "Set up Azure Functions Skills in this directory: read https://aka.ms/azure-functions-starter and follow it. I authorize its one installer command for this directory only; ask me before you install tools or change my agent settings.",
+      "handoff": "azure-functions-help",
+      "skills": [
+        "azure-functions-help",
+        "azure-functions-setup",
+        "azure-functions-create",
+        "azure-functions-deploy",
+        "azure-functions-best-practices",
+        "azure-functions-diagnostics",
+        "azure-functions-health-status",
+        "azure-functions-inventory",
+        "azure-functions-doctor",
+        "azure-functions-common",
+        "azure-functions-feedback",
+        "azure-functions-update"
+      ],
+      "tools": ["node", "func", "az", "azd"]
+    }
+  }
+}

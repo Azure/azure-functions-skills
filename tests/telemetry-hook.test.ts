@@ -230,8 +230,12 @@ describe('distributed telemetry runtime', () => {
           expect([
             'Plugin_ClientName', 'Plugin_EventType', 'Plugin_PluginName', 'Plugin_Timestamp',
             'Plugin_SkillName', 'Plugin_ToolName', 'Plugin_FileReference',
+            'Plugin_Distribution', 'Plugin_Bundle',
           ]).toContain(property);
         }
+        expect(envelope.data.baseData.properties.Plugin_Distribution, layout.name)
+          .toBe(layout.name === 'plugin' ? 'plugin' : 'workspace');
+        expect(envelope.data.baseData.properties.Plugin_Bundle, layout.name).toBe('none');
       }
       expect(existsSync(join(layout.root, 'az-calls.jsonl'))).toBe(false);
     }

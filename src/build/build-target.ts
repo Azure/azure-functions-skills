@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { BuildData, BuildTargetName, McpServer, Skill } from '../types.js';
 
@@ -91,28 +91,45 @@ function buildCodex(data: BuildData, distDir: string): void {
   writeWorkspaceTelemetryAssets(data, join(base, '.codex', 'hooks'));
 }
 
+export interface SkillFile {
+  /** Path relative to the skill directory, with forward slashes. */
+  readonly path: string;
+  readonly content: Buffer;
+}
+
+/** The files of one generated skill directory, in a stable order. */
+export function renderSkillFiles(skill: Skill): SkillFile[] {
+  const files: SkillFile[] = [{ path: 'SKILL.md', content: Buffer.from(generateSkillMd(skill), 'utf-8') }];
+  const directories: Array<[string | null, string]> = [
+    [skill.referencesDir, 'references'],
+    [skill.scriptsDir, 'scripts'],
+    [skill.assetsDir, 'assets'],
+  ];
+  for (const [source, name] of directories) {
+    if (source) collectDirectory(source, name, files);
+  }
+  return files;
+}
+
+function collectDirectory(source: string, prefix: string, files: SkillFile[]): void {
+  const entries = readdirSync(source, { withFileTypes: true })
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const entry of entries) {
+    const sourcePath = join(source, entry.name);
+    if (entry.isDirectory()) collectDirectory(sourcePath, `${prefix}/${entry.name}`, files);
+    else if (entry.isFile()) files.push({ path: `${prefix}/${entry.name}`, content: readFileSync(sourcePath) });
+  }
+}
+
 function writeSkills(skills: Skill[], root: string): void {
   for (const skill of skills) {
     const skillDir = join(root, skill.id);
     mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, 'SKILL.md'), generateSkillMd(skill));
-    copySkillAssets(skill, skillDir);
-  }
-}
-
-function copySkillAssets(skill: Skill, skillDir: string): void {
-  if (skill.referencesDir) copyDirRecursive(skill.referencesDir, join(skillDir, 'references'));
-  if (skill.scriptsDir) copyDirRecursive(skill.scriptsDir, join(skillDir, 'scripts'));
-  if (skill.assetsDir) copyDirRecursive(skill.assetsDir, join(skillDir, 'assets'));
-}
-
-function copyDirRecursive(source: string, destination: string): void {
-  mkdirSync(destination, { recursive: true });
-  for (const entry of readdirSync(source, { withFileTypes: true })) {
-    const sourcePath = join(source, entry.name);
-    const destinationPath = join(destination, entry.name);
-    if (entry.isDirectory()) copyDirRecursive(sourcePath, destinationPath);
-    else if (entry.isFile()) copyFileSync(sourcePath, destinationPath);
+    for (const file of renderSkillFiles(skill)) {
+      const destination = join(skillDir, ...file.path.split('/'));
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, file.content);
+    }
   }
 }
 

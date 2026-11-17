@@ -9,6 +9,8 @@ on:
       - '.plugin/**'
       - '.claude-plugin/**'
       - 'bin/**'
+      - 'starter/**'
+      - 'starter.config.json'
       - 'src/**'
       - 'templates/**'
       - 'tests/**'
@@ -26,6 +28,8 @@ on:
       - '.plugin/**'
       - '.claude-plugin/**'
       - 'bin/**'
+      - 'starter/**'
+      - 'starter.config.json'
       - 'src/**'
       - 'templates/**'
       - 'tests/**'
@@ -63,6 +67,9 @@ jobs:
 
       - name: Verify plugin payload
         run: npm run verify:plugin-payload
+
+      - name: Verify starter payload
+        run: npm run verify:starter-payload
 
       - name: Run tests
         run: npm test
