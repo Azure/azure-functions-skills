@@ -35,18 +35,18 @@ exactly one command with JSON output. Honor the host's permission prompts.
 **Windows (PowerShell)**
 
 ```powershell
-& ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/Azure/azure-functions-skills/main/starter/install.ps1'))) -Bundle functions -Agent <agent> -Json
+& ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/Azure/azure-functions-skills/test/prompt-starter-e2e/starter/install.ps1'))) -Bundle functions -Agent <agent> -Json
 ```
 
 **macOS / Linux (POSIX shell)**
 
 ```sh
-(set -eu; installer=$(mktemp); trap 'rm -f "$installer"' EXIT; curl -fsSL --proto '=https' --proto-redir '=https' 'https://raw.githubusercontent.com/Azure/azure-functions-skills/main/starter/install.sh' -o "$installer"; sh "$installer" --bundle functions --agent <agent> --json)
+(set -eu; installer=$(mktemp); trap 'rm -f "$installer"' EXIT; curl -fsSL --proto '=https' --proto-redir '=https' 'https://raw.githubusercontent.com/Azure/azure-functions-skills/test/prompt-starter-e2e/starter/install.sh' -o "$installer"; sh "$installer" --bundle functions --agent <agent> --json)
 ```
 
-The installer resolves `main` to one commit and verifies every file
+The installer resolves `test/prompt-starter-e2e` to one commit and verifies every file
 against its hash. To pin a version only when the user asks for one, replace
-`main` in the URL with the full commit SHA and add `-Ref <sha>` /
+`test/prompt-starter-e2e` in the URL with the full commit SHA and add `-Ref <sha>` /
 `--ref <sha>`. Add `-NoTelemetry` / `--no-telemetry` only when the user asks to
 turn telemetry off.
 

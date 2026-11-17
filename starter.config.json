@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "source": {
     "repository": "Azure/azure-functions-skills",
-    "branch": "main",
+    "branch": "test/prompt-starter-e2e",
     "path": "starter"
   },
   "bundles": {

@@ -4,7 +4,7 @@
 # execution policy does not apply. It never exits the caller's session. The result is in $LASTEXITCODE
 # (0 ready, 1 check found missing files, 2 failure) and in the JSON report.
 param(
-    [string]$Ref = 'main',
+    [string]$Ref = 'test/prompt-starter-e2e',
     [string]$Bundle,
     [string]$Template,
     [string]$Agent,
@@ -20,7 +20,7 @@ Set-StrictMode -Version 2.0
 $installerEngine = 1
 $repository = 'Azure/azure-functions-skills'
 $archivePrefix = 'azure-functions-skills-'
-$branch = 'main'
+$branch = 'test/prompt-starter-e2e'
 $payloadPath = 'starter'
 $apiBase = 'https://api.github.com'
 $codeloadBase = 'https://codeload.github.com'

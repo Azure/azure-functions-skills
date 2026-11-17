@@ -8,7 +8,7 @@ set -eu
 installer_engine=1
 repository='Azure/azure-functions-skills'
 archive_prefix='azure-functions-skills-'
-branch='main'
+branch='test/prompt-starter-e2e'
 payload_path='starter'
 api_base='https://api.github.com'
 codeload_base='https://codeload.github.com'
