@@ -8,17 +8,35 @@
  * vector — once installed, the agent obeys.
  *
  * This script scans templates/skills/** (canonical source) for patterns
- * that look like remote code execution.
+ * that look like remote code execution. It also scans the starter sources
+ * (templates/starter/**) and the generated starter payload. The starter's
+ * one-liners are an approved exception (FRD-0004, D-023): a download-then-run
+ * line is allowed only in a generated start.md and only for the configured
+ * raw installer URL.
  *
  * Fails CI if any are found. A reviewer-approved override can use an inline
  * `<!-- skill-lint: allow <reason> -->` comment on the same line, but PRs
  * with such overrides should call out the justification.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
 
 const REPO_ROOT = process.cwd();
 const SKILLS_ROOT = join(REPO_ROOT, 'templates', 'skills');
+const STARTER_CONFIG = join(REPO_ROOT, 'starter.config.json');
+const starterSource = existsSync(STARTER_CONFIG)
+  ? JSON.parse(readFileSync(STARTER_CONFIG, 'utf-8')).source
+  : null;
+const STARTER_PAYLOAD = starterSource ? starterSource.path : null;
+const STARTER_RAW_BASE = starterSource
+  ? `https://raw.githubusercontent.com/${starterSource.repository}/${starterSource.branch}/${starterSource.path}`
+  : null;
+const ROOTS = [
+  { dir: SKILLS_ROOT, extensions: ['.md'] },
+  { dir: join(REPO_ROOT, 'templates', 'starter'), extensions: ['.md', '.sh', '.ps1'] },
+  ...(STARTER_PAYLOAD ? [{ dir: join(REPO_ROOT, ...STARTER_PAYLOAD.split('/')), extensions: ['.md', '.sh', '.ps1'] }] : []),
+];
+const STARTER_ONE_LINER_PATTERNS = new Set(['scriptblock-remote', 'download-then-run']);
 
 // Each pattern: { name, regex, reason }
 const PATTERNS = [
@@ -53,6 +71,16 @@ const PATTERNS = [
     reason: 'base64 -d | sh — obfuscated remote code execution',
   },
   {
+    name: 'scriptblock-remote',
+    regex: /\[scriptblock\]::Create\(\s*\(?\s*(?:Invoke-RestMethod|Invoke-WebRequest|irm|iwr)\b/i,
+    reason: 'Script block created from downloaded content (PowerShell RCE pattern)',
+  },
+  {
+    name: 'download-then-run',
+    regex: /\b(?:curl|wget)\b.*\s(?:-o|-O|--output)\s+\S+.*;\s*(?:sh|bash)\s/,
+    reason: 'Download to a file, then run it with a shell (RCE pattern)',
+  },
+  {
     name: 'raw-ip-url',
     regex: /https?:\/\/(?:\d{1,3}\.){3}\d{1,3}\b/,
     reason: 'URL with raw IP address — anomalous, often used in malware C2',
@@ -77,7 +105,14 @@ const ALLOW_COMMENT = /<!--\s*skill-lint:\s*allow\s+(.+?)\s*-->/i;
 
 const findings = [];
 
-function walk(dir) {
+function isApprovedStarterOneLiner(rel, line, pattern) {
+  if (!STARTER_ONE_LINER_PATTERNS.has(pattern.name) || !STARTER_PAYLOAD || !STARTER_RAW_BASE) return false;
+  if (!rel.startsWith(`${STARTER_PAYLOAD}/`) || !rel.endsWith('/start.md')) return false;
+  const installer = pattern.name === 'scriptblock-remote' ? 'install.ps1' : 'install.sh';
+  return line.includes(`'${STARTER_RAW_BASE}/${installer}'`);
+}
+
+function walk(dir, extensions) {
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });
@@ -87,11 +122,11 @@ function walk(dir) {
   for (const entry of entries) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      walk(full);
+      walk(full, extensions);
       continue;
     }
     if (!entry.isFile()) continue;
-    if (extname(entry.name).toLowerCase() !== '.md') continue;
+    if (!extensions.includes(extname(entry.name).toLowerCase())) continue;
     const rel = full.slice(REPO_ROOT.length + 1).replaceAll('\\', '/');
     const size = statSync(full).size;
     if (size > 1_000_000) continue;
@@ -104,6 +139,7 @@ function walk(dir) {
           // Check for allowlist override on the same line
           const allow = line.match(ALLOW_COMMENT);
           if (allow) continue;
+          if (isApprovedStarterOneLiner(rel, line, pattern)) continue;
           findings.push({
             file: rel,
             line: i + 1,
@@ -117,10 +153,10 @@ function walk(dir) {
   }
 }
 
-walk(SKILLS_ROOT);
+for (const root of ROOTS) walk(root.dir, root.extensions);
 
 if (findings.length === 0) {
-  console.log('✅ Skill content lint: no risky shell/RCE patterns found in templates/skills/**');
+  console.log('✅ Skill content lint: no risky shell/RCE patterns found in templates/skills/**, templates/starter/**, or the starter payload');
   process.exit(0);
 }
 

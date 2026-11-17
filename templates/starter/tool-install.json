@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "tools": {
+    "node": {
+      "probes": ["node"],
+      "reason": "Runs the azure-functions-common scripts and the telemetry hooks.",
+      "docs": "https://nodejs.org/en/download",
+      "commands": {
+        "windows": "winget install --exact --id OpenJS.NodeJS.LTS",
+        "macos": "brew install node@24",
+        "linux": null
+      }
+    },
+    "func": {
+      "probes": ["func"],
+      "reason": "Azure Functions Core Tools create and run Functions projects locally.",
+      "docs": "https://learn.microsoft.com/azure/azure-functions/functions-run-local",
+      "commands": {
+        "windows": null,
+        "macos": "brew tap azure/functions && brew install azure-functions-core-tools@4",
+        "linux": null
+      }
+    },
+    "az": {
+      "probes": ["az"],
+      "reason": "Azure CLI is used for sign-in, diagnostics, and resource inspection.",
+      "docs": "https://learn.microsoft.com/cli/azure/install-azure-cli",
+      "commands": {
+        "windows": "winget install --exact --id Microsoft.AzureCLI",
+        "macos": "brew update && brew install azure-cli",
+        "linux": null
+      }
+    },
+    "azd": {
+      "probes": ["azd"],
+      "reason": "Azure Developer CLI provisions and deploys the app.",
+      "docs": "https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd",
+      "commands": {
+        "windows": "winget install --exact --id Microsoft.Azd",
+        "macos": "brew install azure/azd/azd",
+        "linux": null
+      }
+    },
+    "python": {
+      "probes": ["python3", "python"],
+      "reason": "Python runs Python Functions apps locally.",
+      "docs": "https://www.python.org/downloads/",
+      "commands": {
+        "windows": "winget install --exact --id Python.Python.3.13",
+        "macos": "brew install python@3.13",
+        "linux": null
+      }
+    },
+    "azurite": {
+      "probes": ["azurite"],
+      "reason": "Azurite emulates Azure Storage for local runs.",
+      "docs": "https://learn.microsoft.com/azure/storage/common/storage-use-azurite",
+      "commands": {
+        "windows": null,
+        "macos": null,
+        "linux": null
+      }
+    }
+  }
+}

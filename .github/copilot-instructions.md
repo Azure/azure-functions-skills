@@ -8,7 +8,7 @@ This repository is the **Azure Functions Skills** plugin (skills + telemetry) wi
 - **ESM only** — `import`/`export`, never `require()`.
 - **TDD** for code changes — write tests first (`npm test`, `npm run test:watch`).
 - **Lint before commit** — `npm run lint` and `npm run typecheck`.
-- **Templates are canonical** — edit `templates/`, then `npm run build:plugin-payload`. Never hand-edit generated files.
+- **Templates are canonical** — edit `templates/`, then `npm run build:plugin-payload` and `npm run build:starter`. Never hand-edit generated files, including `starter/`.
 - **CLI usability** — commands must be intuitive; error messages must be actionable.
 - **Manual check for CLI changes** — run `node bin/azure-functions-skills.js <cmd> --dir <isolated-workspace>`.
 

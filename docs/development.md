@@ -44,6 +44,7 @@ templates/   Canonical skills, telemetry hooks, and MCP definitions
 src/         TypeScript CLI and build system
 tests/       Vitest coverage for build, validation, telemetry, templates, and release helpers
 .github/plugins/azure-functions-skills/  Generated plugin payload
+starter/     Generated prompt-starter payload (see docs/starter.md)
 ```
 
 ## Update Templates And Plugin Payloads
@@ -78,6 +79,23 @@ tests/       Vitest coverage for build, validation, telemetry, templates, and re
    ```
 
 Do not edit generated files in `.github/plugins/azure-functions-skills/`, `.plugin/marketplace.json`, or `.claude-plugin/marketplace.json` by hand. Change `templates/`, then regenerate.
+
+## Update The Starter Payload
+
+The prompt starter is generated from `starter.config.json` (repository identity
+and bundles) and `templates/starter/` (installer engine, `start.md` template,
+hand-off text, and `tool-install.json`). Skills and the telemetry runtime come
+from the same sources as the plugin payload.
+
+```bash
+npm run build:starter
+npm run verify:starter-payload
+```
+
+`starter/` is committed with `-text` in `.gitattributes`; the build writes text
+with LF line endings so that every file hash is the same on every OS. Do not edit
+`starter/` by hand. Moving the skills to another repository is a change to
+`source` in `starter.config.json`, a rebuild, and an update of the aka.ms links.
 
 ## Local Build
 
