@@ -3,7 +3,7 @@
 | Metadata | Value |
 | --- | --- |
 | Status | Finalized |
-| Revision | 11 |
+| Revision | 12 |
 | Created | 2026-11-14 |
 | Updated | 2026-11-15 |
 | Author | Claude Code, based on Tsuyoshi Ushio's requirements and decisions |
@@ -544,6 +544,7 @@ The prototype's `skills-update` skill is not ported.
 | D-033 | `lint:security` exception for the one-liners | The whole line must equal a generated installer command (bundle, optional template, agent placeholder or slug). A line that only contains the approved URL, for example in a comment next to another command or with a second command appended, is rejected (PR review). Tightens D-023's lint control. Proposal; not approval. | Claude Code (proposal) | 2026-11-17 |
 | D-034 | Review of D-032 and D-033 | Approve D-032 and D-033 as proposed. | Tsuyoshi Ushio (human) | 2026-11-17 |
 | D-035 | Commit lookup when the anonymous GitHub API is rate limited | On HTTP 403 or 429 from `api.github.com`, read `refs/heads/<branch>` from the same repository's Git ref advertisement on `github.com` and use that commit; only when that also fails, stop with `rate-limited`. The API stays first because it is the documented interface. Found in the end-to-end test: the anonymous limit is 60 requests per hour per IP address, and a shared corporate egress used it up, so the first pasted prompt failed. The archive download and SHA-256 checks are unchanged. Proposal; not approval. | Claude Code (proposal) | 2026-11-17 |
+| D-036 | README prompt wording, and whether to stop asking about the hook merge | Use the prompt: "Read https://aka.ms/azure-functions-starter and follow it to set up Azure Functions Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory." It is faster in practice than a prompt that lists every approval, and it keeps the authorization to one command for this directory. Keep the installer free of dependencies: it does not merge hooks into user-owned settings files, and `start.md` keeps asking once before the agent merges (`needs-merge`). Telemetry stays on by default; the user is asked only in the `needs-merge` case. `start.md` also says how to turn telemetry off later (preference file or environment variable), because an agent suggested a `-NoTelemetry` rerun, which never rewrites an existing preference. Found in the manual end-to-end runs. | Tsuyoshi Ushio (human) | 2026-11-17 |
 
 ## 6. Test plan
 
@@ -598,7 +599,7 @@ release process.
 
 | Item | Evidence |
 | --- | --- |
-| Independent architecture review | One pass on revision 3 by a separate Claude Code review agent, 2026-11-14: 6 blockers, 11 major, 11 minor. Addressed in revision 4 (D-016 to D-022, ST-015 to ST-019, open questions 1 to 3). Revision 5 adds only the human decision D-023; revision 6 records D-024 to D-027; revision 7 adds the implementation proposals D-028 to D-030; revision 8 records their approval (D-031); revision 9 adds the review-driven proposals D-032 and D-033; revision 10 records their approval (D-034); revision 11 adds D-035 from the end-to-end test. Revisions 4 to 11 are not re-reviewed by an agent; the human approver read revision 5. A review by a different model family, as `AGENTS.md` asks, is pending. |
+| Independent architecture review | One pass on revision 3 by a separate Claude Code review agent, 2026-11-14: 6 blockers, 11 major, 11 minor. Addressed in revision 4 (D-016 to D-022, ST-015 to ST-019, open questions 1 to 3). Revision 5 adds only the human decision D-023; revision 6 records D-024 to D-027; revision 7 adds the implementation proposals D-028 to D-030; revision 8 records their approval (D-031); revision 9 adds the review-driven proposals D-032 and D-033; revision 10 records their approval (D-034); revision 11 adds D-035 from the end-to-end test; revision 12 records D-036. Revisions 4 to 12 are not re-reviewed by an agent; the human approver read revision 5. A review by a different model family, as `AGENTS.md` asks, is pending. |
 | Human approval | Tsuyoshi Ushio |
 | Approved revision and scope | Revision 5 (SHA-256 of LF-normalized content `8f0557575c06c3a136c1eab66ea4b04a43ade4e2f2208a3a43e4f2efb01ae64e`) plus the decisions D-024 to D-027 recorded in revision 6, D-028 to D-030 approved by D-031 in revision 8, and D-032 and D-033 approved by D-034 in revision 10. Whole document. |
 | Approval reference and date | Chat approval in the authoring session, 2026-11-15: proposals approved and implementation requested. Chat approval of D-028 to D-030, 2026-11-17. Chat approval of D-032 and D-033, 2026-11-17. |

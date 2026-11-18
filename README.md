@@ -22,7 +22,7 @@ It is **focused on Azure Functions**. For deployment of *any* Azure resource (Fu
 Open GitHub Copilot, Claude Code, or Codex in your project directory and paste:
 
 ```text
-Set up Azure Functions Skills in this directory: read https://aka.ms/azure-functions-starter and follow it. I authorize its one installer command for this directory only; ask me before you install tools or change my agent settings.
+Read https://aka.ms/azure-functions-starter and follow it to set up Azure Functions Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
 ```
 
 The agent runs one installer command. It needs only PowerShell on Windows, or a POSIX shell with `curl` and `tar` on macOS and Linux. The installer copies the skills into the workspace (`.agents/skills` or `.claude/skills`), adds a telemetry hook, lists missing tools with their install commands, and asks before installing any of them. It never overwrites an existing file. See [docs/starter.md](docs/starter.md) for details and for pinning a version.
