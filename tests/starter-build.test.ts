@@ -54,14 +54,18 @@ describe('starter build', () => {
   it('gives each bundle a start.md with one command per OS and the configured link in the README prompt (ST-001, ST-003)', () => {
     const config = loadStarterConfig(join(ROOT, 'starter.config.json'));
     const readme = readFileSync(join(ROOT, 'README.md'), 'utf-8');
-    for (const [name, bundle] of Object.entries(config.bundles)) {
-      expect(bundle.prompt).toContain(bundle.akaLink);
-      expect(bundle.prompt).toMatch(/I authorize that one command for this directory only/);
-      expect(readme).toContain(bundle.prompt);
-      const start = text(real, `${name}/start.md`);
+    const entries = Object.entries(config.bundles).flatMap(([name, bundle]): Array<{ name: string; template: string | null; link: string; prompt: string }> => bundle.templates
+      ? Object.entries(bundle.templates).map(([template, value]) => ({ name, template, link: value.akaLink, prompt: value.prompt }))
+      : [{ name, template: null, link: bundle.akaLink ?? '', prompt: bundle.prompt ?? '' }]);
+    expect(entries.length).toBeGreaterThanOrEqual(2);
+    for (const { name, template, link, prompt } of entries) {
+      expect(prompt).toContain(link);
+      expect(prompt).toMatch(/I authorize that one command for this directory only/);
+      expect(readme).toContain(prompt);
+      const start = text(real, template ? `${name}/templates/${template}/start.md` : `${name}/start.md`);
       const input = { config, endpoints: { ...TEST_ENDPOINTS, raw: 'https://raw.githubusercontent.com' } };
-      expect(start).toContain(powerShellCommand(input, name, null, '<agent>'));
-      expect(start).toContain(posixCommand(input, name, null, '<agent>'));
+      expect(start).toContain(powerShellCommand(input, name, template, '<agent>'));
+      expect(start).toContain(posixCommand(input, name, template, '<agent>'));
       expect(start.match(/^```(?:powershell|sh)$/gm)).toHaveLength(2);
       expect(start).toContain('Ask once');
       expect(start).not.toMatch(/\{\{|__AFS_/);

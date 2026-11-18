@@ -25,6 +25,12 @@ Open GitHub Copilot, Claude Code, or Codex in your project directory and paste:
 Read https://aka.ms/azure-functions-starter and follow it to set up Azure Functions Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
 ```
 
+For Azure Functions Hosted Skills, open the agent in a new, empty directory and paste this instead. It installs the five Hosted Skills and Connector skills together with the daily-blog sample app as a starting point:
+
+```text
+Read https://aka.ms/hosted-skills-timer-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
+```
+
 The agent runs one installer command. It needs only PowerShell on Windows, or a POSIX shell with `curl` and `tar` on macOS and Linux. The installer copies the skills into the workspace (`.agents/skills` or `.claude/skills`), adds a telemetry hook, lists missing tools with their install commands, and asks before installing any of them. It never overwrites an existing file. See [docs/starter.md](docs/starter.md) for details and for pinning a version.
 
 ### Option B: Install the plugin with your coding agent
