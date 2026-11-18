@@ -56,7 +56,7 @@ describe('starter build', () => {
     const readme = readFileSync(join(ROOT, 'README.md'), 'utf-8');
     for (const [name, bundle] of Object.entries(config.bundles)) {
       expect(bundle.prompt).toContain(bundle.akaLink);
-      expect(bundle.prompt).toMatch(/I authorize its one installer command for this directory only/);
+      expect(bundle.prompt).toMatch(/I authorize that one command for this directory only/);
       expect(readme).toContain(bundle.prompt);
       const start = text(real, `${name}/start.md`);
       const input = { config, endpoints: { ...TEST_ENDPOINTS, raw: 'https://raw.githubusercontent.com' } };

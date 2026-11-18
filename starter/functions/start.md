@@ -98,6 +98,12 @@ so. Do not claim they are ready based on a rerun in the same shell.
   yes, add it with one edit that keeps every existing setting. On no, continue:
   the skills work and usage telemetry stays off.
 
+If the user asks how to turn telemetry off later: set `"enabled": false` in
+`.azure-functions-skills/telemetry.config.json`, or set the environment
+variable `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false`. Do not suggest
+rerunning the installer with `-NoTelemetry` / `--no-telemetry`: it never
+rewrites an existing preference file.
+
 If `coexistence` is `workspace`, tell the user that plugin-style Azure
 Functions skills are also present in this directory, so usage can be counted
 twice. Do not remove anything.

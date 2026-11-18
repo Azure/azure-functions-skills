@@ -9,7 +9,7 @@
     "functions": {
       "title": "Azure Functions Skills",
       "akaLink": "https://aka.ms/azure-functions-starter",
-      "prompt": "Set up Azure Functions Skills in this directory: read https://aka.ms/azure-functions-starter and follow it. I authorize its one installer command for this directory only; ask me before you install tools or change my agent settings.",
+      "prompt": "Read https://aka.ms/azure-functions-starter and follow it to set up Azure Functions Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.",
       "handoff": "azure-functions-help",
       "skills": [
         "azure-functions-help",
