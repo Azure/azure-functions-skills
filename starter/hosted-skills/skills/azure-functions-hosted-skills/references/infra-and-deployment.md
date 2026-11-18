@@ -1,0 +1,549 @@
+# Infrastructure, Deployment, and Local Development
+
+Use the Bicep retrieved with the official `ai-hosted-skills-python` template as the baseline.
+It provisions Foundry, Flex Consumption, identity-based storage settings, Application Insights,
+dynamic sessions, and optional Connector Namespace MCP resources.
+
+## Contents
+
+- [Infrastructure files](#infrastructure-files)
+- [Dynamic workflow backends](#dynamic-workflow-backends)
+- [Local user access](#local-user-access)
+- [Default model parameters](#default-model-parameters)
+- [Optional email connector](#optional-email-connector)
+- [Connector trigger config deployment](#connector-trigger-config-deployment)
+- [Deploy](#deploy)
+- [Deployment observation](#report-a-successful-deployment-internal-telemetry)
+- [Local development workflow](#local-development-workflow)
+- [Reasoning-capable upgrade](#reasoning-capable-upgrade)
+- [Observability](#observability)
+- [Deployed function keys](#deployed-function-keys)
+
+## Infrastructure Files
+
+| File | Source | Purpose |
+| --- | --- | --- |
+| `main.bicep` | Retrieved template | Subscription-scope root template. Creates resource group and composes modules. |
+| `main.parameters.json` | Retrieved template | Maps `azd` environment values to Bicep parameters. |
+| `app/api.bicep` | Retrieved template | Flex Consumption function app with user-assigned identity and identity-based storage. |
+| `app/foundry.bicep` | Retrieved template | Foundry account, project, model deployment, and model RBAC. |
+| `app/rbac.bicep` | Retrieved template | Storage and Application Insights RBAC for the function app identity, plus deployer storage upload RBAC. |
+| `app/session-pool.bicep` | Retrieved template | ACA dynamic session pool for `execute_python`. |
+| `app/session-pool-rbac.bicep` | Retrieved template | Session Executor role for the app identity and deployer user. |
+| `app/connector-gateway.bicep` | Retrieved template | Connector Namespace resources and connection MCP server config. |
+| `app/trigger-config.bicep` | [Supplemental skill asset](../assets/infra/app/trigger-config.bicep) | Optional Connector Namespace trigger config that calls the function app connector webhook. |
+| `app/durable-task-scheduler.bicep` | [Supplemental DTS asset](../assets/infra/app/durable-task-scheduler.bicep) | Optional new scheduler, isolated Task Hub, scoped RBAC, and Managed Identity connection settings. |
+
+The official template does not currently include `trigger-config.bicep`. Copy the supplemental
+asset into `infra/app/` only for connector-triggered agents. It is deployed separately because its
+callback URL requires the `connector_extension` system key created after the Functions host starts.
+
+## Dynamic Workflow Backends
+
+Use [dynamic-workflows.md](./dynamic-workflows.md) to confirm adoption and then DTS independently.
+Keep backend selection in `host.json` and matching app settings, never in agent frontmatter.
+Changing the backend or Task Hub does not migrate persisted workflows. Drain active instances
+before an approved backend/hub change; never silently switch to Storage after a DTS failure.
+
+### Azure Storage
+
+When DTS is declined, retain the standard Durable storage provider and existing
+`AzureWebJobsStorage` settings. No DTS resource or connection setting is needed. The standard
+extension bundle includes Durable Functions. Existing identity-based scaffolds already supply
+Blob/Queue/Table service URIs and data roles; verify actual permissions instead of replacing them
+with shared-key connection strings. Give each app/environment an isolated hub and use the same
+hub consistently across its workers.
+
+### Durable Task Scheduler
+
+DTS is recommended for its purpose-built, lower-latency execution backend and activity/history
+dashboard. It is optional, separately billed, and does not eliminate Functions host/deployment
+Storage, Application Insights, model costs or service integration permissions.
+
+Before provisioning, confirm the subscription, supported region, new versus existing Scheduler/
+Task Hub, pricing SKU/budget, and network requirements. Prefer the Function App's region. Discover
+current availability with the read-only command:
+
+```bash
+az provider show --namespace Microsoft.DurableTask \
+  --query "resourceTypes[?resourceType=='schedulers'].locations | [0]" --out table
+```
+
+For a **new approved scheduler**, copy only the supplemental `durable-task-scheduler.bicep` into
+the retrieved template's `infra/app/`. It creates a new scheduler and Task Hub, grants the app's
+existing User-assigned Managed Identity `Durable Task Data Contributor` at **Task Hub scope**,
+and optionally grants an approved developer user the same access for local Azure runs/dashboard.
+The asset uses a public TLS/identity-authenticated endpoint with `publicNetworkAccess: 'Enabled'`
+and `ipAllowlist: ['0.0.0.0/0']`, allowing any IPv4 source. RBAC is still required; an empty allowlist
+denies all traffic even when RBAC is correct. Review that network choice; adapt Bicep/networking
+for approved restricted IP ranges or private access rather than weakening existing restrictions.
+Consumption is the asset default; Dedicated uses one capacity unit. Confirm SKU/cost before
+deploying either. Do not deploy this asset over an existing scheduler to change its SKU or network
+policy.
+
+Merge this optional module into the existing subscription-scope `main.bicep`, adapting names to
+the retrieved template:
+
+```bicep
+@allowed(['storage', 'dts'])
+param durableBackend string = 'storage'
+param durableTaskSchedulerSku string = 'Consumption'
+
+module durableTaskScheduler './app/durable-task-scheduler.bicep' = if (durableBackend == 'dts') {
+  name: 'durableTaskScheduler'
+  scope: rg
+  params: {
+    schedulerName: 'dts-${resourceToken}'
+    location: location
+    tags: tags
+    schedulerSku: durableTaskSchedulerSku
+    taskHubName: 'workflows'
+    managedIdentityPrincipalId: apiUserAssignedIdentity.outputs.principalId
+    managedIdentityClientId: apiUserAssignedIdentity.outputs.clientId
+    deployerPrincipalId: deployerPrincipalId
+  }
+}
+
+var durableAppSettings = durableBackend == 'dts' ? durableTaskScheduler!.outputs.appSettings : {}
+
+output DURABLE_TASK_SCHEDULER_ENDPOINT string = durableBackend == 'dts' ? durableTaskScheduler!.outputs.schedulerEndpoint : ''
+output TASKHUB_NAME string = durableBackend == 'dts' ? durableTaskScheduler!.outputs.hubName : ''
+output DURABLE_TASK_SCHEDULER_DASHBOARD_URL string = durableBackend == 'dts' ? durableTaskScheduler!.outputs.dashboardUrl : ''
+```
+
+Add `durableAppSettings` to the existing `api` module's app-settings `union`, preserving Foundry,
+identity, reasoning, connector and session settings. Add parameter mappings to
+`infra/main.parameters.json`:
+
+```json
+"durableBackend": { "value": "${DURABLE_BACKEND=storage}" },
+"durableTaskSchedulerSku": { "value": "${DURABLE_TASK_SCHEDULER_SKU=Consumption}" }
+```
+
+Set the selected azd values only after the backend/SKU choices are made. Also merge this DTS host
+configuration; setting `DURABLE_BACKEND=dts` alone does not change the host:
+
+```json
+{
+  "version": "2.0",
+  "functionTimeout": "00:30:00",
+  "extensions": {
+    "http": {"routePrefix": ""},
+    "durableTask": {
+      "hubName": "%TASKHUB_NAME%",
+      "storageProvider": {
+        "type": "azureManaged",
+        "connectionStringName": "DURABLE_TASK_SCHEDULER_CONNECTION_STRING"
+      }
+    }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.32.0, 5.0.0)"
+  }
+}
+```
+
+DTS requires bundle 4.32.0 or newer. Preserve a newer compatible bundle and the preview bundle
+required for connector triggers; do not downgrade or replace connector configuration with this
+standard-bundle example. Preserve timeout, HTTP routing, logging and other extensions when merging.
+Keep a finite host timeout sufficient for each Activity and agent turn, not the entire timer wait.
+
+The asset emits a cloud connection string with
+`Endpoint=<actual endpoint>;Authentication=ManagedIdentity;ClientID=<app identity client ID>`.
+It contains identity selection, not an access key. Never use `Authentication=None` for Azure.
+For **existing** DTS, read the actual endpoint/Hub and declare approved `existing` resources plus
+scoped role assignments in the application's Bicep; do not create a duplicate scheduler. Reuse the
+same cloud setting shape and do not share a Hub with incompatible apps/environment deployments.
+
+### Local DTS and Service Integrations
+
+For local Emulator use, preserve `AzureWebJobsStorage=UseDevelopmentStorage=true` and use
+`DURABLE_TASK_SCHEDULER_CONNECTION_STRING=Endpoint=http://localhost:8080;TaskHub=workflows;Authentication=None`
+with `TASKHUB_NAME=workflows`. Use the actual verified loopback port and an existing/configured hub,
+not a guessed endpoint. Local `host.json` must agree with that backend. Keep these values only in
+ignored local settings, never Bicep or cloud parameters.
+
+Reuse a compatible existing Emulator/Azurite when available. Verify image identity, hub and ports;
+otherwise obtain approval to start pinned official services. Do not stop borrowed services or
+promise Emulator persistence across restarts. The default local dashboard port is 8082; use the
+actual mapping. To run locally against **Azure DTS**, use documented developer authentication for
+the installed extension and authorized signed-in user; do not copy the deployed app's Managed
+Identity credential into a developer machine or fall back to unauthenticated Azure access.
+
+If a workflow adds Blob/Queue/database/notification/API operations, update the retrieved Bicep
+resources or existing-resource references, scoped app RBAC, approved local-user access, networking
+and app settings alongside Python dependencies and `infra/main.parameters.json`. Keep local
+settings in sync. Approve new service/authentication/side-effect choices separately; do not let the
+runtime agent provision resources or expand permissions. Use a stable destination and deduplication
+for repeated Activity delivery. Store secrets through the existing approved secret design.
+
+References: [DTS host configuration](https://learn.microsoft.com/azure/durable-task/scheduler/quickstart-durable-task-scheduler),
+[identity/RBAC](https://learn.microsoft.com/azure/durable-task/scheduler/durable-task-scheduler-identity),
+[scheduler resource](https://learn.microsoft.com/azure/templates/microsoft.durabletask/2026-02-01/schedulers),
+[public-network Bicep guidance](https://github.com/microsoft/skills/blob/main/.github/plugins/azure-skills/skills/azure-prepare/references/services/durable-task-scheduler/bicep.md),
+and [dashboard](https://learn.microsoft.com/azure/durable-task/scheduler/durable-task-scheduler-dashboard).
+
+## Local User Access
+
+Local development calls real Azure resources through the developer's Azure CLI identity. The
+scaffolded Bicep grants the deployer user:
+
+- Foundry/Cognitive Services roles needed to call the provisioned model locally.
+- `Storage Blob Data Contributor` on the storage account so `azd deploy` can upload the function
+  deployment package to the deployment container.
+- `Azure ContainerApps Session Executor` on the dynamic session pool.
+- Connector connection access policy when optional Office 365 MCP resources are enabled.
+
+The deployed function app identity receives the same service access it needs for cloud runs.
+
+For custom tools that access other Azure resources, add explicit RBAC for both the app identity
+and, when local development needs it, the deployer user.
+
+## Default Model Parameters
+
+New scaffolds default to `gpt-4.1`:
+
+```json
+"foundryModel": { "value": "${FOUNDRY_MODEL=gpt-4.1}" },
+"foundryModelName": { "value": "${FOUNDRY_MODEL_NAME=gpt-4.1}" },
+"foundryModelVersion": { "value": "${FOUNDRY_MODEL_VERSION=2025-04-14}" },
+"foundryDeploymentCapacity": { "value": "${FOUNDRY_DEPLOYMENT_CAPACITY=200}" },
+"reasoningEffort": { "value": "${AZURE_FUNCTIONS_AGENTS_REASONING_EFFORT=}" },
+"reasoningSummary": { "value": "${AZURE_FUNCTIONS_AGENTS_REASONING_SUMMARY=concise}" }
+```
+
+`main.bicep` emits reasoning app settings only when `reasoningEffort` is non-empty. Older models
+can fail when unsupported reasoning settings are present.
+
+## Optional Email Connector
+
+`TO_EMAIL` controls whether the Office 365 Outlook Connector Namespace resources are created:
+
+```bicep
+var emailEnabled = !empty(toEmail)
+
+module office365Connector './app/connector-gateway.bicep' = if (emailEnabled) {
+  ...
+}
+```
+
+If the user wants a different connector, adapt `connector-gateway.bicep` for that connector type.
+
+## Connector Trigger Config Deployment
+
+Connector-triggered agents require a Connector Namespace trigger config. This is separate from
+the function app deployment because the callback URL needs the `connector_extension` system key,
+which exists only after the Functions host loads the Connector Extension.
+
+Use the preview extension bundle in `host.json` for apps with connector triggers:
+
+```json
+{
+  "version": "2.0",
+  "functionTimeout": "00:30:00",
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+    "version": "[4.42.0, 5.0.0)"
+  }
+}
+```
+
+For Flex Consumption background agents, use `functionTimeout: "00:30:00"` as the scaffold default
+and match timer/connector/queue agent runtime timeouts with `timeout: 1800` in the agent file or
+`agents.config.yaml`. Keep synchronous HTTP work under the Azure front-end response limit of about
+230 seconds; use deferred triggers for longer runs.
+
+After copying the supplemental asset and running `azd up`, get the key and deploy
+`trigger-config.bicep`:
+
+```bash
+function_name=$(azd env get-value AZURE_FUNCTION_NAME)
+gateway_name=$(azd env get-value O365_CONNECTOR_GATEWAY_NAME)
+key=$(az functionapp keys list \
+  -g rg-$(azd env get-value AZURE_ENV_NAME) \
+  -n "$function_name" \
+  --query "systemKeys.connector_extension" -o tsv)
+
+az deployment group create \
+  -g rg-$(azd env get-value AZURE_ENV_NAME) \
+  --template-file infra/app/trigger-config.bicep \
+  --parameters \
+    connectorGatewayName="$gateway_name" \
+    connectionName=office365-outlook \
+    triggerConfigName=Office-365-Outlook-on-new-email \
+    triggerOperationName=OnNewEmailV3 \
+    folderPath=Inbox \
+    callbackUrl="https://${function_name}.azurewebsites.net/runtime/webhooks/connector?functionName=OnNewEmail&code=${key}"
+```
+
+Do not print or commit callback URLs; they include a system key.
+
+## Deploy
+
+When the user has asked to deploy or has approved cloud deployment, execute these commands for the
+user. Do not merely list them as next steps. Use a generous timeout for `azd up` because it
+provisions Foundry, Functions, storage, dynamic sessions, and optional Connector Namespace
+resources.
+
+Deploy from the local workspace with `azd up` unless the user explicitly asks for continuous
+deployment. Do not create GitHub Actions workflows, CI/CD pipeline files, repository secrets, or
+run `azd pipeline config` for a normal deployment request.
+
+Confirm the Azure subscription before provisioning. Many users have access to multiple
+subscriptions, and this scaffold creates subscription-scope resources. Unless the user already
+named the target subscription, show the active subscription and confirm it is correct:
+
+```bash
+az account show --query "{name:name,id:id,tenantId:tenantId}" --output table
+```
+
+If needed, switch subscriptions before `azd provision` or `azd up`:
+
+```bash
+az account set --subscription <subscription-id>
+```
+
+From the project root:
+
+```bash
+azd init
+azd env set AZURE_LOCATION eastus2
+azd up
+```
+
+After `azd up` completes:
+
+1. Run `azd env get-values` and capture useful outputs.
+2. If a new connector is present, hand connection authorization and identity verification to
+   `azure-functions-connector-create`.
+3. Hand metadata-derived MCP publication to `azure-functions-connector-mcp`, then run
+   `azure-functions-connector-validate` before enabling connector automation.
+4. Open or provide the built-in chat URL only when the app intentionally includes built-in chat UI
+  or chat API endpoints.
+5. Manually trigger timer/non-HTTP agents with the admin endpoint when practical.
+6. After manual triggers or external events, query Application Insights requests, traces, and
+  exceptions to confirm the function fired and whether the agent/tool run succeeded.
+7. Summarize what was deployed, which connector lifecycle handoffs completed, what was verified,
+   and what still requires user action.
+
+For optional email delivery:
+
+```bash
+azd env set TO_EMAIL user@example.com
+azd up
+```
+
+## Report a successful deployment (internal telemetry)
+
+After a complete `azd up` or a standalone `azd provision` succeeds, run the local
+deployment-observation collector exactly once for that command. This skill owns
+the step for its own deployments, including provision before local development.
+Do not also collect through `azure-functions-deploy` for the same command.
+
+Do not collect after a failed, cancelled, preview, or validation-only command,
+`azd deploy`, Terraform, direct Azure CLI, or Core Tools publish.
+Use `deploy` for `azd up`, or `provision` for standalone `azd provision`.
+Use the current host for `<agent>` (`copilot-cli`, `claude-code`, `codex`, or
+`Visual Studio Code`). Set `environmentName` to the actual azd environment name.
+If that name is absent, skip collection. Do not guess it.
+If you recorded a UTC start time before deployment, include it as `startedAt`.
+Otherwise, omit `startedAt`. The name and start time are not telemetry fields.
+
+Find `hooks/runtime/telemetry.mjs` in the installed plugin root. For workspace
+assets, use `.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`,
+or `.codex/hooks/runtime/telemetry.mjs` in the workspace root. For a starter
+install, use `.azure-functions-skills/runtime/telemetry.mjs` in the workspace root.
+Use only the payload that belongs to this installed skill. Set `<runtime-dir>` to its absolute parent directory.
+Pass the project workspace root with `--dir`, even from a subdirectory.
+The collector checks opt-out settings before ARM queries or sending.
+
+```bash
+printf '%s' '{"skill":"azure-functions-hosted-skills","operation":"<operation>","agent":"<agent>","environmentName":"<azd-env-name>"}' \
+  | node "<runtime-dir>/telemetry.mjs" deployment-observed --dir "<workspace-root>" >/dev/null 2>&1 || true
+```
+
+On PowerShell, pipe the same JSON to
+`& node "<runtime-dir>\telemetry.mjs" deployment-observed --dir "<workspace-root>"`
+inside `try { ... | Out-Null } catch { }`, with `2>&1`.
+Encode values as JSON. Do not insert unescaped values into shell commands.
+If Node or the payload is absent, skip collection. Do not download, install,
+upgrade, or use a package-manager fallback. Suppress output and ignore failures.
+Do not retry collection, redeploy, or change the deployment result.
+Normal verification and Application Insights monitoring in the deployed application
+are unchanged.
+
+## Local Development Workflow
+
+Provision Azure resources before running locally:
+
+```bash
+azd init
+azd env set AZURE_LOCATION eastus2
+azd provision
+azd env get-values
+```
+
+Copy the provisioned values into `src/local.settings.json`, especially:
+
+- `FOUNDRY_PROJECT_ENDPOINT`
+- `FOUNDRY_MODEL`
+- `ACA_SESSION_POOL_ENDPOINT`
+- `O365_MCP_SERVER_URL`, if using email or connector tools
+- app-specific values such as `TO_EMAIL` or `SUBSCRIPTION_ID`
+
+Keep local settings in lockstep with Bicep and `infra/main.parameters.json`. When app-specific
+deployment parameters change, rename or remove the corresponding `src/local.settings.json` keys in
+the same edit. Do not leave stale local-only keys such as old Teams channel IDs after switching to
+a Flow bot DM recipient.
+
+Start Azurite in another terminal when `AzureWebJobsStorage` is `UseDevelopmentStorage=true` or
+the app uses local timer, queue, blob, or durable storage behavior:
+
+```bash
+azurite --skipApiVersionCheck
+```
+
+Run the function app:
+
+```bash
+cd src
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+func start
+```
+
+Manual timer or queue test:
+
+```bash
+curl -X POST http://localhost:7071/admin/functions/<agent-file-stem> \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+## Reasoning-Capable Upgrade
+
+Only for models that support reasoning settings:
+
+```bash
+azd env set FOUNDRY_MODEL gpt-5.4
+azd env set FOUNDRY_MODEL_NAME gpt-5.4
+azd env set FOUNDRY_MODEL_VERSION 2026-03-05
+azd env set FOUNDRY_DEPLOYMENT_CAPACITY 200
+azd env set AZURE_FUNCTIONS_AGENTS_REASONING_EFFORT medium
+azd env set AZURE_FUNCTIONS_AGENTS_REASONING_SUMMARY concise
+azd provision
+```
+
+If the agent is underthinking or the task needs deeper reasoning, offer to raise
+`AZURE_FUNCTIONS_AGENTS_REASONING_EFFORT` to `high` and increase `FOUNDRY_DEPLOYMENT_CAPACITY`
+within available quota.
+
+If the model deployment fails, revert to `gpt-4.1` values and provision again.
+
+## Observability
+
+The runtime emits OpenTelemetry traces and metrics to Application Insights for every agent run —
+without any telemetry code in `function_app.py`.
+
+**Enable in two steps:**
+
+1. Use the `[monitor]` extra in `requirements.txt`:
+
+   ```text
+   azurefunctions-agents-runtime[monitor]
+   ```
+
+2. Ensure `APPLICATIONINSIGHTS_CONNECTION_STRING` is set (already provisioned and injected by the
+   scaffolded Bicep).
+
+When both are present, `create_function_app()` automatically configures Azure Monitor export and
+Microsoft Agent Framework (MAF) `gen_ai` instrumentation.
+
+**Spans emitted:**
+
+| Span | What it covers |
+| --- | --- |
+| `agent.run {name}` | Full agent invocation: trigger type, model, session ID, tool call count, outcome |
+| `dynamic_session.execute` | Each `execute_python` call: session ID, stderr presence, ACA operation correlation |
+
+Runtime-added attributes use the `af.` prefix (standard OpenTelemetry attributes such as
+`server.address` are reused as-is). Failures are tagged with `af.fault_domain` (values:
+`app`, `runtime`, `platform`, `model`, `connector`, `sandbox`, `unknown`) for fast triage.
+
+**Sandbox failure visibility:** previously, a `dynamic_session.execute` call that returned
+non-empty stderr still looked like a success in telemetry. With observability enabled, the
+`dynamic_session.execute` span is marked ERROR and `af.fault_domain=sandbox` whenever stderr is
+present or an exception occurs, even though the tool still returns its string to the model.
+
+**Sensitive content (off by default):**
+
+Content attributes (`af.agent.input`, `af.agent.response`, `af.dynamic_session.code`,
+`af.dynamic_session.stdout`, `af.dynamic_session.stderr`) are gated behind
+`ENABLE_SENSITIVE_DATA=true`. Without it, only metadata (byte counts, call counts, outcome) is
+recorded. Keep this off in production to protect PII.
+
+**Optional host+worker correlation:**
+
+Add `"telemetryMode": "OpenTelemetry"` to `host.json` to align the Functions host's request
+telemetry with the runtime's worker spans under the same end-to-end operation ID. This is
+additive — runtime spans work without it.
+
+**Reduce log noise:**
+
+The runtime automatically quiets known-noisy loggers (Azure SDK HTTP, `azure.identity`, `httpx`,
+OpenTelemetry internals). To also quiet host-side startup noise, add log-level overrides in
+`host.json`:
+
+```json
+{
+  "logging": {
+    "logLevel": {
+      "default": "Warning",
+      "Host.Startup": "Warning",
+      "Host.Function.Console": "Warning",
+      "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService": "Warning"
+    }
+  }
+}
+```
+
+**Useful KQL (Transaction Search covers a full run):**
+
+```kql
+// Everything from one run, in order
+union AppRequests, AppDependencies, AppTraces, AppExceptions
+| where OperationId == "<operation-id>"
+| project TimeGenerated, itemType, Name, Message, Success, DurationMs
+| order by TimeGenerated asc
+
+// Sandbox calls that actually failed (stderr or exception)
+AppDependencies
+| where Name == "dynamic_session.execute"
+| extend stderr_present = tostring(Properties["af.dynamic_session.stderr_present"])
+| where Success == false or stderr_present == "true"
+| project TimeGenerated, OperationId, DurationMs, Properties
+```
+
+## Deployed Function Keys
+
+Built-in chat endpoints use the default function key:
+
+```bash
+az functionapp keys list \
+  --resource-group <resource-group> \
+  --name <function-app-name> \
+  --query "functionKeys.default" \
+  --output tsv
+```
+
+The MCP endpoint uses the MCP extension system key:
+
+```bash
+az functionapp keys list \
+  --resource-group <resource-group> \
+  --name <function-app-name> \
+  --query "systemKeys.mcp_extension" \
+  --output tsv
+```
