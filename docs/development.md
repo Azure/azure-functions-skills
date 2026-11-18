@@ -97,6 +97,24 @@ with LF line endings so that every file hash is the same on every OS. Do not edi
 `starter/` by hand. Moving the skills to another repository is a change to
 `source` in `starter.config.json`, a rebuild, and an update of the aka.ms links.
 
+### Update an app template
+
+A bundle with `templates` ships a cached copy of a sample app per template
+(`templates/starter/apps/<template>/`). `starter.lock.json` records the upstream
+repository, ref, commit, and the hash of every cached file; the build and
+`verify:starter-payload` refuse a cache that differs from the lock, offline. To
+move a template to another upstream release:
+
+```bash
+npm run refresh:starter-template -- hosted-skills/timer --ref v1.0.3
+npm run build:starter
+```
+
+The refresh downloads exactly one commit, stores `.gitignore` files as
+`gitignore.template`, and does not cache `local.settings.json`, `.git*`
+metadata, or `.github/`. Review the cache diff like any other source change.
+Set `GITHUB_TOKEN` if the anonymous GitHub API limit is reached.
+
 ## Local Build
 
 Build the agent-specific layouts and the plugin payload for all targets:

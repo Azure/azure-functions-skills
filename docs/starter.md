@@ -32,10 +32,16 @@ and Linux. On Windows, the installer uses `%SystemRoot%\System32\tar.exe`
 | Bundle | Link | Skills |
 | --- | --- | --- |
 | `functions` | `https://aka.ms/azure-functions-starter` | The 12 Azure Functions skills |
+| `hosted-skills`, template `timer` | `https://aka.ms/hosted-skills-timer-starter` | The 5 Hosted Skills and Connector skills, the daily-blog sample app, and `AGENTS.md` / `CLAUDE.md` / `.github/copilot-instructions.md` |
 
 Bundles are defined in [`starter.config.json`](../starter.config.json). A skill
 belongs to at most one bundle. A bundle can define app templates, each with its
 own link and `start.md`; the installer then needs `-Template` / `--template`.
+Template apps are a pinned cache of an upstream sample (see `starter.lock.json`
+and [development.md](development.md)); the installed app records its origin in
+`.azure-functions-skills/templates/<template>.json`. A template bundle is meant
+for a new, empty directory: an existing `README.md` or `AGENTS.md` that differs
+stops the run with `conflict`, and nothing is written.
 
 ## Installer arguments
 

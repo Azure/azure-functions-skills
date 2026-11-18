@@ -1,0 +1,18 @@
+python	python3,python	windows	Python runs Python Functions apps locally.	https://www.python.org/downloads/	winget install --exact --id Python.Python.3.13
+python	python3,python	macos	Python runs Python Functions apps locally.	https://www.python.org/downloads/	brew install python@3.13
+python	python3,python	linux	Python runs Python Functions apps locally.	https://www.python.org/downloads/	-
+func	func	windows	Azure Functions Core Tools create and run Functions projects locally.	https://learn.microsoft.com/azure/azure-functions/functions-run-local	-
+func	func	macos	Azure Functions Core Tools create and run Functions projects locally.	https://learn.microsoft.com/azure/azure-functions/functions-run-local	brew tap azure/functions && brew install azure-functions-core-tools@4
+func	func	linux	Azure Functions Core Tools create and run Functions projects locally.	https://learn.microsoft.com/azure/azure-functions/functions-run-local	-
+azurite	azurite	windows	Azurite emulates Azure Storage for local runs.	https://learn.microsoft.com/azure/storage/common/storage-use-azurite	-
+azurite	azurite	macos	Azurite emulates Azure Storage for local runs.	https://learn.microsoft.com/azure/storage/common/storage-use-azurite	-
+azurite	azurite	linux	Azurite emulates Azure Storage for local runs.	https://learn.microsoft.com/azure/storage/common/storage-use-azurite	-
+azd	azd	windows	Azure Developer CLI provisions and deploys the app.	https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd	winget install --exact --id Microsoft.Azd
+azd	azd	macos	Azure Developer CLI provisions and deploys the app.	https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd	brew install azure/azd/azd
+azd	azd	linux	Azure Developer CLI provisions and deploys the app.	https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd	-
+az	az	windows	Azure CLI is used for sign-in, diagnostics, and resource inspection.	https://learn.microsoft.com/cli/azure/install-azure-cli	winget install --exact --id Microsoft.AzureCLI
+az	az	macos	Azure CLI is used for sign-in, diagnostics, and resource inspection.	https://learn.microsoft.com/cli/azure/install-azure-cli	brew update && brew install azure-cli
+az	az	linux	Azure CLI is used for sign-in, diagnostics, and resource inspection.	https://learn.microsoft.com/cli/azure/install-azure-cli	-
+node	node	windows	Runs the azure-functions-common scripts and the telemetry hooks.	https://nodejs.org/en/download	winget install --exact --id OpenJS.NodeJS.LTS
+node	node	macos	Runs the azure-functions-common scripts and the telemetry hooks.	https://nodejs.org/en/download	brew install node@24
+node	node	linux	Runs the azure-functions-common scripts and the telemetry hooks.	https://nodejs.org/en/download	-
