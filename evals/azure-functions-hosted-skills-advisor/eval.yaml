@@ -1,0 +1,331 @@
+name: azure-functions-hosted-skills-advisor-eval
+description: |
+  Manual, static-source advisor evaluations. The positive Python fixtures are
+  reconstructed pre-hosted baselines of the expense and delivery recovery samples,
+  not upstream historical snapshots. Additional cases check CRUD restraint,
+  .NET isolated assessment, and unsupported Node.js native adoption.
+  No application execution, Azure resources, or deployments are required.
+
+tags:
+  type: integration
+  skill: azure-functions-hosted-skills-advisor
+
+defaults:
+  runs: 1
+  timeout: "10m"
+  executor: copilot-sdk
+  model: claude-sonnet-5.5
+
+scoring:
+  threshold: 1.0
+
+stimuli:
+  - name: Expense interpretation before hosted skills
+    prompt: &prompt |
+      Use azure-functions-hosted-skills-advisor to assess this Function App.
+      Write hosted-skills-advisor-report.md in the workspace root in English.
+      Inspect the source and sample inputs. Do not change any existing file or
+      implement findings. No application execution, model calls, or Azure access.
+    tags:
+      area: samples
+    agent_environment:
+      skills: &skills
+        - ../../templates/skills/azure-functions-hosted-skills-advisor
+      files:
+        - &boundaries
+          src: fixtures/AGENTS.md
+          dest: AGENTS.md
+        - &host
+          src: fixtures/host.json
+          dest: host.json
+        - &requirements
+          src: fixtures/requirements.txt
+          dest: requirements.txt
+        - src: fixtures/expense/function_app.py
+          dest: function_app.py
+        - src: fixtures/expense/requests.txt
+          dest: requests.txt
+        - src: fixtures/expense/baseline.json
+          dest: baseline.json
+    constraints: &constraints
+      max_turns: 30
+    graders:
+      - &invoked
+        type: skill-invocation
+        config:
+          required: [azure-functions-hosted-skills-advisor]
+      - &report
+        name: report-created
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)Opportunities found:\\s*[0-9]+"
+      - name: semantic-extraction-found
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)extract|unstructured|amount.*words|free.text"
+      - name: policy-category-found
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)categor|policy selection|policy interpretation"
+      - &positive
+        name: positive-finding
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)Opportunities found:\\s*[1-9][0-9]*"
+      - &problem-then-solution
+        name: limitation-then-hosted-skill
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?is)What's limited today.*How a hosted skill helps"
+      - &no-score-labels
+        name: no-priority-or-confidence-labels
+        type: file-not-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?im)^(Priority|Confidence|Adoption):"
+      - &evidence
+        name: file-and-line-evidence
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "function_app\\.py:[0-9]+"
+      - &risk
+        name: cost-latency-and-uncertainty
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?is)(?=.*cost)(?=.*latency)(?=.*non.determin|.*uncertain)(?=.*fallback)"
+      - name: exact-policy-preserved
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)deterministic[^\\n]*(policy|threshold|limit|approv)|(policy|threshold|limit|approv)[^\\n]*deterministic"
+      # The expected baseline digest lives here, outside the writable trial
+      # workspace, so editing or replacing baseline.json fails the grader.
+      - name: existing-files-unchanged
+        type: run-command
+        config:
+          command: node
+          args:
+            - --input-type=module
+            - -e
+            - &unchanged-script |
+              import { readFileSync, readdirSync } from 'node:fs';
+              import { createHash } from 'node:crypto';
+              const sha256 = data => createHash('sha256').update(data).digest('hex');
+              const raw = readFileSync('baseline.json');
+              if (sha256(raw) !== process.argv[1]) throw new Error('Changed fixture: baseline.json');
+              const { files, directories } = JSON.parse(raw.toString('utf8'));
+              for (const [path, expected] of Object.entries(files)) {
+                if (sha256(readFileSync(path)) !== expected) throw new Error(`Changed fixture: ${path}`);
+              }
+              for (const [path, expected] of Object.entries(directories)) {
+                const actual = readdirSync(path).filter(name => !name.startsWith('.') &&
+                  (path !== '.' || name !== 'hosted-skills-advisor-report.md')).sort();
+                if (JSON.stringify(actual) !== JSON.stringify(expected))
+                  throw new Error(`Unexpected files in ${path}`);
+              }
+            - eb271724f0364bfbc4766816e7b1e599f720d645fd24beba06db20af04160197
+          expected_exit_code: 0
+      - &complete
+        type: completed
+
+  - name: Delivery failures before hosted recovery
+    prompt: *prompt
+    tags:
+      area: samples
+    agent_environment:
+      skills: *skills
+      files:
+        - *boundaries
+        - *host
+        - *requirements
+        - src: fixtures/delivery/function_app.py
+          dest: function_app.py
+        - src: fixtures/delivery/queue.bicep
+          dest: queue.bicep
+        - src: fixtures/delivery/messages.json
+          dest: messages.json
+        - src: fixtures/delivery/baseline.json
+          dest: baseline.json
+    constraints: *constraints
+    graders:
+      - *invoked
+      - *report
+      - name: file-and-line-evidence-or-no-adoption
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)Opportunities found:\\s*0\\b|function_app\\.py:[0-9]+"
+      - name: recovery-risks-or-no-adoption
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?is)Opportunities found:\\s*0\\b|(?=.*cost)(?=.*latency)(?=.*non.determin|.*uncertain)(?=.*fallback)"
+      - name: exception-path-proposed
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)Opportunities found:\\s*0\\b|dead.letter|\\bDLQ\\b"
+      - name: deterministic-repair-first
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)Opportunities found:\\s*0\\b|deterministic[^\\n]*(repair|adapt|normaliz|rename|mapping|fix)|(repair|adapt|normaliz|rename|mapping|fix)[^\\n]*deterministic"
+      - name: bounded-replay-and-quarantine
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?is)Opportunities found:\\s*0\\b|(?=.*quarantin)(?=.*validat)(?=.*idempoten|.*deduplic)(?=.*attempt|.*bounded)"
+      - name: no-log-and-drop-misdiagnosis
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)Opportunities found:\\s*0\\b|re.?throws?|raises?|propagat"
+      - name: existing-files-unchanged
+        type: run-command
+        config:
+          command: node
+          args: [--input-type=module, -e, *unchanged-script, 212c3b5c52a242df2e3db7fd495e2a52a0a0c9309eb215062075a217a9ed64ad]
+          expected_exit_code: 0
+      - *complete
+
+  - name: Plain CRUD stays deterministic
+    prompt: *prompt
+    tags:
+      area: restraint
+    agent_environment:
+      skills: *skills
+      files:
+        - *boundaries
+        - *host
+        - *requirements
+        - src: fixtures/crud/function_app.py
+          dest: function_app.py
+        - src: fixtures/crud/baseline.json
+          dest: baseline.json
+    constraints: *constraints
+    graders:
+      - *invoked
+      - *report
+      - name: no-opportunities
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)Opportunities found:\\s*0\\b"
+      - name: no-opportunities-stated
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)No hosted skill opportunities found"
+      - name: existing-files-unchanged
+        type: run-command
+        config:
+          command: node
+          args: [--input-type=module, -e, *unchanged-script, ad4142c49b693ac66eee77b86dad46bf122b19cea7df669e26728d70aeafcbb8]
+          expected_exit_code: 0
+      - *complete
+
+  - name: .NET isolated opportunity without invented bindings
+    prompt: *prompt
+    tags:
+      area: languages
+    agent_environment:
+      skills: *skills
+      files:
+        - *boundaries
+        - *host
+        - src: fixtures/dotnet/ReviewApp.csproj
+          dest: ReviewApp.csproj
+        - src: fixtures/dotnet/Program.cs
+          dest: Program.cs
+        - src: fixtures/dotnet/Triage.cs
+          dest: Triage.cs
+        - src: fixtures/dotnet/requests.txt
+          dest: requests.txt
+        - src: fixtures/dotnet/baseline.json
+          dest: baseline.json
+    constraints: *constraints
+    graders:
+      - *invoked
+      - *report
+      - *positive
+      - *problem-then-solution
+      - *no-score-labels
+      - *risk
+      - name: isolated-detected
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)isolated"
+      - name: csharp-sketch
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "```(csharp|cs|c#)"
+      - name: no-http-workaround
+        type: file-not-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)(PostAsJsonAsync|HttpClient|separately (deployed|hosted) Python)"
+      - name: csharp-evidence
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "Triage\\.cs:[0-9]+"
+      - name: existing-files-unchanged
+        type: run-command
+        config:
+          command: node
+          args: [--input-type=module, -e, *unchanged-script, 912ba70b3a94e288da68bc8e68ec75b1a5fde1f7d609d7eddddb1fcec0be6e6e]
+          expected_exit_code: 0
+      - *complete
+
+  - name: Node.js detection with native adoption blocked
+    prompt: *prompt
+    tags:
+      area: languages
+    agent_environment:
+      skills: *skills
+      files:
+        - *boundaries
+        - *host
+        - src: fixtures/node/package.json
+          dest: package.json
+        - src: fixtures/node/index.js
+          dest: index.js
+        - src: fixtures/dotnet/requests.txt
+          dest: requests.txt
+        - src: fixtures/node/baseline.json
+          dest: baseline.json
+    constraints: *constraints
+    graders:
+      - *invoked
+      - *report
+      - name: node-v4-detected
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?is)(?=.*Node|.*JavaScript)(?=.*v4|.*model 4)(?=.*HTTP)"
+      - name: native-adoption-blocked
+        type: file-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "(?i)unsupported|blocked"
+      - name: no-fictional-node-binding
+        type: file-not-matches
+        config:
+          path: hosted-skills-advisor-report.md
+          pattern: "app\\.hosted[Ss]kill|@HostedSkill|\\[HostedSkill"
+      - name: existing-files-unchanged
+        type: run-command
+        config:
+          command: node
+          args: [--input-type=module, -e, *unchanged-script, 6d29f91282c7caa512713a4b21b3b2c3be18d1c10e4710d39f59842cc8e52e22]
+          expected_exit_code: 0
+      - *complete

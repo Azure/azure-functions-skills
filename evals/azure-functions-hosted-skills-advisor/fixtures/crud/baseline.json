@@ -1,0 +1,11 @@
+{
+  "files": {
+    "AGENTS.md": "5249936a63934e53458ea154ce83ae4967485b898a8c6efe3b8be410d66e8401",
+    "host.json": "d23a9dcbee02b8e205061a83ee0380e15f5af31696b709ab82aad22408da2d00",
+    "requirements.txt": "6ad68cfa9e7f49d89dded9c0caa4281ac95a1d31409f2b8154467b52f8f9771b",
+    "function_app.py": "48f11c818b4a3388327ceb118eb034cc166f874d856874f5ef2a25332a9cd155"
+  },
+  "directories": {
+    ".": ["AGENTS.md", "baseline.json", "function_app.py", "host.json", "requirements.txt"]
+  }
+}

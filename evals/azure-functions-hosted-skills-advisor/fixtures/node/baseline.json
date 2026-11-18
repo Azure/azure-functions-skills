@@ -1,0 +1,12 @@
+{
+  "files": {
+    "AGENTS.md": "5249936a63934e53458ea154ce83ae4967485b898a8c6efe3b8be410d66e8401",
+    "host.json": "d23a9dcbee02b8e205061a83ee0380e15f5af31696b709ab82aad22408da2d00",
+    "index.js": "5422ce3b6f71e91c3a13e28c3787cc471bb97729c7dac7cbf637f945ad599a8d",
+    "package.json": "a29d6203622a389a62294c36e4742d8c149b44bc6e284b0456627bdfea287747",
+    "requests.txt": "6c1e3bfda17332b51b76b7e168bc0bed799a14c74e16bfad921fc6ee572e5f88"
+  },
+  "directories": {
+    ".": ["AGENTS.md", "baseline.json", "host.json", "index.js", "package.json", "requests.txt"]
+  }
+}
