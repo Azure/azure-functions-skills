@@ -1,0 +1,8 @@
+name: functions-daily-blog-hosted-skills-azd
+metadata:
+  template: functions-daily-blog-hosted-skills-azd@0.0.1-beta
+services:
+  api:
+    project: ./src
+    language: python
+    host: function

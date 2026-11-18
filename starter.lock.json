@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "templates": {
+    "hosted-skills/timer": {
+      "repository": "Azure-Samples/functions-daily-blog-hosted-skills-azd",
+      "ref": "v1.0.3",
+      "commit": "b7cb7e49b4e2d78d8bc8e33887a32b14024b57e0",
+      "files": {
+        "LICENSE": "275b4dd619de4e16a017b10d0beec72abbbbf14ee8a2fc68f8bdb398e821f623",
+        "README.md": "bef46d4d03fc6249e395827ae80ed3bd3ccaf74d36aefdafb5bce9000ff4f34d",
+        "azure.yaml": "d41a4ba78cb6f4657998daa9351f714ff1fa8f839b4f3743fceeda40bd96df9d",
+        "gitignore.template": "ffcb4ae314e6460b8252ef09e9aec9e0cbf99ec01b1e644500ab61228ceea9c5",
+        "infra/abbreviations.json": "1919fd5e7a3c2e2ec292acbf0c3233635c23ca5b0dbd7483172341a28b253c53",
+        "infra/app/api.bicep": "a2c8bdd2a4e8369259dd4629120b9835f88b09a81e88fc75bba1b023a150f2aa",
+        "infra/app/connector-gateway.bicep": "a609e13ea1a3bfa73a672b2252236e87b4cd909cff4d7f2f82af8d77b3a98978",
+        "infra/app/foundry.bicep": "66dbc747df5d8e2abb035dabb8c7d9693cba3fb94c0f4cd86096d9823f0bd246",
+        "infra/app/rbac.bicep": "ce6e020f001463bdaca00dcd0c9b3164a860a1aa3b197f4b333146c19d175563",
+        "infra/app/session-pool-rbac.bicep": "286e989e268b23cb121cba43111225f8e3fe95353be815ca9b5044379a88a954",
+        "infra/app/session-pool.bicep": "8efe1bfa041212c6041b0bcec19e9431c32f5dd25ab7fcf3a7b439b0336e6b5d",
+        "infra/main.bicep": "53b5bfa0b9aafe00c56d08285435f4879cae5840c32a2224d5e5f20502d88e1c",
+        "infra/main.parameters.json": "14bb1abbbd882b9cd8e06aaae686e8d8149b0a128fee3b6174972dd78e62eb9c",
+        "src/.funcignore": "6a2b2cf2e844d6ae0715b56c4ef953bc4321e868fedf9d415752fe53c601eac4",
+        "src/agents.config.yaml": "15ac36bfac9f662f83f329dded44509a85d09ece289daf852ac9d92f260b756b",
+        "src/daily_microsoft_blog_summary.agent.md": "845e19d6b3d51df93948b20f7703c50fcf9e19fd0a29d9ad20a57f26e30e6325",
+        "src/function_app.py": "00997da35487f146dfe093770a9e9e19f727232b2da56535726723fe340a6569",
+        "src/host.json": "0f0e69cd302d337c3d52ea9970d7b5243167753cfbf3198e193ed8c568c69665",
+        "src/local.settings.json.sample": "cd18a8285bae1c9b1343ebf783a5b6de7dcced5ac2c2d9ac42ad19d9ad73a375",
+        "src/main.agent.md": "415f79a211878003bb792102ffd0779551952d36f012f3f4350976a8a793190c",
+        "src/mcp.json": "8c195cfe871e1def9209c201ff125b0693e52e3a9f4962e36dd7fd945e2f979b",
+        "src/requirements.txt": "d22707cb6c704a65b9e512bb3c77bb9986320aebce9c5e8b2312974a75a64657"
+      }
+    }
+  }
+}

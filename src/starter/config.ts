@@ -21,6 +21,8 @@ export interface StarterBundle {
   readonly skills: readonly string[];
   readonly tools: readonly string[];
   readonly handoff: string;
+  /** Repository-relative directory of instruction files (AGENTS.md, CLAUDE.md, copilot-instructions.md). */
+  readonly agentFiles?: string;
   readonly akaLink?: string;
   readonly prompt?: string;
   readonly templates?: Readonly<Record<string, StarterTemplate>>;
@@ -95,12 +97,17 @@ function parseBundle(name: string, value: unknown): StarterBundle {
   const handoff = text(bundle.handoff, `bundle ${name}.handoff`);
   if (!skills.includes(handoff)) throw new Error(`bundle ${name}: handoff ${handoff} is not in the bundle.`);
   const title = text(bundle.title, `bundle ${name}.title`);
+  let agentFiles: string | undefined;
+  if (bundle.agentFiles !== undefined) {
+    agentFiles = text(bundle.agentFiles, `bundle ${name}.agentFiles`);
+    if (!SAFE_RELATIVE.test(agentFiles) || agentFiles.split('/').some(part => part === '.' || part === '..')) {
+      throw new Error(`Invalid bundle ${name}.agentFiles: ${agentFiles}`);
+    }
+  }
+  const shared = { title, skills, tools, handoff, ...(agentFiles ? { agentFiles } : {}) };
   if (bundle.templates === undefined) {
     return {
-      title,
-      skills,
-      tools,
-      handoff,
+      ...shared,
       akaLink: akaLink(bundle.akaLink, `bundle ${name}.akaLink`),
       prompt: prompt(bundle.prompt, bundle.akaLink as string, `bundle ${name}.prompt`),
     };
@@ -123,7 +130,7 @@ function parseBundle(name: string, value: unknown): StarterBundle {
     };
   }
   if (Object.keys(templates).length === 0) throw new Error(`bundle ${name}: templates is empty.`);
-  return { title, skills, tools, handoff, templates };
+  return { ...shared, templates };
 }
 
 export function parseToolInstallTable(value: unknown): ToolInstallTable {

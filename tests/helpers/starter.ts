@@ -8,6 +8,7 @@ import type { TelemetryRuntime } from '../../src/build/telemetry-runtime.js';
 import { buildStarterFiles, DEFAULT_STARTER_ENDPOINTS, type StarterEndpoints, type StarterFiles } from '../../src/starter/build.js';
 import { loadToolInstallTable, parseStarterConfig, type StarterConfig } from '../../src/starter/config.js';
 import { writeStarterFiles } from '../../src/starter/payload.js';
+import type { StarterLock } from '../../src/starter/template-lock.js';
 
 export const ROOT = join(import.meta.dirname, '..', '..');
 export const SKILLS = loadSkills(join(ROOT, 'templates', 'skills'));
@@ -56,6 +57,7 @@ export function buildFixture(options: {
   runtime?: TelemetryRuntime;
   endpoints?: Partial<StarterEndpoints>;
   packageVersion?: string;
+  lock?: StarterLock;
 } = {}): StarterFiles {
   return buildStarterFiles({
     root: ROOT,
@@ -65,6 +67,7 @@ export function buildFixture(options: {
     runtime: options.runtime ?? FAKE_RUNTIME,
     packageVersion: options.packageVersion ?? '0.0.7-preview',
     endpoints: { ...TEST_ENDPOINTS, ...options.endpoints },
+    lock: options.lock,
   });
 }
 

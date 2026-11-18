@@ -8,6 +8,7 @@ import {
 } from '../telemetry/public-config.js';
 import { buildStarterFiles, DEFAULT_STARTER_ENDPOINTS, type StarterEndpoints, type StarterFiles } from './build.js';
 import { loadStarterConfig, loadToolInstallTable, type StarterConfig } from './config.js';
+import { loadStarterLock, verifyTemplateCache } from './template-lock.js';
 
 export interface StarterPayloadOptions {
   readonly root: string;
@@ -21,8 +22,14 @@ export function buildRepositoryStarter(options: StarterPayloadOptions): { files:
   const config = options.config ?? loadStarterConfig(join(root, 'starter.config.json'));
   const skillsDir = join(root, 'templates', 'skills');
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8')) as { version: string };
+  const lock = loadStarterLock(join(root, 'starter.lock.json'));
+  const cacheErrors = verifyTemplateCache(root, config, lock);
+  if (cacheErrors.length > 0) {
+    throw new Error(['App template cache differs from starter.lock.json. Run the template refresh.', ...cacheErrors].join('\n  '));
+  }
   const files = buildStarterFiles({
     root,
+    lock,
     config,
     tools: loadToolInstallTable(join(root, 'templates', 'starter', 'tool-install.json')),
     skills: loadSkills(skillsDir),
