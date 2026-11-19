@@ -400,8 +400,10 @@ if [ "$check" = false ] && [ "$created" -gt 0 ] && [ "$no_telemetry" = false ] &
     done
     directory=$target
     while [ "$send" = 1 ]; do
-        for candidate in "$directory/.azure-functions-skills/telemetry.config.json" "$directory/.github/hooks/telemetry.config.json" \
-            "$directory/.claude/hooks/telemetry.config.json" "$directory/.codex/hooks/telemetry.config.json"; do
+        # No trailing slash at the root: Git for Windows reads a leading // as a UNC path.
+        prefix=${directory%/}
+        for candidate in "$prefix/.azure-functions-skills/telemetry.config.json" "$prefix/.github/hooks/telemetry.config.json" \
+            "$prefix/.claude/hooks/telemetry.config.json" "$prefix/.codex/hooks/telemetry.config.json"; do
             [ -e "$candidate" ] || [ -L "$candidate" ] || continue
             [ "$candidate" != "$fresh_preference" ] || continue
             if [ ! -f "$candidate" ] || [ ! -r "$candidate" ]; then send=0; optout=$candidate; break; fi
