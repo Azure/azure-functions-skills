@@ -275,3 +275,13 @@ describe.each(SHELLS)('starter bootstrap (%s)', (shell: Shell) => {
     expect(unknown.json).toMatchObject({ error: { code: 'invalid-argument' } });
   }, TIMEOUT);
 });
+
+describe('starter bootstrap opt-out walk', () => {
+  // At the root, "$directory/.claude/..." became "//.claude/...": Git for Windows reads a
+  // leading // as a UNC path, so the check failed now and then and counted as an opt-out.
+  it('never builds a candidate path with a leading // at the filesystem root (ST-010)', () => {
+    const script = readFileSync(join('templates', 'starter', 'engine', 'bootstrap.sh'), 'utf-8');
+    expect(script).not.toMatch(/"\$directory\/\./);
+    expect(script).toMatch(/prefix=\$\{directory%\/\}/);
+  });
+});
