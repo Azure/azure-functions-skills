@@ -386,7 +386,11 @@ exit_code=0
 if [ "$check" = true ] && [ "$missing" -gt 0 ]; then ready=false; exit_code=1; fi
 
 # Setup event decision. Opt-outs: flag, environment, preference files in the
-# destination and every ancestor.
+# destination and every ancestor. The preference file this run just wrote is
+# known to be enabled and is not read again: a transient read failure of a new
+# file (Windows CI) must not count as an opt-out.
+fresh_preference=
+[ "$preference_exists" = true ] || fresh_preference="$target/$preference_path"
 send=0
 if [ "$check" = false ] && [ "$created" -gt 0 ] && [ "$no_telemetry" = false ] && [ "$preference_enabled" = true ]; then
     send=1
@@ -398,6 +402,7 @@ if [ "$check" = false ] && [ "$created" -gt 0 ] && [ "$no_telemetry" = false ] &
         for candidate in "$directory/.azure-functions-skills/telemetry.config.json" "$directory/.github/hooks/telemetry.config.json" \
             "$directory/.claude/hooks/telemetry.config.json" "$directory/.codex/hooks/telemetry.config.json"; do
             [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+            [ "$candidate" != "$fresh_preference" ] || continue
             if [ ! -f "$candidate" ] || [ ! -r "$candidate" ]; then send=0; break; fi
             LC_ALL=C awk '{ document = document $0 "\n" } END {
                 if (document !~ /^[ \t\r\n]*[{]/ || document !~ /[}][ \t\r\n]*$/) exit 1
