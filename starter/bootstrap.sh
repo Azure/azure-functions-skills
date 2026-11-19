@@ -392,10 +392,11 @@ if [ "$check" = true ] && [ "$missing" -gt 0 ]; then ready=false; exit_code=1; f
 fresh_preference=
 [ "$preference_exists" = true ] || fresh_preference="$target/$preference_path"
 send=0
+optout=
 if [ "$check" = false ] && [ "$created" -gt 0 ] && [ "$no_telemetry" = false ] && [ "$preference_enabled" = true ]; then
     send=1
     for variable in "${AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY:-}" "${AZURE_MCP_COLLECT_TELEMETRY:-}"; do
-        case "$(printf '%s' "$variable" | tr '[:upper:]' '[:lower:]')" in false) send=0 ;; esac
+        case "$(printf '%s' "$variable" | tr '[:upper:]' '[:lower:]')" in false) send=0; optout=environment ;; esac
     done
     directory=$target
     while [ "$send" = 1 ]; do
@@ -403,18 +404,18 @@ if [ "$check" = false ] && [ "$created" -gt 0 ] && [ "$no_telemetry" = false ] &
             "$directory/.claude/hooks/telemetry.config.json" "$directory/.codex/hooks/telemetry.config.json"; do
             [ -e "$candidate" ] || [ -L "$candidate" ] || continue
             [ "$candidate" != "$fresh_preference" ] || continue
-            if [ ! -f "$candidate" ] || [ ! -r "$candidate" ]; then send=0; break; fi
+            if [ ! -f "$candidate" ] || [ ! -r "$candidate" ]; then send=0; optout=$candidate; break; fi
             LC_ALL=C awk '{ document = document $0 "\n" } END {
                 if (document !~ /^[ \t\r\n]*[{]/ || document !~ /[}][ \t\r\n]*$/) exit 1
                 if (document ~ /"enabled"[ \t\r\n]*:[ \t\r\n]*false/) exit 1
-            }' "$candidate" 2>/dev/null || { send=0; break; }
+            }' "$candidate" 2>/dev/null || { send=0; optout=$candidate; break; }
         done
         [ "$directory" != / ] || break
         directory=$(dirname -- "$directory")
     done
 fi
 if [ -n "$result_file" ]; then
-    printf 'send=%s\nos=%s\ncreated=%s\n' "$send" "$os" "$created" > "$result_file"
+    printf 'send=%s\nos=%s\ncreated=%s\noptout=%s\n' "$send" "$os" "$created" "$optout" > "$result_file"
 fi
 
 mode=apply

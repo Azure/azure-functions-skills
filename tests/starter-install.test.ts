@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { delimiter, join } from 'node:path';
+import { join } from 'node:path';
 import { createTempDir, removeDir } from './helpers/fs.js';
 import {
   buildFixture,
@@ -137,34 +137,10 @@ function destination(name: string): string {
   return path;
 }
 
-/**
- * A `curl` on the PATH that runs the real one and logs each call's URL and exit
- * code, so a missing setup event on CI shows whether the installer sent it.
- */
-function curlLogger(name: string): { path: string; log: string } {
-  const directory = join(temp, `curl ${name}`);
-  mkdirSync(directory);
-  const log = join(directory, 'calls.log');
-  writeFileSync(join(directory, 'curl'), [
-    '#!/bin/sh',
-    'PATH=${PATH#*:}',
-    'for argument in "$@"; do url=$argument; done',
-    'started=$(date +%s)',
-    'curl "$@"',
-    'status=$?',
-    `printf '%s exit=%s seconds=%s\\n' "$url" "$status" "$(( $(date +%s) - started ))" >> '${toShPath(log)}'`,
-    'exit "$status"',
-    '',
-  ].join('\n'), { mode: 0o755 });
-  return { path: directory, log };
-}
-
-async function install(shell: Shell, target: string, options: { ref?: string; noTelemetry?: boolean; env?: NodeJS.ProcessEnv; prependPath?: string } = {}) {
+async function install(shell: Shell, target: string, options: { ref?: string; noTelemetry?: boolean; env?: NodeJS.ProcessEnv } = {}) {
   const inherited = Object.fromEntries(Object.entries(process.env)
-    .filter(([key]) => !/^https?_proxy$/i.test(key) && !/^(AZURE_FUNCTIONS_SKILLS|AZURE_MCP)_COLLECT_TELEMETRY$/.test(key)
-      && !(options.prependPath && key.toUpperCase() === 'PATH')));
-  const env: NodeJS.ProcessEnv = { ...inherited, NO_PROXY: '127.0.0.1', ...options.env };
-  if (options.prependPath) env.PATH = [options.prependPath, process.env.PATH ?? process.env.Path ?? ''].join(delimiter);
+    .filter(([key]) => !/^https?_proxy$/i.test(key) && !/^(AZURE_FUNCTIONS_SKILLS|AZURE_MCP)_COLLECT_TELEMETRY$/.test(key)));
+  const env = { ...inherited, NO_PROXY: '127.0.0.1', ...options.env };
   const result = shell === 'sh'
     ? await runProcess(shellExecutable('sh'), [
       toShPath(join(temp, 'install.sh')), '--bundle', 'functions', '--agent', 'claude', '--destination', toShPath(target), '--json',
@@ -189,9 +165,8 @@ describe.each(SHELLS)('starter installer (%s)', (shell: Shell) => {
     const target = destination('fresh');
     const first = events.length;
     const logStart = requestLog.length;
-    const curl = shell === 'sh' ? curlLogger('fresh') : undefined;
     const started = Date.now();
-    const result = await install(shell, target, { prependPath: curl?.path });
+    const result = await install(shell, target);
     const finished = Date.now();
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(result.json).toMatchObject({ ready: true, sourceCommit: SHA, error: null });
@@ -199,7 +174,6 @@ describe.each(SHELLS)('starter installer (%s)', (shell: Shell) => {
       installMs: finished - started,
       requests: requestLog.slice(logStart).map(entry => ({ ...entry, at: entry.at - started })),
       stderr: result.stderr,
-      curl: curl && existsSync(curl.log) ? readFileSync(curl.log, 'utf-8') : 'not logged',
     });
     expect(events.slice(first), diagnostics).toHaveLength(1);
     const event = events[first];
