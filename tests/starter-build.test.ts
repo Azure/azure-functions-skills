@@ -105,6 +105,7 @@ describe('starter build', () => {
     for (const [path, content] of one) expect(two.get(path)?.equals(content), path).toBe(true);
     const added = [...two.keys()].filter(path => !one.has(path)).sort();
     expect(added).toEqual([
+      'extras/templates/second/app-gitignore.template',
       'extras/templates/second/app/README.md',
       'extras/templates/second/files.tsv',
       'extras/templates/second/start.md',

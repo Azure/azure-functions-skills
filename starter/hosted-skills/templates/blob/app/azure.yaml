@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: functions-hosted-skills-starter-blob
+metadata:
+  template: functions-hosted-skills-starter-blob@0.0.1-beta
+services:
+  api:
+    project: ./src
+    language: python
+    host: function
+hooks:
+  # Blob triggers on Flex Consumption use Event Grid. The webhook subscription needs a
+  # key that exists only after deployment, so it is created here.
+  postdeploy:
+    windows:
+      shell: pwsh
+      run: python ./scripts/postdeploy.py
+      continueOnError: false
+    posix:
+      shell: sh
+      run: python3 ./scripts/postdeploy.py
+      continueOnError: false
