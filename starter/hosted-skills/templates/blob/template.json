@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "bundle": "hosted-skills",
+  "template": "blob",
+  "manifestId": "ai-hosted-skills-starter-blob-python",
+  "repository": "Azure-Samples/azure-functions-hosted-skills-samples",
+  "path": "starter-blob",
+  "ref": "v1.1.0",
+  "commit": "f85363726d49acc6c8796b9544d3fab7f0793355"
+}

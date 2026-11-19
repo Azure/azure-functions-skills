@@ -1,0 +1,5 @@
+[
+  { "id": "TENT-4P", "name": "4-person tent", "category": "tents", "price": 289.00, "stock": 42, "reorder_level": 10 },
+  { "id": "STOVE-2B", "name": "Two-burner camp stove", "category": "cooking", "price": 74.50, "stock": 18, "reorder_level": 15 },
+  { "id": "LAMP-LED", "name": "Rechargeable LED lantern", "category": "lighting", "price": 39.00, "stock": 120, "reorder_level": 25 }
+]

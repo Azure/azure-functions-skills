@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "toEmail": {
+      "value": "${TO_EMAIL=}"
+    },
+    "foundryModel": {
+      "value": "${FOUNDRY_MODEL=gpt-5.4}"
+    },
+    "foundryModelName": {
+      "value": "${FOUNDRY_MODEL_NAME=gpt-5.4}"
+    },
+    "foundryModelVersion": {
+      "value": "${FOUNDRY_MODEL_VERSION=2026-03-05}"
+    },
+    "foundryDeploymentCapacity": {
+      "value": "${FOUNDRY_DEPLOYMENT_CAPACITY=50}"
+    }
+  }
+}

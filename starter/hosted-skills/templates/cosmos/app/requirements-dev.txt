@@ -1,0 +1,5 @@
+-r src/requirements.txt
+azure-cosmos
+azure-identity
+azure-monitor-query
+pytest

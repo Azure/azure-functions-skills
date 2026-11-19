@@ -7,7 +7,11 @@ import type { StarterConfig } from './config.js';
 
 /** One cached app template: where it came from and the hash of every cached file. */
 export interface TemplateLockEntry {
+  /** Template id in the templates manifest the cache came from. */
+  readonly manifestId?: string;
   readonly repository: string;
+  /** Folder inside the repository; `.` is the repository root. */
+  readonly path?: string;
   readonly ref: string;
   readonly commit: string;
   /** Cache path (relative to the template's appDir) to SHA-256 of its LF-normalized bytes. */
@@ -24,6 +28,7 @@ const REPOSITORY = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
 const COMMIT = /^[0-9a-f]{40}$/;
 const REF = /^[A-Za-z0-9._/-]+$/;
 const DIGEST = /^[0-9a-f]{64}$/;
+const MANIFEST_ID = /^[a-z0-9][a-z0-9-]{0,100}$/;
 
 export function loadStarterLock(path: string): StarterLock {
   if (!existsSync(path)) return { schemaVersion: 1, templates: {} };
@@ -46,9 +51,117 @@ export function parseStarterLock(value: unknown): StarterLock {
     for (const [path, digest] of Object.entries(entry.files)) {
       if (typeof digest !== 'string' || !DIGEST.test(digest)) throw new Error(`starter.lock.json: ${key}.files.${path} is not a SHA-256.`);
     }
-    templates[key] = { repository: entry.repository, ref: entry.ref, commit: entry.commit, files: { ...entry.files } };
+    if (entry.manifestId !== undefined && (typeof entry.manifestId !== 'string' || !MANIFEST_ID.test(entry.manifestId))) {
+      throw new Error(`starter.lock.json: ${key}.manifestId is invalid.`);
+    }
+    if (entry.path !== undefined && !isFolderPath(entry.path)) throw new Error(`starter.lock.json: ${key}.path is invalid.`);
+    templates[key] = {
+      ...(entry.manifestId !== undefined ? { manifestId: entry.manifestId } : {}),
+      repository: entry.repository,
+      ...(entry.path !== undefined ? { path: entry.path } : {}),
+      ref: entry.ref,
+      commit: entry.commit,
+      files: { ...entry.files },
+    };
   }
   return { schemaVersion: 1, templates };
+}
+
+/** One template of the Azure Functions templates manifest, reduced to what the starter cache needs. */
+export interface ManifestTemplate {
+  readonly id: string;
+  readonly repository: string;
+  /** Folder inside the repository; `.` is the repository root. */
+  readonly path: string;
+  /** Tag, branch, or commit, without a `refs/tags/` or `refs/heads/` prefix. */
+  readonly ref: string;
+  readonly categories: readonly string[];
+}
+
+export interface TemplateManifest {
+  readonly version: string;
+  readonly templates: readonly ManifestTemplate[];
+  /** Entries the starter cannot use, by id, with the reason. Other entries stay usable. */
+  readonly rejected: Readonly<Record<string, string>>;
+}
+
+export const DEFAULT_TEMPLATE_MANIFEST_URL = 'https://cdn.functions.azure.com/public/templates-manifest/manifest.json';
+
+export function parseTemplateManifest(value: unknown): TemplateManifest {
+  const root = value as { version?: unknown; templates?: unknown };
+  if (typeof root?.version !== 'string' || !Array.isArray(root.templates)) {
+    throw new Error('Templates manifest: expected { "version": "...", "templates": [ ... ] }.');
+  }
+  const templates: ManifestTemplate[] = [];
+  const rejected: Record<string, string> = {};
+  for (const raw of root.templates as unknown[]) {
+    const item = raw as { id?: unknown; repositoryUrl?: unknown; folderPath?: unknown; gitRef?: unknown; categories?: unknown };
+    if (typeof item?.id !== 'string' || !MANIFEST_ID.test(item.id)) continue;
+    const repository = typeof item.repositoryUrl === 'string'
+      ? /^https:\/\/github\.com\/([A-Za-z0-9-]+\/[A-Za-z0-9._-]+?)(?:\.git)?\/?$/.exec(item.repositoryUrl)?.[1]
+      : undefined;
+    // An empty folderPath means the repository root.
+    const folder = item.folderPath === '' ? '.' : item.folderPath;
+    const ref = typeof item.gitRef === 'string' ? item.gitRef.replace(/^refs\/(?:tags|heads)\//, '') : '';
+    if (!repository || !REPOSITORY.test(repository)) rejected[item.id] = 'unsupported repositoryUrl (only https://github.com/<owner>/<repo>)';
+    else if (!isFolderPath(folder)) rejected[item.id] = 'unsafe folderPath';
+    else if (!REF.test(ref) || ref.split('/').includes('..')) rejected[item.id] = 'invalid gitRef';
+    else {
+      const categories = Array.isArray(item.categories) ? item.categories.filter((c): c is string => typeof c === 'string') : [];
+      templates.push({ id: item.id, repository, path: folder.replace(/\/+$/, ''), ref, categories });
+    }
+  }
+  return { version: root.version, templates, rejected };
+}
+
+export async function fetchTemplateManifest(url = DEFAULT_TEMPLATE_MANIFEST_URL): Promise<TemplateManifest> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Cannot download the templates manifest ${url} (HTTP ${response.status}).`);
+  return parseTemplateManifest(await response.json());
+}
+
+/**
+ * Compares the cached templates with the manifest. Reports a cached template whose manifest
+ * entry is gone or points elsewhere, and a manifest starter (all of a bundle's
+ * `manifestCategories`) that no template of that bundle caches.
+ */
+export function checkTemplateManifest(config: StarterConfig, lock: StarterLock, manifest: TemplateManifest): string[] {
+  const messages: string[] = [];
+  const byId = new Map(manifest.templates.map(template => [template.id, template]));
+  for (const [bundleName, bundle] of Object.entries(config.bundles)) {
+    const cached = new Set<string>();
+    for (const [templateName, template] of Object.entries(bundle.templates ?? {})) {
+      if (!template.manifestId) continue;
+      cached.add(template.manifestId);
+      const key = `${bundleName}/${templateName}`;
+      const upstream = byId.get(template.manifestId);
+      if (!upstream) {
+        const reason = manifest.rejected[template.manifestId];
+        messages.push(reason
+          ? `${key}: manifest template ${template.manifestId} cannot be used: ${reason}.`
+          : `${key}: manifest template ${template.manifestId} is missing.`);
+        continue;
+      }
+      const entry = lock.templates[key];
+      const want = `${upstream.repository}/${upstream.path}@${upstream.ref}`;
+      const have = entry ? `${entry.repository}/${entry.path ?? '.'}@${entry.ref}` : 'nothing';
+      if (want !== have) messages.push(`${key}: the manifest has ${want}; the cache has ${have}.`);
+    }
+    const categories = bundle.manifestCategories ?? [];
+    if (categories.length === 0) continue;
+    for (const upstream of manifest.templates) {
+      if (categories.every(category => upstream.categories.includes(category)) && !cached.has(upstream.id)) {
+        messages.push(`${bundleName}: manifest starter ${upstream.id} is not cached.`);
+      }
+    }
+  }
+  return messages;
+}
+
+function isFolderPath(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const path = value.replace(/\/+$/, '');
+  return path === '.' || (/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(path) && !path.split('/').some(part => part === '.' || part === '..'));
 }
 
 /** Hashes every file of a cached template directory, as the lock records them. */
@@ -88,17 +201,17 @@ export interface RefreshTemplateOptions {
   readonly lockPath: string;
   readonly bundle: string;
   readonly template: string;
-  /** Upstream repository; defaults to the one in the current lock entry. */
-  readonly repository?: string;
-  readonly ref: string;
+  /** Templates manifest; defaults to the public Azure Functions manifest. */
+  readonly manifestUrl?: string;
   readonly apiBase?: string;
   readonly codeloadBase?: string;
   readonly token?: string;
 }
 
 /**
- * Maintainer command: downloads one upstream commit of a template repository,
- * replaces the template cache with it, and records it in starter.lock.json.
+ * Maintainer command: looks up the template's `manifestId` in the templates
+ * manifest, downloads that repository at the manifest's ref, replaces the
+ * template cache with the manifest's folder, and records it in starter.lock.json.
  * `.gitignore` is stored as `gitignore.template`; `local.settings.json`,
  * `.git*` metadata, and `.github/` are not cached.
  */
@@ -106,18 +219,25 @@ export async function refreshTemplate(options: RefreshTemplateOptions): Promise<
   const template = options.config.bundles[options.bundle]?.templates?.[options.template];
   if (!template) throw new Error(`No template ${options.bundle}/${options.template} in starter.config.json.`);
   const key = `${options.bundle}/${options.template}`;
+  if (!template.manifestId) throw new Error(`${key} has no manifestId in starter.config.json.`);
+  const manifest = await fetchTemplateManifest(options.manifestUrl);
+  const upstream = manifest.templates.find(item => item.id === template.manifestId);
+  if (!upstream) {
+    const reason = manifest.rejected[template.manifestId];
+    throw new Error(reason
+      ? `Templates manifest entry ${template.manifestId} cannot be used: ${reason}.`
+      : `The templates manifest has no ${template.manifestId}.`);
+  }
+  const { repository, path: folder, ref } = upstream;
   const lock = loadStarterLock(options.lockPath);
-  const repository = options.repository ?? lock.templates[key]?.repository;
-  if (!repository || !REPOSITORY.test(repository)) throw new Error(`Pass the upstream repository for ${key}.`);
-  if (!REF.test(options.ref)) throw new Error(`Invalid ref: ${options.ref}`);
   const apiBase = options.apiBase ?? 'https://api.github.com';
   const codeloadBase = options.codeloadBase ?? 'https://codeload.github.com';
   const headers: Record<string, string> = options.token ? { Authorization: `Bearer ${options.token}` } : {};
 
-  const lookup = await fetch(`${apiBase}/repos/${repository}/commits/${options.ref}`, { headers: { ...headers, Accept: 'application/vnd.github.sha' } });
-  if (!lookup.ok) throw new Error(`Cannot resolve ${repository}@${options.ref} (HTTP ${lookup.status}).`);
+  const lookup = await fetch(`${apiBase}/repos/${repository}/commits/${ref}`, { headers: { ...headers, Accept: 'application/vnd.github.sha' } });
+  if (!lookup.ok) throw new Error(`Cannot resolve ${repository}@${ref} (HTTP ${lookup.status}).`);
   const commit = (await lookup.text()).trim();
-  if (!COMMIT.test(commit)) throw new Error(`GitHub returned an invalid commit for ${repository}@${options.ref}.`);
+  if (!COMMIT.test(commit)) throw new Error(`GitHub returned an invalid commit for ${repository}@${ref}.`);
   const download = await fetch(`${codeloadBase}/${repository}/tar.gz/${commit}`, { headers });
   if (!download.ok) throw new Error(`Cannot download ${repository}@${commit} (HTTP ${download.status}).`);
 
@@ -132,7 +252,8 @@ export async function refreshTemplate(options: RefreshTemplateOptions): Promise<
     if (result.status !== 0) throw new Error(`Cannot extract the template archive: ${result.stderr}`);
     const tops = readdirSync(extracted);
     if (tops.length !== 1) throw new Error('The template archive must have one top-level directory.');
-    const source = join(extracted, tops[0]);
+    const source = folder === '.' ? join(extracted, tops[0]) : join(extracted, tops[0], ...folder.split('/'));
+    if (!existsSync(source) || !lstatSync(source).isDirectory()) throw new Error(`${repository}@${ref} has no folder ${folder}.`);
 
     const staged = join(work, 'staged');
     mkdirSync(staged);
@@ -150,7 +271,9 @@ export async function refreshTemplate(options: RefreshTemplateOptions): Promise<
     mkdirSync(dirname(appDir), { recursive: true });
     cpSync(staged, appDir, { recursive: true });
 
-    const entry: TemplateLockEntry = { repository, ref: options.ref, commit, files: templateLockEntry(appDir) };
+    const entry: TemplateLockEntry = {
+      manifestId: upstream.id, repository, path: folder, ref, commit, files: templateLockEntry(appDir),
+    };
     const templates = { ...lock.templates, [key]: entry };
     const sorted = Object.fromEntries(Object.keys(templates).sort().map(name => [name, templates[name]]));
     writeFileSync(options.lockPath, `${JSON.stringify({ schemaVersion: 1, templates: sorted }, null, 2)}\n`);

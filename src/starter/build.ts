@@ -157,10 +157,19 @@ function addBundle(
         templateRows.push({ scope: 'common', source, destination: path.replace(/\.sample$/, '') });
       }
     }
+    if (!templateRows.some(row => row.destination === '.gitignore')) {
+      // A sample taken from a folder of a larger repository has no .gitignore of its own.
+      add(`${base}/app-gitignore.template`, readFileSync(join(input.root, 'templates', 'starter', 'app-gitignore.template')));
+      templateRows.push({ scope: 'common', source: 'app-gitignore.template', destination: '.gitignore' });
+    }
     const origin = input.lock?.templates[`${name}/${templateName}`];
     if (origin) {
       add(`${base}/template.json`, `${JSON.stringify({
-        schemaVersion: 1, bundle: name, template: templateName, repository: origin.repository, ref: origin.ref, commit: origin.commit,
+        schemaVersion: 1, bundle: name, template: templateName,
+        ...(origin.manifestId ? { manifestId: origin.manifestId } : {}),
+        repository: origin.repository,
+        ...(origin.path ? { path: origin.path } : {}),
+        ref: origin.ref, commit: origin.commit,
       }, null, 2)}\n`);
       templateRows.push({ scope: 'common', source: 'template.json', destination: `.azure-functions-skills/templates/${templateName}.json` });
     }
@@ -218,10 +227,16 @@ export function posixCommand(input: Pick<StarterBuildInput, 'config' | 'endpoint
 
 function renderStart(input: StarterBuildInput, name: string, bundle: StarterBundle, template: string | null): string {
   const startTemplate = readFileSync(join(input.root, 'templates', 'starter', 'start.md'), 'utf-8');
-  const handoffPath = join(input.root, 'templates', 'starter', 'handoff', `${name}.md`);
-  const handoff = existsSync(handoffPath)
+  const handoffDir = join(input.root, 'templates', 'starter', 'handoff');
+  const handoffPath = join(handoffDir, `${name}.md`);
+  const bundleHandoff = existsSync(handoffPath)
     ? readFileSync(handoffPath, 'utf-8').trim()
     : `When the user answers, use the installed \`${bundle.handoff}\` skill.`;
+  // A template can add its own introduction and examples before the bundle's routing text.
+  const templateHandoffPath = template ? join(handoffDir, name, `${template}.md`) : null;
+  const handoff = templateHandoffPath && existsSync(templateHandoffPath)
+    ? `${readFileSync(templateHandoffPath, 'utf-8').trim()}\n\n${bundleHandoff}`
+    : bundleHandoff;
   return substitute(startTemplate, {
     '{{TITLE}}': bundle.title,
     '{{BRANCH}}': input.config.source.branch,

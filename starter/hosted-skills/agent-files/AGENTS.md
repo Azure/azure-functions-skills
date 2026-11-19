@@ -20,11 +20,13 @@ another plugin:
 No development MCP server is required to edit this project. Do not open a
 Canvas unless the user asks for one.
 
-The app is the official daily-blog sample: a chat agent, a daily timer, dynamic
-sessions, and optional Outlook infrastructure. Before adapting it, understand
-the user's scenario. Remove or replace sample agents that do not belong to it;
-do not keep a timer or chat endpoint only for testing. Keep local settings and
-infrastructure parameters consistent with each other.
+The app is an official Hosted Skills sample; read its `README.md` first. The
+README was written for the sample's own repository, so commands such as
+`cd starter-queue` do not apply: the app is at the root of this directory.
+Before adapting it, understand the user's scenario. Remove or replace sample
+agents, triggers, and demo data that do not belong to it; do not keep an
+endpoint only for testing. Keep local settings and infrastructure parameters
+consistent with each other.
 
 Setup made the project ready to author, not to run or deploy. It did not
 install Python, Core Tools, Azurite, or azd, sign in, provision resources, or
