@@ -1,0 +1,6 @@
+{
+  "ticket_id": "T-1001",
+  "customer": "maria.garcia@example.com",
+  "subject": "Charged twice for my order",
+  "message": "Hi, I placed order 58213 yesterday and my card was charged twice for the same amount ($84.50). I only received one confirmation email. Can you please fix this? I need that money back before my rent is due on Friday."
+}

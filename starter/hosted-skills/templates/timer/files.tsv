@@ -21,4 +21,4 @@ common	cd18a8285bae1c9b1343ebf783a5b6de7dcced5ac2c2d9ac42ad19d9ad73a375	app/src/
 common	415f79a211878003bb792102ffd0779551952d36f012f3f4350976a8a793190c	app/src/main.agent.md	src/main.agent.md
 common	8c195cfe871e1def9209c201ff125b0693e52e3a9f4962e36dd7fd945e2f979b	app/src/mcp.json	src/mcp.json
 common	d22707cb6c704a65b9e512bb3c77bb9986320aebce9c5e8b2312974a75a64657	app/src/requirements.txt	src/requirements.txt
-common	3598be2b849673b1c8de8d36a471dc9a839fc7a6eeeaa46f2af57e050471e993	template.json	.azure-functions-skills/templates/timer.json
+common	d7ff785fa68b997eca559f059f459b7b6b844fb22099debdf6771f6e27466ee8	template.json	.azure-functions-skills/templates/timer.json

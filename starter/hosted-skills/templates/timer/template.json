@@ -2,7 +2,9 @@
   "schemaVersion": 1,
   "bundle": "hosted-skills",
   "template": "timer",
+  "manifestId": "ai-hosted-skills-python",
   "repository": "Azure-Samples/functions-daily-blog-hosted-skills-azd",
+  "path": ".",
   "ref": "v1.0.3",
   "commit": "b7cb7e49b4e2d78d8bc8e33887a32b14024b57e0"
 }

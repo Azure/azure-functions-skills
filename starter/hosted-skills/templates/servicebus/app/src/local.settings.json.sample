@@ -1,0 +1,15 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AZURE_FUNCTIONS_AGENTS_PROVIDER": "foundry",
+    "FOUNDRY_PROJECT_ENDPOINT": "",
+    "FOUNDRY_MODEL": "gpt-5.4",
+    "ACA_SESSION_POOL_ENDPOINT": "",
+    "TO_EMAIL": "",
+    "O365_MCP_SERVER_URL": "",
+    "O365_MCP_CLIENT_ID": "",
+    "SERVICEBUS__fullyQualifiedNamespace": "<your-namespace>.servicebus.windows.net"
+  }
+}

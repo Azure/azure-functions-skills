@@ -8,7 +8,9 @@ import { join } from 'node:path';
 import { type StarterFiles } from '../src/starter/build.js';
 import { loadStarterConfig, parseStarterConfig, type StarterConfig } from '../src/starter/config.js';
 import { buildRepositoryStarter } from '../src/starter/payload.js';
-import { loadStarterLock, refreshTemplate, templateLockEntry, verifyTemplateCache, type StarterLock } from '../src/starter/template-lock.js';
+import {
+  checkTemplateManifest, loadStarterLock, parseTemplateManifest, refreshTemplate, templateLockEntry, verifyTemplateCache, type StarterLock,
+} from '../src/starter/template-lock.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
 import { buildFixture, ROOT, runBootstrap, SHELLS, testConfig, writeFixture } from './helpers/starter.js';
 
@@ -35,7 +37,11 @@ function rows(files: StarterFiles, manifest: string): string[] {
 }
 
 /** testConfig with `extras` turned into a template bundle with instruction files. */
-function templateConfig(appDir = 'tests/fixtures/starter/app-timer', agentFiles: string | undefined = 'tests/fixtures/starter/agent-files'): StarterConfig {
+function templateConfig(
+  appDir = 'tests/fixtures/starter/app-timer',
+  agentFiles: string | undefined = 'tests/fixtures/starter/agent-files',
+  manifest: { manifestId?: string; manifestCategories?: string[] } = {},
+): StarterConfig {
   const bundles = JSON.parse(JSON.stringify(testConfig().bundles)) as Record<string, Record<string, unknown>>;
   return parseStarterConfig({
     schemaVersion: 1,
@@ -47,7 +53,11 @@ function templateConfig(appDir = 'tests/fixtures/starter/app-timer', agentFiles:
         akaLink: undefined,
         prompt: undefined,
         ...(agentFiles ? { agentFiles } : {}),
-        templates: { timer: { akaLink: 'https://aka.ms/test-timer', prompt: 'Read https://aka.ms/test-timer.', appDir } },
+        ...(manifest.manifestCategories ? { manifestCategories: manifest.manifestCategories } : {}),
+        templates: { timer: {
+          akaLink: 'https://aka.ms/test-timer', prompt: 'Read https://aka.ms/test-timer.', appDir,
+          ...(manifest.manifestId ? { manifestId: manifest.manifestId } : {}),
+        } },
       },
     },
   });
@@ -118,15 +128,68 @@ describe('starter template lock', () => {
   });
 });
 
+function manifestEntry(id: string, folderPath: string, gitRef = 'refs/tags/v1.0.0', categories = ['starters', 'hosted-skills']): Record<string, unknown> {
+  return { id, repositoryUrl: 'https://github.com/contoso/sample-app', folderPath, gitRef, categories, priority: 60 };
+}
+
+describe('templates manifest', () => {
+  it('reads the repository, folder, and ref of each template', () => {
+    const manifest = parseTemplateManifest({ version: '1.0.0', templates: [manifestEntry('sample-timer', 'timer'), manifestEntry('root-app', '.', 'refs/heads/main')] });
+    expect(manifest.version).toBe('1.0.0');
+    expect(manifest.templates).toEqual([
+      { id: 'sample-timer', repository: 'contoso/sample-app', path: 'timer', ref: 'v1.0.0', categories: ['starters', 'hosted-skills'] },
+      { id: 'root-app', repository: 'contoso/sample-app', path: '.', ref: 'main', categories: ['starters', 'hosted-skills'] },
+    ]);
+  });
+
+  it('sets aside a template outside GitHub or with an unsafe folder without failing the others', () => {
+    const manifest = parseTemplateManifest({ version: '1', templates: [
+      { ...manifestEntry('elsewhere', 'timer'), repositoryUrl: 'https://example.com/a/b' },
+      manifestEntry('escape', '../outside'),
+      manifestEntry('root-empty', ''),
+    ] });
+    expect(manifest.templates.map(template => `${template.id}:${template.path}`)).toEqual(['root-empty:.']);
+    expect(manifest.rejected.elsewhere).toMatch(/repositoryUrl/);
+    expect(manifest.rejected.escape).toMatch(/folderPath/);
+    const config = templateConfig('tests/fixtures/starter/app-timer', undefined, { manifestId: 'escape' });
+    expect(checkTemplateManifest(config, { schemaVersion: 1, templates: {} }, manifest))
+      .toEqual(['extras/timer: manifest template escape cannot be used: unsafe folderPath.']);
+  });
+
+  it('reports manifest starters that are not cached and cached templates that differ from the manifest', () => {
+    const config = templateConfig('tests/fixtures/starter/app-timer', undefined, { manifestId: 'sample-timer', manifestCategories: ['starters', 'hosted-skills'] });
+    const lock: StarterLock = { schemaVersion: 1, templates: {
+      'extras/timer': { ...fixtureLock().templates['extras/timer'], manifestId: 'sample-timer', path: 'timer' },
+    } };
+    const current = parseTemplateManifest({ version: '1', templates: [
+      manifestEntry('sample-timer', 'timer'),
+      manifestEntry('not-a-starter', 'other', 'refs/tags/v1.0.0', ['hosted-skills', 'workflows']),
+    ] });
+    expect(checkTemplateManifest(config, lock, current)).toEqual([]);
+    const moved = parseTemplateManifest({ version: '2', templates: [
+      manifestEntry('sample-timer', 'timer', 'refs/tags/v1.2.0'),
+      manifestEntry('sample-queue', 'queue'),
+    ] });
+    expect(checkTemplateManifest(config, lock, moved)).toEqual([
+      'extras/timer: the manifest has contoso/sample-app/timer@v1.2.0; the cache has contoso/sample-app/timer@v1.0.0.',
+      'extras: manifest starter sample-queue is not cached.',
+    ]);
+    expect(checkTemplateManifest(config, lock, parseTemplateManifest({ version: '3', templates: [] })))
+      .toEqual(['extras/timer: manifest template sample-timer is missing.']);
+  });
+});
+
 describe('starter template refresh', () => {
-  it('downloads one upstream commit, maps special files, skips local settings, and updates the lock', async () => {
+  it('downloads the manifest folder of one upstream commit, maps special files, skips local settings, and updates the lock', async () => {
     const stage = join(temp, 'upstream', `sample-app-${UPSTREAM_SHA}`);
     for (const [path, content] of Object.entries({
-      'README.md': '# Sample\n',
-      '.gitignore': 'node_modules/\n',
-      'src/local.settings.json': '{"secret": "do not copy"}\n',
-      'src/local.settings.json.sample': '{"Values": {}}\n',
-      '.github/workflows/ci.yml': 'name: ci\n',
+      'README.md': '# Repository readme, not cached\n',
+      'other/README.md': '# Another sample, not cached\n',
+      'timer/README.md': '# Sample\n',
+      'timer/.gitignore': 'node_modules/\n',
+      'timer/src/local.settings.json': '{"secret": "do not copy"}\n',
+      'timer/src/local.settings.json.sample': '{"Values": {}}\n',
+      'timer/.github/workflows/ci.yml': 'name: ci\n',
     })) {
       mkdirSync(join(stage, ...path.split('/').slice(0, -1)), { recursive: true });
       writeFileSync(join(stage, ...path.split('/')), content);
@@ -138,7 +201,10 @@ describe('starter template refresh', () => {
     const requests: string[] = [];
     const server = createServer((request, response) => {
       requests.push(request.url ?? '');
-      if (request.url === '/repos/contoso/sample-app/commits/v1.0.0') {
+      if (request.url === '/manifest.json') {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ version: '1.0.0', templates: [manifestEntry('sample-other', 'other'), manifestEntry('sample-timer', 'timer')] }));
+      } else if (request.url === '/repos/contoso/sample-app/commits/v1.0.0') {
         response.writeHead(200, { 'Content-Type': 'text/plain' });
         response.end(UPSTREAM_SHA);
       } else if (request.url === `/contoso/sample-app/tar.gz/${UPSTREAM_SHA}`) {
@@ -156,20 +222,24 @@ describe('starter template refresh', () => {
       const root = join(temp, 'refresh-root');
       mkdirSync(join(root, 'apps', 'timer'), { recursive: true });
       writeFileSync(join(root, 'apps', 'timer', 'STALE.md'), 'removed by refresh\n');
-      const config = templateConfig('apps/timer');
+      const config = templateConfig('apps/timer', 'tests/fixtures/starter/agent-files', { manifestId: 'sample-timer' });
       const lockPath = join(root, 'starter.lock.json');
       const entry = await refreshTemplate({
-        root, config, lockPath, bundle: 'extras', template: 'timer', repository: 'contoso/sample-app', ref: 'v1.0.0',
-        apiBase: base, codeloadBase: base,
+        root, config, lockPath, bundle: 'extras', template: 'timer',
+        manifestUrl: `${base}/manifest.json`, apiBase: base, codeloadBase: base,
       });
-      expect(entry).toMatchObject({ repository: 'contoso/sample-app', ref: 'v1.0.0', commit: UPSTREAM_SHA });
+      expect(entry).toMatchObject({ manifestId: 'sample-timer', repository: 'contoso/sample-app', path: 'timer', ref: 'v1.0.0', commit: UPSTREAM_SHA });
       expect(Object.keys(entry.files).sort()).toEqual(['README.md', 'gitignore.template', 'src/local.settings.json.sample']);
       expect(existsSync(join(root, 'apps', 'timer', 'STALE.md'))).toBe(false);
       expect(existsSync(join(root, 'apps', 'timer', 'src', 'local.settings.json'))).toBe(false);
       expect(readFileSync(join(root, 'apps', 'timer', 'gitignore.template'), 'utf-8')).toBe('node_modules/\n');
       expect(loadStarterLock(lockPath).templates['extras/timer']).toEqual(entry);
       expect(verifyTemplateCache(root, config, loadStarterLock(lockPath))).toEqual([]);
-      expect(requests).toEqual(['/repos/contoso/sample-app/commits/v1.0.0', `/contoso/sample-app/tar.gz/${UPSTREAM_SHA}`]);
+      expect(requests).toEqual(['/manifest.json', '/repos/contoso/sample-app/commits/v1.0.0', `/contoso/sample-app/tar.gz/${UPSTREAM_SHA}`]);
+      await expect(refreshTemplate({
+        root, config: templateConfig('apps/timer'), lockPath, bundle: 'extras', template: 'timer',
+        manifestUrl: `${base}/manifest.json`, apiBase: base, codeloadBase: base,
+      })).rejects.toThrow(/manifestId/);
     } finally {
       server.close();
     }
@@ -177,6 +247,38 @@ describe('starter template refresh', () => {
 });
 
 describe('hosted-skills bundle configuration', () => {
+  it('caches the five manifest starters, each with its own link, prompt, lock entry, and examples (ST-001, ST-014)', () => {
+    const config = loadStarterConfig(join(ROOT, 'starter.config.json'));
+    const lock = loadStarterLock(join(ROOT, 'starter.lock.json'));
+    const bundle = config.bundles['hosted-skills'];
+    expect(bundle.manifestCategories).toEqual(['starters', 'hosted-skills']);
+    const expected: Record<string, string> = {
+      timer: 'ai-hosted-skills-python',
+      queue: 'ai-hosted-skills-starter-queue-python',
+      servicebus: 'ai-hosted-skills-starter-servicebus-python',
+      blob: 'ai-hosted-skills-starter-blob-python',
+      cosmos: 'ai-hosted-skills-starter-cosmos-python',
+    };
+    expect(Object.keys(bundle.templates ?? {}).sort()).toEqual(Object.keys(expected).sort());
+    const readme = readFileSync(join(ROOT, 'README.md'), 'utf-8');
+    const files = buildRepositoryStarter({ root: ROOT }).files;
+    const handoffs = new Set<string>();
+    for (const [name, manifestId] of Object.entries(expected)) {
+      const template = bundle.templates?.[name];
+      expect(template?.manifestId).toBe(manifestId);
+      expect(template?.akaLink).toBe(`https://aka.ms/hosted-skills-${name}-starter`);
+      expect(template?.appDir).toBe(`templates/starter/apps/${name}`);
+      expect(readme).toContain(template?.prompt ?? '<missing>');
+      expect(lock.templates[`hosted-skills/${name}`]?.manifestId).toBe(manifestId);
+      const start = text(files, `hosted-skills/templates/${name}/start.md`);
+      expect(start).toContain(`-Bundle hosted-skills -Template ${name} -Agent <agent>`);
+      expect(start).toContain('azure-functions-hosted-skills-migrate');
+      expect(rows(files, `hosted-skills/templates/${name}/files.tsv`).filter(row => row.endsWith(' -> .gitignore'))).toHaveLength(1);
+      handoffs.add(start.slice(start.indexOf('Offer examples')));
+    }
+    expect(handoffs.size).toBe(Object.keys(expected).length);
+  }, 120_000);
+
   it('defines the Hosted Skills bundle with the timer template and its prompt (ST-001, ST-014)', () => {
     const config = loadStarterConfig(join(ROOT, 'starter.config.json'));
     const bundle = config.bundles['hosted-skills'];
