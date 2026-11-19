@@ -1,5 +1,5 @@
-agents	e0effe2d0a2f344240b459ba1546bbd84c0b1dd8ab63f91481e8ada7db2a2ea6	skills/azure-functions-hosted-skills/SKILL.md	.agents/skills/azure-functions-hosted-skills/SKILL.md
-claude	e0effe2d0a2f344240b459ba1546bbd84c0b1dd8ab63f91481e8ada7db2a2ea6	skills/azure-functions-hosted-skills/SKILL.md	.claude/skills/azure-functions-hosted-skills/SKILL.md
+agents	0f23f741b3bb05d71386e3d5fe3fb9af44edd94406f94442348732d004bc4357	skills/azure-functions-hosted-skills/SKILL.md	.agents/skills/azure-functions-hosted-skills/SKILL.md
+claude	0f23f741b3bb05d71386e3d5fe3fb9af44edd94406f94442348732d004bc4357	skills/azure-functions-hosted-skills/SKILL.md	.claude/skills/azure-functions-hosted-skills/SKILL.md
 agents	74072e48e30f663b5203c228feec260e6b8c22fe46fff219ba8285ee96c45175	skills/azure-functions-hosted-skills/references/abbreviations.json	.agents/skills/azure-functions-hosted-skills/references/abbreviations.json
 claude	74072e48e30f663b5203c228feec260e6b8c22fe46fff219ba8285ee96c45175	skills/azure-functions-hosted-skills/references/abbreviations.json	.claude/skills/azure-functions-hosted-skills/references/abbreviations.json
 agents	9af06e261beb66bb1f3c5926c470c6e27e21e3c32229a2c7a21ff98288b8f5f4	skills/azure-functions-hosted-skills/references/agent-authoring.md	.agents/skills/azure-functions-hosted-skills/references/agent-authoring.md
@@ -66,6 +66,6 @@ agents	b3b9cf40fe236ec606b3cbe629ce3b26debe6d65dbebe88703d203e2f9bccc24	skills/a
 claude	b3b9cf40fe236ec606b3cbe629ce3b26debe6d65dbebe88703d203e2f9bccc24	skills/azure-functions-connector-validate/SKILL.md	.claude/skills/azure-functions-connector-validate/SKILL.md
 agents	898fd9dc6bdc5b863fe4a0b5610d7cbf170ed2b22700e254832ef090dc508981	skills/azure-functions-connector-validate/references/deployment-gates.md	.agents/skills/azure-functions-connector-validate/references/deployment-gates.md
 claude	898fd9dc6bdc5b863fe4a0b5610d7cbf170ed2b22700e254832ef090dc508981	skills/azure-functions-connector-validate/references/deployment-gates.md	.claude/skills/azure-functions-connector-validate/references/deployment-gates.md
-common	e414cfec68ddc6b9920559b91c176a1f8036c199fdaa6fb82fa2d0de662700d2	agent-files/AGENTS.md	AGENTS.md
+common	510746c4cbc9a7a27e3fb5fabe83bfbce8a9941026fbb7c1a16f8231b343880f	agent-files/AGENTS.md	AGENTS.md
 claude	f7b3331eae3c892204c7f0c99d6527f7920a48f47239908e93bbc02b3b252615	agent-files/CLAUDE.md	CLAUDE.md
 copilot	ca4458be695d298f65d62f70fe47c105a3fbe5ce690faa9d8dd1faf43154906d	agent-files/copilot-instructions.md	.github/copilot-instructions.md

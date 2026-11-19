@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "bundle": "hosted-skills",
+  "template": "cosmos",
+  "manifestId": "ai-hosted-skills-starter-cosmos-python",
+  "repository": "Azure-Samples/azure-functions-hosted-skills-samples",
+  "path": "starter-cosmos",
+  "ref": "v1.1.0",
+  "commit": "f85363726d49acc6c8796b9544d3fab7f0793355"
+}

@@ -120,8 +120,8 @@ Reply in the user's language with:
 2. The tool and hook results from the steps above.
 3. One question about what the user wants to build.
 
-The app in this directory is the daily-blog sample. Offer examples as
-inspiration, not as tasks to run:
+The app in this directory is the daily-blog sample: a timer-triggered skill
+and a chat agent. Offer examples as inspiration, not as tasks to run:
 
 > Turn this sample into a daily summary of my team's GitHub issues.
 

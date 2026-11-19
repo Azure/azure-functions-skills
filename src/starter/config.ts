@@ -14,6 +14,8 @@ export interface StarterTemplate {
   readonly prompt: string;
   /** Repository-relative directory that holds the cached app files. */
   readonly appDir: string;
+  /** Template id in the Azure Functions templates manifest that the cache is refreshed from. */
+  readonly manifestId?: string;
 }
 
 export interface StarterBundle {
@@ -23,6 +25,8 @@ export interface StarterBundle {
   readonly handoff: string;
   /** Repository-relative directory of instruction files (AGENTS.md, CLAUDE.md, copilot-instructions.md). */
   readonly agentFiles?: string;
+  /** Manifest categories that, together, mark the starters this bundle is expected to cache. */
+  readonly manifestCategories?: readonly string[];
   readonly akaLink?: string;
   readonly prompt?: string;
   readonly templates?: Readonly<Record<string, StarterTemplate>>;
@@ -50,7 +54,8 @@ const NAME = /^[a-z][a-z0-9-]{0,40}$/;
 const REPOSITORY = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
 const BRANCH = /^[A-Za-z0-9._/-]+$/;
 const SAFE_RELATIVE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
-const AKA_LINK = /^https:\/\/aka\.ms\/[A-Za-z0-9-]+$/;
+const MANIFEST_ID = /^[a-z0-9][a-z0-9-]{0,100}$/;
+const AKA_LINK =/^https:\/\/aka\.ms\/[A-Za-z0-9-]+$/;
 
 export function loadStarterConfig(path: string): StarterConfig {
   return parseStarterConfig(JSON.parse(readFileSync(path, 'utf-8')));
@@ -104,7 +109,14 @@ function parseBundle(name: string, value: unknown): StarterBundle {
       throw new Error(`Invalid bundle ${name}.agentFiles: ${agentFiles}`);
     }
   }
-  const shared = { title, skills, tools, handoff, ...(agentFiles ? { agentFiles } : {}) };
+  const manifestCategories = bundle.manifestCategories === undefined
+    ? undefined
+    : names(bundle.manifestCategories, `bundle ${name}.manifestCategories`);
+  const shared = {
+    title, skills, tools, handoff,
+    ...(agentFiles ? { agentFiles } : {}),
+    ...(manifestCategories ? { manifestCategories } : {}),
+  };
   if (bundle.templates === undefined) {
     return {
       ...shared,
@@ -123,10 +135,16 @@ function parseBundle(name: string, value: unknown): StarterBundle {
     const link = akaLink(template.akaLink, `template ${templateName}.akaLink`);
     const appDir = text(template.appDir, `template ${templateName}.appDir`);
     if (!SAFE_RELATIVE.test(appDir)) throw new Error(`Invalid template ${templateName}.appDir: ${appDir}`);
+    let manifestId: string | undefined;
+    if (template.manifestId !== undefined) {
+      manifestId = text(template.manifestId, `template ${templateName}.manifestId`);
+      if (!MANIFEST_ID.test(manifestId)) throw new Error(`Invalid template ${templateName}.manifestId: ${manifestId}`);
+    }
     templates[templateName] = {
       akaLink: link,
       prompt: prompt(template.prompt, link, `template ${templateName}.prompt`),
       appDir,
+      ...(manifestId ? { manifestId } : {}),
     };
   }
   if (Object.keys(templates).length === 0) throw new Error(`bundle ${name}: templates is empty.`);
