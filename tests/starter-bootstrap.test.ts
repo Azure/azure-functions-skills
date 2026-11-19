@@ -232,11 +232,13 @@ describe.each(SHELLS)('starter bootstrap (%s)', (shell: Shell) => {
       expect(result.status, result.stdout + result.stderr).toBe(0);
       return readFileSync(resultFile, 'utf-8');
     };
-    expect(await decide('send')).toMatch(/^send=1$/m);
+    expect(await decide('send')).toMatch(/^send=1$[\s\S]*^optout=$/m);
     expect(await decide('flag', { noTelemetry: true })).toMatch(/^send=0$/m);
-    expect(await decide('env1', { env: { AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'FaLsE' } })).toMatch(/^send=0$/m);
+    expect(await decide('env1', { env: { AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'FaLsE' } })).toMatch(/^send=0$[\s\S]*^optout=environment$/m);
     expect(await decide('env2', { env: { AZURE_MCP_COLLECT_TELEMETRY: 'false' } })).toMatch(/^send=0$/m);
-    expect(await decide('ancestor', { parentOptOut: '{"enabled": false}' })).toMatch(/^send=0$/m);
+    // The result names the opt-out, so a CI failure shows which file decided.
+    expect(await decide('ancestor', { parentOptOut: '{"enabled": false}' }))
+      .toMatch(/^send=0$[\s\S]*^optout=.*ancestor[/\\]\.claude[/\\]hooks[/\\]telemetry\.config\.json$/m);
     expect(await decide('ancestor invalid', { parentOptOut: '{broken' })).toMatch(/^send=0$/m);
   }, TIMEOUT);
 
