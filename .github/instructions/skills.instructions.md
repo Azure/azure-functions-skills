@@ -22,6 +22,7 @@ applyTo: "templates/**"
 - Skill Markdown (`SKILL.md`) is loaded as LLM agent instructions. Write clearly and unambiguously.
 - Include `references/` for checklists, examples, and supporting material.
 - Tag skills with proper YAML front matter (name, title, description, category).
+- Keep the front matter `description` at or below 1,024 characters. Keep routing cues in the description and move supporting details into the body or references.
 
 ## Security
 

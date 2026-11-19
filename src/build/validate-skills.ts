@@ -17,6 +17,7 @@ export interface SkillValidationResult {
 }
 
 const REQUIRED_SKILL_FILES = ['SKILL.md'] as const;
+const MAX_SKILL_DESCRIPTION_LENGTH = 1024;
 
 export function validateSkills(skillsDir: string): SkillValidationResult {
   const errors: SkillValidationError[] = [];
@@ -61,6 +62,15 @@ export function validateSkills(skillsDir: string): SkillValidationResult {
           skillId: declaredName,
           file: 'SKILL.md',
           message: `Skill name '${declaredName}' does not match directory '${dirName}'`,
+        });
+      }
+
+      const descriptionLength = frontmatter.description?.length ?? 0;
+      if (descriptionLength > MAX_SKILL_DESCRIPTION_LENGTH) {
+        errors.push({
+          skillId: declaredName || dirName,
+          file: 'SKILL.md',
+          message: `Skill description must be at most ${MAX_SKILL_DESCRIPTION_LENGTH} characters (found ${descriptionLength})`,
         });
       }
     }
