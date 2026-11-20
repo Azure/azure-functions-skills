@@ -1,0 +1,28 @@
+# Installed by the Azure Functions Hosted Skills starter for a sample that has no .gitignore of its own.
+
+# Local settings and secrets
+local.settings.json
+.env
+*.env
+
+# Azure Developer CLI environments
+.azure/
+
+# Python
+__pycache__/
+*.py[codz]
+.venv/
+venv/
+.python_packages/
+.pytest_cache/
+
+# Azure Functions and Azurite local state
+bin/
+obj/
+__blobstorage__/
+__queuestorage__/
+__azurite_db*.json
+
+# Editors and OS
+.vscode/settings.json
+.DS_Store

@@ -1,0 +1,1 @@
+azurefunctions-agents-runtime[monitor]>=0.1.0b17

@@ -97,6 +97,40 @@ with LF line endings so that every file hash is the same on every OS. Do not edi
 `starter/` by hand. Moving the skills to another repository is a change to
 `source` in `starter.config.json`, a rebuild, and an update of the aka.ms links.
 
+### Update an app template
+
+A bundle with `templates` ships a cached copy of a sample app per template
+(`templates/starter/apps/<template>/`). Each template names its source with
+`manifestId`, an id in the
+[Azure Functions templates manifest](https://cdn.functions.azure.com/public/templates-manifest/manifest.json).
+The Hosted Skills bundle caches every manifest template whose categories include
+both `starters` and `hosted-skills` (`manifestCategories`). `starter.lock.json`
+records the manifest id, repository, folder, ref, commit, and the hash of every
+cached file; the build and `verify:starter-payload` refuse a cache that differs
+from the lock, offline.
+
+To see whether the manifest moved on (a new ref, folder, or repository, or a new
+starter that is not cached yet):
+
+```bash
+npm run check:starter-templates
+```
+
+To take the manifest's current folder and ref for one template:
+
+```bash
+npm run refresh:starter-template -- hosted-skills/queue
+npm run build:starter
+```
+
+A new starter needs a template entry in `starter.config.json` (link, prompt,
+`appDir`, `manifestId`), a README prompt, and optionally
+`templates/starter/handoff/<bundle>/<template>.md` with its examples, before the
+refresh. The refresh downloads exactly one commit, caches only the manifest's
+folder, stores `.gitignore` files as `gitignore.template`, and does not cache
+`local.settings.json`, `.git*` metadata, or `.github/`. Review the cache diff
+like any other source change. Set `GITHUB_TOKEN` if the anonymous GitHub API limit is reached.
+
 ## Local Build
 
 Build the agent-specific layouts and the plugin payload for all targets:

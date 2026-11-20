@@ -1,0 +1,10 @@
+# Global configuration for all hosted skills in this function app.
+
+# Python code execution in Azure Container Apps dynamic sessions. The agent can use it
+# for calculations, data formatting, or the current date; no custom tools are needed.
+system_tools:
+  dynamic_sessions_code_interpreter:
+    endpoint: $ACA_SESSION_POOL_ENDPOINT
+
+model: $FOUNDRY_MODEL
+timeout: 1800

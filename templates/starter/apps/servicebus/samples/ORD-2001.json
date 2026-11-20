@@ -1,0 +1,10 @@
+{
+  "order_id": "ORD-2001",
+  "customer": "lena.schmidt@example.com",
+  "items": [
+    { "sku": "TENT-4P", "name": "4-person tent", "quantity": 1, "unit_price": 289.00 },
+    { "sku": "STOVE-2B", "name": "Two-burner camp stove", "quantity": 1, "unit_price": 74.50 }
+  ],
+  "shipping": { "method": "standard", "country": "DE", "address_matches_billing": true },
+  "customer_note": "Please deliver before the weekend if possible."
+}

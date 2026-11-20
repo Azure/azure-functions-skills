@@ -1,0 +1,7 @@
+region,month,orders,revenue,returns
+North,April,412,38210.50,17
+North,May,455,41980.00,29
+South,April,298,27115.25,11
+South,May,341,30902.75,24
+West,April,520,49870.00,20
+West,May,489,46315.40,33

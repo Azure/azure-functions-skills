@@ -6,6 +6,7 @@ import type { TelemetryRuntime } from '../build/telemetry-runtime.js';
 import type { Skill } from '../types.js';
 import { STARTER_OSES, type StarterBundle, type StarterConfig, type ToolInstallTable } from './config.js';
 import { HOOK_DESTINATIONS, STARTER_AGENTS, hookSnippet, type StarterAgent } from './hooks.js';
+import type { StarterLock } from './template-lock.js';
 
 /** Raised when an archive needs an installer that understands a newer payload layout. */
 export const STARTER_ENGINE_VERSION = 1;
@@ -39,7 +40,16 @@ export interface StarterBuildInput {
   readonly runtime: TelemetryRuntime;
   readonly packageVersion: string;
   readonly endpoints: StarterEndpoints;
+  /** Upstream provenance of the cached app templates (starter.lock.json). */
+  readonly lock?: StarterLock;
 }
+
+/** Instruction file name in a bundle's agentFiles directory → manifest scope and destination. */
+const AGENT_FILES: Readonly<Record<string, { scope: string; destination: string }>> = {
+  'AGENTS.md': { scope: 'common', destination: 'AGENTS.md' },
+  'CLAUDE.md': { scope: 'claude', destination: 'CLAUDE.md' },
+  'copilot-instructions.md': { scope: 'copilot', destination: '.github/copilot-instructions.md' },
+};
 
 /** Generated starter files keyed by path relative to the starter root. */
 export type StarterFiles = Map<string, Buffer>;
@@ -119,6 +129,16 @@ function addBundle(
       rows.push({ scope: 'claude', source, destination: `.claude/skills/${id}/${file.path}` });
     }
   }
+  if (bundle.agentFiles !== undefined) {
+    const directory = join(input.root, ...bundle.agentFiles.split('/'));
+    for (const path of listFiles(directory)) {
+      const target = AGENT_FILES[path];
+      if (!target) throw new Error(`Bundle ${name} agentFiles has ${path}; only ${Object.keys(AGENT_FILES).join(', ')} are mapped.`);
+      const source = `agent-files/${path}`;
+      add(`${name}/${source}`, readFileSync(join(directory, path)));
+      rows.push({ scope: target.scope, source, destination: target.destination });
+    }
+  }
   add(`${name}/files.tsv`, manifest(rows, name, files));
   add(`${name}/tools.tsv`, toolsTable(input.tools, bundle.tools, name));
 
@@ -137,6 +157,22 @@ function addBundle(
         templateRows.push({ scope: 'common', source, destination: path.replace(/\.sample$/, '') });
       }
     }
+    if (!templateRows.some(row => row.destination === '.gitignore')) {
+      // A sample taken from a folder of a larger repository has no .gitignore of its own.
+      add(`${base}/app-gitignore.template`, readFileSync(join(input.root, 'templates', 'starter', 'app-gitignore.template')));
+      templateRows.push({ scope: 'common', source: 'app-gitignore.template', destination: '.gitignore' });
+    }
+    const origin = input.lock?.templates[`${name}/${templateName}`];
+    if (origin) {
+      add(`${base}/template.json`, `${JSON.stringify({
+        schemaVersion: 1, bundle: name, template: templateName,
+        ...(origin.manifestId ? { manifestId: origin.manifestId } : {}),
+        repository: origin.repository,
+        ...(origin.path ? { path: origin.path } : {}),
+        ref: origin.ref, commit: origin.commit,
+      }, null, 2)}\n`);
+      templateRows.push({ scope: 'common', source: 'template.json', destination: `.azure-functions-skills/templates/${templateName}.json` });
+    }
     add(`${base}/files.tsv`, manifest(templateRows, base, files));
     add(`${base}/start.md`, renderStart(input, name, bundle, templateName));
   }
@@ -144,7 +180,7 @@ function addBundle(
 
 /** Cached files that git or a host would treat specially are stored under another name. */
 function appDestination(path: string): string {
-  return path === 'gitignore.template' ? '.gitignore' : path;
+  return path === 'gitignore.template' || path.endsWith('/gitignore.template') ? path.replace(/gitignore\.template$/, '.gitignore') : path;
 }
 
 function manifest(rows: readonly ManifestRow[], base: string, files: StarterFiles): string {
@@ -191,10 +227,16 @@ export function posixCommand(input: Pick<StarterBuildInput, 'config' | 'endpoint
 
 function renderStart(input: StarterBuildInput, name: string, bundle: StarterBundle, template: string | null): string {
   const startTemplate = readFileSync(join(input.root, 'templates', 'starter', 'start.md'), 'utf-8');
-  const handoffPath = join(input.root, 'templates', 'starter', 'handoff', `${name}.md`);
-  const handoff = existsSync(handoffPath)
+  const handoffDir = join(input.root, 'templates', 'starter', 'handoff');
+  const handoffPath = join(handoffDir, `${name}.md`);
+  const bundleHandoff = existsSync(handoffPath)
     ? readFileSync(handoffPath, 'utf-8').trim()
     : `When the user answers, use the installed \`${bundle.handoff}\` skill.`;
+  // A template can add its own introduction and examples before the bundle's routing text.
+  const templateHandoffPath = template ? join(handoffDir, name, `${template}.md`) : null;
+  const handoff = templateHandoffPath && existsSync(templateHandoffPath)
+    ? `${readFileSync(templateHandoffPath, 'utf-8').trim()}\n\n${bundleHandoff}`
+    : bundleHandoff;
   return substitute(startTemplate, {
     '{{TITLE}}': bundle.title,
     '{{BRANCH}}': input.config.source.branch,
@@ -235,7 +277,7 @@ function substitute(text: string, values: Readonly<Record<string, string>>): str
 }
 
 /** Text files are stored with LF line endings so that hashes match on every OS. */
-function normalize(content: Buffer): Buffer {
+export function normalize(content: Buffer): Buffer {
   if (content.includes(0)) return content;
   const text = content.toString('utf-8');
   if (!Buffer.from(text, 'utf-8').equals(content) || !text.includes('\r\n')) return content;
@@ -246,7 +288,7 @@ export function sha256(content: Buffer): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
-function listFiles(root: string): string[] {
+export function listFiles(root: string): string[] {
   const files: string[] = [];
   const walk = (directory: string, prefix: string): void => {
     const entries = readdirSync(directory, { withFileTypes: true })

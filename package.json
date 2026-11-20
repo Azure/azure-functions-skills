@@ -35,6 +35,8 @@
     "build": "npm run compile && node lib/build/build.js",
     "build:plugin-payload": "npm run compile && node lib/build/build.js --plugin-only --repo-plugin-dir .github/plugins/azure-functions-skills --marketplace-root .",
     "build:starter": "npm run compile && node lib/starter/cli.js build",
+    "refresh:starter-template": "npm run compile && node lib/starter/cli.js refresh-template",
+    "check:starter-templates": "npm run compile && node lib/starter/cli.js check-templates",
     "check": "npm run lint && npm run typecheck && npm run lint:security && npm run validate:skills && npm run verify:plugin-payload && npm run verify:starter-payload && npm test && npm run build",
     "ci": "npm run check",
     "compile": "tsc",
