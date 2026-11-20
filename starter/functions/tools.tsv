@@ -1,0 +1,12 @@
+node	node	windows	Runs the azure-functions-common scripts and the telemetry hooks.	https://nodejs.org/en/download	winget install --exact --id OpenJS.NodeJS.LTS
+node	node	macos	Runs the azure-functions-common scripts and the telemetry hooks.	https://nodejs.org/en/download	brew install node@24
+node	node	linux	Runs the azure-functions-common scripts and the telemetry hooks.	https://nodejs.org/en/download	-
+func	func	windows	Azure Functions Core Tools create and run Functions projects locally.	https://learn.microsoft.com/azure/azure-functions/functions-run-local	-
+func	func	macos	Azure Functions Core Tools create and run Functions projects locally.	https://learn.microsoft.com/azure/azure-functions/functions-run-local	brew tap azure/functions && brew install azure-functions-core-tools@4
+func	func	linux	Azure Functions Core Tools create and run Functions projects locally.	https://learn.microsoft.com/azure/azure-functions/functions-run-local	-
+az	az	windows	Azure CLI is used for sign-in, diagnostics, and resource inspection.	https://learn.microsoft.com/cli/azure/install-azure-cli	winget install --exact --id Microsoft.AzureCLI
+az	az	macos	Azure CLI is used for sign-in, diagnostics, and resource inspection.	https://learn.microsoft.com/cli/azure/install-azure-cli	brew update && brew install azure-cli
+az	az	linux	Azure CLI is used for sign-in, diagnostics, and resource inspection.	https://learn.microsoft.com/cli/azure/install-azure-cli	-
+azd	azd	windows	Azure Developer CLI provisions and deploys the app.	https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd	winget install --exact --id Microsoft.Azd
+azd	azd	macos	Azure Developer CLI provisions and deploys the app.	https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd	brew install azure/azd/azd
+azd	azd	linux	Azure Developer CLI provisions and deploys the app.	https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd	-

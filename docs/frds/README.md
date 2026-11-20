@@ -24,6 +24,7 @@ prerequisites for development.
 | ID | Feature | Status | Depends on |
 | --- | --- | --- | --- |
 | [FRD-0003](0003-azure-deployment-observation-telemetry.md) | Azure deployment observation telemetry: observed successful Azure deployment operations | Draft | — |
+| [FRD-0004](0004-prompt-starter-onboarding.md) | Prompt-driven starter onboarding: paste a prompt to install the Functions or Hosted Skills bundle | Finalized | — |
 
 FRD numbers 0001 and 0002 are reserved by pull requests that were open when this
 index was written; check the index and open pull requests for collisions before

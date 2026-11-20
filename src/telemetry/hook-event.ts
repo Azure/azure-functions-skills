@@ -1,8 +1,19 @@
+import { NO_BUNDLE, type TelemetryDistribution } from './distribution.js';
 import { parseTelemetryEvent, type TelemetryEvent } from './sender.js';
+
+export interface HookEventContext {
+  /** Client name passed by the hook command. It overrides input-shape inference. */
+  readonly clientName?: string;
+  /** Set by the runtime from its own location, never from hook input. */
+  readonly distribution?: TelemetryDistribution;
+  /** Starter bundle that installed a skill, or `none`. */
+  readonly bundleFor?: (skillName: string | undefined) => string;
+}
 
 export function parseHookEvent(
   value: unknown,
   environment: { readonly COPILOT_CLI?: string },
+  context: HookEventContext = {},
 ): TelemetryEvent | undefined {
   if (!isRecord(value)) return undefined;
   const toolName = value.toolName ?? value.tool_name;
@@ -20,7 +31,7 @@ export function parseHookEvent(
   const sessionId = value.sessionId ?? value.session_id;
   const base = {
     timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
-    clientName: clientName(value, environment),
+    clientName: context.clientName ?? clientName(value, environment),
     pluginName: 'azure-functions-skills',
     ...(sessionId === undefined ? {} : { sessionId }),
   };
@@ -45,6 +56,13 @@ export function parseHookEvent(
       : { ...base, eventType: 'reference_file_read', fileReference: relative };
   } else {
     return undefined;
+  }
+
+  if (context.distribution !== undefined && isRecord(event)) {
+    const skill = typeof event.skillName === 'string'
+      ? event.skillName
+      : typeof event.fileReference === 'string' ? event.fileReference.split('/')[0] : undefined;
+    event = { ...event, distribution: context.distribution, bundle: context.bundleFor?.(skill) ?? NO_BUNDLE };
   }
 
   try {

@@ -19,6 +19,7 @@ export default [
       'lib/**',
       'node_modules/**',
       '.github/plugins/**/hooks/runtime/**',
+      'starter/**',
       'coverage/**',
     ],
   },

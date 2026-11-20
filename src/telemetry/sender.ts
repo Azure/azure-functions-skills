@@ -9,6 +9,7 @@ import {
   APPLICATION_INSIGHTS_INSTRUMENTATION_KEY,
 } from './config.js';
 import { isNormalizedResourceType } from './arm-deployments.js';
+import { isBundleName, TELEMETRY_DISTRIBUTIONS, type TelemetryDistribution } from './distribution.js';
 
 const EVENT_NAME = 'AzureFunctionsSkillsPluginExecuted';
 export const DEPLOYMENT_OBSERVED_EVENT_NAME = 'azure_deployment_observed';
@@ -25,6 +26,8 @@ const ALLOWED_PROPERTIES = new Set([
   'skillName',
   'toolName',
   'fileReference',
+  'distribution',
+  'bundle',
 ]);
 const EVENT_TYPES = new Set<TelemetryEventType>([
   'skill_invocation',
@@ -36,9 +39,10 @@ const CLIENT_NAMES = new Set([
   'claude-code',
   'Visual Studio Code',
   'Visual Studio Code - Insiders',
+  'codex',
   'unknown',
 ]);
-const OBSERVATION_AGENTS = new Set([...CLIENT_NAMES, 'codex']);
+const OBSERVATION_AGENTS = new Set(CLIENT_NAMES);
 const OBSERVATION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-hosted-skills']);
 const OBSERVATION_OPERATIONS = new Set(['deploy', 'provision']);
 const OBSERVATION_DEPLOYMENT_KINDS = new Set(['function-app', 'hosted-agent']);
@@ -86,6 +90,8 @@ export interface TelemetryEvent {
   readonly skillName?: string;
   readonly toolName?: string;
   readonly fileReference?: string;
+  readonly distribution?: TelemetryDistribution;
+  readonly bundle?: string;
 }
 
 export interface DeploymentObservedEvent {
@@ -158,6 +164,14 @@ export function parseTelemetryEvent(value: unknown): TelemetryEvent {
   const skillName = optionalString(value, 'skillName', 128);
   const toolName = optionalString(value, 'toolName', 256);
   const fileReference = optionalString(value, 'fileReference', 512);
+  const distribution = optionalString(value, 'distribution', 16);
+  const bundle = optionalString(value, 'bundle', 41);
+  if (distribution !== undefined && !TELEMETRY_DISTRIBUTIONS.has(distribution)) {
+    throw new Error(`Unsupported telemetry distribution: ${distribution}`);
+  }
+  if (bundle !== undefined && !isBundleName(bundle)) {
+    throw new Error(`Unsupported telemetry bundle: ${bundle}`);
+  }
 
   if (skillName !== undefined && !BUNDLED_SKILL_NAMES.has(skillName)) {
     throw new Error(`Unsupported skill name: ${skillName}`);
@@ -188,6 +202,8 @@ export function parseTelemetryEvent(value: unknown): TelemetryEvent {
     ...(skillName === undefined ? {} : { skillName }),
     ...(toolName === undefined ? {} : { toolName }),
     ...(fileReference === undefined ? {} : { fileReference }),
+    ...(distribution === undefined ? {} : { distribution: distribution as TelemetryDistribution }),
+    ...(bundle === undefined ? {} : { bundle }),
   };
 }
 
@@ -407,6 +423,8 @@ function telemetryProperties(event: TelemetryEvent): Record<string, string> {
     ...(event.skillName === undefined ? {} : { Plugin_SkillName: event.skillName }),
     ...(event.toolName === undefined ? {} : { Plugin_ToolName: event.toolName }),
     ...(event.fileReference === undefined ? {} : { Plugin_FileReference: event.fileReference }),
+    ...(event.distribution === undefined ? {} : { Plugin_Distribution: event.distribution }),
+    ...(event.bundle === undefined ? {} : { Plugin_Bundle: event.bundle }),
   };
 }
 
