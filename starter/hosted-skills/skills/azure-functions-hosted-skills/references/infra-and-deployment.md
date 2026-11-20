@@ -202,7 +202,9 @@ and, when local development needs it, the deployer user.
 
 ## Default Model Parameters
 
-New scaffolds default to `gpt-4.1`:
+The base template defaults to `gpt-4.1`; the trigger-specific starters default to `gpt-5.4`
+without the reasoning parameters. These are fallbacks; select the deployed model with the checks
+in [models.md](./models.md):
 
 ```json
 "foundryModel": { "value": "${FOUNDRY_MODEL=gpt-4.1}" },
@@ -440,7 +442,8 @@ If the agent is underthinking or the task needs deeper reasoning, offer to raise
 `AZURE_FUNCTIONS_AGENTS_REASONING_EFFORT` to `high` and increase `FOUNDRY_DEPLOYMENT_CAPACITY`
 within available quota.
 
-If the model deployment fails, revert to `gpt-4.1` values and provision again.
+If the model deployment fails, revert to a model with confirmed quota (`gpt-4.1` without reasoning
+settings when nothing else is available) and provision again.
 
 ## Observability
 
