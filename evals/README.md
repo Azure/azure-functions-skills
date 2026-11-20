@@ -20,3 +20,4 @@ to run it with `vally eval`.
 | Skill | Suite |
 | --- | --- |
 | `azure-functions-update` | [eval.yaml](azure-functions-update/README.md) |
+| `azure-functions-hosted-skills-advisor` | [eval.yaml](azure-functions-hosted-skills-advisor/README.md) |

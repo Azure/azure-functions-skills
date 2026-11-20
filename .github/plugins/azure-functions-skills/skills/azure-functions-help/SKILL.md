@@ -13,6 +13,10 @@ Use this skill when the user asks what Azure Functions capabilities are availabl
 3. Recommend at most three matching skills, with one short reason for each.
 4. Invoke or direct the user to the best match.
 
+For a source review to find where Hosted Skills could help, use
+`azure-functions-hosted-skills-advisor`. It writes an opportunity report without
+changing customer code and can recommend no changes.
+
 For conversion of an existing workflow from skills, selected chat context, configured agents,
 code, or instructions to a Hosted Skill, recommend
 `azure-functions-hosted-skills-migrate`. For a new capability with no existing workflow, use
