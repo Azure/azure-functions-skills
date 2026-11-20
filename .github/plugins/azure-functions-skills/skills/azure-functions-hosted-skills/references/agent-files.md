@@ -12,7 +12,7 @@ The file stem is important. `main.agent.md` uses route segment `main` and functi
 | --- | --- | --- |
 | `name` | Yes | Display name for logs and labels. |
 | `description` | Yes | What the agent does and when it should run. |
-| `trigger` | For event agents | One trigger per file. Not needed when only built-in endpoints are enabled. |
+| `trigger` | For event agents | One trigger per file. Not needed when only built-in endpoints are enabled or when a code-defined function calls the agent (see [Call an Agent from a Function](#call-an-agent-from-a-function)). |
 | `builtin_endpoints` | Optional | Enables debug chat UI, chat API, streaming API, and/or MCP endpoint. Add only when the user wants an interactive/API/MCP surface. |
 | `model` | Optional | Per-agent model override. Prefer app defaults first. |
 | `timeout` | Optional | Per-agent timeout in seconds. Runtime default is 900. Use 1800 for timer, connector-triggered, queue, and other background agents unless the task clearly needs more. |
@@ -20,7 +20,7 @@ The file stem is important. `main.agent.md` uses route segment `main` and functi
 | `skills` | Optional | `false` disables Agent Skills. `exclude` removes selected skills. |
 | `tools` | Optional | `false` disables custom Python tools. `exclude` removes selected tools. |
 | `workflows` | Optional | Opt-in Dynamic Workflows: `enabled`, workflow-tool `exclude`, and explicit `subagents` grants. Backend/hub settings belong in `host.json`. |
-| `system_tools` | Optional | Disable inherited system tools such as dynamic sessions per agent. |
+| `system_tools` | Optional | Disable inherited system tools per agent, such as dynamic sessions (`dynamic_sessions_code_interpreter: false`) or the built-in web request tool (`web_request: false`). |
 | `input_schema` | Optional | JSON Schema for HTTP request validation. |
 | `response_schema` | Optional | JSON Schema for structured HTTP responses. |
 | `response_example` | Optional | Example response shape for HTTP agents. |
@@ -120,6 +120,47 @@ workflow system skill. Workflow-tool access uses the independent `workflows.excl
 Do not put `backend`, `hub_name`, `max_nodes`, or `max_parallelism` under `workflows`; those are not
 supported agent settings. Keep backend/hub configuration in the Functions host and app settings.
 
+## Call an Agent from a Function
+
+An agent file without `trigger` and without `builtin_endpoints` has no trigger or endpoint of its
+own. A code-defined function in `function_app.py` can call it with `@app.hosted_skill(...)`, which
+injects a `HostedSkill` whose `run()` method runs the agent with a prompt you build:
+
+```python
+import logging
+
+import azure.functions as func
+from azure_functions_agents import HostedSkill, create_function_app
+
+app = create_function_app()
+
+
+@app.function_name("summarize_document")
+@app.blob_trigger(arg_name="blob", path="documents/{name}", connection="AzureWebJobsStorage",
+                  source=func.BlobSource.EVENT_GRID)
+@app.hosted_skill(arg_name="skill", agent_name="document_summary")
+async def summarize_document(blob: func.InputStream, skill: HostedSkill) -> None:
+    text = blob.read().decode("utf-8", errors="replace")
+    result = await skill.run(f"<document>\n{text}\n</document>")
+    logging.info("Summary:\n%s", result.content)
+```
+
+`agent_name` is the agent file stem (`document_summary.agent.md`). Keep `create_function_app()`
+so the runtime still registers the other agents.
+
+Use this pattern only when the trigger payload alone is not enough for the agent, such as:
+
+- **Blob triggers (current limitation):** a `blob_trigger` in agent frontmatter passes only blob
+  metadata (name, URI, size) to the agent, not the file content. Until the runtime passes content,
+  read the blob in a code-defined function and send the text to a trigger-less agent, as the
+  Hosted Skills blob starter does. This may change in a future runtime release; prefer frontmatter
+  triggers once content is available.
+- Preprocessing that must run before the agent, such as filtering file types, truncating large
+  inputs, or joining data the agent would otherwise need a custom tool to fetch.
+
+Wrap the input in clear delimiters and tell the agent in its instructions to treat that content as
+data, not instructions.
+
 ## Variable Substitution
 
 The runtime substitutes `$VAR` and `%VAR%` in string values in agent frontmatter, agent body,
@@ -151,6 +192,18 @@ Disable dynamic sessions for one agent:
 system_tools:
   dynamic_sessions_code_interpreter: false
 ```
+
+Disable the built-in web request tool for one agent:
+
+```yaml
+system_tools:
+  web_request: false
+```
+
+The Hosted Skills starters set `web_request: false` on agents that only process the trigger
+payload (customer messages, orders, documents, catalog changes). Keep it off for agents that read
+untrusted content and do not need to fetch URLs. Use dynamic sessions, not the web request tool,
+when an agent needs web browsing.
 
 Disable custom tools or skills similarly:
 

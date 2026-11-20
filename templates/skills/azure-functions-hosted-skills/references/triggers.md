@@ -82,7 +82,11 @@ trigger:
 ```
 
 Use the app setting name for `connection`, not the raw connection string. Identity-based storage
-settings can still be used by the Functions host.
+settings can still be used by the Functions host. A dedicated connection prefix (for example
+`SUPPORT_QUEUE`) uses `SUPPORT_QUEUE__queueServiceUri`, `__credential: managedidentity`, and
+`__clientId` when deployed, and `UseDevelopmentStorage=true` locally. Set
+`extensions.queues.messageEncoding` to `none` in `host.json` when senders write plain JSON
+instead of Base64.
 
 ## Blob Trigger
 
@@ -100,7 +104,21 @@ Arguments:
 | --- | --- | --- |
 | `path` | Yes | Container and blob pattern. |
 | `connection` | Yes | App setting prefix or connection setting name. |
-| `source` | No | Use `EventGrid` for lower latency when infrastructure supports it. |
+| `source` | On Flex Consumption | `EventGrid` is required on Flex Consumption, which does not support the polling blob trigger. Use `LogsAndContainerScan` only for local runs against Azurite, which has no Event Grid. |
+
+Current limitation: an agent with a `blob_trigger` in its frontmatter receives only blob metadata
+(name, URI, size) as trigger data, not the file content. When the agent needs the content, put the
+blob trigger on a code-defined function that reads the blob and calls a trigger-less agent with
+`@app.hosted_skill(...)`; see [agent-files.md](./agent-files.md#call-an-agent-from-a-function).
+The Hosted Skills blob starter does this. Revisit this when the runtime passes blob content.
+
+An Event Grid blob trigger also needs an Event Grid subscription on the storage account that
+posts `Microsoft.Storage.BlobCreated` events to the function's blob extension webhook. The webhook
+URL contains the `blobs_extension` system key, which exists only after the code is deployed and
+the host has started, so create the subscription after deployment: the blob starter runs
+`scripts/postdeploy.py` from an `azure.yaml` `postdeploy` hook. Without the subscription the
+function deploys but never runs. The starter switches `source` with a `DOCUMENTS_BLOB_SOURCE` app
+setting (`EventGrid` in Bicep, `LogsAndContainerScan` in `local.settings.json`).
 
 ## Event Grid Trigger
 
@@ -137,6 +155,19 @@ trigger:
 Common optional arguments include `is_sessions_enabled`, `cardinality`, and
 `auto_complete_messages`.
 
+Use identity-based connection settings under the `connection` prefix. Deployed (user-assigned
+managed identity):
+
+```text
+SERVICEBUS_CONNECTION__fullyQualifiedNamespace=<namespace>.servicebus.windows.net
+SERVICEBUS_CONNECTION__credential=managedidentity
+SERVICEBUS_CONNECTION__clientId=<identity-client-id>
+```
+
+Locally, set only `__fullyQualifiedNamespace` so the host uses the developer's Azure CLI sign-in.
+The app identity needs Azure Service Bus Data Receiver; the developer needs Data Receiver to run
+locally and Data Sender to send test messages.
+
 ## Service Bus Topic Trigger
 
 ```yaml
@@ -161,6 +192,21 @@ trigger:
 
 Common optional arguments include `lease_connection`, `lease_container_name`,
 `create_lease_container_if_not_exists`, and `max_items_per_invocation`.
+
+Use identity-based connection settings under the `connection` prefix:
+
+```text
+COSMOSDB_CONNECTION__accountEndpoint=https://<account>.documents.azure.com:443/
+COSMOSDB_CONNECTION__credential=managedidentity
+COSMOSDB_CONNECTION__clientId=<identity-client-id>
+```
+
+Locally, set only `__accountEndpoint`. Cosmos DB data-plane roles are SQL role assignments, not
+Azure RBAC roles. The app identity needs Cosmos DB Built-in Data Reader on the monitored container
+and Data Contributor on the lease container; a developer running locally or writing test
+documents needs Data Contributor. Data-plane roles cannot create containers, so create the monitored and lease containers in
+Bicep and set `create_lease_container_if_not_exists: false`. The trigger data is a JSON array of
+changed documents; the change feed does not include previous values or deletes.
 
 ## Other Function Event Triggers
 

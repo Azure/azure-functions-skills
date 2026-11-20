@@ -17,6 +17,8 @@ supporting agent-runtime files in the function app project root, usually `src`.
 | `tools/` | Optional | Custom Python tools. |
 | `skills/` | Optional | Agent Skills. |
 | `infra/` | For azd deploy | Bicep infrastructure. |
+| `scripts/` | Starters | Sample helpers at the project root, such as `demo.py` (send test events, run a best-effort smoke check) and `postdeploy.py` (an `azure.yaml` hook). Keep hooks the app still needs. |
+| `samples/` | Starters | Sample payloads used by `scripts/demo.py`. Replace them with data from the user's scenario. |
 
 ## function_app.py
 
@@ -25,6 +27,10 @@ from azure_functions_agents import create_function_app
 
 app = create_function_app()
 ```
+
+Code-defined Azure Functions can sit next to this bootstrap. A function that needs an agent, such
+as a blob-triggered function that reads the file content, uses `@app.hosted_skill(...)`; see
+[agent-files.md](./agent-files.md#call-an-agent-from-a-function).
 
 Do not replace this bootstrap with a hand-authored Durable orchestrator for Dynamic Workflows.
 After an agent opts in, the runtime creates the Durable App and registers the workflow functions.
@@ -159,7 +165,9 @@ set `timeout: 1800` on the background `.agent.md` files.
 
 ## local.settings.json
 
-Default scaffold for local development with `gpt-4.1`:
+Default scaffold for local development (the base template uses `gpt-4.1`; trigger-specific
+starters use `gpt-5.4` and add their trigger's connection settings, and ship the file as
+`local.settings.json.sample`). Keep `FOUNDRY_MODEL` equal to the model the app deploys:
 
 ```json
 {
