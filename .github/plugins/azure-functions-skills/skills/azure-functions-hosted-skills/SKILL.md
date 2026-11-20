@@ -1,6 +1,6 @@
 ---
 name: azure-functions-hosted-skills
-description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: cloud-hosted, event-driven intelligent capabilities built with Markdown, natural-language instructions, declarative configuration, code, and tools. Use whenever the user asks for an Azure Functions Hosted Skill, medium-code intelligent capability, AI app on Azure Functions, intelligent app on Azure Functions, serverless agent, serverless agents, Azure Functions agent, scheduled agent, morning briefing, daily digest, timer agent, inbox summary, email or Teams briefing, background AI workflow, connector-triggered agent, HTTP/chat capability, MCP tool, webhook-style agent, Azure Functions hosted agent, or Dynamic Workflows on the Azure Functions agents runtime with Durable Functions or Durable Task Scheduler (DTS). Use this skill, not azure-functions-deploy, for follow-up deployment requests when the conversation or project is about Hosted Skills, even if the user only says to deploy without repeating Hosted Skills. Likewise use this skill and its troubleshooting reference, not azure-functions-diagnostics, for Hosted Skills errors and failures. To migrate an existing workflow from skills, chat context, agents, code, or instructions, recommend azure-functions-hosted-skills-migrate; it requires an explicit use request by name and must not run automatically."
+description: "Build, scaffold, extend, deploy, and troubleshoot Azure Functions Hosted Skills: medium-code, event-driven capabilities built with Markdown, configuration, code, and tools. Use for an AI app on Azure Functions, an Azure Functions hosted agent, or a serverless agent: scheduled or timer agents, morning briefings, daily digests, inbox summaries, email or Teams briefings, background AI workflows, connector-triggered agents, HTTP/chat, MCP tools, webhooks, and Dynamic Workflows on the Azure Functions agents runtime with Durable Functions or Durable Task Scheduler (DTS). For Hosted Skills, use this skill for follow-up deployment and troubleshooting even if the user only says deploy or reports an error; do not route to azure-functions-deploy or azure-functions-diagnostics. For migration of existing skills, chat workflows, agents, code, or instructions, recommend azure-functions-hosted-skills-migrate and wait for an explicit request by name."
 argument-hint: "Describe the Hosted Skill, triggers, instructions, tools, model needs, and deployment target"
 ---
 
@@ -52,8 +52,10 @@ not the generic Azure REST dispatch pattern in the custom-tool reference.
 ## Current Defaults
 
 - Scaffold with Microsoft Foundry as the model provider.
-- Scaffold files may keep `gpt-4.1` as the safe Bicep fallback, but before provisioning or
-  deploying, check the user's subscription/region for the best deployable GPT model and quota.
+- The Bicep model default is only a fallback for when no model is chosen; it differs by template
+  (`gpt-4.1` in the base template, `gpt-5.4` in the trigger-specific starters). Keep whatever the
+  template ships and do not change it back to `gpt-4.1`. Before provisioning or deploying, check
+  the user's subscription/region for the best deployable GPT model and quota.
 - Prefer the newest deployable GPT reasoning model with remaining quota when available, such as
   `gpt-5.4` or newer. Only configure reasoning settings for models known to support them. Older
   models can fail if `AZURE_FUNCTIONS_AGENTS_REASONING_*` settings are present.
@@ -113,7 +115,13 @@ apps. Deploy with this skill's `azd` guidance, and diagnose errors with
 
 Before editing, inspect the app. Look for:
 
-- `src/function_app.py` importing `create_function_app()`
+- `.azure-functions-skills/templates/<template>.json`, which the Hosted Skills prompt starter writes
+  when it installs a sample app; the app is already scaffolded (see
+  [Scaffold a New App](#scaffold-a-new-app))
+- `README.md`, `scripts/` (for example `demo.py`, `postdeploy.py`), and `samples/` from a sample
+- `src/function_app.py` importing `create_function_app()`, and any code-defined functions that use
+  `@app.hosted_skill(...)` to call an agent (see
+  [agent-files.md](./references/agent-files.md#call-an-agent-from-a-function))
 - `src/*.agent.md`
 - `src/agents.config.yaml`
 - `src/mcp.json`
@@ -201,16 +209,26 @@ changes, and completion checks in the plan. A started Workflow ID is not busines
 
 ## Scaffold a New App
 
+Scaffold only when the workspace has no Hosted Skills app yet. If it already has one, such as an
+app installed by the Hosted Skills prompt starter (it has
+`.azure-functions-skills/templates/<template>.json`), do not scaffold, fetch, or reapply a
+template. Read its `README.md` and adapt the existing files to the user's scenario. The sample
+README was written for its own repository, so its `cd <folder>` steps do not apply when the app
+is at the workspace root.
+
 Use **manifest discovery + MCP primary retrieval** when Azure MCP tools are available:
 
 1. Fetch the Azure Functions template manifest from
-   `https://cdn.functions.azure.com/public/templates-manifest/manifest.json` and find
-   `ai-hosted-skills-python`. Use its catalog metadata (`priority`, `categories`, `tags`,
-   `whatsIncluded`) to explain why this is the correct Azure Functions Hosted Skills scaffold. Keep
+   `https://cdn.functions.azure.com/public/templates-manifest/manifest.json` and list the Python
+   templates whose `categories` include both `starters` and `hosted-skills`. Choose the one that
+   matches the planned trigger: `ai-hosted-skills-python` is the general template (timer agent,
+   chat endpoints), and `ai-hosted-skills-starter-<trigger>-python` templates (for example
+   `queue`, `servicebus`, `blob`, `cosmos`) include the trigger's resources, settings, demo
+   script, and samples. Use `ai-hosted-skills-python` when no starter matches. Use the catalog
+   metadata (`priority`, `categories`, `tags`, `whatsIncluded`) to explain the choice. Keep
    `repositoryUrl`, `folderPath`, and `gitRef` for fallback.
-2. Call Azure MCP `functions_template_get` with `language: python` and
-   `template: ai-hosted-skills-python`. This is the primary source for the complete project
-   files.
+2. Call Azure MCP `functions_template_get` with `language: python` and the selected `template`
+   ID. This is the primary source for the complete project files.
 3. Write the returned `files` array into the target project. If the output is truncated or saved to
    a temporary file, read the complete JSON response before deciding retrieval failed.
 4. If MCP returns an actual tool error, cannot retrieve the template, or returns an empty/zero-file
@@ -262,7 +280,7 @@ Baseline structure:
 Default scaffold choices:
 
 - Python 3.13 in Bicep.
-- Foundry provider. Keep `gpt-4.1` in template defaults only as a safe fallback.
+- Foundry provider. Keep the template's Bicep model default as the fallback.
 - Before running `azd provision` or `azd up`, run the model and quota checks in
   [models.md](./references/models.md), recommend the best deployable GPT model, and set the
   `FOUNDRY_MODEL`, `FOUNDRY_MODEL_NAME`, `FOUNDRY_MODEL_VERSION`, `FOUNDRY_DEPLOYMENT_CAPACITY`,
@@ -300,15 +318,21 @@ Local prerequisites:
 
 When an app uses Foundry, dynamic sessions, or connector MCP servers, run `azd provision` before
 local development. Local `func start` still calls real Azure resources for model, session pool,
-and connector operations.
+and connector operations. Service Bus and Cosmos DB triggers have no local emulator in the
+templates: a local run listens to the provisioned namespace or account through identity-based
+settings, and competes with the deployed app for the same messages or change feed. Azurite then
+only holds the Functions host state.
 
 Local loop:
 
-1. `azd init`
+1. `azd init` (skip when the workspace already has `azure.yaml`)
 2. `azd provision`
-3. Copy outputs from `azd env get-values` into `src/local.settings.json`.
+3. Copy outputs from `azd env get-values` into `src/local.settings.json`. Starters ship
+   `src/local.settings.json.sample`; copy it first.
 4. Start Azurite with `azurite --skipApiVersionCheck`.
 5. From `src`, create a venv, install requirements, and run `func start`.
+6. Send a test event as described in [testing.md](./references/testing.md#trigger-smoke-tests),
+   using the sample's `scripts/demo.py` when it has one.
 
 The scaffolded Bicep grants the deployer/local user access to Foundry and the session pool, and
 connection access policies when optional connectors are enabled.
@@ -360,14 +384,17 @@ Load [agent-files.md](./references/agent-files.md) before adding less common fro
 
 ## Model Selection Guidance
 
-For new scaffolds, keep `gpt-4.1` as the safe Bicep default, but actively try to select the best
+Keep the template's Bicep model default as the fallback, but actively try to select the best
 deployable GPT model before provisioning. Use `az cognitiveservices model list` and
 `az cognitiveservices usage list` to check the user's subscription, target region, model version,
 deployment SKU, and quota. See [models.md](./references/models.md) for copyable commands.
 
-Do not silently deploy `gpt-4.1` just because it is the template default. Either run the model
-and quota checks and choose/recommend a better deployable model, or state why the checks could not
-be run and then use `gpt-4.1` without reasoning settings.
+Do not silently deploy the template default. Either run the model and quota checks and
+choose/recommend a deployable model, or state why the checks could not be run and then use the
+template default without reasoning settings.
+The trigger-specific starters default to `gpt-5.4` without reasoning settings and their Bicep has
+no reasoning parameters; adding reasoning there means adding the app settings in Bicep and
+`local.settings.json` together.
 
 Recommend the newest deployable GPT reasoning model with remaining quota. Ask the user to choose
 when there are meaningful tradeoffs, such as newer/slower/costlier reasoning models versus smaller

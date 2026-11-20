@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { sha256 } from '../src/starter/build.js';
 import { hookSnippet } from '../src/starter/hooks.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
@@ -232,12 +232,36 @@ describe.each(SHELLS)('starter bootstrap (%s)', (shell: Shell) => {
       expect(result.status, result.stdout + result.stderr).toBe(0);
       return readFileSync(resultFile, 'utf-8');
     };
-    expect(await decide('send')).toMatch(/^send=1$/m);
+    expect(await decide('send')).toMatch(/^send=1$[\s\S]*^optout=$/m);
     expect(await decide('flag', { noTelemetry: true })).toMatch(/^send=0$/m);
-    expect(await decide('env1', { env: { AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'FaLsE' } })).toMatch(/^send=0$/m);
+    expect(await decide('env1', { env: { AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY: 'FaLsE' } })).toMatch(/^send=0$[\s\S]*^optout=environment$/m);
     expect(await decide('env2', { env: { AZURE_MCP_COLLECT_TELEMETRY: 'false' } })).toMatch(/^send=0$/m);
-    expect(await decide('ancestor', { parentOptOut: '{"enabled": false}' })).toMatch(/^send=0$/m);
+    // The result names the opt-out, so a CI failure shows which file decided.
+    expect(await decide('ancestor', { parentOptOut: '{"enabled": false}' }))
+      .toMatch(/^send=0$[\s\S]*^optout=.*ancestor[/\\]\.claude[/\\]hooks[/\\]telemetry\.config\.json$/m);
     expect(await decide('ancestor invalid', { parentOptOut: '{broken' })).toMatch(/^send=0$/m);
+  }, TIMEOUT);
+
+  // Windows CI showed send=0 now and then: re-reading the preference file this run had just
+  // written failed (a transient read failure, for example while a scanner holds the new file).
+  it.runIf(shell === 'sh')('does not re-read the preference file it just wrote to decide the setup event (ST-010)', async () => {
+    const parent = workspace('fresh preference');
+    const shim = join(parent, 'shim');
+    mkdirSync(shim);
+    writeFileSync(join(shim, 'awk'), [
+      '#!/bin/sh',
+      'for argument in "$@"; do',
+      '  case "$argument" in */app/.azure-functions-skills/telemetry.config.json) exit 2 ;; esac',
+      'done',
+      'exec /usr/bin/awk "$@"',
+      '',
+    ].join('\n'), { mode: 0o755 });
+    const resultFile = join(parent, 'result.txt');
+    const result = await runBootstrap(shell, starterX, {
+      destination: join(parent, 'app'), resultFile, path: [shim, process.env.PATH ?? process.env.Path ?? ''].join(delimiter),
+    });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(readFileSync(resultFile, 'utf-8')).toMatch(/^send=1$/m);
   }, TIMEOUT);
 
   it('checks without writing and fails on unknown arguments (ST-003, ST-019)', async () => {
@@ -250,4 +274,14 @@ describe.each(SHELLS)('starter bootstrap (%s)', (shell: Shell) => {
     expect(unknown.status).toBe(2);
     expect(unknown.json).toMatchObject({ error: { code: 'invalid-argument' } });
   }, TIMEOUT);
+});
+
+describe('starter bootstrap opt-out walk', () => {
+  // At the root, "$directory/.claude/..." became "//.claude/...": Git for Windows reads a
+  // leading // as a UNC path, so the check failed now and then and counted as an opt-out.
+  it('never builds a candidate path with a leading // at the filesystem root (ST-010)', () => {
+    const script = readFileSync(join('templates', 'starter', 'engine', 'bootstrap.sh'), 'utf-8');
+    expect(script).not.toMatch(/"\$directory\/\./);
+    expect(script).toMatch(/prefix=\$\{directory%\/\}/);
+  });
 });

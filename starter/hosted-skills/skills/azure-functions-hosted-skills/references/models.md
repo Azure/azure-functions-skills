@@ -1,8 +1,10 @@
 # Foundry Models
 
-Scaffold with Microsoft Foundry. Keep `gpt-4.1` as the safe Bicep default because it is broadly
-available and does not require reasoning settings. Before provisioning, try to choose the best
-deployable GPT model for the user's subscription and region.
+Scaffold with Microsoft Foundry. The Bicep model default is only a fallback: the base template
+uses `gpt-4.1` because it is broadly available and does not require reasoning settings, and the
+trigger-specific Hosted Skills starters use `gpt-5.4` without reasoning settings. Keep the
+template's default and do not change a `gpt-5.4` default back to `gpt-4.1`. Before provisioning,
+try to choose the best deployable GPT model for the user's subscription and region.
 
 ## Default Scaffold
 

@@ -386,30 +386,38 @@ exit_code=0
 if [ "$check" = true ] && [ "$missing" -gt 0 ]; then ready=false; exit_code=1; fi
 
 # Setup event decision. Opt-outs: flag, environment, preference files in the
-# destination and every ancestor.
+# destination and every ancestor. The preference file this run just wrote is
+# known to be enabled and is not read again: a transient read failure of a new
+# file (Windows CI) must not count as an opt-out.
+fresh_preference=
+[ "$preference_exists" = true ] || fresh_preference="$target/$preference_path"
 send=0
+optout=
 if [ "$check" = false ] && [ "$created" -gt 0 ] && [ "$no_telemetry" = false ] && [ "$preference_enabled" = true ]; then
     send=1
     for variable in "${AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY:-}" "${AZURE_MCP_COLLECT_TELEMETRY:-}"; do
-        case "$(printf '%s' "$variable" | tr '[:upper:]' '[:lower:]')" in false) send=0 ;; esac
+        case "$(printf '%s' "$variable" | tr '[:upper:]' '[:lower:]')" in false) send=0; optout=environment ;; esac
     done
     directory=$target
     while [ "$send" = 1 ]; do
-        for candidate in "$directory/.azure-functions-skills/telemetry.config.json" "$directory/.github/hooks/telemetry.config.json" \
-            "$directory/.claude/hooks/telemetry.config.json" "$directory/.codex/hooks/telemetry.config.json"; do
+        # No trailing slash at the root: Git for Windows reads a leading // as a UNC path.
+        prefix=${directory%/}
+        for candidate in "$prefix/.azure-functions-skills/telemetry.config.json" "$prefix/.github/hooks/telemetry.config.json" \
+            "$prefix/.claude/hooks/telemetry.config.json" "$prefix/.codex/hooks/telemetry.config.json"; do
             [ -e "$candidate" ] || [ -L "$candidate" ] || continue
-            if [ ! -f "$candidate" ] || [ ! -r "$candidate" ]; then send=0; break; fi
+            [ "$candidate" != "$fresh_preference" ] || continue
+            if [ ! -f "$candidate" ] || [ ! -r "$candidate" ]; then send=0; optout=$candidate; break; fi
             LC_ALL=C awk '{ document = document $0 "\n" } END {
                 if (document !~ /^[ \t\r\n]*[{]/ || document !~ /[}][ \t\r\n]*$/) exit 1
                 if (document ~ /"enabled"[ \t\r\n]*:[ \t\r\n]*false/) exit 1
-            }' "$candidate" 2>/dev/null || { send=0; break; }
+            }' "$candidate" 2>/dev/null || { send=0; optout=$candidate; break; }
         done
         [ "$directory" != / ] || break
         directory=$(dirname -- "$directory")
     done
 fi
 if [ -n "$result_file" ]; then
-    printf 'send=%s\nos=%s\ncreated=%s\n' "$send" "$os" "$created" > "$result_file"
+    printf 'send=%s\nos=%s\ncreated=%s\noptout=%s\n' "$send" "$os" "$created" "$optout" > "$result_file"
 fi
 
 mode=apply

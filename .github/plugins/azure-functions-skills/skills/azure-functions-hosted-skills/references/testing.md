@@ -15,8 +15,9 @@ azd provision
 azd env get-values
 ```
 
-Copy values into `src/local.settings.json`, then start Azurite in another terminal when using
-`UseDevelopmentStorage=true`:
+Copy values into `src/local.settings.json` (starters ship `src/local.settings.json.sample`), then
+start Azurite in another terminal when using `UseDevelopmentStorage=true`. Service Bus and Cosmos
+DB triggers still use the provisioned resources; Azurite only holds the host state:
 
 ```bash
 azurite --skipApiVersionCheck
@@ -186,13 +187,62 @@ isolated targets; never repeat live emails/posts to prove retry or kill shared p
 If the publisher outcome is unknown, reconcile the stable destination/event key before retrying.
 Report business completion only after terminal state and the required destination are verified.
 
-## Queue and Blob Smoke Tests
+## Trigger Smoke Tests
 
-For local Storage Queue triggers, add a queue message with Azure Storage tooling or SDKs after
-Azurite is running. For Blob triggers, upload a file to the configured container/path.
+Send one real event to the trigger source, then check the function logs locally or Application
+Insights when deployed. When the app came from a Hosted Skills starter, prefer its
+`scripts/demo.py` (for example `send`, `upload`, `seed`, `update`) and `samples/`; it reads
+`azd env get-values` and signs in with the developer's Azure CLI identity. Its `e2e` command is a
+best-effort check: it counts successful invocations and does not prove a given event was processed.
+Ask before sending events that make the agent email or post.
 
-For deployed identity-based storage triggers, use Azure CLI or the portal with the deployed storage
-account. Make sure the function app identity has the relevant Storage data roles.
+Storage Queue: locally, with Azurite running, send to the queue on `UseDevelopmentStorage=true`
+(create the queue first). Deployed, send with the developer's identity, which needs Storage Queue
+Data Contributor:
+
+```bash
+az storage message put --auth-mode login --account-name <storage> --queue-name <queue> \
+  --content '{"ticket_id":"T-1","message":"..."}'
+```
+
+Match the sender to `host.json` `extensions.queues.messageEncoding` (`none` for plain JSON).
+
+Blob: locally, upload to the Azurite container with `source: LogsAndContainerScan`. Deployed, upload
+with `az storage blob upload --auth-mode login` (Storage Blob Data Contributor); the run starts only
+when the Event Grid subscription from the `postdeploy` hook exists. Before debugging the agent,
+confirm that subscription with `az eventgrid system-topic event-subscription list`.
+
+Service Bus: there is no local emulator in the templates, so run `azd provision` first. Both a
+local `func start` and the deployed app listen to the same queue and compete for messages; stop
+one of them when you need a predictable run. Send with the Python SDK and the developer's identity
+(Azure Service Bus Data Sender):
+
+```python
+from azure.identity import DefaultAzureCredential
+from azure.servicebus import ServiceBusClient, ServiceBusMessage
+
+with ServiceBusClient("<namespace>.servicebus.windows.net", DefaultAzureCredential()) as client:
+    with client.get_queue_sender("<queue>") as sender:
+        sender.send_messages(ServiceBusMessage('{"order_id":"ORD-1"}', content_type="application/json"))
+```
+
+Cosmos DB: there is no local emulator in the templates, so run `azd provision` first. A local run
+reads the same change feed as the deployed app, and both share the lease container; stop one when
+you need a predictable run. Create or update a document with the developer's identity (Cosmos DB
+Built-in Data Contributor); key-based auth is disabled in the templates:
+
+```python
+from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
+
+client = CosmosClient("https://<account>.documents.azure.com:443/", DefaultAzureCredential())
+client.get_database_client("<database>").get_container_client("<container>").upsert_item(
+    {"id": "SKU-1", "name": "Tent", "stock": 2}
+)
+```
+
+A Cosmos DB trigger receives only changes after its lease starts; a new lease does not replay
+documents written before the first run.
 
 ## Connector Trigger Smoke Tests
 

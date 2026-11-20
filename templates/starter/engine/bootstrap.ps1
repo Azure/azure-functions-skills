@@ -333,19 +333,25 @@ try {
     if ($Check -and $missing.Count -gt 0) { $ready = $false; $exitCode = 1 }
 
     $send = (-not $Check) -and $created -gt 0 -and (-not $NoTelemetry) -and $preferenceEnabled
+    $optOut = ''
     foreach ($name in @('AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY', 'AZURE_MCP_COLLECT_TELEMETRY')) {
         $value = [Environment]::GetEnvironmentVariable($name)
-        if ($null -ne $value -and $value.ToLowerInvariant() -eq 'false') { $send = $false }
+        if ($null -ne $value -and $value.ToLowerInvariant() -eq 'false') { $send = $false; $optOut = 'environment' }
     }
+    # The preference file this run just wrote is known to be enabled and is not
+    # read again: a transient read failure of a new file must not count as an opt-out.
+    $freshPreference = if ($preferenceExists) { $null } else { [IO.Path]::GetFullPath($preferenceFile) }
     $directory = $target
     while ($send -and $directory) {
         foreach ($candidate in @('.azure-functions-skills/telemetry.config.json', '.github/hooks/telemetry.config.json', '.claude/hooks/telemetry.config.json', '.codex/hooks/telemetry.config.json')) {
-            if (Test-OptOutFile ([IO.Path]::Combine($directory, $candidate))) { $send = $false; break }
+            $candidatePath = [IO.Path]::Combine($directory, $candidate)
+            if ($freshPreference -and [string]::Equals([IO.Path]::GetFullPath($candidatePath), $freshPreference, [StringComparison]::OrdinalIgnoreCase)) { continue }
+            if (Test-OptOutFile $candidatePath) { $send = $false; $optOut = $candidatePath; break }
         }
         $directory = [IO.Path]::GetDirectoryName($directory)
     }
     if ($ResultFile) {
-        [IO.File]::WriteAllText($ResultFile, "send=$(if ($send) { 1 } else { 0 })`nos=$os`ncreated=$created`n", $utf8)
+        [IO.File]::WriteAllText($ResultFile, "send=$(if ($send) { 1 } else { 0 })`nos=$os`ncreated=$created`noptout=$optOut`n", $utf8)
     }
 
     $counts = @{}
