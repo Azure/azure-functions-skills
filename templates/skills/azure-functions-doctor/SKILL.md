@@ -1,7 +1,7 @@
 ---
 name: azure-functions-doctor
 title: Azure Functions Project Diagnostics
-description: "Analyze local Azure Functions workspace code and configuration for common issues, then report prioritized findings with evidence and fixes. Use when the user asks to check, review, audit, or diagnose a local Azure Functions project before running or deploying it. This skill targets local workspaces only — use azure-functions-diagnostics for deployed Azure resources."
+description: "Analyze local Azure Functions workspace code and configuration for common issues, then report prioritized findings with evidence and fixes. Use when the user asks to check, review, audit, or diagnose a local Azure Functions project before running or deploying it. Do not use for Azure Functions Hosted Skills (conversations creating, extending, running, testing, or deploying a Hosted Skill, or the selected Functions app has agents.config.yaml, depends on azurefunctions-agents-runtime, or imports create_function_app() from that runtime). App-local *.agent.md files count only when they belong to that runtime app; ignore repository-level .github/agents/*.agent.md coding-agent configuration. Use azure-functions-hosted-skills and its troubleshooting reference instead. This skill targets standard local Azure Functions workspaces only — use azure-functions-diagnostics for deployed Azure resources."
 category: task
 ---
 
@@ -10,6 +10,13 @@ category: task
 Analyze the local Azure Functions workspace for code, configuration, packaging, and supply-chain issues. Do the complete analysis yourself: read the project files, run the checks in the reference checklists, and report the findings to the user.
 
 ## Instructions
+
+Before analyzing the workspace, check the conversation and project context. If the task is about an Azure Functions Hosted Skills app, invoke `azure-functions-hosted-skills` instead and stop this workflow. Treat it as a Hosted Skills app when any of these apply:
+
+- The conversation is creating, extending, running, testing, or deploying a Hosted Skill.
+- The selected Functions app contains `agents.config.yaml` (commonly `src/agents.config.yaml`).
+- Its `requirements.txt` depends on `azurefunctions-agents-runtime`, or its `function_app.py` imports `create_function_app()` from that runtime.
+- App-local `*.agent.md` files count only when they belong to that runtime app. Do not treat repository-level `.github/agents/*.agent.md` coding-agent configuration as a Hosted Skills marker.
 
 1. Identify the project root. Look for `host.json`. If the workspace has more than one Functions app, ask the user which app to analyze, or analyze each app separately.
 2. Detect the language, the programming model, the triggers and bindings, the dependency manifests, and the IaC files.

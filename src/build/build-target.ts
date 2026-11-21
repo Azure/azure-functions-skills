@@ -1,5 +1,5 @@
-import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, sep } from 'node:path';
 import type { BuildData, BuildTargetName, McpServer, Skill } from '../types.js';
 import { TOOLS_FILE, TOOLS_SKILL_ID, type FunctionsTools } from './loader.js';
 
@@ -92,35 +92,58 @@ function buildCodex(data: BuildData, distDir: string): void {
   writeWorkspaceTelemetryAssets(data, join(base, '.codex', 'hooks'));
 }
 
+export interface SkillFile {
+  /** Path relative to the skill directory, with forward slashes. */
+  readonly path: string;
+  readonly content: Buffer;
+}
+
+/** The bundled tool's path inside its skill directory, with forward slashes. */
+const TOOLS_SKILL_PATH = TOOLS_FILE.split(sep).join('/');
+
+/**
+ * The files of one generated skill directory, in a stable order. The skill that
+ * carries the bundled tool also receives it, so every install that ships that
+ * skill ships the tool.
+ */
+export function renderSkillFiles(skill: Skill, tools?: FunctionsTools): SkillFile[] {
+  const files: SkillFile[] = [{ path: 'SKILL.md', content: Buffer.from(generateSkillMd(skill), 'utf-8') }];
+  const directories: Array<[string | null, string]> = [
+    [skill.referencesDir, 'references'],
+    [skill.scriptsDir, 'scripts'],
+    [skill.assetsDir, 'assets'],
+  ];
+  for (const [source, name] of directories) {
+    if (source) collectDirectory(source, name, files);
+  }
+  if (tools && skill.id === TOOLS_SKILL_ID) {
+    if (files.some(file => file.path === TOOLS_SKILL_PATH)) {
+      throw new Error(`Skill ${skill.id} must not contain ${TOOLS_SKILL_PATH}; it is generated from src/tools.`);
+    }
+    files.push({ path: TOOLS_SKILL_PATH, content: Buffer.from(tools.code, 'utf-8') });
+  }
+  return files;
+}
+
+function collectDirectory(source: string, prefix: string, files: SkillFile[]): void {
+  const entries = readdirSync(source, { withFileTypes: true })
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const entry of entries) {
+    const sourcePath = join(source, entry.name);
+    if (entry.isDirectory()) collectDirectory(sourcePath, `${prefix}/${entry.name}`, files);
+    else if (entry.isFile()) files.push({ path: `${prefix}/${entry.name}`, content: readFileSync(sourcePath) });
+  }
+}
+
 function writeSkills(data: BuildData, root: string): void {
   for (const skill of data.skills) {
     const skillDir = join(root, skill.id);
     mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, 'SKILL.md'), generateSkillMd(skill));
-    copySkillAssets(skill, skillDir);
-  }
-  if (data.tools) writeFunctionsTools(data.tools, root);
-}
-
-function writeFunctionsTools(tools: FunctionsTools, skillsRoot: string): void {
-  const path = join(skillsRoot, TOOLS_SKILL_ID, TOOLS_FILE);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, tools.code);
-}
-
-function copySkillAssets(skill: Skill, skillDir: string): void {
-  if (skill.referencesDir) copyDirRecursive(skill.referencesDir, join(skillDir, 'references'));
-  if (skill.scriptsDir) copyDirRecursive(skill.scriptsDir, join(skillDir, 'scripts'));
-  if (skill.assetsDir) copyDirRecursive(skill.assetsDir, join(skillDir, 'assets'));
-}
-
-function copyDirRecursive(source: string, destination: string): void {
-  mkdirSync(destination, { recursive: true });
-  for (const entry of readdirSync(source, { withFileTypes: true })) {
-    const sourcePath = join(source, entry.name);
-    const destinationPath = join(destination, entry.name);
-    if (entry.isDirectory()) copyDirRecursive(sourcePath, destinationPath);
-    else if (entry.isFile()) copyFileSync(sourcePath, destinationPath);
+    for (const file of renderSkillFiles(skill, data.tools)) {
+      const destination = join(skillDir, ...file.path.split('/'));
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, file.content);
+    }
   }
 }
 

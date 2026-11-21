@@ -17,7 +17,49 @@ It is **focused on Azure Functions**. For deployment of *any* Azure resource (Fu
 
 ## Quick Start
 
-### 1. Install the plugin with your coding agent
+### Option A: Paste a prompt (preview)
+
+Open GitHub Copilot, Claude Code, or Codex in your project directory and paste:
+
+```text
+Read https://aka.ms/azure-functions-starter and follow it to set up Azure Functions Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
+```
+
+For Azure Functions Hosted Skills, open the agent in a new, empty directory and paste one of these prompts instead. Each installs the five Hosted Skills and Connector skills together with one official starter sample (Python, azd, Bicep). Pick the trigger your skill reacts to:
+
+- **Timer**: a daily blog summarizer with a chat agent.
+
+  ```text
+  Read https://aka.ms/hosted-skills-timer-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
+  ```
+
+- **Storage queue**: support message triage.
+
+  ```text
+  Read https://aka.ms/hosted-skills-queue-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
+  ```
+
+- **Service Bus**: order review.
+
+  ```text
+  Read https://aka.ms/hosted-skills-servicebus-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
+  ```
+
+- **Blob Storage**: document summary.
+
+  ```text
+  Read https://aka.ms/hosted-skills-blob-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
+  ```
+
+- **Cosmos DB**: product change watch.
+
+  ```text
+  Read https://aka.ms/hosted-skills-cosmos-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.
+  ```
+
+The agent runs one installer command. It needs only PowerShell on Windows, or a POSIX shell with `curl` and `tar` on macOS and Linux. The installer copies the skills into the workspace (`.agents/skills` or `.claude/skills`), adds a telemetry hook, lists missing tools with their install commands, and asks before installing any of them. It never overwrites an existing file. See [docs/starter.md](docs/starter.md) for details and for pinning a version.
+
+### Option B: Install the plugin with your coding agent
 
 Choose your coding agent and follow its install steps:
 
@@ -74,11 +116,11 @@ Then start Codex, run `/plugins`, select **azure-functions-skills**, and choose 
 
 > The [`@azure/functions-skills`](https://www.npmjs.com/package/@azure/functions-skills) npm package provides the companion CLI and the telemetry sender. Installing it does not install or launch a coding-agent plugin.
 
-### 2. Verify your prerequisites
+### After Option B: verify your prerequisites
 
 Ask your coding agent to run the `azure-functions-setup` skill. It checks the required Azure Functions tools and language runtimes, then guides you through installing or configuring anything that is missing.
 
-### 3. Ask for Azure Functions help
+### Ask for Azure Functions help
 
 Ask which Azure Functions workflow to use. `azure-functions-help` discovers the installed `azure-functions-*` skills and routes to the best match.
 
@@ -110,7 +152,8 @@ use. Normal deployment and Application Insights monitoring in deployed applicati
 are unchanged.
 
 Usage events accept allowlisted skill/tool names, relative allowlisted Azure
-Functions skill-file paths, client name, session id, and timestamp. They do not
+Functions skill-file paths, client name, session id, timestamp, how the skills
+were installed (`plugin`, `workspace`, or `starter`), and the starter bundle name. They do not
 include file contents, prompts, raw tool arguments, credentials, or absolute
 paths. The sender uses the Azure Functions team's Application Insights resource,
 not Azure MCP.
@@ -130,6 +173,10 @@ This is an adoption/observation trend, not exact accounting. Phase 1 limitations
 - The collector supports only the two canonical skills' `azd`/Bicep paths.
 
 Application telemetry content is categorical, but HTTPS necessarily exposes the client's network address to the receiving service. This does not promise anonymous transport; the receiving Application Insights service's privacy policy and IP handling apply.
+
+The prompt starter also sends one `AzureFunctionsSkillsStarterSetup` event when
+it installs files. It carries only the bundle, template, agent, OS, and skills
+version. See [docs/starter.md](docs/starter.md).
 
 To opt out, set either `AZURE_FUNCTIONS_SKILLS_COLLECT_TELEMETRY=false` or
 `AZURE_MCP_COLLECT_TELEMETRY=false` in the environment.

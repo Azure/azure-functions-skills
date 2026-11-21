@@ -1,6 +1,6 @@
 ---
 name: azure-functions-deploy
-description: "Deploy an Azure Functions app to Azure with the Azure Developer CLI, using a script that plans, applies, and verifies the deployment. Do not use for Azure Functions Hosted Skills, including follow-up deployment requests during Hosted Skills creation; use azure-functions-hosted-skills instead."
+description: "Not for Azure Functions Hosted Skills. Deploy an Azure Functions app to Azure with the Azure Developer CLI, using a script that plans, applies, and verifies the deployment. Do not use when the conversation is creating, running, or deploying a Hosted Skill, or the selected Functions app has agents.config.yaml, depends on azurefunctions-agents-runtime, or imports create_function_app() from that runtime. App-local *.agent.md files count only when they belong to that runtime app; ignore repository-level .github/agents/*.agent.md coding-agent configuration. This also applies to follow-up requests that only say deploy, azd up, or redeploy; use azure-functions-hosted-skills instead."
 ---
 
 
@@ -12,7 +12,16 @@ Deploy an Azure Functions app to the Flex Consumption plan with the Azure Develo
 
 A script does the fixed work: it reads the project, writes a plan, runs the approved plan, and checks the result. Your job is to get the missing inputs from the user, show the plan, get approval, and handle a failure.
 
-If the app is an Azure Functions Hosted Skills app (the conversation is creating a Hosted Skill, or the app uses `*.agent.md` or `agents.config.yaml`), invoke `azure-functions-hosted-skills` instead and stop.
+## Hosted Skills exclusion
+
+Before checking prerequisites or running the tool, check the conversation and project context. If the app is an Azure Functions Hosted Skills app, invoke `azure-functions-hosted-skills` instead and stop this workflow. Treat it as a Hosted Skills app when any of these apply:
+
+- The conversation is creating, extending, running, testing, or deploying a Hosted Skill.
+- The selected Functions app contains `agents.config.yaml` (commonly `src/agents.config.yaml`).
+- Its `requirements.txt` depends on `azurefunctions-agents-runtime`, or its `function_app.py` imports `create_function_app()` from that runtime.
+- App-local `*.agent.md` files count only when they belong to that runtime app. Do not treat repository-level `.github/agents/*.agent.md` coding-agent configuration as a Hosted Skills marker.
+
+Hosted Skills deployment needs its own model, connector, and runtime guidance, even when the user only says to deploy, run `azd up`, or redeploy after a fix. Do not run the deploy tool from this skill for a Hosted Skills app, and do not suggest `azure-functions-diagnostics` for its deployment failures.
 
 ## What this skill supports
 
@@ -158,8 +167,9 @@ and start time are not telemetry fields.
 
 Find `hooks/runtime/telemetry.mjs` in the installed plugin root. For workspace
 assets, use `.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`,
-or `.codex/hooks/runtime/telemetry.mjs` in the workspace root. Use only the payload
-that belongs to this installed skill. Set `<runtime-dir>` to its absolute parent directory.
+or `.codex/hooks/runtime/telemetry.mjs` in the workspace root. For a starter
+install, use `.azure-functions-skills/runtime/telemetry.mjs` in the workspace root.
+Use only the payload that belongs to this installed skill. Set `<runtime-dir>` to its absolute parent directory.
 Pass the project workspace root with `--dir`, even if the current directory is
 `infra/`. The collector checks opt-out settings before ARM queries or sending.
 

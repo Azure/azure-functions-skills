@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "Azure/azure-functions-skills",
+    "branch": "main",
+    "path": "starter"
+  },
+  "bundles": {
+    "functions": {
+      "title": "Azure Functions Skills",
+      "akaLink": "https://aka.ms/azure-functions-starter",
+      "prompt": "Read https://aka.ms/azure-functions-starter and follow it to set up Azure Functions Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.",
+      "handoff": "azure-functions-help",
+      "skills": [
+        "azure-functions-help",
+        "azure-functions-setup",
+        "azure-functions-create",
+        "azure-functions-deploy",
+        "azure-functions-best-practices",
+        "azure-functions-diagnostics",
+        "azure-functions-health-status",
+        "azure-functions-inventory",
+        "azure-functions-doctor",
+        "azure-functions-common",
+        "azure-functions-feedback",
+        "azure-functions-update"
+      ],
+      "tools": [
+        "node",
+        "func",
+        "az",
+        "azd"
+      ]
+    },
+    "hosted-skills": {
+      "title": "Azure Functions Hosted Skills",
+      "handoff": "azure-functions-hosted-skills",
+      "skills": [
+        "azure-functions-hosted-skills",
+        "azure-functions-hosted-skills-migrate",
+        "azure-functions-connector-create",
+        "azure-functions-connector-mcp",
+        "azure-functions-connector-validate"
+      ],
+      "tools": [
+        "python",
+        "func",
+        "azurite",
+        "azd",
+        "az",
+        "node"
+      ],
+      "agentFiles": "templates/starter/agent-files/hosted-skills",
+      "manifestCategories": [
+        "starters",
+        "hosted-skills"
+      ],
+      "templates": {
+        "timer": {
+          "akaLink": "https://aka.ms/hosted-skills-timer-starter",
+          "prompt": "Read https://aka.ms/hosted-skills-timer-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.",
+          "appDir": "templates/starter/apps/timer",
+          "manifestId": "ai-hosted-skills-python"
+        },
+        "queue": {
+          "akaLink": "https://aka.ms/hosted-skills-queue-starter",
+          "prompt": "Read https://aka.ms/hosted-skills-queue-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.",
+          "appDir": "templates/starter/apps/queue",
+          "manifestId": "ai-hosted-skills-starter-queue-python"
+        },
+        "servicebus": {
+          "akaLink": "https://aka.ms/hosted-skills-servicebus-starter",
+          "prompt": "Read https://aka.ms/hosted-skills-servicebus-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.",
+          "appDir": "templates/starter/apps/servicebus",
+          "manifestId": "ai-hosted-skills-starter-servicebus-python"
+        },
+        "blob": {
+          "akaLink": "https://aka.ms/hosted-skills-blob-starter",
+          "prompt": "Read https://aka.ms/hosted-skills-blob-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.",
+          "appDir": "templates/starter/apps/blob",
+          "manifestId": "ai-hosted-skills-starter-blob-python"
+        },
+        "cosmos": {
+          "akaLink": "https://aka.ms/hosted-skills-cosmos-starter",
+          "prompt": "Read https://aka.ms/hosted-skills-cosmos-starter and follow it to set up Azure Functions Hosted Skills in this directory. Use the one-liner for your OS and coding agent; I authorize that one command for this directory only. Do not open a Canvas. Load no other skills until setup is reported; then use the skills it added to this directory.",
+          "appDir": "templates/starter/apps/cosmos",
+          "manifestId": "ai-hosted-skills-starter-cosmos-python"
+        }
+      }
+    }
+  }
+}

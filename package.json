@@ -34,7 +34,10 @@
   "scripts": {
     "build": "npm run compile && node lib/build/build.js",
     "build:plugin-payload": "npm run compile && node lib/build/build.js --plugin-only --repo-plugin-dir .github/plugins/azure-functions-skills --marketplace-root .",
-    "check": "npm run lint && npm run typecheck && npm run lint:security && npm run validate:skills && npm run verify:plugin-payload && npm test && npm run build",
+    "build:starter": "npm run compile && node lib/starter/cli.js build",
+    "refresh:starter-template": "npm run compile && node lib/starter/cli.js refresh-template",
+    "check:starter-templates": "npm run compile && node lib/starter/cli.js check-templates",
+    "check": "npm run lint && npm run typecheck && npm run lint:security && npm run validate:skills && npm run verify:plugin-payload && npm run verify:starter-payload && npm test && npm run build",
     "ci": "npm run check",
     "compile": "tsc",
     "lint": "eslint .",
@@ -46,6 +49,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "validate:skills": "npm run compile && node lib/build/validate-skills.js",
     "verify:plugin-payload": "npm run compile && node lib/build/verify-plugin-payload.js",
+    "verify:starter-payload": "npm run compile && node lib/starter/cli.js verify",
     "release:local": "node scripts/release-local.mjs"
   },
   "engines": {

@@ -20,6 +20,7 @@ export default [
       'node_modules/**',
       '.github/plugins/**/hooks/runtime/**',
       '.github/plugins/**/scripts/functions-tools.mjs',
+      'starter/**',
       'coverage/**',
     ],
   },
