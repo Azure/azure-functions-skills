@@ -134,8 +134,9 @@ export async function runCli(argv: readonly string[], dependencies: CliDependenc
     throw new UsageError(command ? `Unknown command: ${command}` : 'No command was given');
   } catch (error) {
     if (error instanceof UsageError) {
-      return fail(command || 'usage', EXIT.usage, error.message, {
-        findings: [{ id: 'USAGE', severity: 'error', title: error.message, detail: USAGE }],
+      const message = redact(error.message);
+      return fail(command || 'usage', EXIT.usage, message, {
+        findings: [{ id: 'USAGE', severity: 'error', title: message, detail: USAGE }],
       });
     }
     return fail(command, EXIT.unexpected, 'Unexpected failure', {

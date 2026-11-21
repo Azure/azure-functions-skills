@@ -48,9 +48,10 @@ var RULES = [
   // Query-string credentials: function keys and SAS signatures.
   [/([?&](?:code|sig|key|token|access_token)=)[^&\s"']+/gi, `$1${MASK}`],
   [/\b(Bearer)\s+[A-Za-z0-9._~+/-]+=*/g, `$1 ${MASK}`],
-  // KEY=value and "key": "value" pairs whose name looks like a credential.
-  [/\b([A-Za-z0-9_]*(?:SECRET|PASSWORD|TOKEN|CONNECTION_STRING|CONNECTIONSTRING|_KEY)[A-Za-z0-9_]*)=("?)[^"\s]+\2/gi, `$1=${MASK}`],
-  [/("[A-Za-z0-9_]*(?:secret|password|token|connectionString|key)"\s*:\s*)"[^"]*"/gi, `$1"${MASK}"`]
+  // KEY=value and "key": "value" pairs whose name looks like a credential. A quoted value is
+  // matched whole, including spaces and escaped quotes, before a bare value.
+  [/\b([A-Za-z0-9_]*(?:SECRET|PASSWORD|TOKEN|CONNECTION_STRING|CONNECTIONSTRING|_KEY)[A-Za-z0-9_]*)=(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s"']+)/gi, `$1=${MASK}`],
+  [/("[A-Za-z0-9_]*(?:secret|password|token|connectionString|key)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi, `$1"${MASK}"`]
 ];
 function redact(text) {
   return RULES.reduce((current, [pattern, replacement]) => current.replace(pattern, replacement), text);
@@ -78,6 +79,22 @@ function ensureToolDir(dir, ...parts) {
 }
 
 // src/tools/deploy/plan-file.ts
+var TARGET_VARIABLES = {
+  AZURE_SUBSCRIPTION_ID: "subscriptionId",
+  AZURE_LOCATION: "location"
+};
+var AZD_MANAGED = /* @__PURE__ */ new Set([
+  "AZURE_ENV_NAME",
+  "AZURE_LOCATION",
+  "AZURE_SUBSCRIPTION_ID",
+  "AZURE_PRINCIPAL_ID",
+  "AZURE_PRINCIPAL_TYPE",
+  "AZURE_TENANT_ID",
+  "AZURE_RESOURCE_GROUP"
+]);
+function valueDigest(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
 function stepArgs(id, plan, value = "") {
   if (id === "env-new") {
     return ["env", "new", plan.environment, "--subscription", plan.subscriptionId, "--location", plan.location, "--no-prompt"];
@@ -90,6 +107,11 @@ function isValidStep(step2, plan) {
   if (!Array.isArray(step2.args) || step2.args.some((argument) => typeof argument !== "string")) return false;
   const known = step2.id === "env-new" || step2.id === "provision" || step2.id === "deploy" || /^env-set:[A-Z_][A-Z0-9_]*$/.test(step2.id);
   if (!known) return false;
+  if (step2.id.startsWith("env-set:")) {
+    const name = step2.id.slice("env-set:".length);
+    const target = TARGET_VARIABLES[name];
+    if (target ? step2.args[ENV_SET_VALUE_INDEX] !== plan[target] : AZD_MANAGED.has(name)) return false;
+  }
   const expected = stepArgs(step2.id, plan, step2.id.startsWith("env-set:") ? step2.args[ENV_SET_VALUE_INDEX] : "");
   return expected.length === step2.args.length && expected.every((argument, index) => argument === step2.args[index]);
 }
@@ -116,6 +138,7 @@ function writePlan(dir, content) {
 function readPlan(path) {
   const parsed = readJson(path);
   if (!parsed || parsed.kind !== "azure-functions-deploy-plan" || !Array.isArray(parsed.steps)) return null;
+  if (typeof parsed.expectedEnvironment !== "object" || parsed.expectedEnvironment === null) return null;
   const { planId: recorded, ...content } = parsed;
   return recorded === planId(content) ? parsed : null;
 }
@@ -467,10 +490,24 @@ async function applyDeploy(options, dependencies) {
   const sleep = dependencies.sleep ?? ((ms) => new Promise((done2) => setTimeout(done2, ms)));
   const state = readState(dir, plan);
   const completed = [...state.completed];
+  const alreadyFinished = plan.steps.every((step2) => completed.includes(step2.id));
   let provisionedAt = state.provisionedAt;
   const retries = [];
   for (const step2 of plan.steps) {
     if (completed.includes(step2.id)) continue;
+    const drift = environmentDrift(dir, plan, completed);
+    if (drift.length > 0) {
+      return fail(COMMAND, EXIT.blocked, "The azd environment changed after the plan was approved", {
+        data: { planId: plan.planId, environment: plan.environment, completed },
+        findings: [{
+          id: "DEPLOY-ENV-DRIFT",
+          severity: "error",
+          title: "The azd environment no longer matches the approved plan",
+          detail: `Changed: ${drift.join(", ")}`,
+          fix: "Run deploy plan again and ask the user to approve the new plan."
+        }]
+      });
+    }
     const isPreview = options.preview && step2.changes !== "local-environment";
     const args = isPreview ? [...step2.args, "--preview"] : [...step2.args];
     if (isPreview && step2.id !== "provision") break;
@@ -545,6 +582,21 @@ ${output2}
     });
   }
   const functionApp = functionAppName(readEnvironmentValues(dir, plan.environment) ?? {});
+  if (alreadyFinished) {
+    return succeed(COMMAND, `Plan ${plan.planId} was already applied; nothing ran`, {
+      planId: plan.planId,
+      environment: plan.environment,
+      completed,
+      functionApp,
+      logFile
+    }, {
+      next: {
+        action: "verify",
+        reason: "Confirm that the functions are listed and respond.",
+        command: `deploy verify --dir "${dir}" --env ${plan.environment}`
+      }
+    });
+  }
   return succeed(COMMAND, `Deployed environment ${plan.environment}`, {
     planId: plan.planId,
     environment: plan.environment,
@@ -560,6 +612,13 @@ ${output2}
       command: `deploy verify --dir "${dir}" --env ${plan.environment}`
     }
   });
+}
+function environmentDrift(dir, plan, completed) {
+  const pending = new Set(plan.steps.map((step2) => step2.id).filter((id) => !completed.includes(id)));
+  if (pending.has("env-new")) return [];
+  const values = readEnvironmentValues(dir, plan.environment);
+  if (values === null) return [`.azure/${plan.environment}/.env (missing)`];
+  return Object.entries(plan.expectedEnvironment).filter(([name]) => !pending.has(`env-set:${name}`)).filter(([name, digest]) => (values[name] === void 0 ? null : valueDigest(values[name])) !== digest).map(([name]) => name);
 }
 function functionAppName(values) {
   if (values.AZURE_FUNCTION_NAME) return values.AZURE_FUNCTION_NAME;
@@ -656,15 +715,6 @@ function parseArgs(argv, spec) {
 // src/tools/deploy/plan.ts
 var COMMAND2 = "deploy plan";
 var MANUAL_STEPS = "references/manual-deploy.md";
-var AZD_MANAGED = /* @__PURE__ */ new Set([
-  "AZURE_ENV_NAME",
-  "AZURE_LOCATION",
-  "AZURE_SUBSCRIPTION_ID",
-  "AZURE_PRINCIPAL_ID",
-  "AZURE_PRINCIPAL_TYPE",
-  "AZURE_TENANT_ID",
-  "AZURE_RESOURCE_GROUP"
-]);
 var KNOWN_DEFAULTS = { VNET_ENABLED: "false" };
 var ENVIRONMENT_NAME = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/;
 var VALUE_NAME = /^[A-Z_][A-Z0-9_]*$/;
@@ -759,6 +809,10 @@ async function planDeploy(options, dependencies) {
     });
   }
   const mode = options.codeOnly ? "code-only" : "provision-and-deploy";
+  const targetValues = existing === null ? [] : [
+    ...existing.AZURE_SUBSCRIPTION_ID ? [] : [{ name: "AZURE_SUBSCRIPTION_ID", value: subscriptionId, source: "option" }],
+    ...existing.AZURE_LOCATION ? [] : [{ name: "AZURE_LOCATION", value: location, source: "option" }]
+  ];
   const plan = writePlan(dir, {
     schemaVersion: 1,
     kind: "azure-functions-deploy-plan",
@@ -768,7 +822,8 @@ async function planDeploy(options, dependencies) {
     location,
     mode,
     fingerprint: project.fingerprint,
-    steps: buildSteps(environment, subscriptionId, location, existing !== null, values, options.codeOnly)
+    expectedEnvironment: expectedEnvironment(project, existing ?? {}, subscriptionId, location, values),
+    steps: buildSteps(environment, subscriptionId, location, existing !== null, [...targetValues, ...values], options.codeOnly)
   });
   const next = {
     action: "approve",
@@ -785,7 +840,7 @@ async function planDeploy(options, dependencies) {
     mode,
     template: project.azureYaml?.template ?? "",
     services: (project.azureYaml?.services ?? []).filter((service) => service.host === "function").map((service) => service.name),
-    values: values.map((value) => SECRET_NAME.test(value.name) ? { ...value, value: "***" } : value),
+    values: [...targetValues, ...values].map((value) => ({ ...value, value: displayValue(value.name, value.value) })),
     steps: plan.steps.map((step2) => ({ id: step2.id, command: display(step2), changes: step2.changes }))
   }, { findings, gaps, next });
 }
@@ -910,18 +965,41 @@ function buildSteps(environment, subscriptionId, location, environmentExists, va
   });
   return steps;
 }
+function expectedEnvironment(project, existing, subscriptionId, location, values) {
+  const expected = {
+    AZURE_SUBSCRIPTION_ID: valueDigest(subscriptionId),
+    AZURE_LOCATION: valueDigest(location)
+  };
+  for (const input of project.infra.inputs) {
+    if (AZD_MANAGED.has(input.variable)) continue;
+    const current = existing[input.variable];
+    expected[input.variable] = current === void 0 ? null : valueDigest(current);
+  }
+  for (const value of values) expected[value.name] = valueDigest(value.value);
+  return expected;
+}
+function displayValue(name, value) {
+  return SECRET_NAME.test(name) ? "***" : redact(value);
+}
 function display(step2) {
-  const args = step2.id.startsWith("env-set:") && SECRET_NAME.test(step2.args[2]) ? step2.args.map((argument, index) => index === 3 ? "***" : argument) : step2.args;
+  const args = step2.id.startsWith("env-set:") ? step2.args.map((argument, index) => index === 3 ? displayValue(step2.args[2], argument) : argument) : step2.args;
   return ["azd", ...args].join(" ");
 }
 function parseValues(pairs) {
   const values = /* @__PURE__ */ new Map();
-  for (const pair of pairs) {
+  pairs.forEach((pair, index) => {
     const separator = pair.indexOf("=");
     const name = separator > 0 ? pair.slice(0, separator) : "";
-    if (!VALUE_NAME.test(name)) throw new UsageError(`--set expects NAME=VALUE with an upper-case name: ${pair}`);
+    if (!VALUE_NAME.test(name)) {
+      const label = name ? `"${name}"` : `number ${index + 1}`;
+      throw new UsageError(`--set expects NAME=VALUE with an upper-case name; pair ${label} is not one`);
+    }
+    if (AZD_MANAGED.has(name)) {
+      const option = name === "AZURE_SUBSCRIPTION_ID" ? "--subscription" : name === "AZURE_LOCATION" ? "--location" : "--env";
+      throw new UsageError(`--set cannot change ${name}; azd manages it. Use ${option} instead.`);
+    }
     values.set(name, pair.slice(separator + 1));
-  }
+  });
   return values;
 }
 function parseAccount(stdout) {
@@ -1155,8 +1233,10 @@ function orderExtensions(extensions) {
 }
 function buildInvocation(file, args, platform) {
   if (platform !== "win32" || !/\.(?:cmd|bat)$/i.test(file)) return { file, args: [...args], verbatim: false };
-  const unsafe = args.find((argument) => UNSAFE_FOR_CMD.test(argument));
-  if (unsafe !== void 0) throw new Error(`Unsafe argument for a Windows command script: ${JSON.stringify(unsafe)}`);
+  const unsafe = args.findIndex((argument) => UNSAFE_FOR_CMD.test(argument));
+  if (unsafe !== -1) {
+    throw new Error(`Unsafe argument for a Windows command script: argument ${unsafe + 1} contains a character that cmd.exe interprets (" % ^ & | < > ! or a line break)`);
+  }
   const quoted = args.map((argument) => argument === "" || /\s/.test(argument) ? `"${argument}"` : argument);
   return { file: "cmd.exe", args: ["/d", "/s", "/c", `"${[`"${file}"`, ...quoted].join(" ")}"`], verbatim: true };
 }
@@ -2798,8 +2878,9 @@ async function runCli(argv, dependencies) {
     throw new UsageError(command ? `Unknown command: ${command}` : "No command was given");
   } catch (error) {
     if (error instanceof UsageError) {
-      return fail(command || "usage", EXIT.usage, error.message, {
-        findings: [{ id: "USAGE", severity: "error", title: error.message, detail: USAGE }]
+      const message = redact(error.message);
+      return fail(command || "usage", EXIT.usage, message, {
+        findings: [{ id: "USAGE", severity: "error", title: message, detail: USAGE }]
       });
     }
     return fail(command, EXIT.unexpected, "Unexpected failure", {

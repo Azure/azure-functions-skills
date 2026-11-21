@@ -25,10 +25,17 @@ async function plannedProject(): Promise<{ dir: string; planId: string }> {
 /** Simulates azd writing the environment file when the environment is created and provisioned. */
 function azd(dir: string, responses: Parameters<typeof fakeRunner>[0] = {}): FakeRunner {
   const environmentDir = join(dir, '.azure', 'dev');
-  return fakeRunner({
+  const calls: string[] = [];
+  const runner = fakeRunner({
     'azd env new': () => {
       mkdirSync(environmentDir, { recursive: true });
       writeFileSync(join(environmentDir, '.env'), `AZURE_SUBSCRIPTION_ID="${SUBSCRIPTION}"\nAZURE_LOCATION="japaneast"\n`);
+      return result();
+    },
+    'azd env set': () => {
+      // Like azd, store the value in the environment file.
+      const [, , , name, value] = calls.at(-1)!.split(' ');
+      setEnvironmentValue(dir, name, value);
       return result();
     },
     'azd provision': () => {
@@ -37,6 +44,20 @@ function azd(dir: string, responses: Parameters<typeof fakeRunner>[0] = {}): Fak
     },
     ...responses,
   });
+  return {
+    calls: runner.calls,
+    run: async (command, args, runOptions) => {
+      calls.push([command, ...args].join(' '));
+      return runner.run(command, args, runOptions);
+    },
+  };
+}
+
+/** Replaces or adds one `NAME="value"` line in the `dev` environment file. */
+function setEnvironmentValue(dir: string, name: string, value: string): void {
+  const path = join(dir, '.azure', 'dev', '.env');
+  const lines = readFileSync(path, 'utf-8').split('\n').filter(line => line && !line.startsWith(`${name}=`));
+  writeFileSync(path, `${[...lines, `${name}="${value}"`].join('\n')}\n`);
 }
 
 afterEach(() => {
@@ -152,6 +173,77 @@ describe('deploy apply', () => {
     expect(runner.calls).not.toContain('azd deploy -e dev --no-prompt');
     expect(preview.body.data.preview).toContain('Create : Function App');
     expect(preview.body.data.completed).toEqual(['env-new', 'env-set:VNET_ENABLED']);
+  });
+
+  it.each([
+    ['subscription', 'AZURE_SUBSCRIPTION_ID', '00000000-0000-0000-0000-00000000000b'],
+    ['location', 'AZURE_LOCATION', 'eastus'],
+    ['infrastructure input', 'VNET_ENABLED', 'true'],
+  ])('runs nothing when the environment %s changed after planning', async (_name, variable, value) => {
+    const dir = createTempDir('af-deploy-apply-');
+    TEMP_DIRS.push(dir);
+    writeProject(dir, {
+      environment: { name: 'dev', values: { AZURE_SUBSCRIPTION_ID: SUBSCRIPTION, AZURE_LOCATION: 'japaneast', VNET_ENABLED: 'false' } },
+    });
+    const planned = await planDeploy({ dir, env: 'dev', set: [], codeOnly: false }, { run: signedIn().run, now: NOW });
+    setEnvironmentValue(dir, variable, value);
+
+    const runner = azd(dir);
+    const applied = await applyDeploy({ dir, approve: planned.body.data.planId!, preview: false }, { run: runner.run });
+    expect(applied.exitCode).toBe(EXIT.blocked);
+    expect(applied.body.findings[0]).toMatchObject({ id: 'DEPLOY-ENV-DRIFT' });
+    expect(applied.body.findings[0].detail).toContain(variable);
+    expect(JSON.stringify(applied.body)).not.toContain(value === 'true' ? '"true"' : value);
+    expect(runner.calls).toEqual([]);
+  });
+
+  it('runs nothing on resume when the target changed after the environment was created', async () => {
+    const { dir, planId } = await plannedProject();
+    const failing = azd(dir, { 'azd provision': result({ code: 1, stderr: 'ERROR: transient' }) });
+    await applyDeploy({ dir, approve: planId, preview: false }, { run: failing.run });
+    setEnvironmentValue(dir, 'AZURE_SUBSCRIPTION_ID', '00000000-0000-0000-0000-00000000000b');
+
+    const retry = azd(dir);
+    const resumed = await applyDeploy({ dir, approve: planId, preview: false }, { run: retry.run });
+    expect(resumed.body.findings.map(finding => finding.id)).toEqual(['DEPLOY-ENV-DRIFT']);
+    expect(retry.calls).toEqual([]);
+  });
+
+  it('refuses a target step whose value differs from the planned target', async () => {
+    const { dir } = await plannedProject();
+    const { planId: _old, ...content } = readPlan(planFilePath(dir))!;
+    const { writePlan } = await import('../src/tools/deploy/plan-file.js');
+    const tampered = writePlan(dir, {
+      ...content,
+      steps: [{
+        id: 'env-set:AZURE_LOCATION', changes: 'local-environment', timeoutSeconds: 60,
+        args: ['env', 'set', 'AZURE_LOCATION', 'eastus', '-e', 'dev', '--no-prompt'],
+      }],
+    });
+    const runner = azd(dir);
+    const applied = await applyDeploy({ dir, approve: tampered.planId, preview: false }, { run: runner.run });
+    expect(applied.body.findings.map(finding => finding.id)).toEqual(['DEPLOY-PLAN-INVALID']);
+    expect(runner.calls).toEqual([]);
+  });
+
+  it('does not ask for deployment telemetry again when the plan already finished', async () => {
+    const { dir, planId } = await plannedProject();
+    await applyDeploy({ dir, approve: planId, preview: false }, { run: azd(dir).run });
+
+    const again = azd(dir);
+    const repeated = await applyDeploy({ dir, approve: planId, preview: false }, { run: again.run });
+    expect(repeated.exitCode).toBe(EXIT.ok);
+    expect(again.calls).toEqual([]);
+    expect(repeated.body.data.telemetry).toBeUndefined();
+    expect(repeated.body.summary).toMatch(/already/);
+  });
+
+  it('asks for deployment telemetry after a resumed run finishes', async () => {
+    const { dir, planId } = await plannedProject();
+    await applyDeploy({ dir, approve: planId, preview: false },
+      { run: azd(dir, { 'azd deploy': result({ code: 1, stderr: 'ERROR: transient' }) }).run });
+    const resumed = await applyDeploy({ dir, approve: planId, preview: false }, { run: azd(dir).run });
+    expect(resumed.body.data.telemetry).toEqual({ operation: 'deploy', environmentName: 'dev' });
   });
 
   it('refuses a plan step that does not belong to the deployment sequence', async () => {

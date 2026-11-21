@@ -8,8 +8,8 @@ agents	fadae30f1671d9721cc52cd9757c1fb16a63904fa0ee6049cb0e7004774dff95	skills/a
 claude	fadae30f1671d9721cc52cd9757c1fb16a63904fa0ee6049cb0e7004774dff95	skills/azure-functions-create/references/go-project.md	.claude/skills/azure-functions-create/references/go-project.md
 agents	4d49cddf15b5dfa2c8e59a07f609ea06f6f631c4d6ec515ee495f8b81ace65f8	skills/azure-functions-create/references/language-snippets.md	.agents/skills/azure-functions-create/references/language-snippets.md
 claude	4d49cddf15b5dfa2c8e59a07f609ea06f6f631c4d6ec515ee495f8b81ace65f8	skills/azure-functions-create/references/language-snippets.md	.claude/skills/azure-functions-create/references/language-snippets.md
-agents	ad62f7adaf8cde5fde503d9d66da2c22ae78514484eb3ff5e41e60da9422c723	skills/azure-functions-deploy/SKILL.md	.agents/skills/azure-functions-deploy/SKILL.md
-claude	ad62f7adaf8cde5fde503d9d66da2c22ae78514484eb3ff5e41e60da9422c723	skills/azure-functions-deploy/SKILL.md	.claude/skills/azure-functions-deploy/SKILL.md
+agents	a0aeb46e236f26154e7207368a29542fe1cd2177478460144232e704bdbe1c3d	skills/azure-functions-deploy/SKILL.md	.agents/skills/azure-functions-deploy/SKILL.md
+claude	a0aeb46e236f26154e7207368a29542fe1cd2177478460144232e704bdbe1c3d	skills/azure-functions-deploy/SKILL.md	.claude/skills/azure-functions-deploy/SKILL.md
 agents	24056cf0bc134c1728a728a8f836aaf0f7b27f4779e555c0753f500e11b31a86	skills/azure-functions-deploy/references/manual-deploy.md	.agents/skills/azure-functions-deploy/references/manual-deploy.md
 claude	24056cf0bc134c1728a728a8f836aaf0f7b27f4779e555c0753f500e11b31a86	skills/azure-functions-deploy/references/manual-deploy.md	.claude/skills/azure-functions-deploy/references/manual-deploy.md
 agents	9ffe6cae15460056a264558f7cc60a004b30820f8b9be407e5be24f0055fd7f3	skills/azure-functions-best-practices/SKILL.md	.agents/skills/azure-functions-best-practices/SKILL.md
@@ -120,8 +120,8 @@ agents	15bf12542d702fe8e35a853d5d06b768f0d22904b1e99f16339ff33e952aa49a	skills/a
 claude	15bf12542d702fe8e35a853d5d06b768f0d22904b1e99f16339ff33e952aa49a	skills/azure-functions-common/references/local-emulators.md	.claude/skills/azure-functions-common/references/local-emulators.md
 agents	b7abad2a6b6bf34f9f34f67bb4751f1aab552961f0b77e08bf7671a892d5b04a	skills/azure-functions-common/references/routing.md	.agents/skills/azure-functions-common/references/routing.md
 claude	b7abad2a6b6bf34f9f34f67bb4751f1aab552961f0b77e08bf7671a892d5b04a	skills/azure-functions-common/references/routing.md	.claude/skills/azure-functions-common/references/routing.md
-agents	2d2d10c9ed617d78e685a30ddeac841c17ef95013a9509f1f1f9851f49b92f43	skills/azure-functions-common/scripts/functions-tools.mjs	.agents/skills/azure-functions-common/scripts/functions-tools.mjs
-claude	2d2d10c9ed617d78e685a30ddeac841c17ef95013a9509f1f1f9851f49b92f43	skills/azure-functions-common/scripts/functions-tools.mjs	.claude/skills/azure-functions-common/scripts/functions-tools.mjs
+agents	584cbd4472a0c4899924a9816dc2b1d8cdedb1a1ce5c7ae1c40353808b3ee6ec	skills/azure-functions-common/scripts/functions-tools.mjs	.agents/skills/azure-functions-common/scripts/functions-tools.mjs
+claude	584cbd4472a0c4899924a9816dc2b1d8cdedb1a1ce5c7ae1c40353808b3ee6ec	skills/azure-functions-common/scripts/functions-tools.mjs	.claude/skills/azure-functions-common/scripts/functions-tools.mjs
 agents	aeb080f524af2c8a6d16737cd0375f5025b999ebe0a8924594ac7904d1db7c9d	skills/azure-functions-feedback/SKILL.md	.agents/skills/azure-functions-feedback/SKILL.md
 claude	aeb080f524af2c8a6d16737cd0375f5025b999ebe0a8924594ac7904d1db7c9d	skills/azure-functions-feedback/SKILL.md	.claude/skills/azure-functions-feedback/SKILL.md
 agents	2959c193ad8a24c8584c1ffca403ecb004a6a15f844a965f041012721382839b	skills/azure-functions-update/SKILL.md	.agents/skills/azure-functions-update/SKILL.md

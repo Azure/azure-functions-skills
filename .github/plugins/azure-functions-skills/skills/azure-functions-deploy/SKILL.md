@@ -90,6 +90,8 @@ node "<tool>" deploy apply --dir "<project-root>" --approve <planId> --preview
 
 Pass `--approve` only with the `planId` the user approved. If you run `deploy plan` again, the id changes and you must ask again.
 
+`deploy apply` runs nothing when the azd environment's subscription, location, or infrastructure inputs no longer match the approved plan (`DEPLOY-ENV-DRIFT`). Plan again and ask the user to approve the new plan. Running an already finished plan again runs nothing and returns no `data.telemetry`.
+
 ### 3. Apply
 
 ```text

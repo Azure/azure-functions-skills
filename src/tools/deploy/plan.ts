@@ -3,7 +3,10 @@ import { basename, resolve } from 'node:path';
 import { UsageError } from '../shared/args.js';
 import type { Runner } from '../shared/exec.js';
 import { EXIT, fail, succeed, type Finding, type Gap, type NextStep, type ToolResult } from '../shared/output.js';
-import { planFilePath, stepArgs, writePlan, type PlanStep, type StepId } from './plan-file.js';
+import { redact } from '../shared/redact.js';
+import {
+  AZD_MANAGED, planFilePath, stepArgs, valueDigest, writePlan, type PlanStep, type StepId,
+} from './plan-file.js';
 import { inspectProject, readEnvironmentValues, type DeployProject } from './project.js';
 
 export interface PlanOptions {
@@ -52,11 +55,6 @@ export interface PlanData {
 
 const COMMAND = 'deploy plan';
 const MANUAL_STEPS = 'references/manual-deploy.md';
-/** Variables that azd fills in by itself. */
-const AZD_MANAGED = new Set([
-  'AZURE_ENV_NAME', 'AZURE_LOCATION', 'AZURE_SUBSCRIPTION_ID', 'AZURE_PRINCIPAL_ID', 'AZURE_PRINCIPAL_TYPE',
-  'AZURE_TENANT_ID', 'AZURE_RESOURCE_GROUP',
-]);
 /** Defaults for inputs of the official quickstart templates. The plan shows each one for approval. */
 const KNOWN_DEFAULTS: Readonly<Record<string, string>> = { VNET_ENABLED: 'false' };
 const ENVIRONMENT_NAME = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/;
@@ -147,6 +145,11 @@ export async function planDeploy(options: PlanOptions, dependencies: PlanDepende
   }
 
   const mode = options.codeOnly ? 'code-only' : 'provision-and-deploy';
+  // An existing environment without a target gets the resolved one written to it first.
+  const targetValues: PlannedValue[] = existing === null ? [] : [
+    ...(existing.AZURE_SUBSCRIPTION_ID ? [] : [{ name: 'AZURE_SUBSCRIPTION_ID', value: subscriptionId, source: 'option' as const }]),
+    ...(existing.AZURE_LOCATION ? [] : [{ name: 'AZURE_LOCATION', value: location, source: 'option' as const }]),
+  ];
   const plan = writePlan(dir, {
     schemaVersion: 1,
     kind: 'azure-functions-deploy-plan',
@@ -156,7 +159,8 @@ export async function planDeploy(options: PlanOptions, dependencies: PlanDepende
     location,
     mode,
     fingerprint: project.fingerprint,
-    steps: buildSteps(environment, subscriptionId, location, existing !== null, values, options.codeOnly),
+    expectedEnvironment: expectedEnvironment(project, existing ?? {}, subscriptionId, location, values),
+    steps: buildSteps(environment, subscriptionId, location, existing !== null, [...targetValues, ...values], options.codeOnly),
   });
   const next: NextStep = {
     action: 'approve',
@@ -173,7 +177,7 @@ export async function planDeploy(options: PlanOptions, dependencies: PlanDepende
     mode,
     template: project.azureYaml?.template ?? '',
     services: (project.azureYaml?.services ?? []).filter(service => service.host === 'function').map(service => service.name),
-    values: values.map(value => (SECRET_NAME.test(value.name) ? { ...value, value: '***' } : value)),
+    values: [...targetValues, ...values].map(value => ({ ...value, value: displayValue(value.name, value.value) })),
     steps: plan.steps.map(step => ({ id: step.id, command: display(step), changes: step.changes })),
   }, { findings, gaps, next });
 }
@@ -317,21 +321,58 @@ function buildSteps(
   return steps;
 }
 
+/**
+ * What `deploy apply` must find in the environment before provision and deploy: the target and every
+ * infrastructure input, either the planned value, the value it has now, or unset.
+ */
+function expectedEnvironment(
+  project: DeployProject,
+  existing: Readonly<Record<string, string>>,
+  subscriptionId: string,
+  location: string,
+  values: readonly PlannedValue[],
+): Record<string, string | null> {
+  const expected: Record<string, string | null> = {
+    AZURE_SUBSCRIPTION_ID: valueDigest(subscriptionId),
+    AZURE_LOCATION: valueDigest(location),
+  };
+  for (const input of project.infra.inputs) {
+    if (AZD_MANAGED.has(input.variable)) continue;
+    const current = existing[input.variable];
+    expected[input.variable] = current === undefined ? null : valueDigest(current);
+  }
+  for (const value of values) expected[value.name] = valueDigest(value.value);
+  return expected;
+}
+
+/** Masks a value by its name and by its content. The plan file keeps the original for execution. */
+function displayValue(name: string, value: string): string {
+  return SECRET_NAME.test(name) ? '***' : redact(value);
+}
+
 function display(step: PlanStep): string {
-  const args = step.id.startsWith('env-set:') && SECRET_NAME.test(step.args[2])
-    ? step.args.map((argument, index) => (index === 3 ? '***' : argument))
+  const args = step.id.startsWith('env-set:')
+    ? step.args.map((argument, index) => (index === 3 ? displayValue(step.args[2], argument) : argument))
     : step.args;
   return ['azd', ...args].join(' ');
 }
 
 function parseValues(pairs: readonly string[]): Map<string, string> {
   const values = new Map<string, string>();
-  for (const pair of pairs) {
+  pairs.forEach((pair, index) => {
     const separator = pair.indexOf('=');
     const name = separator > 0 ? pair.slice(0, separator) : '';
-    if (!VALUE_NAME.test(name)) throw new UsageError(`--set expects NAME=VALUE with an upper-case name: ${pair}`);
+    // Name the pair by its name or position only: its value may be a secret.
+    if (!VALUE_NAME.test(name)) {
+      const label = name ? `"${name}"` : `number ${index + 1}`;
+      throw new UsageError(`--set expects NAME=VALUE with an upper-case name; pair ${label} is not one`);
+    }
+    if (AZD_MANAGED.has(name)) {
+      const option = name === 'AZURE_SUBSCRIPTION_ID' ? '--subscription' : name === 'AZURE_LOCATION' ? '--location' : '--env';
+      throw new UsageError(`--set cannot change ${name}; azd manages it. Use ${option} instead.`);
+    }
     values.set(name, pair.slice(separator + 1));
-  }
+  });
   return values;
 }
 

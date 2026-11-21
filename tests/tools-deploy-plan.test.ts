@@ -181,6 +181,35 @@ describe('deploy plan', () => {
     expect(planned.body.findings.map(finding => finding.id)).toContain('DEPLOY-VALUE-NOT-USED');
   });
 
+  it('masks connection-string values by content in the values and the commands', async () => {
+    const dir = project();
+    const planned = await planDeploy(options(dir, { set: ['VNET_ENABLED=false', 'STORAGE=AccountKey=abc123=='] }),
+      { run: signedIn().run, now: NOW });
+    expect(planned.exitCode).toBe(EXIT.ok);
+    expect(JSON.stringify(planned.body)).not.toContain('abc123');
+    expect(planned.body.data.values).toContainEqual({ name: 'STORAGE', value: 'AccountKey=***', source: 'option' });
+    expect(readFileSync(planFilePath(dir), 'utf-8')).toContain('abc123');
+  });
+
+  it.each([['AZURE_SUBSCRIPTION_ID=other'], ['AZURE_LOCATION=westus'], ['AZURE_ENV_NAME=prod']])(
+    'rejects the deployment target %j in --set', async value => {
+      await expect(planDeploy(options(project(), { set: [value] }), { run: signedIn().run, now: NOW }))
+        .rejects.toThrow(/--set cannot change/);
+    },
+  );
+
+  it('configures the target of an existing environment that lacks it', async () => {
+    const dir = project({ environment: { name: 'dev', values: { VNET_ENABLED: 'false' } } });
+    const planned = await planDeploy(options(dir, { location: 'japaneast' }), { run: signedIn().run, now: NOW });
+    expect(planned.exitCode).toBe(EXIT.ok);
+    const plan = readPlan(planFilePath(dir))!;
+    expect(plan.steps.map(step => step.id)).toEqual([
+      'env-set:AZURE_SUBSCRIPTION_ID', 'env-set:AZURE_LOCATION', 'provision', 'deploy',
+    ]);
+    expect(plan.steps[0].args).toEqual(['env', 'set', 'AZURE_SUBSCRIPTION_ID', SUBSCRIPTION, '-e', 'dev', '--no-prompt']);
+    expect(plan.steps[1].args).toEqual(['env', 'set', 'AZURE_LOCATION', 'japaneast', '-e', 'dev', '--no-prompt']);
+  });
+
   it.each([['lowercase=1'], ['NOVALUE'], ['A B=1']])('rejects the malformed value %j', async value => {
     await expect(planDeploy(options(project(), { set: [value] }), { run: signedIn().run, now: NOW }))
       .rejects.toThrow(/--set/);

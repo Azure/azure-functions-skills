@@ -65,6 +65,12 @@ describe('command invocation', () => {
     },
   );
 
+  it('does not echo the refused argument, which may be a secret', () => {
+    const refuse = (): unknown => buildInvocation('C:\\az.cmd', ['ok', 'p%ssw&rd'], 'win32');
+    expect(refuse).toThrow(/argument 2/);
+    expect(refuse).not.toThrow(/ssw/);
+  });
+
   it('does not wrap command scripts outside Windows', () => {
     expect(buildInvocation('/usr/bin/az', ['a&b'], 'linux')).toEqual({ file: '/usr/bin/az', args: ['a&b'], verbatim: false });
   });
@@ -111,6 +117,10 @@ describe('redaction', () => {
     ['AZURE_CLIENT_SECRET="top-secret-value"', 'top-secret-value'],
     ['InstrumentationKey=00000000-1111-2222-3333-444444444444;IngestionEndpoint=https://x', '1111-2222'],
     ['"masterKey": "m4st3r"', 'm4st3r'],
+    ['API_SECRET="secret phrase"', 'phrase'],
+    ["API_SECRET='secret phrase'", 'phrase'],
+    ['API_SECRET="a \\"quoted\\" phrase"', 'phrase'],
+    ['"apiToken": "with \\"escaped\\" quote"', 'quote'],
   ])('removes the secret from %j', (text, secret) => {
     const output = redact(text);
     expect(output).not.toContain(secret);

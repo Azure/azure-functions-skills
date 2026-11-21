@@ -4,7 +4,7 @@ import type { Runner, RunResult } from '../shared/exec.js';
 import { EXIT, fail, succeed, type Finding, type ToolResult } from '../shared/output.js';
 import { redact } from '../shared/redact.js';
 import {
-  ensureWorkDir, isValidStep, logFilePath, planFilePath, readPlan, readState, writeState,
+  ensureWorkDir, isValidStep, logFilePath, planFilePath, readPlan, readState, valueDigest, writeState,
   type DeployPlan, type PlanStep, type StepId,
 } from './plan-file.js';
 import { inspectProject, readEnvironmentValues } from './project.js';
@@ -90,10 +90,23 @@ export async function applyDeploy(options: ApplyOptions, dependencies: ApplyDepe
   const sleep = dependencies.sleep ?? ((ms: number) => new Promise<void>(done => setTimeout(done, ms)));
   const state = readState(dir, plan);
   const completed = [...state.completed];
+  const alreadyFinished = plan.steps.every(step => completed.includes(step.id));
   let provisionedAt = state.provisionedAt;
   const retries: RetryRecord[] = [];
   for (const step of plan.steps) {
     if (completed.includes(step.id)) continue;
+    const drift = environmentDrift(dir, plan, completed);
+    if (drift.length > 0) {
+      return fail<ApplyData>(COMMAND, EXIT.blocked, 'The azd environment changed after the plan was approved', {
+        data: { planId: plan.planId, environment: plan.environment, completed },
+        findings: [{
+          id: 'DEPLOY-ENV-DRIFT', severity: 'error',
+          title: 'The azd environment no longer matches the approved plan',
+          detail: `Changed: ${drift.join(', ')}`,
+          fix: 'Run deploy plan again and ask the user to approve the new plan.',
+        }],
+      });
+    }
     const isPreview = options.preview && step.changes !== 'local-environment';
     const args = isPreview ? [...step.args, '--preview'] : [...step.args];
     if (isPreview && step.id !== 'provision') break;
@@ -156,6 +169,17 @@ export async function applyDeploy(options: ApplyOptions, dependencies: ApplyDepe
   }
 
   const functionApp = functionAppName(readEnvironmentValues(dir, plan.environment) ?? {});
+  if (alreadyFinished) {
+    // Nothing ran, so there is no new deployment to report.
+    return succeed<ApplyData>(COMMAND, `Plan ${plan.planId} was already applied; nothing ran`, {
+      planId: plan.planId, environment: plan.environment, completed, functionApp, logFile,
+    }, {
+      next: {
+        action: 'verify', reason: 'Confirm that the functions are listed and respond.',
+        command: `deploy verify --dir "${dir}" --env ${plan.environment}`,
+      },
+    });
+  }
   return succeed<ApplyData>(COMMAND, `Deployed environment ${plan.environment}`, {
     planId: plan.planId,
     environment: plan.environment,
@@ -172,6 +196,22 @@ export async function applyDeploy(options: ApplyOptions, dependencies: ApplyDepe
       command: `deploy verify --dir "${dir}" --env ${plan.environment}`,
     },
   });
+}
+
+/**
+ * Names the expected variables whose value differs from the approved plan. A variable that a pending
+ * step of the plan will write is not checked yet; it is checked before the steps that follow it.
+ */
+function environmentDrift(dir: string, plan: DeployPlan, completed: readonly StepId[]): string[] {
+  const pending = new Set(plan.steps.map(step => step.id).filter(id => !completed.includes(id)));
+  // The environment did not exist when the plan was made; env new creates it.
+  if (pending.has('env-new')) return [];
+  const values = readEnvironmentValues(dir, plan.environment);
+  if (values === null) return [`.azure/${plan.environment}/.env (missing)`];
+  return Object.entries(plan.expectedEnvironment)
+    .filter(([name]) => !pending.has(`env-set:${name}`))
+    .filter(([name, digest]) => (values[name] === undefined ? null : valueDigest(values[name])) !== digest)
+    .map(([name]) => name);
 }
 
 /** Reads the function app name from the outputs that azd templates write to the environment. */

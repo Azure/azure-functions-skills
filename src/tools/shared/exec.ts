@@ -70,8 +70,11 @@ function orderExtensions(extensions: string[]): string[] {
  */
 export function buildInvocation(file: string, args: readonly string[], platform: NodeJS.Platform): Invocation {
   if (platform !== 'win32' || !/\.(?:cmd|bat)$/i.test(file)) return { file, args: [...args], verbatim: false };
-  const unsafe = args.find(argument => UNSAFE_FOR_CMD.test(argument));
-  if (unsafe !== undefined) throw new Error(`Unsafe argument for a Windows command script: ${JSON.stringify(unsafe)}`);
+  // The message names the position only: the argument may be a secret.
+  const unsafe = args.findIndex(argument => UNSAFE_FOR_CMD.test(argument));
+  if (unsafe !== -1) {
+    throw new Error(`Unsafe argument for a Windows command script: argument ${unsafe + 1} contains a character that cmd.exe interprets (" % ^ & | < > ! or a line break)`);
+  }
   const quoted = args.map(argument => (argument === '' || /\s/.test(argument) ? `"${argument}"` : argument));
   return { file: 'cmd.exe', args: ['/d', '/s', '/c', `"${[`"${file}"`, ...quoted].join(' ')}"`], verbatim: true };
 }

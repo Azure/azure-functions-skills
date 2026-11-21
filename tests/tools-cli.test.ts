@@ -45,6 +45,16 @@ describe('functions-tools command line', () => {
     expect(outcome.body.findings[0].id).toBe('USAGE');
   });
 
+  it('does not print the value of a rejected --set pair', async () => {
+    const dir = tempDir();
+    writeProject(dir);
+    const outcome = await runCli(['deploy', 'plan', '--dir', dir, '--env', 'dev', '--set', 'api_secret=hunter2'],
+      dependencies(signedIn().run));
+    expect(outcome.exitCode).toBe(EXIT.usage);
+    expect(JSON.stringify(outcome.body)).not.toContain('hunter2');
+    expect(outcome.body.summary).toContain('api_secret');
+  });
+
   it('turns an unexpected error into exit code 1 without leaking secrets', async () => {
     const dir = tempDir();
     writeProject(dir);
