@@ -16,7 +16,7 @@ Run each check and report results:
 
 ```bash
 az --version        # Azure CLI ≥ 2.60 (≥ 2.87.0 for Go deployments)
-azd version         # Azure Developer CLI, required for Azure Skills deployment workflows
+azd version         # Azure Developer CLI, required by azure-functions-deploy
 func --version      # Azure Functions Core Tools ≥ 4.x (≥ 4.12 for Go projects)
 node --version      # Node.js 24 or 22 for new Node.js/TypeScript projects
 python --version    # Python 3.13 preferred; 3.10-3.13 supported for Python projects
@@ -27,25 +27,16 @@ go version          # Go 1.24 or later (if Go project; Go support is in preview)
 
 Run the language checks that match the user's project or stated intent. Do not report a missing Go toolchain as a problem for a Python project, and do not report a missing Python interpreter as a problem for a Go project.
 
-## Azure Skills Plugin Check
+## Deployment Sign-in Check
 
-Azure Functions deployment is proxied through the Azure Skills deployment workflow. For deployment scenarios, verify that the Azure Skills plugin is installed and that these skills are available:
+When the user plans to deploy, also check the sign-in state. `azure-functions-deploy` runs `azd` and verifies the result with `az`.
 
-- `azure-prepare`
-- `azure-validate`
-- `azure-deploy`
+```bash
+azd auth login --check-status
+az account show --query "{name:name, id:id}" -o json
+```
 
-**How to detect availability**: Check your current tool/skill list for the above skill names. If they appear in the list of available skills (e.g., in `<available_skills>` or equivalent plugin registry), they are installed. You do not need to run any commands — the presence of these skills in the agent's tool list is sufficient confirmation.
-
-If the Azure Skills plugin is missing, install it for the active host before using `azure-functions-deploy`.
-
-| Host | Install guidance |
-|------|------------------|
-| GitHub Copilot CLI | `/plugin marketplace add microsoft/azure-skills`, then `/plugin install azure@azure-skills` |
-| Claude Code | `/plugin install azure@claude-plugins-official` |
-| Codex CLI | `codex plugin marketplace add microsoft/azure-skills`, then install `azure` from `/plugins` |
-| VS Code | Install the Azure MCP extension and companion Azure Skills integration, then reload VS Code |
-| GitHub Copilot fallback | `npx skills add https://github.com/microsoft/azure-skills/tree/main/.github/plugins/azure-skills/skills -a github-copilot -g -y` |
+Report a signed-out tool as a warning with its sign-in command. Do not sign in for the user.
 
 ## Output Format
 
@@ -59,7 +50,7 @@ Azure Functions Environment Check
   ✅ Core Tools         <version>
   ✅ Node.js            <version>
   ⚠️  Azure subscription  Not logged in → Run 'az login'
-  ⚠️  Azure Skills plugin Missing → install before azure-functions-deploy
+  ⚠️  Azure Developer CLI sign-in  Not logged in → Run 'azd auth login'
 ```
 
 ## Fix Instructions
@@ -112,10 +103,10 @@ When all checks pass, suggest the next step:
 > - Use **azure-functions-create** to scaffold a new Azure Functions project (HTTP triggers, timer triggers, queue triggers, etc.)
 > - Use **azure-functions-hosted-skills** to build cloud-hosted, event-driven intelligent capabilities with Markdown, Functions triggers, code, tools, HTTP, and MCP
 
-For deployment, confirm the Azure Skills plugin is available before suggesting **azure-functions-deploy**. `azure-functions-deploy` delegates to `azure-prepare`, `azure-validate`, and `azure-deploy`.
+For deployment, suggest **azure-functions-deploy** when `azd` is installed and signed in. It plans, applies, and verifies the deployment with `azd`, and does not need another plugin.
 
 ## Next steps
 
 - On success, suggest `azure-functions-create` for traditional Functions projects, or `azure-functions-hosted-skills` for Azure Functions Hosted Skills — let the user choose based on their goal.
 - On failure, keep the user in `azure-functions-setup`: explain fixes, then ask them to rerun setup verification.
-- If deployment is requested and Azure Skills is missing, keep the user in `azure-functions-setup` until the Azure Skills plugin is installed or the user explicitly chooses a fallback deployment path.
+- If deployment is requested and `azd` is missing or signed out, keep the user in `azure-functions-setup` until it is fixed.

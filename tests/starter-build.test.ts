@@ -30,6 +30,14 @@ describe('starter build', () => {
     expect(compareStarterFiles(real, join(ROOT, 'starter'))).toEqual([]);
   });
 
+  it('ships the bundled tool with the skill that carries it, for both agents', () => {
+    const source = 'skills/azure-functions-common/scripts/functions-tools.mjs';
+    expect(text(real, `functions/${source}`)).toContain('deploy plan');
+    const rows = text(real, 'functions/files.tsv');
+    expect(rows).toContain(`.agents/skills/azure-functions-common/scripts/functions-tools.mjs`);
+    expect(rows).toContain(`.claude/skills/azure-functions-common/scripts/functions-tools.mjs`);
+  });
+
   it('detects a hand edit, a missing file, and an extra file (ST-011)', () => {
     const copy = join(temp, 'edited');
     writeStarterFiles(real, copy);

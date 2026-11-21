@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { dirname, join, relative } from 'node:path';
 import { loadSkills } from '../build/loader.js';
 import { buildTelemetryRuntime } from '../build/telemetry-runtime.js';
+import { buildFunctionsTools } from '../build/tools-runtime.js';
 import {
   PUBLIC_TELEMETRY_INGESTION_ENDPOINT,
   PUBLIC_TELEMETRY_INSTRUMENTATION_KEY,
@@ -34,6 +35,7 @@ export function buildRepositoryStarter(options: StarterPayloadOptions): { files:
     tools: loadToolInstallTable(join(root, 'templates', 'starter', 'tool-install.json')),
     skills: loadSkills(skillsDir),
     runtime: buildTelemetryRuntime(skillsDir),
+    functionsTools: buildFunctionsTools(),
     packageVersion: pkg.version,
     endpoints: {
       ...DEFAULT_STARTER_ENDPOINTS,

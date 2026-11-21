@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { buildPluginPayload, buildTarget } from '../src/build/build-target.js';
 import { loadHooks, loadMcpServers, loadSkills } from '../src/build/loader.js';
 import { buildTelemetryRuntime } from '../src/build/telemetry-runtime.js';
+import { buildFunctionsTools } from '../src/build/tools-runtime.js';
 import type { BuildData, BuildTargetName } from '../src/types.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
@@ -23,6 +24,7 @@ function buildData(): BuildData {
     skills: loadSkills(join(TEMPLATES_DIR, 'skills')),
     mcpServers: loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')),
     hooks: loadHooks(join(TEMPLATES_DIR, 'hooks'), buildTelemetryRuntime(join(TEMPLATES_DIR, 'skills'))),
+    tools: buildFunctionsTools(),
     packageVersion: '1.2.3',
   };
 }
@@ -59,6 +61,9 @@ describe('simplified distribution', () => {
     expect(result.status, result.stderr).toBe(0);
     expect(readFileSync(join(output, 'plugin', 'azure-functions-skills', 'hooks', 'runtime', 'telemetry.mjs'), 'utf-8'))
       .toBe(readFileSync(join(plugin, 'hooks', 'runtime', 'telemetry.mjs'), 'utf-8'));
+    const tool = join('skills', 'azure-functions-common', 'scripts', 'functions-tools.mjs');
+    expect(readFileSync(join(output, 'plugin', 'azure-functions-skills', tool), 'utf-8'))
+      .toBe(readFileSync(join(plugin, tool), 'utf-8'));
   }, 60_000);
 
   it('builds one plugin payload containing only skills, MCP, telemetry hooks, and manifests', () => {

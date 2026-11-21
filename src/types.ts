@@ -1,4 +1,5 @@
 import type { TelemetryRuntime } from './build/telemetry-runtime.js';
+import type { FunctionsTools } from './build/loader.js';
 
 export type BuildTargetName = 'ghcp' | 'claude' | 'codex';
 
@@ -37,5 +38,7 @@ export interface BuildData {
   skills: Skill[];
   mcpServers: McpServer[];
   hooks: HookDefinitions;
+  /** The bundled deployment tool. Written into the common skill when present. */
+  tools?: FunctionsTools;
   packageVersion?: string;
 }

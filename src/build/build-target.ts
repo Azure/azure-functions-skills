@@ -1,6 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import type { BuildData, BuildTargetName, McpServer, Skill } from '../types.js';
+import { TOOLS_FILE, TOOLS_SKILL_ID, type FunctionsTools } from './loader.js';
 
 type TargetBuilder = (data: BuildData, distDir: string) => void;
 
@@ -31,7 +32,7 @@ export function buildPluginPayload(data: BuildData, pluginDir: string): void {
   mkdirSync(join(pluginDir, '.codex-plugin'), { recursive: true });
   writeJson(join(pluginDir, '.codex-plugin', 'plugin.json'), manifest);
 
-  writeSkills(data.skills, join(pluginDir, 'skills'));
+  writeSkills(data, join(pluginDir, 'skills'));
   writeJson(join(pluginDir, '.mcp.json'), generatePluginMcpJson(data.mcpServers));
   writePluginTelemetryAssets(data, pluginDir);
 }
@@ -61,7 +62,7 @@ export function buildPluginMarketplaces(repoRoot: string, options: PluginMarketp
 
 function buildGhcp(data: BuildData, distDir: string): void {
   const base = join(distDir, 'ghcp');
-  writeSkills(data.skills, join(base, '.github', 'skills'));
+  writeSkills(data, join(base, '.github', 'skills'));
   writeJson(join(base, '.mcp.json'), generateCopilotMcpJson(data.mcpServers));
   writeWorkspaceTelemetryAssets(data, join(base, '.github', 'hooks'));
   writeJson(
@@ -72,7 +73,7 @@ function buildGhcp(data: BuildData, distDir: string): void {
 
 function buildClaude(data: BuildData, distDir: string): void {
   const base = join(distDir, 'claude');
-  writeSkills(data.skills, join(base, '.claude', 'skills'));
+  writeSkills(data, join(base, '.claude', 'skills'));
   const hooks = workspaceClaudeHooks();
   writeJson(join(base, '.claude', 'settings.json'), {
     ...generateClaudeSettings(data.mcpServers),
@@ -84,7 +85,7 @@ function buildClaude(data: BuildData, distDir: string): void {
 
 function buildCodex(data: BuildData, distDir: string): void {
   const base = join(distDir, 'codex');
-  writeSkills(data.skills, join(base, '.agents', 'skills'));
+  writeSkills(data, join(base, '.agents', 'skills'));
   mkdirSync(join(base, '.codex'), { recursive: true });
   writeFileSync(join(base, '.codex', 'config.toml'), generateCodexConfigToml(data.mcpServers));
   writeJson(join(base, '.codex', 'hooks.json'), workspaceCodexHooks());
@@ -97,8 +98,15 @@ export interface SkillFile {
   readonly content: Buffer;
 }
 
-/** The files of one generated skill directory, in a stable order. */
-export function renderSkillFiles(skill: Skill): SkillFile[] {
+/** The bundled tool's path inside its skill directory, with forward slashes. */
+const TOOLS_SKILL_PATH = TOOLS_FILE.split(sep).join('/');
+
+/**
+ * The files of one generated skill directory, in a stable order. The skill that
+ * carries the bundled tool also receives it, so every install that ships that
+ * skill ships the tool.
+ */
+export function renderSkillFiles(skill: Skill, tools?: FunctionsTools): SkillFile[] {
   const files: SkillFile[] = [{ path: 'SKILL.md', content: Buffer.from(generateSkillMd(skill), 'utf-8') }];
   const directories: Array<[string | null, string]> = [
     [skill.referencesDir, 'references'],
@@ -107,6 +115,12 @@ export function renderSkillFiles(skill: Skill): SkillFile[] {
   ];
   for (const [source, name] of directories) {
     if (source) collectDirectory(source, name, files);
+  }
+  if (tools && skill.id === TOOLS_SKILL_ID) {
+    if (files.some(file => file.path === TOOLS_SKILL_PATH)) {
+      throw new Error(`Skill ${skill.id} must not contain ${TOOLS_SKILL_PATH}; it is generated from src/tools.`);
+    }
+    files.push({ path: TOOLS_SKILL_PATH, content: Buffer.from(tools.code, 'utf-8') });
   }
   return files;
 }
@@ -121,11 +135,11 @@ function collectDirectory(source: string, prefix: string, files: SkillFile[]): v
   }
 }
 
-function writeSkills(skills: Skill[], root: string): void {
-  for (const skill of skills) {
+function writeSkills(data: BuildData, root: string): void {
+  for (const skill of data.skills) {
     const skillDir = join(root, skill.id);
     mkdirSync(skillDir, { recursive: true });
-    for (const file of renderSkillFiles(skill)) {
+    for (const file of renderSkillFiles(skill, data.tools)) {
       const destination = join(skillDir, ...file.path.split('/'));
       mkdirSync(dirname(destination), { recursive: true });
       writeFileSync(destination, file.content);

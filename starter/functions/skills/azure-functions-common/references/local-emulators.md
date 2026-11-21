@@ -17,7 +17,7 @@ Official links below were checked for HTTP 200 access on 2026-05-12.
 | Trigger / binding | Local E2E option | Official reference | Notes |
 | --- | --- | --- | --- |
 | `httpTrigger` | No emulator needed | [HTTP trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-http-webhook-trigger), [run locally](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) | Start `func host` and send an HTTP request to `http://localhost:7071/api/<FunctionName>`. |
-| `timerTrigger` | No service emulator needed | [Timer trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer), [manually run non-HTTP functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-manually-run-non-http) | Verify listener startup. For a full local run, ask before changing the schedule to a short development-only value and restore it afterward. |
+| `timerTrigger` | Azurite for `AzureWebJobsStorage` | [Timer trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer), [manually run non-HTTP functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-manually-run-non-http) | Verify listener startup. For a full local run, ask before changing the schedule to a short development-only value and restore it afterward. |
 | Blob, Queue, Table Storage | Azurite | [Use Azurite](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azurite), [local storage emulator note](https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-local#local-storage-emulator) | Use Azurite for `AzureWebJobsStorage` and Storage triggers/bindings when the extension supports local development. |
 | Cosmos DB | Azure Cosmos DB Emulator or a temporary Azure dev account | [Cosmos DB Emulator](https://learn.microsoft.com/en-us/azure/cosmos-db/emulator), [develop locally with emulator](https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-develop-emulator) | The emulator is platform/runtime dependent. If unavailable, use a disposable Azure dev resource after user approval. |
 | Service Bus | Service Bus Emulator or temporary Azure Service Bus dev namespace | [Service Bus trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-service-bus-trigger), [emulator overview](https://learn.microsoft.com/en-us/azure/service-bus-messaging/overview-emulator), [test locally](https://learn.microsoft.com/en-us/azure/service-bus-messaging/test-locally-with-service-bus-emulator) | Do not assume the emulator is installed. Ask before creating Azure resources or installing containers/tools. |
@@ -30,6 +30,21 @@ Official links below were checked for HTTP 200 access on 2026-05-12.
 | MySQL | Local MySQL container/server or temporary Azure Database for MySQL dev instance | No Azure Functions-specific emulator page found in the checked official set | Verify schema/table prerequisites before starting the host. |
 | RabbitMQ | Local RabbitMQ container/server or approved development broker | No Azure Functions-specific emulator page found in the checked official set | Validate queue/exchange setup. |
 | Dapr | Local Dapr sidecar and component configuration | No Azure Functions-specific emulator page found in the checked official set | Ask before running sidecars. Confirm component YAML does not include secrets. |
+
+## The bundled local check
+
+When the bundled tool is available, run it before any manual steps:
+
+```text
+node "<skill-dir>/../azure-functions-common/scripts/functions-tools.mjs" local verify --dir "<project>"
+```
+
+It installs dependencies, starts the host, waits for `/admin/host/status` to report `Running`, lists the indexed functions, and calls one HTTP function (GET when allowed, otherwise POST with `{}`; a function that accepts only PUT, PATCH, or DELETE is reported as a gap instead of being called). It talks to `127.0.0.1` directly, so a system HTTP proxy cannot stall the check; when you call the local host yourself, set `NO_PROXY=localhost,127.0.0.1` or use `curl --noproxy '*'`.
+
+- A timer, blob, queue, Event Hubs, or Durable trigger needs Azurite for `AzureWebJobsStorage`. When Azurite is not running, the tool stops with `AZURITE-NOT-RUNNING`. After the user agrees, run it again with `--start-azurite`. The tool starts Azurite (the `azurite` command, or the official Docker image), and stops only the Azurite it started (`--keep-azurite` leaves it running and lets the command exit).
+- The tool checks each Azurite service the app uses: blob always, queue for queue, blob, and Durable triggers, and table for Durable. When Azurite runs without one of them (for example `azurite-blob` alone), it reports `AZURITE-INCOMPLETE`.
+- When another program holds an Azurite port (10000-10002), the tool reports `AZURITE-PORT-CONFLICT` instead of replacing it.
+- The tool does not start Cosmos DB, Service Bus, Event Hubs, or SQL emulators. Use the table above for those.
 
 ## Suggested verification pattern
 
