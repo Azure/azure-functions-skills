@@ -57,7 +57,7 @@ Use this table to decide where a change should go.
 1. Confirm that the workspace is an Azure Functions project.
 2. Collect Functions-specific deployment context such as runtime, hosting plan preference, trigger shape, endpoint verification guidance, Application Insights expectations, and Flex Consumption guidance.
 3. Use Azure Skills as the deployment engine:
-   - no plan: invoke `azure-prepare`, unless a documented shortcut applies
+   - no plan: invoke `azure-prepare`
    - plan not validated: invoke `azure-validate`
    - validated plan: invoke `azure-deploy`
 4. Avoid running deployment commands directly, including `azd up`, `azd deploy`, Terraform apply, `az deployment`, or `func azure functionapp publish`, unless Azure Skills cannot handle the scenario and the user explicitly approves a fallback.

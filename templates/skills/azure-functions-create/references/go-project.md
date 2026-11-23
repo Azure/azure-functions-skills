@@ -30,6 +30,11 @@ another language. Check hosting status against the current Go developer referenc
 a catalog's preview label can lag the service. The Go worker's version is not
 the Go compiler version.
 
+For an existing app, skip the scaffold steps and go directly to
+[Adding a function to an existing Go function project](#adding-a-function-to-an-existing-go-function-project).
+If the app is a Go custom handler or its model is unknown, return to the parent
+skill's programming-model gate instead of using this worker guidance.
+
 ## Step 1 — Verify prerequisites
 
 | Tool | Minimum | Check |
@@ -55,7 +60,7 @@ cd <project-name>
 Omit the project name to scaffold into the current directory instead of a subdirectory.
 
 This supported fallback generates a local project, not Azure resources. Run it
-only in an approved empty directory, never over an existing custom-handler app.
+only for a new project in an approved empty directory, never over any existing app.
 
 | File | Notes |
 | --- | --- |

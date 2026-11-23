@@ -2,7 +2,10 @@
 
 Minimal starter patterns for HTTP triggers. Use these only as a last-resort fallback when the Azure MCP tools are unavailable **and** `func new` does not produce the desired shape. Prefer the `functions list or get template` Azure MCP tool whenever possible — it returns maintained, complete templates.
 
-**Go is the exception.** The Azure MCP tools and the templates manifest do not include Go, so the Go snippet below is the primary starting point rather than a fallback. See Path C in the skill for the full Go workflow.
+For Go, apply the existing-project and programming-model gate first. Prefer a returned
+Go template, then the manifest and Core Tools paths in the parent skill. Use the Go
+snippet below only as the worker-specific last-resort pattern for a new project or an
+existing app already confirmed to use the Go worker; never apply it to a custom handler.
 
 ## TypeScript (Node.js v4 model)
 

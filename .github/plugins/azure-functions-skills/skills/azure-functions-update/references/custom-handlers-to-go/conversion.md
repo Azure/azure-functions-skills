@@ -4,6 +4,25 @@ Load only for common step 4, after inventory and approval. Keep the agreed Go
 version and business contracts. Consult [validation.md](validation.md)'s completion
 table when defining the acceptance checks; do not deploy as part of local conversion.
 
+## Preserve the baseline and isolate the candidate
+
+Before editing, preserve a runnable baseline with its source/ref, custom-handler
+configuration, per-function metadata, build/package inputs, and accepted behavior
+evidence. Confirm that the restore path is usable; a copied file list without the
+matching settings and event-source ownership is not a rollback.
+
+Perform the conversion in an isolated migration candidate, such as an approved
+worktree, branch, or copied workspace. Do not point that candidate at production
+event sources or state. The candidate must use one indexing model: after every
+function has an implemented Go worker mapping or approved replacement, remove the
+legacy custom-handler block and `function.json` files from the candidate so the Go
+worker can start and be validated. If any required behavior remains blocked, the
+candidate is incomplete and cannot be cut over.
+
+Do not permanently retire the baseline metadata, settings, or package because the
+candidate starts. Keep the baseline restorable through cutover and post-cutover
+checks, until the approved rollback window is explicitly closed.
+
 ## Module and entry point
 
 Keep the existing module and application code. Do not run `func init` or `go mod init`
@@ -63,16 +82,15 @@ blocked if no safe replacement is agreed.
 
 ## Configuration and telemetry
 
-Remove `host.json`'s `customHandler` block after the new entry point exists.
-Keep applicable extension bundles, connection setting names, HTTP options, retries,
-service settings, and logging. Translate obsolete extension schemas only with
-version-specific evidence and record the change. Remove each old `function.json`
-only after all its binding and retry behavior has implemented, verified Go worker
-mappings or approved, verified replacements. Recording a blocker is not sufficient:
-retain the original metadata and pause conversion while any behavior is blocked.
-When metadata is retired, keep a copy in the rollback source/snapshot outside the
-active migrated app and package. Do not mix legacy metadata indexing with Go worker
-registrations or cut over while any behavior is blocked.
+In the isolated candidate, remove `host.json`'s `customHandler` block and each old
+`function.json` only after all functions have implemented Go worker mappings or
+approved replacements. This exclusion is required to start the candidate under
+worker-driven indexing; it is not evidence that behavior is verified or permission
+to alter the baseline. Keep applicable extension bundles, connection setting names,
+HTTP options, retries, service settings, and logging. Translate obsolete extension
+schemas only with version-specific evidence and record the change. Recording a blocker
+is not sufficient: keep the baseline unchanged and pause completion while any required
+behavior is blocked. Do not mix legacy metadata indexing with Go worker registrations.
 
 Under `Values`, preserve unrelated values and set:
 

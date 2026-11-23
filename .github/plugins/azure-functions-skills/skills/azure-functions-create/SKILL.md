@@ -16,13 +16,35 @@ Ensure `func` (Azure Functions Core Tools v4) is installed. If not, suggest runn
 
 ## Workflow
 
-### Step 0 — Check for Go
+### Step 0 — Preserve an existing programming model
 
-If the user asks for **Go** (or Golang), first check whether the target is a new project or an existing app. For an existing app, inspect `host.json`, local runtime settings, Go source, and modules to distinguish apps using the Go worker from Go custom handlers; neither `native` nor `custom` alone identifies the language. A `customHandler` block and its Go executable/source indicate the custom-handler model. Preserve that model when adding a function: extend its handler and `function.json` metadata, skip the Go worker template paths below, and do not change runtime settings. Route to **azure-functions-update** only when migration is explicitly requested. If the model is unclear or configuration conflicts with source, resolve it before editing.
+Before selecting a template for an existing app, identify its language and programming
+model from source and configuration. Preserve that model when adding a function; do not
+reinitialize the project or use a template from a different programming model.
 
-For a new Go function project or an existing app confirmed to use the Go worker, load [references/go-project.md](references/go-project.md) for Go worker prerequisites, configuration, and registration rules, then continue with Step 1. Go templates are available through MCP and the manifest; discover the current catalog rather than assuming a fixed template set.
+If the target is requested or detected as Go, inspect `host.json`, local runtime
+settings, Go source, and modules. Classify it as one of:
 
-Use Path C only when no suitable Go template can be retrieved through Path A or Path B.
+- **New Go project** — no existing Functions app is being extended.
+- **Existing app confirmed to use the Go worker** — Go worker source/modules and
+  configuration agree.
+- **Existing Go custom handler** — a `customHandler` block and its Go executable/source
+  identify the custom-handler model.
+- **Unknown or conflicting model** — evidence is missing or disagrees. Stop and resolve
+  the model before selecting templates or editing files.
+
+For a Go custom handler, preserve its handler, runtime `custom`,
+`host.json.customHandler`, and per-function `function.json`. Extend that model and route
+to **azure-functions-update** only when migration is explicitly requested.
+
+For a new Go project or an existing app confirmed to use the Go worker, load
+[references/go-project.md](references/go-project.md) for prerequisites, configuration,
+and registration rules. Go templates are available through MCP and the manifest;
+discover the current catalog rather than assuming a fixed template set.
+
+Path C is only for a new project in an approved empty directory. For an existing app
+confirmed to use the Go worker, use an MCP template with `output: Add` or use the
+verified worker registration APIs; never enter a scaffold path.
 
 ### Step 1 — Detect Azure MCP tools
 
@@ -76,8 +98,10 @@ Call `functions_project_get` for the selected language before browsing its templ
 
 Call `functions_template_get` with only the `language` parameter (omit `template`). This returns the list of available templates for the chosen language with descriptions. Present the templates to the user and let them pick.
 
-If no returned Go template matches the requested trigger, try Path B, then Path C.
-Do not substitute an unrelated trigger or silently change the hosting target.
+If no returned Go template matches the requested trigger, try Path B. For a new Go
+project, Path C is the final scaffold fallback. For an existing app confirmed to use
+the Go worker, use the verified worker registration APIs instead. Do not substitute an
+unrelated trigger, change programming models, or silently change the hosting target.
 
 Do **not** invent or guess template identifiers such as `HttpTrigger`. Azure MCP template IDs are versioned, language-specific strings returned by the template list. For example, the TypeScript HTTP trigger template is currently returned as `http-trigger-typescript-azd`.
 
@@ -99,7 +123,10 @@ Only the connectors above have connector trigger templates. For any other connec
 
 If a template-get call fails with "template not found", immediately recover by calling `functions_template_get` again with only `language`, then select the closest returned template ID instead of retrying the failed alias.
 
-Catalog discovery does not prove that a template can be downloaded or deployed. For retrieval/network failures, report the failed operation and try Path B; use Path C for Go if no suitable template can be retrieved. Never mark creation complete from a template list alone.
+Catalog discovery does not prove that a template can be downloaded or deployed. For
+retrieval/network failures, report the failed operation and try Path B. Use Path C only
+for a new Go project; extend an existing Go worker app through its registration APIs.
+Never mark creation complete from a template list alone.
 
 #### A.4 Initialize the project
 
@@ -170,11 +197,13 @@ Follow this manifest-based fallback algorithm:
    If fetch fails → fall back to:
      https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json
    If both fail → fall back to known-good Azure-Samples/functions-quickstart-* repos
-   If all fail → for Go use Path C; otherwise report error and ask user to retry later
+   If all fail → for a new Go project use Path C; for an existing Go worker app use
+   verified registration APIs; otherwise report error and ask user to retry later
 
 2. FILTER TEMPLATES
    Filter by: language, resource, iac
-   If no suitable Go trigger template matches → use Path C
+   If no suitable Go trigger template matches → use Path C only for a new project;
+   use verified registration APIs for an existing Go worker app
 
 3. CHECK SINGLE-TEMPLATE MATCH
    If one template covers ALL requirements → use it alone
@@ -222,7 +251,9 @@ func start
 
 ### Path C — Go Core Tools fallback
 
-Use this path when MCP and manifest retrieval cannot provide a suitable Go template. Go has its own scaffolding command and worker-runtime configuration.
+Path C is only for a new project in an approved empty directory. Use it when MCP and
+manifest retrieval cannot provide a suitable Go template. Never use it to extend or
+repair an existing app.
 
 Follow the Core Tools fallback in [references/go-project.md](references/go-project.md). Never scaffold another language as a substitute.
 
@@ -234,10 +265,17 @@ Go is GA on Linux Flex Consumption. Confirm preview availability and acceptance 
 
 If `host.json` already exists, do **not** re-initialize. Instead:
 
-- **Go model gate**: apply Step 0 before selecting templates. For a Go custom handler, preserve the dispatch/HTTP-forwarding model, `host.json.customHandler`, runtime `custom`, and per-function `function.json`; add the requested handler and metadata without merging Go worker templates.
+- **Programming-model gate**: identify the existing language and model before selecting
+  templates. For a Go custom handler, preserve the dispatch/HTTP-forwarding model,
+  `host.json.customHandler`, runtime `custom`, and per-function `function.json`; add the
+  requested handler and metadata without merging Go worker templates.
 - **MCP path**: call `functions_template_get` with the same language as the existing project, the desired returned template ID, and `output: Add`. Merge only the needed function code, dependencies, and settings; do not replace the existing project or deploy its template infrastructure.
 - **Fallback path**: fetch the manifest, filter for the desired template by language and resource, download the template source, and merge the function files into the existing project.
-- **Go worker registration only**: merge the relevant MCP template pattern when available, or use the verified worker APIs. Add another `app.*` registration and, for an extension trigger, the blank import. `func new` is not supported for apps using the Go worker. Do not run `func init` or `go mod init` again, and do not create `function.json`. See [references/go-project.md](references/go-project.md).
+- **Go worker registration only**: merge the relevant MCP template pattern when
+  available, or use the verified worker APIs. Add another `app.*` registration and,
+  for an extension trigger, the blank import. `func new` is not supported for apps
+  using the Go worker. Do not use Path C, run `func init` or `go mod init` again, or
+  create `function.json`. See [references/go-project.md](references/go-project.md).
 
 ## After Creation
 
