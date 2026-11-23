@@ -240,6 +240,33 @@ sign-off gate (AC-012).
 | Operator rollback | Remove the collection step from the two skills and ship a release. Reverting the implementation PRs removes the event entirely. |
 | No remote kill switch | Deliberate. A switch would add a configuration service, a fetch path, and a failure mode to every collection, out of proportion to one categorical event; the worst case is bounded by release cadence. |
 
+## Prompt starter
+
+The starter installs the same runtime to `.azure-functions-skills/runtime/` and
+adds a `node -e` hook (see [docs/starter.md](../starter.md)). The hook calls the
+runtime's exported `runHook(client)` with an explicit client name.
+
+Usage events from every distribution carry two runtime-owned properties:
+
+| Property | Values |
+| --- | --- |
+| `Plugin_Distribution` | `plugin`, `workspace`, or `starter`, from the runtime's location |
+| `Plugin_Bundle` | The starter bundle whose install record lists the event's skill, or `none` |
+
+The installer sends one `AzureFunctionsSkillsStarterSetup` event per apply run
+that created at least one file, unless an opt-out applies. It is a direct POST
+to `<endpoint>/v2/track` with no envelope tags and these properties only:
+`distribution` (`starter`), `bundle`, `template` (or `none`), `agent`
+(`copilot-cli`, `claude-code`, or `codex`), `os` (`windows`, `macos`, or
+`linux`), and `skillsVersion`. It has one 5-second attempt and no retry, and
+its result never changes the setup result.
+
+**Double counting (disclosed limitation, FRD-0004 D-026).** When the plugin and
+a starter are both active for the same workspace, both hooks fire and a skill use
+is counted twice. The installer reports plugin-style workspace assets it can see
+(`coexistence: workspace`), but cannot see a user-level plugin install. Split or
+filter reports by `Plugin_Distribution`. Version 1 has no de-duplication.
+
 ## Events and expected dimensions
 
 | Event type | Trigger | Dimensions |

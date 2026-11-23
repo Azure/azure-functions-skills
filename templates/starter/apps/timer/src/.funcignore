@@ -1,0 +1,15 @@
+.git*
+.vscode
+.azure
+infra
+README.md
+__azurite_db*__.json
+__blobstorage__
+__queuestorage__
+local.settings.json
+.venv
+__pycache__
+*.pyc
+*.pyo
+.python_packages
+.env

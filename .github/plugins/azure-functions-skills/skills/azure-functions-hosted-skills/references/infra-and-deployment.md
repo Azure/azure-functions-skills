@@ -352,8 +352,9 @@ Otherwise, omit `startedAt`. The name and start time are not telemetry fields.
 
 Find `hooks/runtime/telemetry.mjs` in the installed plugin root. For workspace
 assets, use `.github/hooks/runtime/telemetry.mjs`, `.claude/hooks/runtime/telemetry.mjs`,
-or `.codex/hooks/runtime/telemetry.mjs` in the workspace root. Use only the payload
-that belongs to this installed skill. Set `<runtime-dir>` to its absolute parent directory.
+or `.codex/hooks/runtime/telemetry.mjs` in the workspace root. For a starter
+install, use `.azure-functions-skills/runtime/telemetry.mjs` in the workspace root.
+Use only the payload that belongs to this installed skill. Set `<runtime-dir>` to its absolute parent directory.
 Pass the project workspace root with `--dir`, even from a subdirectory.
 The collector checks opt-out settings before ARM queries or sending.
 

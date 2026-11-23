@@ -22,6 +22,8 @@
 | Security lint | `npm run lint:security` |
 | Skill validation | `npm run validate:skills` |
 | Plugin payload verify | `npm run verify:plugin-payload` |
+| Starter payload build | `npm run build:starter` |
+| Starter payload verify | `npm run verify:starter-payload` |
 | Full gate | `npm run check` |
 
 ## Local npm Authentication Failures
@@ -52,10 +54,11 @@ their feed access. Do not print credentials, change registries, or remove
 
 ## Architecture
 
-- Separate concerns by domain: `src/build/`, `src/telemetry/`, `src/templates/`.
+- Separate concerns by domain: `src/build/`, `src/starter/`, `src/telemetry/`, `src/templates/`.
 - Avoid duplicate code — extract shared logic into helpers.
 - `templates/` is the canonical source; generated payloads are derived.
 - Never hand-edit files under `.github/plugins/`, `.plugin/`, or `.claude-plugin/`. Change `templates/`, then regenerate with `npm run build:plugin-payload`.
+- Never hand-edit files under `starter/`. Change `templates/` or `starter.config.json`, then regenerate with `npm run build:starter`.
 
 ## Testing
 
@@ -76,7 +79,7 @@ their feed access. Do not print credentials, change registries, or remove
 
 ## Boundaries
 
-- Never edit generated files under `.github/plugins/`, `.plugin/`, `.claude-plugin/`.
+- Never edit generated files under `.github/plugins/`, `.plugin/`, `.claude-plugin/`, `starter/`.
 - Never commit `local.settings.json` or `.env` files.
 - Do not run `template apply` from the repo root — use `--dir <isolated-workspace>` to avoid pollution.
 - Do not touch `templates/agents/AGENTS.md` — that is the user-facing template, not this repo's dev standards.
@@ -87,7 +90,7 @@ their feed access. Do not print credentials, change registries, or remove
 2. `npm run typecheck`
 3. `npm test`
 4. CLI changes → run the command manually in an isolated workspace
-5. Template changes → `npm run build:plugin-payload` then `npm run verify:plugin-payload`
+5. Template changes → `npm run build:plugin-payload` and `npm run build:starter`, then `npm run verify:plugin-payload` and `npm run verify:starter-payload`
 
 ## After Implementation
 

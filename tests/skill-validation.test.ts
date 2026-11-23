@@ -16,7 +16,7 @@ function createFixture(): string {
 function writeSkill(
   skillsDir: string,
   dirName: string,
-  options: { frontmatterName?: string; includeFrontmatter?: boolean } = {},
+  options: { frontmatterName?: string; includeFrontmatter?: boolean; description?: string } = {},
 ): void {
   const skillDir = join(skillsDir, dirName);
   mkdirSync(skillDir, { recursive: true });
@@ -24,7 +24,7 @@ function writeSkill(
   writeFileSync(
     join(skillDir, 'SKILL.md'),
     includeFrontmatter
-      ? `---\nname: ${options.frontmatterName || dirName}\ntitle: ${dirName}\ndescription: ${dirName}\ncategory: test\n---\n\n# ${dirName}\n`
+      ? `---\nname: ${options.frontmatterName || dirName}\ntitle: ${dirName}\ndescription: "${options.description ?? dirName}"\ncategory: test\n---\n\n# ${dirName}\n`
       : `# ${dirName}\n`,
   );
 }
@@ -54,6 +54,27 @@ describe('validateSkills', () => {
 
     expect(result.valid).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+
+  it('accepts a description with exactly 1024 characters', () => {
+    const skillsDir = createFixture();
+    writeSkill(skillsDir, 'at-limit', { description: 'a'.repeat(1024) });
+
+    expect(validateSkills(skillsDir)).toEqual({ valid: true, errors: [] });
+  });
+
+  it('reports a description with more than 1024 characters', () => {
+    const skillsDir = createFixture();
+    writeSkill(skillsDir, 'over-limit', { description: 'a'.repeat(1025) });
+
+    expect(validateSkills(skillsDir)).toEqual({
+      valid: false,
+      errors: [{
+        skillId: 'over-limit',
+        file: 'SKILL.md',
+        message: 'Skill description must be at most 1024 characters (found 1025)',
+      }],
+    });
   });
 
   it('reports skill IDs that do not match directory names', () => {

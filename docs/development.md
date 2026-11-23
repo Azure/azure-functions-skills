@@ -44,6 +44,7 @@ templates/   Canonical skills, telemetry hooks, and MCP definitions
 src/         TypeScript CLI and build system
 tests/       Vitest coverage for build, validation, telemetry, templates, and release helpers
 .github/plugins/azure-functions-skills/  Generated plugin payload
+starter/     Generated prompt-starter payload (see docs/starter.md)
 ```
 
 ## Update Templates And Plugin Payloads
@@ -78,6 +79,57 @@ tests/       Vitest coverage for build, validation, telemetry, templates, and re
    ```
 
 Do not edit generated files in `.github/plugins/azure-functions-skills/`, `.plugin/marketplace.json`, or `.claude-plugin/marketplace.json` by hand. Change `templates/`, then regenerate.
+
+## Update The Starter Payload
+
+The prompt starter is generated from `starter.config.json` (repository identity
+and bundles) and `templates/starter/` (installer engine, `start.md` template,
+hand-off text, and `tool-install.json`). Skills and the telemetry runtime come
+from the same sources as the plugin payload.
+
+```bash
+npm run build:starter
+npm run verify:starter-payload
+```
+
+`starter/` is committed with `-text` in `.gitattributes`; the build writes text
+with LF line endings so that every file hash is the same on every OS. Do not edit
+`starter/` by hand. Moving the skills to another repository is a change to
+`source` in `starter.config.json`, a rebuild, and an update of the aka.ms links.
+
+### Update an app template
+
+A bundle with `templates` ships a cached copy of a sample app per template
+(`templates/starter/apps/<template>/`). Each template names its source with
+`manifestId`, an id in the
+[Azure Functions templates manifest](https://cdn.functions.azure.com/public/templates-manifest/manifest.json).
+The Hosted Skills bundle caches every manifest template whose categories include
+both `starters` and `hosted-skills` (`manifestCategories`). `starter.lock.json`
+records the manifest id, repository, folder, ref, commit, and the hash of every
+cached file; the build and `verify:starter-payload` refuse a cache that differs
+from the lock, offline.
+
+To see whether the manifest moved on (a new ref, folder, or repository, or a new
+starter that is not cached yet):
+
+```bash
+npm run check:starter-templates
+```
+
+To take the manifest's current folder and ref for one template:
+
+```bash
+npm run refresh:starter-template -- hosted-skills/queue
+npm run build:starter
+```
+
+A new starter needs a template entry in `starter.config.json` (link, prompt,
+`appDir`, `manifestId`), a README prompt, and optionally
+`templates/starter/handoff/<bundle>/<template>.md` with its examples, before the
+refresh. The refresh downloads exactly one commit, caches only the manifest's
+folder, stores `.gitignore` files as `gitignore.template`, and does not cache
+`local.settings.json`, `.git*` metadata, or `.github/`. Review the cache diff
+like any other source change. Set `GITHUB_TOKEN` if the anonymous GitHub API limit is reached.
 
 ## Local Build
 
