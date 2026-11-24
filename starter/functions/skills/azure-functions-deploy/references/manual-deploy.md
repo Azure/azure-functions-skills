@@ -92,7 +92,7 @@ Core Tools requests a remote build for Python apps. For an azd project, use `azd
    | Python | `python` |
    | Java | `java` |
    | PowerShell | `powershell` |
-   | Go (preview) | `go`, with `--runtime-version 1.0 --functions-version 4` |
+   | Go | `go`, with `--runtime-version 1.0 --functions-version 4` |
 
 4. Publish the code with [path B](#b-publish-code-to-an-existing-app).
 
@@ -100,18 +100,28 @@ The documentation recommends a managed identity for the storage connection in pr
 
 ## Go apps
 
-Go is in public preview. Confirm that the user accepts preview status before a production deployment.
+Apply this Go worker guidance only after confirming the app uses the Go worker from
+source/modules and configuration. A Go custom handler keeps runtime `custom`,
+`host.json.customHandler`, its existing build/package process, and `function.json`
+metadata until an explicitly approved migration. If the model is unknown or evidence
+conflicts, stop before changing runtime or packaging configuration.
 
-- Go apps run only on the Flex Consumption plan and only on Linux.
-- `FUNCTIONS_WORKER_RUNTIME` must be `native`.
-- Core Tools 4.12 or later builds and packages the app. Azure CLI 2.87.0 or later is required to create resources or deploy packages.
+Go is GA on Linux Flex Consumption. Linux Elastic Premium and Dedicated support is a
+preview rollout; confirm availability for the actual plan, SKU, and region and obtain
+acceptance before a production preview deployment.
+
+- Go apps using the Go worker run on **Linux only** in Azure. Windows-hosted apps and Linux Consumption are not supported hosting targets; Windows local development is supported.
+- Do not force an existing Premium/Dedicated app to Flex without an approved hosting-plan change.
+- Core Tools builds and packages the app: 4.12 is the Flex minimum; use 4.16.0 or later for Elastic Premium/Dedicated ([release notes](https://github.com/Azure/azure-functions-core-tools/releases/tag/4.16.0)). Azure CLI 2.87.0 or later is required to create resources or deploy packages.
+- Runtime configuration: Flex uses `functionAppConfig.runtime`; where the plan uses `FUNCTIONS_WORKER_RUNTIME`, its Go value is `native`. Do not copy local CLI settings into Azure app settings.
+- For a confirmed Premium/Dedicated preview target, set `WEBSITE_RUN_FROM_PACKAGE=1`, wait for the configuration to apply, and use Always On for Dedicated. Do not add `WEBSITE_RUN_FROM_PACKAGE` on Flex.
 
 | Command | What it does |
 | --- | --- |
-| `func azure functionapp publish <APP_NAME>` | Builds, packages, and deploys to an existing function app. |
+| `func azure functionapp publish <APP_NAME>` | Builds, packages, and deploys to an existing compatible function app. |
 | `func pack` | Builds for Linux x64 and writes a zip with the binary at the package root as `app`. Deploy it with `az functionapp deployment source config-zip`. Do not request a remote build for this package. |
 
-Do not assemble the archive by hand. Some tools, such as Windows `Compress-Archive`, drop the Unix executable permission, and the platform then cannot start the binary.
+With `func pack --no-build`, supply a Linux x64 binary at `bin/app` (`binpp` on Windows, without `.exe`); see Manual cross-compilation in `azure-functions-common/references/languages/go.md`. Do not assemble the archive by hand. Some tools, such as Windows `Compress-Archive`, drop the Unix executable permission, and the platform then cannot start the binary.
 
 Reference: https://learn.microsoft.com/azure/azure-functions/functions-reference-go
 

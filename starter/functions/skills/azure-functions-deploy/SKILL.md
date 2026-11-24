@@ -144,7 +144,7 @@ az deployment sub list --query "[?contains(name, '<environment>')].{name:name, s
 - Python apps run on Linux. The official templates set `remoteBuild: true` in `azure.yaml`, so do not build Python dependencies locally for deployment.
 - Flex Consumption has no deployment slots. Use rolling updates for zero-downtime deployments.
 - When the app has private endpoints and no public network access, the machine that deploys needs network access to the deployment endpoint.
-- Go apps are in public preview. They run only on Flex Consumption and Linux, need `FUNCTIONS_WORKER_RUNTIME=native`, Core Tools 4.12 or later, and Azure CLI 2.87.0 or later. See [references/manual-deploy.md](references/manual-deploy.md#go-apps).
+- Go apps using the Go worker run on Linux only. Go is GA on Flex Consumption; Linux Elastic Premium and Dedicated support is a preview rollout. Apply the Go worker guidance below only after confirming the app uses the Go worker from source/modules and configuration: a Go custom handler keeps runtime `custom`, `host.json.customHandler`, its build process, and `function.json` until an approved migration. A Go azd template for Flex deploys with the script like any other language; for an existing Premium or Dedicated app or a custom handler, see [references/manual-deploy.md](references/manual-deploy.md#go-apps).
 
 ## Report a successful deployment (internal telemetry)
 

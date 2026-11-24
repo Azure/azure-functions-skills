@@ -2,7 +2,10 @@
 
 Minimal starter patterns for HTTP triggers. Use these only as a last-resort fallback when the Azure MCP tools are unavailable **and** `func new` does not produce the desired shape. Prefer the `functions list or get template` Azure MCP tool whenever possible — it returns maintained, complete templates.
 
-**Go is the exception.** The Azure MCP tools and the templates manifest do not include Go, so the Go snippet below is the primary starting point rather than a fallback. See Path C in the skill for the full Go workflow.
+For Go, apply the existing-project and programming-model gate first. Prefer a returned
+Go template, then the manifest and Core Tools paths in the parent skill. Use the Go
+snippet below only as the worker-specific last-resort pattern for a new project or an
+existing app already confirmed to use the Go worker; never apply it to a custom handler.
 
 ## TypeScript (Node.js v4 model)
 
@@ -70,7 +73,7 @@ public HttpResponseMessage run(
 }
 ```
 
-## Go (preview)
+## Go
 
 Go uses worker-driven indexing — there is no `function.json`. Register the function in code and start the worker. The module path is lowercase (`github.com/azure/...`) even though the repository is `Azure/...`.
 
@@ -105,9 +108,9 @@ func main() {
 }
 ```
 
-Set `"FUNCTIONS_WORKER_RUNTIME": "native"` in `local.settings.json` — not `go` or `golang`.
+Set `"FUNCTIONS_WORKER_RUNTIME": "native"` and `"FUNCTIONS_CLI_NATIVE_LANGUAGE": "go"` in `local.settings.json` under `Values` — not `go` or `golang` as the worker runtime.
 
 ## Notes
 
 - HTTP triggers default to `authLevel: 'function'`. Use `'anonymous'` only for explicitly public endpoints.
-- For non-HTTP triggers (Timer, Blob, Queue, Service Bus, Cosmos DB, Event Hub, etc.), always prefer the `functions list or get template` Azure MCP tool — binding configuration is error-prone to write by hand. Go is the exception: it has no MCP templates, so use the trigger table in Path C of the skill.
+- For non-HTTP triggers (Timer, Blob, Queue, Service Bus, Cosmos DB, Event Hub, etc.), prefer the Azure MCP template list/get tools. If the requested Go trigger has no retrievable template, use the verified registration APIs in [go-project.md](go-project.md); do not invent a template or binding.

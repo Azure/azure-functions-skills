@@ -18,10 +18,16 @@ Reference files are bundled with `azure-functions-common`:
 | `FUNCTIONS_WORKER_RUNTIME=java` | `languages/java.md` |
 | `FUNCTIONS_WORKER_RUNTIME=powershell` | `languages/powershell.md` |
 | `FUNCTIONS_WORKER_RUNTIME=native` **and** a Go signal (`go.mod`, `worker.Start`, `FUNCTIONS_CLI_NATIVE_LANGUAGE=go`) | `languages/go.md` |
-| `FUNCTIONS_WORKER_RUNTIME=go` or `golang` on a Go project | `languages/go.md` (this value is a misconfiguration; the correct value is `native`) |
+| `FUNCTIONS_WORKER_RUNTIME=custom`, `host.json.customHandler`, and Go executable/source evidence | `languages/go.md` (Go custom handler; preserve the model unless migration is approved) |
+| `FUNCTIONS_WORKER_RUNTIME=go` or `golang` with Go evidence | `languages/go.md` (invalid runtime value; determine the model before choosing `native` or `custom`) |
 | Durable bindings, Durable package, or orchestration/entity/activity symptom | `languages/durable-functions.md` |
 
-`native` is not unique to Go. It is the runtime value for native-binary workers generally, so `native` alone does not identify a Go app. Core Tools resolves `native` to Go when a `go.mod` is present, so use the same rule: confirm with a secondary signal such as `go.mod` requiring `github.com/azure/azure-functions-golang-worker`, a `main.go` calling `worker.Start`, or `FUNCTIONS_CLI_NATIVE_LANGUAGE=go`. Without one of those signals, treat the app as a custom handler.
+`native` is not unique to Go, and a compiled executable can belong to either model.
+Confirm the Go worker with source/modules or CLI configuration. Confirm a Go custom
+handler with `host.json.customHandler` plus its Go executable/source. If the available
+evidence proves neither model, leave the programming model unknown and gather the
+missing source or configuration; do not infer a custom handler from absent Go worker
+signals or rewrite the runtime value.
 
 ## Extension routing
 
