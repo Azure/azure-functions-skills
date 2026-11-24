@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderSkillFiles } from '../build/build-target.js';
+import type { FunctionsTools } from '../build/loader.js';
 import type { TelemetryRuntime } from '../build/telemetry-runtime.js';
 import type { Skill } from '../types.js';
 import { STARTER_OSES, type StarterBundle, type StarterConfig, type ToolInstallTable } from './config.js';
@@ -38,6 +39,8 @@ export interface StarterBuildInput {
   readonly tools: ToolInstallTable;
   readonly skills: readonly Skill[];
   readonly runtime: TelemetryRuntime;
+  /** The bundled tool, shipped with the skill that carries it. */
+  readonly functionsTools?: FunctionsTools;
   readonly packageVersion: string;
   readonly endpoints: StarterEndpoints;
   /** Upstream provenance of the cached app templates (starter.lock.json). */
@@ -122,7 +125,7 @@ function addBundle(
   for (const id of bundle.skills) {
     const skill = skillsById.get(id);
     if (!skill) throw new Error(`Bundle ${name} lists unknown skill ${id}.`);
-    for (const file of renderSkillFiles(skill)) {
+    for (const file of renderSkillFiles(skill, input.functionsTools)) {
       const source = `skills/${id}/${file.path}`;
       add(`${name}/${source}`, file.content);
       rows.push({ scope: 'agents', source, destination: `.agents/skills/${id}/${file.path}` });

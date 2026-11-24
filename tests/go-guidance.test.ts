@@ -42,14 +42,12 @@ describe('Go project model guidance', () => {
 });
 
 describe('Go deployment and migration guidance', () => {
-  it('uses the Azure Skills deployment-plan contract without shortcuts', () => {
+  it('deploys only an approved plan, without template-based shortcuts', () => {
     const deploySkill = readSkill('azure-functions-deploy', 'SKILL.md');
 
     expect(deploySkill).not.toContain('.azure/plan.md');
     expect(deploySkill).not.toContain('metadata.template');
-    expect(deploySkill).toMatch(
-      /Invoke `azure-prepare` even when `azure\.yaml` and infrastructure already exist/,
-    );
+    expect(deploySkill).toContain('Pass `--approve` only with the `planId` the user approved.');
     expect(deploySkill).toContain('Apply the Go worker guidance below only after confirming');
     expect(readDoc('azure-skills-boundary.md')).not.toContain(
       'unless a documented shortcut applies',

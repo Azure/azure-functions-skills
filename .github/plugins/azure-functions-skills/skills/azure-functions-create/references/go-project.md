@@ -14,17 +14,18 @@ Primary reference: [Go developer reference for Azure Functions](https://learn.mi
 
 ## Template discovery
 
-Prefer the MCP path in the parent skill: call `functions_language_list`, then
-`functions_project_get` with `language: go`, and list/get the returned Go templates
-with `functions_template_get`. The catalog includes Go HTTP and timer templates
-with AZD/Bicep infrastructure. Discover current IDs rather than inventing them.
+Prefer the bundled tool in the parent skill: `template write --language go --resource <resource>`
+writes the manifest's recommended Go template, and `template find --language go` lists the
+current ids. The Azure MCP catalog (`functions_template_get` with `language: go`) has the same
+templates. The catalog includes Go HTTP and timer templates with AZD/Bicep infrastructure.
+Discover current IDs rather than inventing them.
 
 Project metadata alone is not a buildable app. Retrieve the selected template's
 files and follow its setup instructions; validate Go worker settings, dependencies,
 and actual local behavior before reporting creation complete. Template infrastructure
 does not mean Azure resources exist or authorize provisioning/deployment.
 
-Use the manifest fallback when MCP retrieval is unavailable or fails, then the
+Use Azure MCP or the manifest by hand when the tool is unavailable or fails, then the
 Core Tools scaffold below if no suitable template can be retrieved. Never substitute
 another language. Check hosting status against the current Go developer reference;
 a catalog's preview label can lag the service. The Go worker's version is not

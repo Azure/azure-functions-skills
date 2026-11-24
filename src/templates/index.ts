@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,8 +7,26 @@ export const DEFAULT_TEMPLATE_MANIFEST_URL = 'https://cdn.functions.azure.com/pu
 
 export type TemplateApplyMode = 'auto' | 'new' | 'add';
 
+export type TemplateErrorCode =
+  | 'not-found'
+  | 'unsafe-path'
+  | 'needs-new-mode'
+  | 'fetch-failed'
+  | 'invalid-manifest'
+  | 'unsupported-source';
+
+/** A template failure that callers can handle by its code instead of its message. */
+export class TemplateError extends Error {
+  constructor(readonly code: TemplateErrorCode, message: string) {
+    super(message);
+    this.name = 'TemplateError';
+  }
+}
+
 export interface TemplateListOptions {
   readonly manifestUrl?: string;
+  /** An already loaded manifest. `manifestUrl` must still name where it came from. */
+  readonly manifest?: TemplateManifest;
   readonly language?: string;
   readonly resource?: string;
   readonly iac?: string;
@@ -16,6 +34,8 @@ export interface TemplateListOptions {
 
 export interface TemplateApplyOptions {
   readonly manifestUrl?: string;
+  /** An already loaded manifest, so it is not downloaded twice. `manifestUrl` must still name where it came from. */
+  readonly manifest?: TemplateManifest;
   readonly language?: string;
   readonly template: string;
   readonly runtimeVersion?: string;
@@ -111,11 +131,15 @@ const ADD_MODE_PROJECT_PREFIXES = [
   'infra/',
 ];
 
+const DOWNLOAD_CONCURRENCY = 8;
+
 let githubCliTokenWarningShown = false;
+/** `null` until `gh auth token` has been asked once in this process. Parallel requests share the answer. */
+let githubCliToken: string | undefined | null = null;
 
 export async function listFunctionTemplates(options: TemplateListOptions = {}): Promise<TemplateListResult> {
   const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
-  const manifest = await loadTemplateManifest(manifestUrl);
+  const manifest = options.manifest ?? await loadTemplateManifest(manifestUrl);
   const templates = manifest.templates
     .filter(template => matchesFilter(template.language, options.language))
     .filter(template => matchesFilter(template.resource, options.resource))
@@ -128,7 +152,7 @@ export async function listFunctionTemplates(options: TemplateListOptions = {}): 
 
 export async function applyFunctionTemplate(targetDir: string, options: TemplateApplyOptions): Promise<TemplateApplyResult> {
   const manifestUrl = options.manifestUrl ?? DEFAULT_TEMPLATE_MANIFEST_URL;
-  const manifest = await loadTemplateManifest(manifestUrl);
+  const manifest = options.manifest ?? await loadTemplateManifest(manifestUrl);
   const template = findTemplate(manifest, options.template, options.language);
   const mode = resolveApplyMode(targetDir, options.mode ?? 'auto');
   const downloadedFiles = await downloadTemplateFiles(template, manifestUrl);
@@ -142,13 +166,16 @@ export async function applyFunctionTemplate(targetDir: string, options: Template
   const filesWritten: string[] = [];
   const skippedFiles: string[] = [];
 
-  for (const file of templateFiles) {
-    if (shouldSkipFile(file.relativePath, mode, options.force === true)) {
-      skippedFiles.push(file.relativePath);
-      continue;
-    }
+  const candidates = templateFiles.filter(file => {
+    if (!shouldSkipFile(file.relativePath, mode, options.force === true)) return true;
+    skippedFiles.push(file.relativePath);
+    return false;
+  });
+  // Check every destination before the first write, so a rejected template writes nothing.
+  const destinations = new Map(candidates.map(file => [file, resolveInsideTarget(targetDir, file.relativePath)]));
 
-    const destination = join(targetDir, file.relativePath);
+  for (const file of candidates) {
+    const destination = destinations.get(file) as string;
     if (existsSync(destination) && options.force !== true) {
       skippedFiles.push(file.relativePath);
       continue;
@@ -171,14 +198,32 @@ export async function applyFunctionTemplate(targetDir: string, options: Template
   };
 }
 
-async function loadTemplateManifest(manifestUrl: string): Promise<TemplateManifest> {
+/**
+ * Returns the destination for a template file. Throws when the path, or a link
+ * on the way to it, would place the file outside the target folder.
+ */
+export function resolveInsideTarget(targetDir: string, relativePath: string): string {
+  const destination = join(targetDir, normalizeTemplatePath(relativePath));
+  if (!existsSync(targetDir)) return destination;
+  const root = realpathSync(targetDir);
+  let ancestor = dirname(destination);
+  while (!existsSync(ancestor)) ancestor = dirname(ancestor);
+  const inside = relative(root, realpathSync(ancestor));
+  const isLink = existsSync(destination) && lstatSync(destination).isSymbolicLink();
+  if (inside.startsWith('..') || isAbsolute(inside) || isLink) {
+    throw new TemplateError('unsafe-path', `Template file would be written outside the target folder: ${relativePath}`);
+  }
+  return destination;
+}
+
+export async function loadTemplateManifest(manifestUrl: string): Promise<TemplateManifest> {
   const parsed = new URL(manifestUrl);
   const raw = parsed.protocol === 'file:'
     ? readFileSync(fileURLToPath(parsed), 'utf-8')
     : await fetchText(manifestUrl);
   const parsedJson: unknown = JSON.parse(raw);
   if (!isTemplateManifest(parsedJson)) {
-    throw new Error(`Template manifest at ${manifestUrl} does not match the expected schema.`);
+    throw new TemplateError('invalid-manifest', `Template manifest at ${manifestUrl} does not match the expected schema.`);
   }
   return parsedJson;
 }
@@ -187,14 +232,14 @@ async function downloadTemplateFiles(template: FunctionTemplate, manifestUrl: st
   const repositoryUrl = new URL(template.repositoryUrl);
   if (repositoryUrl.protocol === 'file:') {
     if (new URL(manifestUrl).protocol !== 'file:') {
-      throw new Error('Local file template repositories are only supported with local file manifests.');
+      throw new TemplateError('unsupported-source', 'Local file template repositories are only supported with local file manifests.');
     }
     return readLocalTemplateFiles(fileURLToPath(repositoryUrl), template.folderPath);
   }
 
   const repo = parseGitHubRepo(repositoryUrl);
   if (!repo) {
-    throw new Error(`Unsupported template repository URL: ${template.repositoryUrl}`);
+    throw new TemplateError('unsupported-source', `Unsupported template repository URL: ${template.repositoryUrl}`);
   }
 
   return downloadGitHubTemplateFiles(repo, template.folderPath, normalizeGitHubRef(template.gitRef ?? 'main'));
@@ -232,20 +277,29 @@ async function downloadGitHubTemplateFiles(repo: GitHubRepo, folderPath: string,
   assertSafeFolderPath(folderPath);
   const rootPath = folderPath === '.' ? '' : folderPath.replace(/^\/+|\/+$/g, '');
   const entries = await listGitHubContents(repo, rootPath, ref);
-  const files: TemplateFile[] = [];
-
-  for (const entry of entries) {
+  return mapLimit(entries, DOWNLOAD_CONCURRENCY, async entry => {
     if (!entry.download_url) {
       throw new Error(`GitHub file entry is missing download URL: ${entry.path}`);
     }
-    const content = await fetchBuffer(entry.download_url);
-    files.push({
+    return {
       relativePath: rootPath ? entry.path.slice(rootPath.length + 1) : entry.path,
-      content,
-    });
-  }
+      content: await fetchBuffer(entry.download_url),
+    };
+  });
+}
 
-  return files;
+/** Runs `worker` over `items` with at most `limit` calls in flight and keeps the input order. */
+async function mapLimit<T, R>(items: readonly T[], limit: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array<R>(items.length);
+  let next = 0;
+  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await worker(items[index]);
+    }
+  });
+  await Promise.all(lanes);
+  return results;
 }
 
 async function listGitHubContents(repo: GitHubRepo, path: string, ref: string): Promise<readonly GitHubContentEntry[]> {
@@ -257,16 +311,11 @@ async function listGitHubContents(repo: GitHubRepo, path: string, ref: string): 
     throw new Error(`GitHub contents path is not a directory: ${path || '.'}`);
   }
 
-  const files: GitHubContentEntry[] = [];
-  for (const entry of entries) {
-    if (!isGitHubContentEntry(entry)) continue;
-    if (entry.type === 'file') {
-      files.push(entry);
-    } else {
-      files.push(...await listGitHubContents(repo, entry.path, ref));
-    }
-  }
-  return files;
+  const valid = entries.filter(isGitHubContentEntry);
+  const nested = await Promise.all(valid.map(entry => (entry.type === 'file'
+    ? Promise.resolve([entry])
+    : listGitHubContents(repo, entry.path, ref))));
+  return nested.flat();
 }
 
 function parseGitHubRepo(url: URL): GitHubRepo | null {
@@ -282,14 +331,14 @@ function normalizeGitHubRef(ref: string): string {
 
 function assertSafeFolderPath(folderPath: string): void {
   if (isAbsolute(folderPath) || folderPath.split(/[\\/]/).includes('..')) {
-    throw new Error(`Unsafe template folder path: ${folderPath}`);
+    throw new TemplateError('unsafe-path', `Unsafe template folder path: ${folderPath}`);
   }
 }
 
 function assertPathInside(root: string, candidate: string, label: string): void {
   const relativePath = relative(root, candidate);
   if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
-    throw new Error(`${label} must stay inside the template repository.`);
+    throw new TemplateError('unsafe-path', `${label} must stay inside the template repository.`);
   }
 }
 
@@ -299,7 +348,8 @@ function assertAddModeSafe(template: FunctionTemplate, files: readonly TemplateF
     return normalized.includes('/') && ADD_MODE_PROJECT_PATHS.has(normalized.split('/').at(-1) ?? '');
   });
   if (nestedProjectFile) {
-    throw new Error(
+    throw new TemplateError(
+      'needs-new-mode',
       `Template '${template.id}' appears to contain a nested full project (${nestedProjectFile.relativePath}). ` +
       'Apply it with --mode new, or choose an add-specific template.',
     );
@@ -309,20 +359,20 @@ function assertAddModeSafe(template: FunctionTemplate, files: readonly TemplateF
 function findTemplate(manifest: TemplateManifest, templateId: string, language?: string): FunctionTemplate {
   const templates = manifest.templates.filter(candidate => equalsIgnoreCase(candidate.id, templateId));
   if (templates.length === 0) {
-    throw new Error(`Template '${templateId}' was not found in the manifest.`);
+    throw new TemplateError('not-found', `Template '${templateId}' was not found in the manifest.`);
   }
 
   if (language) {
     const template = templates.find(candidate => equalsIgnoreCase(candidate.language, language));
     if (!template) {
-      throw new Error(`Template '${templateId}' was found, but not for language '${language}'.`);
+      throw new TemplateError('not-found', `Template '${templateId}' was found, but not for language '${language}'.`);
     }
     return template;
   }
 
   if (templates.length > 1) {
     const languages = templates.map(template => template.language).sort().join(', ');
-    throw new Error(`Template '${templateId}' matches multiple languages (${languages}); pass --language to disambiguate.`);
+    throw new TemplateError('not-found', `Template '${templateId}' matches multiple languages (${languages}); pass --language to disambiguate.`);
   }
 
   return templates[0];
@@ -344,7 +394,7 @@ function shouldSkipFile(relativePath: string, mode: Exclude<TemplateApplyMode, '
 function normalizeTemplatePath(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
   if (!normalized || normalized.split('/').includes('..') || /^[A-Za-z]:/.test(normalized)) {
-    throw new Error(`Unsafe template file path: ${path}`);
+    throw new TemplateError('unsafe-path', `Unsafe template file path: ${path}`);
   }
   return normalized;
 }
@@ -385,7 +435,7 @@ async function fetchText(url: string): Promise<string> {
 async function fetchBuffer(url: string): Promise<Buffer> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+    throw new TemplateError('fetch-failed', `Failed to fetch ${url}: ${response.status} ${response.statusText}`);
   }
   return Buffer.from(await response.arrayBuffer());
 }
@@ -398,12 +448,12 @@ async function fetchGitHubJson(url: string): Promise<unknown> {
 
   const token = resolveGitHubToken();
   if (!token || !isGitHubAuthRetryable(result.response)) {
-    throw new Error(buildFetchErrorMessage(url, result, { includeGitHubTokenHint: true }));
+    throw new TemplateError('fetch-failed', buildFetchErrorMessage(url, result, { includeGitHubTokenHint: true }));
   }
 
   const retryResult = await fetchTextResponse(url, githubHeaders(token));
   if (!retryResult.response.ok) {
-    throw new Error(buildFetchErrorMessage(url, retryResult));
+    throw new TemplateError('fetch-failed', buildFetchErrorMessage(url, retryResult));
   }
 
   return JSON.parse(retryResult.text) as unknown;
@@ -413,7 +463,7 @@ async function fetchTextResponse(url: string, headers?: Record<string, string>):
   const response = await fetch(url, headers ? { headers } : undefined);
   const text = await response.text();
   if (!response.ok && !headers) {
-    throw new Error(buildFetchErrorMessage(url, { text, response }));
+    throw new TemplateError('fetch-failed', buildFetchErrorMessage(url, { text, response }));
   }
   return { text, response };
 }
@@ -431,6 +481,7 @@ function resolveGitHubToken(env: NodeJS.ProcessEnv = process.env): string | unde
 }
 
 function resolveGitHubCliToken(): string | undefined {
+  if (githubCliToken !== null) return githubCliToken;
   if (!githubCliTokenWarningShown) {
     process.stderr.write(
       'GitHub API rate limit or private repository access requires authentication. Trying `gh auth token`...\n',
@@ -443,10 +494,11 @@ function resolveGitHubCliToken(): string | undefined {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
-    return token || undefined;
+    githubCliToken = token || undefined;
   } catch (_err) {
-    return undefined;
+    githubCliToken = undefined;
   }
+  return githubCliToken;
 }
 
 function isGitHubAuthRetryable(response: Response): boolean {
