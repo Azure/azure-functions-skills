@@ -1,4 +1,4 @@
-common	fb9b54ae310fc8965f910a690be1c2dd4947126dcd52642664f9e51c085bdb56	telemetry.mjs	.azure-functions-skills/runtime/telemetry.mjs
+common	9b93b29c80d8bc42cd5b039ab1245d9d2f3ead12d540a46c980214219f49a626	telemetry.mjs	.azure-functions-skills/runtime/telemetry.mjs
 common	0395e3c7d415de7cecda72e2b331ce4a24a697d22e5299fb26e7812ea2d22141	package.json	.azure-functions-skills/runtime/package.json
 common	fdc673dca10d629e97b29c61418fbb49316a7e2a94df02b3658ff02d19220cfb	THIRD-PARTY-NOTICES.txt	.azure-functions-skills/runtime/THIRD-PARTY-NOTICES.txt
 common	6fdaa4d79b5553abb4a20febd08fe700ab74f1d47c0bfe85839554fb6cf60bbb	vendor/applicationinsights/package.json	.azure-functions-skills/runtime/vendor/applicationinsights/package.json
