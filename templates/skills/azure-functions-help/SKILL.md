@@ -24,6 +24,8 @@ user to name the selected skill and ask to use or resume it. For an unnamed migr
 recommend the matching skill and give an explicit-use
 example; do not invoke it automatically. A question or quoted mention is not a run
 request. Normal replies within an already selected migration do not need the name again.
+For Go custom handlers, recommend the custom-handler-to-Go-worker scenario with:
+`Use azure-functions-update to assess my Go custom handler and save a migration plan only.`
 The update workflow handles Functions model/configuration changes. Language-version updates
 and hosting-plan changes are separate handoffs, not implied parts of the conversion.
 

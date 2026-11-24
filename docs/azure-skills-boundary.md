@@ -57,7 +57,7 @@ Use this table to decide where a change should go.
 1. Confirm that the workspace is an Azure Functions project.
 2. Collect Functions-specific deployment context such as runtime, hosting plan preference, trigger shape, endpoint verification guidance, Application Insights expectations, and Flex Consumption guidance.
 3. Use Azure Skills as the deployment engine:
-   - no plan: invoke `azure-prepare`, unless a documented shortcut applies
+   - no plan: invoke `azure-prepare`
    - plan not validated: invoke `azure-validate`
    - validated plan: invoke `azure-deploy`
 4. Avoid running deployment commands directly, including `azd up`, `azd deploy`, Terraform apply, `az deployment`, or `func azure functionapp publish`, unless Azure Skills cannot handle the scenario and the user explicitly approves a fallback.
@@ -87,7 +87,7 @@ azure-functions-help -> azure-functions-deploy -> azure-prepare -> azure-validat
 | --- | --- |
 | Set up local tools or verify prerequisites | `azure-functions-setup` |
 | Create a new Functions project or add a function to an existing project | `azure-functions-create` |
-| Explicitly ask to use or resume `azure-functions-update` by name | `azure-functions-update` (draft: umbrella model/config workflow; current scenarios: C# in-process to isolated, Python model v1 to v2, Python Blob SDK types, Python HTTP streaming, extension bundles v4, and Durable Functions extension; more scenarios are planned) |
+| Explicitly ask to use or resume `azure-functions-update` by name | `azure-functions-update` (draft: umbrella model/config workflow; current scenarios: C# in-process to isolated, Go custom handlers to the Go worker, Python model v1 to v2, Python Blob SDK types, Python HTTP streaming, extension bundles v4, and Durable Functions extension; more scenarios are planned) |
 | Request Functions code migration without selecting the update skill by name | Recommend `azure-functions-update`; do not start it automatically |
 | Change a hosting plan or SKU, including Consumption to Flex | Azure Skills; not an implicit code-migration request |
 | Build or modify Azure Functions Hosted Skills: cloud-hosted intelligent capabilities using Markdown, Functions triggers, code, tools, HTTP, or MCP | `azure-functions-hosted-skills` |

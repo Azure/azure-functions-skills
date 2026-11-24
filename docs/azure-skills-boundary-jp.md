@@ -57,7 +57,7 @@ Azure Functions Skills は **Azure Functions domain layer** です。各 skill �
 1. Workspace が Azure Functions project であることを確認する。
 2. Runtime、hosting plan preference、trigger shape、endpoint verification guidance、Application Insights expectations、Flex Consumption guidance など、Functions 固有の deployment context を集める。
 3. Azure Skills を deployment engine として使う。
-   - Plan がない場合: documented shortcut が適用される場合を除き、`azure-prepare` を invoke する
+   - Plan がない場合: `azure-prepare` を invoke する
    - Plan が未検証の場合: `azure-validate` を invoke する
    - Plan が検証済みの場合: `azure-deploy` を invoke する
 4. Azure Skills が対応できず、かつユーザーが明示的に fallback を承認した場合を除き、`azd up`、`azd deploy`、Terraform apply、`az deployment`、`func azure functionapp publish` などの deployment command を直接実行しない。
