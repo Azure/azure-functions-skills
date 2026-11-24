@@ -120,6 +120,64 @@ stimuli:
           pattern: "net8\\.0"
       - type: completed
 
+  - name: "Selection — a Python v1 app selects the python-model-v2 scenario"
+    prompt: |
+      Use azure-functions-update to migrate this Azure Functions project to the
+      latest programming model. For this run, save the migration plan only.
+      Stop before you change project or source files.
+    tags:
+      area: routing
+    agent_environment:
+      skills:
+        - ../../templates/skills/azure-functions-update
+      files:
+        - src: fixtures/AGENTS.md
+          dest: AGENTS.md
+        - src: fixtures/python-v1-app/host.json
+          dest: host.json
+        - src: fixtures/python-v1-app/requirements.txt
+          dest: requirements.txt
+        - src: fixtures/python-v1-app/HttpHello/__init__.py
+          dest: HttpHello/__init__.py
+        - src: fixtures/python-v1-app/HttpHello/function.json
+          dest: HttpHello/function.json
+        - src: fixtures/app/trial.gitignore
+          dest: .gitignore
+    constraints:
+      max_turns: 25
+    graders:
+      - type: skill-invocation
+        config:
+          required:
+            - azure-functions-update
+      - name: python-plan-saved
+        type: file-matches
+        config:
+          # Root only: the trial copies the skill into a subfolder.
+          path: "*.md"
+          pattern: "(?i)python-model-v2|programming model v2|decorator"
+      - name: python-function-json-kept
+        type: file-matches
+        config:
+          path: HttpHello/function.json
+          pattern: "httpTrigger"
+      - name: python-route-kept
+        type: file-matches
+        config:
+          path: HttpHello/function.json
+          pattern: "\"route\": \"hello\""
+      - name: python-auth-level-kept
+        type: file-matches
+        config:
+          path: HttpHello/function.json
+          pattern: "\"authLevel\": \"function\""
+      - name: python-handler-kept
+        type: file-matches
+        config:
+          path: HttpHello/__init__.py
+          pattern: "def main\\(req: func\\.HttpRequest\\)"
+      - type: completed
+
   # ─────────────────────────────────────────────────────────────────
   # Resume: continue from the saved plan, not from a new plan.
   # ─────────────────────────────────────────────────────────────────
