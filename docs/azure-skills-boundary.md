@@ -1,5 +1,7 @@
 # Azure Skills and Azure Functions Skills Boundary
 
+> **v2 prototype note (historical content below)**: On this branch, the standard Azure Functions skills (setup, create, deploy, diagnostics, doctor, best-practices, health-status, inventory, common, update) are deleted and replaced by `azure-functions-app`, which calls Azure REST APIs directly, including code deployment. The rest of this page describes the v1 boundary only. Do not follow its routing to the deleted skills; route standard Function App work to `azure-functions-app`. Hosted Skills and Connector boundaries are unchanged. `azure-functions-app` does not depend on or delegate to Azure Skills (`azure-prepare`, `azure-validate`, `azure-deploy`, or others); it owns create, deploy, inspection, and operations for standard Function Apps itself.
+
 Created: 2026-05-21
 
 This document helps contributors and PMs decide whether a feature, fix, or feedback item belongs in Azure Skills or Azure Functions Skills.

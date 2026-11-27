@@ -502,7 +502,7 @@ describe('createArmRequestBudget', () => {
 
 describe('parseDeploymentObservationInput', () => {
   const VALID: DeploymentObservationInput = {
-    skill: 'azure-functions-deploy',
+    skill: 'azure-functions-app',
     operation: 'deploy',
     agent: 'copilot-cli',
     skillsVersion: '1.2.3',
@@ -527,7 +527,7 @@ describe('parseDeploymentObservationInput', () => {
   });
 
   it('rejects unsupported skill and operation values', () => {
-    expect(() => parseDeploymentObservationInput({ ...VALID, skill: 'azure-functions-create' })).toThrow();
+    expect(() => parseDeploymentObservationInput({ ...VALID, skill: 'azure-functions-deploy' })).toThrow();
     expect(() => parseDeploymentObservationInput({ ...VALID, operation: 'delete' })).toThrow();
   });
 
@@ -604,7 +604,7 @@ const RECENT_DEPLOYMENT: ArmDeploymentSummary = {
 };
 
 const DEPLOY_INPUT: DeploymentObservationInput = {
-  skill: 'azure-functions-deploy',
+  skill: 'azure-functions-app',
   operation: 'deploy',
   agent: 'copilot-cli',
   skillsVersion: '1.0.0',
@@ -645,7 +645,7 @@ describe('collectDeploymentObservationWithDependencies', () => {
   it('skips before any query when environmentName is absent', async () => {
     const query = makeQuery([RECENT_DEPLOYMENT], {});
     const result = await collectDeploymentObservationWithDependencies({
-      skill: 'azure-functions-deploy',
+      skill: 'azure-functions-app',
       operation: 'deploy',
       agent: 'copilot-cli',
     }, baseDeps({ query }));
@@ -656,7 +656,7 @@ describe('collectDeploymentObservationWithDependencies', () => {
   it('skips before any query when environmentName is not a valid ARM name', async () => {
     const query = makeQuery([RECENT_DEPLOYMENT], {});
     const result = await collectDeploymentObservationWithDependencies({
-      skill: 'azure-functions-deploy',
+      skill: 'azure-functions-app',
       operation: 'deploy',
       agent: 'copilot-cli',
       environmentName: 'bad name & rm -rf',
@@ -746,7 +746,7 @@ describe('collectDeploymentObservationWithDependencies', () => {
     const call = (client.trackEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.name).toBe('azure_deployment_observed');
     expect(call.properties).toEqual({
-      skill: 'azure-functions-deploy',
+      skill: 'azure-functions-app',
       operation: 'deploy',
       result: 'success',
       resourceTypes: '["microsoft.storage/storageaccounts","microsoft.web/sites"]',
@@ -783,7 +783,7 @@ describe('collectDeploymentObservationWithDependencies', () => {
     });
 
     await collectDeploymentObservationWithDependencies({
-      skill: 'azure-functions-deploy',
+      skill: 'azure-functions-app',
       operation: 'deploy',
       agent: 'some-unlisted-agent',
       environmentName: 'root',
@@ -800,7 +800,7 @@ describe('collectDeploymentObservationWithDependencies', () => {
     });
 
     await collectDeploymentObservationWithDependencies({
-      skill: 'azure-functions-deploy',
+      skill: 'azure-functions-app',
       operation: 'deploy',
       agent: 'copilot-cli',
       skillsVersion: '/etc/passwd',
@@ -937,7 +937,7 @@ describe('collectDeploymentObservationWithDependencies startedAt lower bound', (
 
 describe('parseDeploymentObservedEvent', () => {
   const EVENT: DeploymentObservedEvent = {
-    skill: 'azure-functions-deploy',
+    skill: 'azure-functions-app',
     operation: 'deploy',
     result: 'success',
     resourceTypes: ['microsoft.web/sites'],

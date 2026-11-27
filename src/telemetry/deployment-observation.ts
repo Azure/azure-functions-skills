@@ -35,11 +35,11 @@ const OBSERVATION_INPUT_PROPERTIES = new Set([
   'environmentName',
   'startedAt',
 ]);
-const OBSERVATION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-hosted-skills']);
+const OBSERVATION_SKILLS = new Set(['azure-functions-app', 'azure-functions-hosted-skills']);
 const OBSERVATION_OPERATIONS = new Set(['deploy', 'provision']);
 
 export interface DeploymentObservationInput {
-  readonly skill: 'azure-functions-deploy' | 'azure-functions-hosted-skills';
+  readonly skill: 'azure-functions-app' | 'azure-functions-hosted-skills';
   readonly operation: 'deploy' | 'provision';
   readonly agent: string;
   readonly skillsVersion?: string;
@@ -235,7 +235,7 @@ function buildDeploymentObservedEvent(
     operation: input.operation,
     result: 'success',
     resourceTypes,
-    deploymentKind: input.skill === 'azure-functions-deploy' ? 'function-app' : 'hosted-agent',
+    deploymentKind: input.skill === 'azure-functions-app' ? 'function-app' : 'hosted-agent',
     agent: normalizeObservedAgent(input.agent),
     skillsVersion: normalizeSkillsVersion(input.skillsVersion),
   };

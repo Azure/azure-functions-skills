@@ -1,5 +1,7 @@
 # Azure Functions Skills vs Azure Skills
 
+> **v2 prototype note (historical content below)**: On this branch, the standard Azure Functions skills (setup, create, deploy, diagnostics, doctor, best-practices, health-status, inventory, common, update) are deleted and replaced by `azure-functions-app`, which calls Azure REST APIs directly, including code deployment. The rest of this page describes the v1 boundary only. Do not follow its routing to the deleted skills; route standard Function App work to `azure-functions-app`. Hosted Skills and Connector boundaries are unchanged. The Azure Skills delegation model for v2 is still under discussion.
+
 Two independent skill packages work together but have **distinct responsibilities**. This page clarifies the boundary so you know which one to install for which task.
 
 ## TL;DR
@@ -69,4 +71,4 @@ If you plan to deploy:
 ## Related
 
 - [Azure Skills repo](https://github.com/microsoft/azure-skills)
-- [`azure-functions-deploy` skill source](../templates/skills/azure-functions-deploy/SKILL.md)
+- [`azure-functions-app` skill source](../templates/skills/azure-functions-app/SKILL.md)

@@ -17,6 +17,5 @@ Each skill suite is in `evals/<skill-name>/`. The folder contains `eval.yaml` in
 Vally format, the fixtures, and a `README.md` that tells what the suite checks and how
 to run it with `vally eval`.
 
-| Skill | Suite |
-| --- | --- |
-| `azure-functions-update` | [eval.yaml](azure-functions-update/README.md) |
+No suites are checked in yet. The `azure-functions-app` portal-parity map in
+`templates/skills/azure-functions-app/references/portal-parity.md` is the planned scenario list.

@@ -247,13 +247,13 @@ sign-off gate (AC-012).
 | `skill_invocation` | `skill`/`Skill` invokes a bundled Azure Functions skill, or its `SKILL.md` is read from a recognized plugin path. | `timestamp`, `client-name`, `session-id`, `skill-name` |
 | `tool_invocation` | Azure Functions MCP tool names such as `functions_template_get`, `functions_project_get`, or host-prefixed equivalents are called. | `timestamp`, `client-name`, `session-id`, `tool-name` |
 | `reference_file_read` | A non-`SKILL.md` file is read under a bundled Azure Functions skill directory. | `timestamp`, `client-name`, `session-id`, `file-reference` |
-| `azure_deployment_observed` | The `azure-functions-deploy` or `azure-functions-hosted-skills` skill collects once after a supported `azd up` / standalone `azd provision` succeeds and a current ARM deployment confirms it. | `skill`, `operation`, `result`, `resourceTypes`, `deploymentKind`, `agent`, `skillsVersion` |
+| `azure_deployment_observed` | The `azure-functions-app` or `azure-functions-hosted-skills` skill collects once after a supported `azd up` / standalone `azd provision` succeeds and a current ARM deployment confirms it. | `skill`, `operation`, `result`, `resourceTypes`, `deploymentKind`, `agent`, `skillsVersion` |
 
 The `azure_deployment_observed` properties are all categorical strings:
 
 | Property | Value |
 | --- | --- |
-| `skill` | `azure-functions-deploy` or `azure-functions-hosted-skills` |
+| `skill` | `azure-functions-app` or `azure-functions-hosted-skills` |
 | `operation` | `deploy` (from `azd up`) or `provision` (standalone `azd provision`) |
 | `result` | Constant `success`, constructed only after ARM verification |
 | `resourceTypes` | JSON-encoded, sorted, de-duplicated array of Microsoft resource-provider types |
@@ -267,7 +267,7 @@ Example serialized event:
 {
   "name": "azure_deployment_observed",
   "properties": {
-    "skill": "azure-functions-deploy",
+    "skill": "azure-functions-app",
     "operation": "deploy",
     "result": "success",
     "resourceTypes": "[\"microsoft.storage/storageaccounts\",\"microsoft.web/sites\"]",
@@ -297,7 +297,7 @@ show this text next to the number, verbatim (AC-010):
 
 > **Observed successful Azure deployment operations.** Counts azd/Bicep
 > subscription-scope deployments observed after a successful
-> `azure-functions-deploy` or `azure-functions-hosted-skills` command, verified
+> `azure-functions-app` or `azure-functions-hosted-skills` command, verified
 > against Azure Resource Manager. It is a best-effort adoption signal, not a
 > deployment inventory, conversion rate, success rate, or proof that Azure
 > Functions Skills created the workload. Resource-group-scope deployments,
@@ -317,7 +317,7 @@ keeps it. Show the same text next to any number that a query produces.
 ```kusto
 // Observed successful Azure deployment operations. Counts azd/Bicep
 // subscription-scope deployments observed after a successful
-// `azure-functions-deploy` or `azure-functions-hosted-skills` command, verified
+// `azure-functions-app` or `azure-functions-hosted-skills` command, verified
 // against Azure Resource Manager. It is a best-effort adoption signal, not a
 // deployment inventory, conversion rate, success rate, or proof that Azure
 // Functions Skills created the workload. Resource-group-scope deployments,
@@ -335,7 +335,7 @@ customEvents
 ```kusto
 // Observed successful Azure deployment operations. Counts azd/Bicep
 // subscription-scope deployments observed after a successful
-// `azure-functions-deploy` or `azure-functions-hosted-skills` command, verified
+// `azure-functions-app` or `azure-functions-hosted-skills` command, verified
 // against Azure Resource Manager. It is a best-effort adoption signal, not a
 // deployment inventory, conversion rate, success rate, or proof that Azure
 // Functions Skills created the workload. Resource-group-scope deployments,

@@ -39,7 +39,7 @@ const CLIENT_NAMES = new Set([
   'unknown',
 ]);
 const OBSERVATION_AGENTS = new Set([...CLIENT_NAMES, 'codex']);
-const OBSERVATION_SKILLS = new Set(['azure-functions-deploy', 'azure-functions-hosted-skills']);
+const OBSERVATION_SKILLS = new Set(['azure-functions-app', 'azure-functions-hosted-skills']);
 const OBSERVATION_OPERATIONS = new Set(['deploy', 'provision']);
 const OBSERVATION_DEPLOYMENT_KINDS = new Set(['function-app', 'hosted-agent']);
 const SKILLS_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9a-z][0-9a-z.]{0,20})?$/;
@@ -53,23 +53,14 @@ const OBSERVED_EVENT_PROPERTIES = new Set([
   'skillsVersion',
 ]);
 export const BUNDLED_SKILL_NAMES = new Set([
-  'azure-functions-best-practices',
-  'azure-functions-common',
+  'azure-functions-app',
   'azure-functions-connector-create',
   'azure-functions-connector-mcp',
   'azure-functions-connector-validate',
-  'azure-functions-create',
-  'azure-functions-deploy',
-  'azure-functions-diagnostics',
-  'azure-functions-doctor',
   'azure-functions-feedback',
-  'azure-functions-health-status',
   'azure-functions-help',
   'azure-functions-hosted-skills',
   'azure-functions-hosted-skills-migrate',
-  'azure-functions-inventory',
-  'azure-functions-setup',
-  'azure-functions-update',
 ]);
 
 export type TelemetryEventType =
@@ -89,7 +80,7 @@ export interface TelemetryEvent {
 }
 
 export interface DeploymentObservedEvent {
-  readonly skill: 'azure-functions-deploy' | 'azure-functions-hosted-skills';
+  readonly skill: 'azure-functions-app' | 'azure-functions-hosted-skills';
   readonly operation: 'deploy' | 'provision';
   readonly result: 'success';
   readonly resourceTypes: readonly string[];
@@ -246,7 +237,7 @@ export function parseDeploymentObservedEvent(value: unknown): DeploymentObserved
   if (!OBSERVATION_DEPLOYMENT_KINDS.has(deploymentKind)) {
     throw new Error(`Unsupported deployment observation deployment kind: ${deploymentKind}`);
   }
-  const expectedDeploymentKind = skill === 'azure-functions-deploy' ? 'function-app' : 'hosted-agent';
+  const expectedDeploymentKind = skill === 'azure-functions-app' ? 'function-app' : 'hosted-agent';
   if (deploymentKind !== expectedDeploymentKind) {
     throw new Error('Deployment observation deploymentKind does not match skill.');
   }

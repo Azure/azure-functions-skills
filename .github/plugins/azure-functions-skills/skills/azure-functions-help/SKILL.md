@@ -16,14 +16,14 @@ Use this skill when the user asks what Azure Functions capabilities are availabl
 For conversion of an existing workflow from skills, selected chat context, configured agents,
 code, or instructions to a Hosted Skill, recommend
 `azure-functions-hosted-skills-migrate`. For a new capability with no existing workflow, use
-`azure-functions-hosted-skills`. This conversion is not a Functions programming-model update.
+`azure-functions-hosted-skills`.
 
-Exceptions: `azure-functions-update` and `azure-functions-hosted-skills-migrate` require the
-user to name the selected skill and ask to use or resume it. For an unnamed migration request,
-recommend the matching skill and give an explicit-use
-example; do not invoke it automatically. A question or quoted mention is not a run
-request. Normal replies within an already selected migration do not need the name again.
-The update workflow handles Functions model/configuration changes. Language-version updates
-and hosting-plan changes are separate handoffs, not implied parts of the conversion.
+For finding, inspecting, configuring, deploying, operating, or monitoring a standard Function App
+from the agent instead of the Azure portal, recommend `azure-functions-app`.
+
+Exception: `azure-functions-hosted-skills-migrate` requires the user to name the selected skill
+and ask to use or resume it. For an unnamed migration request, recommend the matching skill and
+give an explicit-use example; do not invoke it automatically. A question or quoted mention is not
+a run request. Normal replies within an already selected migration do not need the name again.
 
 Do not reproduce a static catalog when the runtime skill list is available. Do not route generic Azure work here unless the request involves Azure Functions, Function Apps, triggers, bindings, `host.json`, or Functions deployment/runtime behavior.

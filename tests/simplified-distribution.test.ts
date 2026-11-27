@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { buildPluginPayload, buildTarget } from '../src/build/build-target.js';
 import { loadHooks, loadMcpServers, loadSkills } from '../src/build/loader.js';
 import { buildTelemetryRuntime } from '../src/build/telemetry-runtime.js';
+import { buildAppTool } from '../src/build/app-tool-runtime.js';
 import type { BuildData, BuildTargetName } from '../src/types.js';
 import { createTempDir, removeDir } from './helpers/fs.js';
 
@@ -23,6 +24,7 @@ function buildData(): BuildData {
     skills: loadSkills(join(TEMPLATES_DIR, 'skills')),
     mcpServers: loadMcpServers(join(TEMPLATES_DIR, 'mcp', 'servers.yaml')),
     hooks: loadHooks(join(TEMPLATES_DIR, 'hooks'), buildTelemetryRuntime(join(TEMPLATES_DIR, 'skills'))),
+    appTool: buildAppTool(),
     packageVersion: '1.2.3',
   };
 }
@@ -133,13 +135,13 @@ function expectLocalTelemetry(root: string, hooksPath: string, skillsPath: strin
     expect(content).not.toMatch(/\b(?:npx|npm|curl|wget)\b/);
   }
   for (const path of [
-    join(skillsPath, 'azure-functions-deploy', 'SKILL.md'),
+    join(skillsPath, 'azure-functions-app', 'SKILL.md'),
     join(skillsPath, 'azure-functions-hosted-skills', 'SKILL.md'),
     join(skillsPath, 'azure-functions-hosted-skills', 'references', 'infra-and-deployment.md'),
   ]) {
     const content = readFileSync(join(root, path), 'utf-8');
     expect(content).not.toContain('Automatic plugin telemetry is temporarily disabled.');
-    if (path.endsWith('infra-and-deployment.md') || path.includes('azure-functions-deploy')) {
+    if (path.endsWith('infra-and-deployment.md') || path.includes('azure-functions-app')) {
       expect(content).toContain('telemetry.mjs');
       expect(content).toContain('deployment-observed');
       expect(content).not.toContain('npx -y @azure/functions-skills');

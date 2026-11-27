@@ -8,12 +8,11 @@
 
 Azure Functions Skills equips your coding agent with Functions-specific knowledge — trigger/binding patterns, language anti-patterns, runtime versions, deployment best practices — so the agent gives accurate guidance instead of generic advice.
 
-It is **focused on Azure Functions**. For deployment of *any* Azure resource (Functions or otherwise), it delegates to [Azure Skills](https://github.com/microsoft/azure-skills) via the `azure-functions-deploy` skill. The two packages complement each other — see [docs/skills-vs-azure-skills.md](docs/skills-vs-azure-skills.md) for the role split.
+It is **focused on Azure Functions**. The `azure-functions-app` skill lets the agent find, inspect, configure, deploy, operate, and monitor Function Apps by calling Azure REST APIs directly, so routine tasks do not require the Azure portal.
 
 ## Prerequisites
 
-**Node.js 20+** is necessary for the companion CLI. Everything else (Azure CLI, Core Tools, language runtimes) is checked and guided by the
-`azure-functions-setup` skill when environment verification is needed.
+**Node.js 20+** is necessary for the companion CLI. Skills that call Azure need the Azure CLI signed in (`az login`); they use `az rest` and `curl` only.
 
 ## Quick Start
 
@@ -74,11 +73,7 @@ Then start Codex, run `/plugins`, select **azure-functions-skills**, and choose 
 
 > The [`@azure/functions-skills`](https://www.npmjs.com/package/@azure/functions-skills) npm package provides the companion CLI and the telemetry sender. Installing it does not install or launch a coding-agent plugin.
 
-### 2. Verify your prerequisites
-
-Ask your coding agent to run the `azure-functions-setup` skill. It checks the required Azure Functions tools and language runtimes, then guides you through installing or configuring anything that is missing.
-
-### 3. Ask for Azure Functions help
+### 2. Ask for Azure Functions help
 
 Ask which Azure Functions workflow to use. `azure-functions-help` discovers the installed `azure-functions-*` skills and routes to the best match.
 
@@ -150,20 +145,12 @@ For contributor guidance on the product boundary between Azure Skills and Azure 
 | Skill | Purpose |
 | --- | --- |
 | [`azure-functions-help`](templates/skills/azure-functions-help/SKILL.md) | Discover and route to the best Azure Functions skill |
-| [`azure-functions-setup`](templates/skills/azure-functions-setup/SKILL.md) | Verify local prerequisites (Azure CLI, Core Tools, runtimes, Azure Skills) |
-| [`azure-functions-create`](templates/skills/azure-functions-create/SKILL.md) | Create new Functions projects or add functions via Azure MCP templates |
+| [`azure-functions-app`](templates/skills/azure-functions-app/SKILL.md) | Find, inspect, configure, deploy, operate, and monitor Function Apps through Azure REST APIs (portal parity) |
 | [`azure-functions-hosted-skills`](templates/skills/azure-functions-hosted-skills/SKILL.md) | Build cloud-hosted, event-driven intelligent capabilities with Markdown, Functions triggers, code, tools, HTTP, and MCP |
 | [`azure-functions-hosted-skills-migrate`](templates/skills/azure-functions-hosted-skills-migrate/SKILL.md) | Explicit use by name only: migrate existing skills, chat workflows, agents, code, or instructions; compare Connector/MCP/Python tools, deploy, and test |
 | [`azure-functions-connector-create`](templates/skills/azure-functions-connector-create/SKILL.md) | Create and authorize least-privilege Connector Namespace connections for Hosted Skills |
 | [`azure-functions-connector-mcp`](templates/skills/azure-functions-connector-mcp/SKILL.md) | Generate and register connector MCP tools from authoritative operation metadata |
 | [`azure-functions-connector-validate`](templates/skills/azure-functions-connector-validate/SKILL.md) | Validate connector identity, MCP contracts, side effects, and Hosted Skill integration |
-| [`azure-functions-deploy`](templates/skills/azure-functions-deploy/SKILL.md) | Prepare, validate, and deploy via Azure Skills with Functions-specific guidance |
-| [`azure-functions-best-practices`](templates/skills/azure-functions-best-practices/SKILL.md) | Production-readiness review (config, security, reliability) |
-| [`azure-functions-diagnostics`](templates/skills/azure-functions-diagnostics/SKILL.md) | Investigate deployment, runtime, trigger, binding, logging issues |
-| [`azure-functions-health-status`](templates/skills/azure-functions-health-status/SKILL.md) | Collect current health, metrics, logs, Resource Health, Activity Log |
-| [`azure-functions-inventory`](templates/skills/azure-functions-inventory/SKILL.md) | Collect app specification and configuration inventory |
-| [`azure-functions-doctor`](templates/skills/azure-functions-doctor/SKILL.md) | Pre-deployment check of local code, configuration, and supply-chain risks |
-| [`azure-functions-common`](templates/skills/azure-functions-common/SKILL.md) | Shared language, trigger, binding, extension, routing references |
 | [`azure-functions-feedback`](templates/skills/azure-functions-feedback/SKILL.md) | Turn session findings into previewed issues or pull requests |
 
 The `azure-functions-help` skill provides the discovery and routing entry point.

@@ -46,7 +46,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "validate:skills": "npm run compile && node lib/build/validate-skills.js",
     "verify:plugin-payload": "npm run compile && node lib/build/verify-plugin-payload.js",
-    "release:local": "node scripts/release-local.mjs"
+    "release:local": "node scripts/release-local.mjs",
+    "generate:api-index": "npm run compile && node lib/build/generate-api-index.js",
+    "generate:docs-index": "npm run compile && node lib/build/generate-docs-index.js"
   },
   "engines": {
     "node": ">=18"

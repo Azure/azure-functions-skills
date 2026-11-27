@@ -108,8 +108,8 @@ Because skills are loaded by an LLM agent that may run with elevated permissions
 Conventional commits are preferred but not strictly enforced. Use the imperative mood:
 
 ```text
-feat: add Durable Functions retry guidance to azure-functions-create
-fix: correct extension bundle range in azure-functions-common
+feat: add slot swap guidance to azure-functions-app
+fix: correct Flex Consumption deploy endpoint in azure-functions-app
 docs: rewrite README with focused topics + linked references
 ```
 

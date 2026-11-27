@@ -27,7 +27,7 @@ Do not use it for ordinary app bugs unless the finding is about the skill suite 
 
 Review the available conversation/session history, files changed, test output, and command results. Identify only actionable feedback related to this repository:
 
-- affected skill or file (`azure-functions-create`, `azure-functions-deploy`, README, routing, references, tests, etc.)
+- affected skill or file (`azure-functions-app`, `azure-functions-hosted-skills`, README, routing, references, tests, etc.)
 - observed behavior
 - expected behavior
 - evidence from the session

@@ -304,7 +304,7 @@ describe('distributed telemetry runtime', () => {
     const layout = layouts[0];
     const callsPath = join(layout.root, 'az-calls.jsonl');
     const input = JSON.stringify({
-      skill: 'azure-functions-deploy', operation: 'deploy', agent: 'codex', environmentName: 'private-env',
+      skill: 'azure-functions-app', operation: 'deploy', agent: 'codex', environmentName: 'private-env',
     });
     const args = [
       join(layout.hooks, 'runtime', 'telemetry.mjs'), 'deployment-observed',
@@ -344,7 +344,7 @@ describe('distributed telemetry runtime', () => {
     for (const layout of layouts) {
       const callsPath = join(layout.root, 'az-calls.jsonl');
       const before = existsSync(callsPath) ? readFileSync(callsPath, 'utf-8') : '';
-      for (const skill of ['azure-functions-deploy', 'azure-functions-hosted-skills']) {
+      for (const skill of ['azure-functions-app', 'azure-functions-hosted-skills']) {
         const first = requests.length;
         const runtime = join(layout.hooks, 'runtime', 'telemetry.mjs');
         const args = shell === 'bash'
@@ -385,7 +385,7 @@ describe('distributed telemetry runtime', () => {
     const callsPath = join(layout.root, 'az-calls.jsonl');
     const before = existsSync(callsPath) ? readFileSync(callsPath, 'utf-8') : '';
     const first = requests.length;
-    const input = JSON.stringify({ skill: 'azure-functions-deploy', operation: 'deploy', agent: 'codex', environmentName: 'private-env' });
+    const input = JSON.stringify({ skill: 'azure-functions-app', operation: 'deploy', agent: 'codex', environmentName: 'private-env' });
     expect((await run(process.execPath, args, layout.root, input)).stdout).toBe('disabled\n');
     rmSync(config);
     expect((await run(process.execPath, args, layout.root, input, { AF_TEST_ARM_FAIL: '1' })).stdout).toBe('skipped\n');

@@ -1,0 +1,59 @@
+name: Update Learn docs index
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-docs-index
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use public npm registry
+        run: rm -f .npmrc
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Regenerate the Learn index from MicrosoftDocs/azure-docs
+        run: npm run generate:docs-index
+
+      - name: Regenerate the plugin payload
+        run: |
+          npm run build:plugin-payload
+          npm run verify:plugin-payload
+
+      - name: Open a pull request when the index changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: automation/update-docs-index
+        run: |
+          if git diff --quiet; then
+            echo "Learn index is up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git add -A templates .github/plugins
+          git commit -m "chore: update the bundled Learn docs index"
+          git push --force origin "$BRANCH"
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --base "${{ github.event.repository.default_branch }}" --head "$BRANCH" \
+              --title "chore: update the bundled Learn docs index" \
+              --body "Automated daily refresh of templates/skills/azure-functions-app/assets/learn-index.json.gz from MicrosoftDocs/azure-docs (CC BY 4.0)."
+          fi

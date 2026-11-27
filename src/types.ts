@@ -1,3 +1,4 @@
+import type { AppTool } from './build/loader.js';
 import type { TelemetryRuntime } from './build/telemetry-runtime.js';
 
 export type BuildTargetName = 'ghcp' | 'claude' | 'codex';
@@ -37,5 +38,6 @@ export interface BuildData {
   skills: Skill[];
   mcpServers: McpServer[];
   hooks: HookDefinitions;
+  appTool?: AppTool;
   packageVersion?: string;
 }

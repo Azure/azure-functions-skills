@@ -1,5 +1,7 @@
 # Azure Skills と Azure Functions Skills の役割分担
 
+> **v2 プロトタイプの注記**: このブランチでは標準 Azure Functions 向けスキル（setup、create、deploy、diagnostics、doctor、best-practices、health-status、inventory、common、update）を削除し、Azure REST API を直接呼び出す `azure-functions-app` に置き換えています（コードのデプロイも含む）。以下は v1 の境界の記録です。削除済みスキルへのルーティングには従わず、標準の Function App 作業は `azure-functions-app` にルーティングしてください。Hosted Skills と Connector スキルの境界は変わりません。`azure-functions-app` は Azure Skills（`azure-prepare`、`azure-validate`、`azure-deploy` など）に依存・委譲せず、標準 Function App の作成、デプロイ、確認、運用を自身で担当します。
+
 作成日: 2026-05-21
 
 この文書は、Azure Skills と Azure Functions Skills のどちらに機能追加、修正、フィードバックを入れるべきかを明確にするための contributor / PM 向けガイドです。

@@ -36,15 +36,14 @@ This repository does **not** publish to npm. A downstream Microsoft mirror pipel
 | Skill content lint | `scripts/lint-skill-content.mjs` rejects `curl \| sh`, `eval $(...)`, base64-decode-execute, raw IPs in skill markdown |
 | NPM_TOKEN audit | `scripts/audit-npm-token.mjs` rejects publish-credential references in workflows or scripts |
 | Dependabot | Security advisories opened automatically |
-| Doctor skill as a defender for users | The `azure-functions-doctor` skill checks user-project supply-chain risk (lifecycle scripts, unpinned deps, missing lockfile, tracked `.env`, install-script deps) and semantic patterns (import-time side effects, fetch-then-eval, credential exfiltration, anti-analysis) |
 
 ## What users should also do
 
-Pre-deployment checks with the `azure-functions-doctor` skill are one of several layers. Users running Azure Functions deployments should also:
+The controls above are one of several layers. Users running Azure Functions deployments should also:
 
 1. **Use [Harden-Runner](https://github.com/step-security/harden-runner)** or equivalent egress filtering on CI runners.
 2. **Run coding agents with elevated permissions only on trusted code**, never on unreviewed contributor PRs.
-3. **Pin direct production dependencies** in their own projects (the doctor skill flags unpinned ones).
+3. **Pin direct production dependencies** in their own projects.
 4. **Use OIDC for cloud credentials** instead of long-lived secrets.
 5. **Monitor for unexpected npm publishes** of any package they depend on — supply-chain attacks often skip the maintainer's CI pipeline.
 
